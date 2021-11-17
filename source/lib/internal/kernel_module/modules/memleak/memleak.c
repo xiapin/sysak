@@ -4,7 +4,7 @@
 #include<linux/version.h>
 #include <linux/mmzone.h>
 #include <linux/page-flags.h>
-
+#include <linux/stacktrace.h>
 #include"mem.h"
 #include"common/hook.h"
 
