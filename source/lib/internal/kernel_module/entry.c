@@ -14,10 +14,29 @@
 #include "common/proc.h"
 #include "sysak_mods.h"
 
+void sysak_module_get(int *mod_ref)
+{
+	if (*mod_ref)
+		return;
+	try_module_get(THIS_MODULE);
+	*mod_ref = 1;
+}
+
+void sysak_module_put(int *mod_ref)
+{
+	if (*mod_ref) {
+		*mod_ref = 0;
+		module_put(THIS_MODULE);
+	}
+}
+
 static int sysak_mod_init(void)
 {
-	int i;
+	int i, ret;
 
+	ret = sysak_bbox_init();
+	if (ret)
+		return ret;
 	sysak_proc_init();
 	sysak_dev_init();
 
@@ -35,6 +54,7 @@ static void sysak_mod_exit(void)
 	int i;
 
 	sysak_dev_uninit();
+	sysak_bbox_exit();
 	sysak_proc_exit();
 
 	for (i = 0; i < sysk_module_num; i++)
