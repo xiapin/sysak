@@ -15,8 +15,8 @@ import json
 import argparse
 import getopt
 
-OOM_REASON_CGROUP = 'Cgroup内存使用量达到上限',
-OOM_REASON_PCGROUP = '父Cgroup内存使用量达到上限',
+OOM_REASON_CGROUP = '内存使用达到cgroup limit',
+OOM_REASON_PCGROUP = '父Cgroup内存使用达到limit',
 OOM_REASON_HOST = '主机内存不足',
 OOM_REASON_MEMLEAK = '主机内存不足,存在内存泄漏',
 OOM_REASON_NODEMASK = 'mempolicy配置不合理',
@@ -315,7 +315,7 @@ def oom_cgroup_output_ext(oom_result, num):
         return summary
     anon = int(oom["cg_inanon"]) + int(oom["cg_anon"]) - int(oom["cg_rss"])
     if anon > int(oom['cg_usage'][:-2])*0.3:
-        summary = ",并且shmem内存使用量达到:%dKB 请及时删除tmpfs文件或ipcs共享内存"%(anon)
+        summary = ",且shmem内存使用量%dKB,需要清理tmpfs文件或ipcs"%(anon)
     return summary
 
 
