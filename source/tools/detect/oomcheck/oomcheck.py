@@ -162,6 +162,29 @@ def oom_get_cgroup_mem(oom_result, line, num):
     oom_result['sub_msg'][num]['cg_usage'] = memory_usage
     oom_result['sub_msg'][num]['cg_limit'] = memory_limit
 
+def oom_get_cgroup_shmem(oom_result, line, num):
+    inanon = "0"
+    anon = "0"
+    rss = '0'
+    oom_result['sub_msg'][num]['cg_inanon'] = inanon;
+    oom_result['sub_msg'][num]['cg_anon'] = anon;
+    oom_result['sub_msg'][num]['cg_rss'] = rss;
+
+    if line.find("inactive_anon:") == -1:
+        return
+    inanon = line.strip().split("inactive_anon:")[1]
+    inanon = inanon.split()[0][:-2]
+
+    anon = line.strip().split("active_anon:")[1]
+    anon = anon.split()[0][:-2]
+
+    rss = line.strip().split("rss:")[1]
+    rss = rss.split()[0][:-2]
+
+    oom_result['sub_msg'][num]['cg_inanon'] = inanon;
+    oom_result['sub_msg'][num]['cg_anon'] = anon;
+    oom_result['sub_msg'][num]['cg_rss'] = rss;
+
 def oom_get_cgroup_name(oom_result, line, num):
     is_host = False
     if "limit of host" in line:
@@ -284,6 +307,18 @@ def oom_cgroup_output(oom_result, num):
     summary += "cgroup内存限制:%s\n"%(oom['cg_limit'])
     return summary
 
+def oom_cgroup_output_ext(oom_result, num):
+    summary = ''
+    oom = oom_result['sub_msg'][num]
+    reason = oom['reason']
+    if not oom_is_cgroup_oom(reason):
+        return summary
+    anon = int(oom["cg_inanon"]) + int(oom["cg_anon"]) - int(oom["cg_rss"])
+    if anon > int(oom['cg_usage'][:-2])*0.3:
+        summary = ",并且shmem内存使用量达到:%dKB 请及时删除tmpfs文件或ipcs共享内存"%(anon)
+    return summary
+
+
 def oom_check_score(oom, oom_result):
     res = oom_result['max']
     res_total = oom_result['max_total']
@@ -311,6 +346,7 @@ def oom_output_msg(oom_result,num):
     summary += oom_cgroup_output(oom_result, num)
     summary += oom_host_output(oom_result, num)
     summary += "诊断结论:%s"%(oom['reason'])
+    summary += oom_cgroup_output_ext(oom_result, num)
     summary += oom_check_score(oom, oom_result)
     return summary
 
@@ -378,6 +414,8 @@ def oom_reason_analyze(num, oom_result):
                 oom_get_cgroup_name(oom_result, line, num)
             elif "memory: usage" in line:
                 oom_get_cgroup_mem(oom_result, line, num)
+            elif "Memory cgroup stats for" in line:
+                oom_get_cgroup_shmem(oom_result, line, num)
             elif "Normal free:" in line:
                 oom_get_host_mem(oom_result, line, num)
             elif "slab_unreclaimable:" in line:
