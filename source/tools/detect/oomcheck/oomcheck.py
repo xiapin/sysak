@@ -214,7 +214,7 @@ def oom_set_node_oom(oom_result, num, node_num):
             oom_result['sub_msg'][num]['reason'] = OOM_REASON_NODE
 
 def oom_get_slab_unrecl(oom_result, line, num):
-    if "slab_unreclaimable" not in line:
+    if "min:" in line or "low:" in line:
         oom_result['sub_msg'][num]['slab'] = 0
         return True
     slab_str = line.strip().split("slab_unreclaimable:")[1].split()[0]
