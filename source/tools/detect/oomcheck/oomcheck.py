@@ -135,7 +135,11 @@ def oom_is_host_oom(reason):
     return reason == OOM_REASON_HOST
 
 def oom_get_pid(oom_result, line, num):
-    pid = line.strip().split("Killed process")[1].strip().split()[0]
+    if OOM_END_KEYWORD in line:
+        split_line = OOM_END_KEYWORD
+    else:
+        split_line = OOM_END_KEYWORD_4_19
+    pid = line.strip().split(split_line)[1].strip().split()[0]
     oom_result['sub_msg'][num]['pid'] = pid
 
 def oom_get_task_mem(oom_result, line, num):
@@ -323,9 +327,10 @@ def oom_get_max_task(num, oom_result):
             continue
         if not dump_task:
             continue
-        if "Kill process" in line:
+        if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
             break
-
+        if line.count('[') !=2 or line.count(']') !=2:
+            break
         pid_idx = line.rfind('[')
         last_idx = line.rfind(']')
         if pid_idx == -1 or last_idx == -1:
@@ -379,7 +384,7 @@ def oom_reason_analyze(num, oom_result):
                 oom_get_slab_unrecl(oom_result, line, num)
             elif "pages RAM" in line:
                 oom_get_total_mem(oom_result, line, num)
-            elif "Killed process" in line:
+            elif OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
                 oom_get_task_mem(oom_result, line, num)
                 oom_get_pid(oom_result, line, num)
         oom_result['node_num'] = node_num
@@ -397,6 +402,9 @@ def oom_dmesg_analyze(dmesgs, oom_result):
             return
         dmesg = dmesgs.splitlines()
         oom_getting = 0
+        task_name = "-unknow-"
+        if task_name not in oom_result['task']:
+            oom_result['task'][task_name] = 0
         for line in dmesg:
             line = line.strip()
             if len(line) > 0 and OOM_BEGIN_KEYWORD in line:
@@ -406,6 +414,9 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = []
                 oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = 0 
                 oom_result['sub_msg'][oom_result['oom_total_num']]['cg_name'] = 'unknow'
+                oom_result['sub_msg'][oom_result['oom_total_num']]['task_name'] = task_name
+                oom_result['sub_msg'][oom_result['oom_total_num']]['pid'] = "0"
+                oom_result['sub_msg'][oom_result['oom_total_num']]['killed_task_mem'] = 0
                 if line.find('[') != -1:
                     oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = oom_time_to_normal_time(line.split('[')[1].split(']')[0])
                 oom_result['time'].append(oom_result['sub_msg'][oom_result['oom_total_num']]['time'])
@@ -450,6 +461,7 @@ def oom_read_dmesg(data, mode, filename):
 def oom_diagnose(sn, data, mode):
     try:
         oom_result = {}
+        oom_result['task'] = ""
         oom_result['summary'] = ""
         oom_result['oom_total_num'] = 0
         oom_result['cgroup'] = {}
