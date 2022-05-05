@@ -67,6 +67,23 @@ struct {
 #define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
 #define BITS_PER_LONG	64
 
+#define get_current_rqlen(p) ({			\
+	int len = 0;				\
+	struct cfs_rq *cfs;			\
+	struct sched_entity *se, *parent;	\
+	se = &p->se;				\
+	for (int i = 0; i < 10; i++) {		\
+		parent = _(se->parent);		\
+		if (parent)			\
+			se = parent;		\
+		else				\
+			break;			\
+	}					\
+	cfs = BPF_CORE_READ(se, cfs_rq);	\
+	len = _(cfs->nr_running);		\
+	len;					\
+})
+
 #define strequal(a, pcom) ({				\
 	bool ret = true;				\
 	int i;						\
@@ -185,7 +202,7 @@ int raw_tracepoint__sched_wakeup(struct bpf_raw_tracepoint_args *ctx)
 	if (!program_ready())
 		return 0;
 
-	runqlen = BPF_CORE_READ(p, se.cfs_rq, nr_running);
+	runqlen = get_current_rqlen(p);
 	return trace_enqueue(p, runqlen);
 }
 
@@ -198,7 +215,7 @@ int raw_tracepoint__sched_wakeup_new(struct bpf_raw_tracepoint_args *ctx)
 	if (!program_ready())
 		return 0;
 
-	runqlen = BPF_CORE_READ(p, se.cfs_rq, nr_running);
+	runqlen = get_current_rqlen(p);
 	return trace_enqueue(p, runqlen);
 }
 
@@ -242,7 +259,7 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 	if (prev_state == TASK_RUNNING) {
 		unsigned int runqlen = 0;
 
-		runqlen = BPF_CORE_READ(prev, se.cfs_rq, nr_running);
+		runqlen = get_current_rqlen(prev);
 		return trace_enqueue(prev, runqlen);
 	}
 	/* fetch timestamp and calculate delta */
