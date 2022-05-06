@@ -1,3 +1,3 @@
 target := netinfo
-DEPEND := "prev{default python};"
+DEPEND := "python-dep{python3}"
 include $(SRC)/mk/py.mk

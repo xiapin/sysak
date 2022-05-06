@@ -1,5 +1,4 @@
 mods := mon_connect
 target := mon_connect
-DEPEND := "prev{default python};"
-
+DEPEND := "python-dep{python3}"
 include $(SRC)/mk/py.mk

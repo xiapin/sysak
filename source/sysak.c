@@ -9,8 +9,9 @@
 
 #define KVERSION 64
 #define MAX_SUBCMD_ARGS 512
+#define MAX_DEPEND_LEN 128
 #define MAX_NAME_LEM 64
-#define MAX_WORK_PATH_LEN 256
+#define MAX_WORK_PATH_LEN 512
 #define ERR_NOSUBTOOL 2
 #define ERR_MISSARG 3
 
@@ -24,9 +25,11 @@ char *system_modules = "/proc/modules";
 char *bin_path = "/usr/local/sbin";
 
 char kern_version[KVERSION];
-char modin[MAX_SUBCMD_ARGS];
-char modun[MAX_SUBCMD_ARGS];
+char modin[MAX_DEPEND_LEN];
+char modun[MAX_DEPEND_LEN];
+char run_depend[MAX_DEPEND_LEN]= {0};
 char tools_path[MAX_WORK_PATH_LEN];
+char tools_exec[MAX_WORK_PATH_LEN] = {0};
 char sysak_rule[MAX_WORK_PATH_LEN];
 char module_path[MAX_WORK_PATH_LEN];
 char sysak_work_path[MAX_WORK_PATH_LEN];
@@ -49,7 +52,7 @@ static void kern_release(void)
     struct utsname name;
 
     if (uname (&name) == -1){
-        printf("cannot get system name\n");
+        printf("cannot get system version\n");
         return;
     }
     strncpy(kern_version, name.release, sizeof(name.release));
@@ -90,6 +93,16 @@ static void mod_ctrl(bool enable)
         system(exec_mod);
     }
 }
+static void add_python_depend(char *depend,char *cmd)
+{
+    if (!strcmp(depend, "all")){
+        snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
+    }else if (!strcmp(depend, "python3")){
+        snprintf(tools_exec, sizeof(tools_exec), "python3 %s", cmd);
+    }else if(!strcmp(depend, "python2")){
+        snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
+    }
+}
 
 static int exectue(int argc, char *argv[])
 {
@@ -111,7 +124,13 @@ static int exectue(int argc, char *argv[])
         snprintf(subcmd_args, sizeof(subcmd_args), " \"%s\"", argv[i]);
         strcat(subcmd_name,subcmd_args);
     }
-    snprintf(subcmd_exec_final, sizeof(subcmd_exec_final), "%s;%s", sysak_work_path, subcmd_name);
+
+    if (run_depend[0])
+        add_python_depend(run_depend, subcmd_name);
+    else
+        strncpy(tools_exec,subcmd_name,strlen(subcmd_name));
+
+    snprintf(subcmd_exec_final, sizeof(subcmd_exec_final), "%s;%s", sysak_work_path, tools_exec);
     ret = system(subcmd_exec_final);
     
     if (post_module)
@@ -170,9 +189,9 @@ static bool tool_lookup(char *path, char *tool)
         if (strcmp(tools_name, tool)){
             continue;
         }
-
-        sscanf(buf,"%*[^:]:prev{%[^}]};post{%[^}]}", modin, modun);
-        fclose(fp);
+        sscanf(buf,"%*[^:]:prev{%[^}]};post{%[^}]};python-dep{%[^}]}", modin, modun, run_depend);
+        if (!run_depend[0])
+            sscanf(buf,"%*[^:]:python-dep{%[^}]}", run_depend);
         return true;
     }
     fclose(fp);
