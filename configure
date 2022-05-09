@@ -119,7 +119,7 @@ for opt; do
 			disable_list="$disable|$disable_list"
 			;;
 		--show-target)
-			grep -nrw "target :=" $(pwd)/source/tools/ | awk '{print $3}' | grep -v test
+			find $(pwd)/source/tools/ -name Makefile -exec grep -H 'target :=' {} \; | awk '{print $3}' | grep -v test
 			exit
 			;;
 		*)
