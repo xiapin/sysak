@@ -24,8 +24,13 @@ char *cg_usage = "    --cg                Linux container stats";
 #define MAX_CGROUPS 64
 /*Todo,user configure ?*/
 #define CGROUP_INFO_AGING_TIME  7200
+#define NCONF_HW	2
 
 int nr_cpus;
+int hwconfigs[] = {
+	PERF_COUNT_HW_CACHE_MISSES,
+	PERF_COUNT_HW_CACHE_REFERENCES};
+
 struct cg_load_info {
 	int load_avg_1;
 	int load_avg_5;
@@ -90,9 +95,9 @@ struct cg_blkio_info {
 };
 
 struct cg_hwres_info {
-	int *cachmis_fds;
-	long long *cachmis_cnt;
-	long long cachmis_sum;
+	int **hw_fds;
+	long long **hw_counters;
+	long long hw_sum[NCONF_HW];
 };
 
 struct cgroup_info {
@@ -178,9 +183,11 @@ static struct mod_info cg_info[] = {
 	{"wioqsz", HIDE_BIT,  MERGE_AVG,  STATS_NULL},
 	{"rarqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	{"warqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
-	/* cache miss info 65-66 */
+	/* hw_events info 65-68 */
 	{"_cahms", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
-	{"cahms", DETAIL_BIT,  0,  STATS_NULL},
+	{"cahmis", DETAIL_BIT,  0,  STATS_NULL},
+	{"_cahrf", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
+	{"cahref", DETAIL_BIT,  0,  STATS_NULL},
 };
 
 #define NR_CGROUP_INFO sizeof(cg_info)/sizeof(struct mod_info)
@@ -216,55 +223,78 @@ static int need_reinit(void)
 
 static int perf_event_init(struct cgroup_info *cgroup)
 {
-	int cgrp_fd, ret = 0;
-	int cpu, *fds;
-	long long *counts;
+	int cgrp_id, ret = 0;
+	int cpu, **fds;
+	long long **counts;
 	char path[LEN_256];
 
 	if (!get_cgroup_path(cgroup->name, "perf_event", path))
 		return -1;
 
-	cgrp_fd = open(path, O_RDONLY);
-	if (cgrp_fd < 0) {
+	cgrp_id = open(path, O_RDONLY);
+	if (cgrp_id < 0) {
 		ret = errno;
 		fprintf(stderr, "%s :open %s\n", strerror(errno), path);
 		return ret;
 	}
 
 	nr_cpus = sysconf(_SC_NPROCESSORS_CONF);
-	fds = malloc(nr_cpus * sizeof(int));
+	fds = malloc(nr_cpus * sizeof(int*));
 	if (!fds) {
 		fprintf(stderr, "%s :malloc fds fail\n", strerror(errno));
 		return -ENOMEM;
 	}
-	counts = malloc(nr_cpus * sizeof(long long));
+	counts = malloc(nr_cpus * sizeof(long long*));
 	if (!counts) {
 		fprintf(stderr, "%s :malloc counsts fail\n", strerror(errno));
 		free(fds);
 		return -ENOMEM;
 	}
 	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		long long *cnts;
+		int i, *grp_fds, gleader_fd = -1;
+
+		grp_fds =  malloc(NCONF_HW * sizeof(int));
+		if (!grp_fds) {
+			fprintf(stderr, "%s :malloc grp_fds for cpu%d\n", strerror(errno),cpu);
+			fds[cpu] = NULL;
+			continue;
+		}
+		fds[cpu] = grp_fds;
+		cnts =  malloc(NCONF_HW * sizeof(long long));
+		if (!cnts) {
+			fprintf(stderr, "%s :malloc cnts for cpu%d\n", strerror(errno),cpu);
+			counts[cpu] = NULL;
+			free(fds[cpu]);
+			continue;
+		}
+		counts[cpu] = cnts;
 		struct perf_event_attr attr = {
 			.type = PERF_TYPE_HARDWARE,
 			.freq = 0,
 			.disabled = 1,
 			.sample_period = 5*1000*1000-1,
-			.config = PERF_COUNT_HW_CACHE_MISSES,
 		};
-		fds[cpu] = syscall(__NR_perf_event_open, &attr, cgrp_fd, cpu, -1, PERF_FLAG_PID_CGROUP);
-		if (fds[cpu] < 0) {
-			if (errno == ENODEV)
+		for (i = 0; i < NCONF_HW; i++) {
+			attr.config = hwconfigs[i];
+			fds[cpu][i] = syscall(__NR_perf_event_open, &attr, cgrp_id,
+						cpu, gleader_fd, PERF_FLAG_PID_CGROUP);
+			if (fds[cpu][i] < 0) {
+				if (errno == ENODEV)
+					continue;
+				fprintf(stderr, "perf_event_open %s:%d: %s\n",
+					cgroup->name, cpu, strerror(errno));
 				continue;
-			fprintf(stderr, "perf_event_open %s:%d: %s\n",
-				cgroup->name, cpu, strerror(errno));
-			continue;
+			}
+			if (i == 0)
+				gleader_fd = fds[cpu][i];
+			counts[cpu][i] = 0;
 		}
-		ioctl(fds[cpu], PERF_EVENT_IOC_RESET, 0);
-		ioctl(fds[cpu], PERF_EVENT_IOC_ENABLE, 0);
-		counts[cpu] = 0;
+		ioctl(gleader_fd, PERF_EVENT_IOC_RESET, PERF_IOC_FLAG_GROUP);
+		ioctl(gleader_fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP);
 	}
-	cgroup->hwres.cachmis_fds = fds;
-	cgroup->hwres.cachmis_cnt = counts;
+	cgroup->hwres.hw_fds = fds;
+	cgroup->hwres.hw_counters = counts;
 	return ret;
 }
 
@@ -683,24 +713,28 @@ static int get_blkinfo_stats(int cg_idx)
 
 static int get_hwres_stats(int cg_idx)
 {
-	int i, nr;
-	long long sum = 0, count = 0;
+	long long count;
+	int i, j, nr;
 	struct cg_hwres_info *hwres;
 
 	hwres = &cgroups[cg_idx].hwres;
-	if (!hwres->cachmis_fds || !hwres->cachmis_cnt)
+	if (!hwres->hw_fds || !hwres->hw_counters)
 		return 0;	//todo
 
 	for (i = 0; i < nr_cpus; i++) {
-		if (hwres->cachmis_fds[i] < 0)
+		if (!hwres->hw_fds[i] || !hwres->hw_counters[i])
 			continue;
-		nr = read(hwres->cachmis_fds[i], &count, sizeof(long long));
-		if (nr < 0)
-			continue;
-		hwres->cachmis_cnt[i] = count;
-		sum += hwres->cachmis_cnt[i];
+		for (j = 0; j < NCONF_HW; j++) {
+			int fd = hwres->hw_fds[i][j];
+			if (fd < 0)
+				continue;
+			nr = read(fd, &count, sizeof(long long));
+			if (nr < 0)
+				continue;
+			hwres->hw_counters[i][j] = count;
+			hwres->hw_sum[j] += count;
+		}
 	}
-	hwres->cachmis_sum = sum;
 	return nr_cpus*sizeof(long long);
 }
 
@@ -782,7 +816,12 @@ static int print_cgroup_blkio(char *buf, int len, struct cg_blkio_info *info)
 
 static int print_cgroup_hwres(char *buf, int len, struct cg_hwres_info *info)
 {
-	return snprintf(buf, len, "%lld", info->cachmis_sum);
+	int i, pos = 0;
+
+	for (i = 0; i < NCONF_HW - 1; i++)
+		pos += snprintf(buf + pos, len - pos, "%lld,", info->hw_sum[i]);
+	pos += snprintf(buf + pos, len - pos, "%lld", info->hw_sum[i]);
+	return pos;
 }
 
 void
@@ -944,8 +983,16 @@ set_blkio_record(double st_array[], U_64 pre_array[], U_64 cur_array[], int inte
 static void
 set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 {
+	/*
+ 	 * _cachms: delta(cache_miss)		65
+ 	 * cachmis: cache_miss accumulated	66
+ 	 * _cachrf: delta(cache_refer)		67
+ 	 * cachref: cache_refer accumulated	68
+ 	* */
 	st_array[0] = cur_array[1] - pre_array[1];
 	st_array[1] = cur_array[1];
+	st_array[2] = cur_array[3] - pre_array[3];
+	st_array[3] = cur_array[3];
 }
 
 static void
