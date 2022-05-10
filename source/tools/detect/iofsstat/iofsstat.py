@@ -549,20 +549,22 @@ def main():
 		print "This program must be run as root. Aborting."
 		sys.exit(0)
 	examples = """e.g.
+  ./iofsstat.py -i 1
+			Report IO statistic for all disk per 1secs
   ./iofsstat.py -d vda -i 1
 			Report IO statistic for vda per 1secs
+  ./iofsstat.py --fs -i 1
+			Report fs IO statistic for all partitions per 1secs
   ./iofsstat.py -d vda1 --fs -i 1
-			Report fs IO statistic for vda1 per 1secs(depend on vmlinux)
+			Report fs IO statistic for vda1 per 1secs
 	"""
 	parser = argparse.ArgumentParser(
 		description="Report IO statistic for partitions.",
 		formatter_class=argparse.RawDescriptionHelpFormatter,
 		epilog=examples)
-	parser.add_argument('-v','--vmlinux',\
-			    help='Specify the vmlinux file(used for --fs).')
 	parser.add_argument('-T','--Timeout', help='Specify the timeout for program exit(secs).')
 	parser.add_argument('-i','--interval', help='Specify refresh interval(secs).')
-	parser.add_argument('-d','--device', help='Specify the disk name.')
+	parser.add_argument('-d','--device', help='Specify the disk or partition name.')
 	parser.add_argument('-p','--pid', help='Specify the process id.')
 	parser.add_argument('-f','--fs', action='store_true',\
 			    help='Report filesystem statistic for partitions.')
