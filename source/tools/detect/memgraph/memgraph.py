@@ -198,6 +198,8 @@ def memgraph_get_meminfo(meminfo):
 
 def dump2json(res,filename):
     jsonStr = json.dumps(res)
+    if not os.path.exists(os.path.dirname(filename)):
+        os.popen("mkdir -p "+os.path.dirname(filename)).read()
     with open(filename, 'w') as jsonFile:
         jsonFile.write(jsonStr)
 
