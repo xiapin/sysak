@@ -175,7 +175,8 @@ def oom_get_cgroup_shmem(oom_result, line, num):
     inanon = line.strip().split("inactive_anon:")[1]
     inanon = inanon.split()[0][:-2]
 
-    anon = line.strip().split("active_anon:")[1]
+    anon = line.strip().split("inactive_anon:")[1]
+    anon = anon.strip().split("active_anon:")[1]
     anon = anon.split()[0][:-2]
 
     rss = line.strip().split("rss:")[1]
@@ -333,6 +334,41 @@ def oom_check_score(oom, oom_result):
     else:
         return '，%d个进程%s累加消耗内存%dKB,oom_score_adj:%s. 另需进一步确认进程oom score设置是否合理.'%(res_total['cnt'],res_total['task'],res_total['rss']*4,res_total['score'])
 
+def oom_get_podName(cgName, cID):
+    podName = 'unknow'
+    if cgName.find("kubepods") == -1:
+        return "unknow"
+    cmd = "crictl inspect " + cID + " | grep -w io.kubernetes.pod.name "
+    res = os.popen(cmd).read().strip()
+    if res.find("io.kubernetes.pod.name") == -1:
+        return 'unknow'
+    res = res.split()
+    if len(res) < 2:
+        return 'unkonw'
+    if res[0].find("io.kubernetes.pod.name") != -1:
+        podName = res[1][1:-2]
+    return podName
+
+def oom_get_k8spod(oom_result,num):
+    oom = oom_result['sub_msg'][num]
+    cgName = oom['cg_name']
+    oom['podName'] = 'unknow'
+    oom['containerID '] = 'unknow'
+    index = cgName.find("cri-containerd-")
+    if index != -1:
+        index = index + 15
+    if index == -1:
+        index = cgName.find("docker-")
+        if index != -1:
+            index = index + 7
+    if index == -1:
+        return ''
+    oom['containerID '] = cgName[index: index+13]
+    oom['podName'] = oom_get_podName(cgName, oom['containerID '])
+    summary = ''
+    summary += "podName: %s, containerID: %s\n"%(oom['podName'], oom['containerID '])
+    return summary
+
 def oom_output_msg(oom_result,num):
     oom = oom_result['sub_msg'][num]
     summary = ''
@@ -343,6 +379,7 @@ def oom_output_msg(oom_result,num):
     summary += "进程所属cgroup:%s,"%(oom['cg_name'])
     if oom['cg_name'] in oom_result['cgroup']:
         summary += "cgroup OOM总次数:%s\n"%(oom_result['cgroup'][oom['cg_name']])
+        summary += oom_get_k8spod(oom_result, num)
     summary += oom_cgroup_output(oom_result, num)
     summary += oom_host_output(oom_result, num)
     summary += "诊断结论:%s"%(oom['reason'])
