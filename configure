@@ -53,6 +53,14 @@ check_bpf_kernel() {
 }
 
 check_bpf_depend() {
+	if [ ! -d "source/lib/internal/ebpf/libbpf" ];then
+		echo "download libbpf ... "
+		wget https://gitee.com/anolis/libbpf/repository/archive/master.zip -O libbpf.zip
+		echo "extract libbpf"
+		unzip libbpf.zip -d source/lib/internal/ebpf/
+		mv source/lib/internal/ebpf/libbpf-master source/lib/internal/ebpf/libbpf
+	fi
+
 	check_bpf_kernel
 	if [ $kernel_bpf_support = "YES" ];then
 		clang -v > /dev/null
@@ -66,6 +74,14 @@ check_bpf_depend() {
 }
 
 check_lkm_depend() {
+	if [ ! -d "source/lib/internal/kernel_module" ];then
+		echo "download sysak-module ... "
+		wget https://gitee.com/anolis/sysak-module/repository/archive/master.zip -O sysak-module.zip
+		echo "extract sysak-module"
+		unzip sysak-module.zip -d source/lib/internal/
+		mv source/lib/internal/sysak-module-master source/lib/internal/kernel_module
+	fi
+
 	rpm -q kernel-devel-$kern_ver > /dev/null
 	if [ $? != 0 ];then
 		echo "check kernel-devel-$kern_ver failed, should intall first"
