@@ -467,8 +467,8 @@ if __name__ == "__main__":
         output = os.popen(cmd)
         #a = output.read()
         output.close()
-        print "/tmp/oomcheck.log exist"
+        print ("/tmp/oomcheck.log exist")
     else:
-        print "/tmp/oomcheck.log not exist"
+        print ("/tmp/oomcheck.log not exist")
     oom_scan(sn, data, 3)
     main()

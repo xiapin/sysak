@@ -258,9 +258,9 @@ def main():
         cmd = 'echo "" > /tmp/hwcheck.log'
         output = os.popen(cmd)
         output.close()
-        print "/tmp/hwcheck.log exist"
+        print ("/tmp/hwcheck.log exist")
     else:
-        print "/tmp/hwcheck.log not exist"
+        print ("/tmp/hwcheck.log not exist")
 
     ret = query(sn, data)
     if ret['return']:

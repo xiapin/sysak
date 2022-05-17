@@ -88,9 +88,9 @@ def main():
         cmd = 'echo "" > /tmp/memleakcheck.log'
         output = os.popen(cmd)
         output.close()
-        print "/tmp/memleakcheck.log exist"
+        print ("/tmp/memleakcheck.log exist")
     else:
-        print "/tmp/memleakcheck.log not exist"
+        print ("/tmp/memleakcheck.log not exist")
 
     ret = query(sn, data)
     if ret['return']:

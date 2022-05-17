@@ -144,7 +144,7 @@ def get_tsar_path(data=None):
 class Logger(object):
     def __init__(self, filename="/var/log/sysak/ossre.log"):
         if not os.path.exists("/var/log/sysak"):
-            os.mkdir("/var/log/sysak",0755);
+            os.mkdir("/var/log/sysak",755);
         self.log = open(filename, "w+")
 
     def write(self, message):
