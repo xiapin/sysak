@@ -174,14 +174,65 @@ static int prepare_dictory(char *path)
 		return 0;
 }
 
+static int get_container(char *dockerid, int pid)
+{
+	char *buf;
+	FILE *fp;
+	int ret = -1;
+	char cgroup_path[32] = {0};
+
+	snprintf(cgroup_path, sizeof(cgroup_path), "/proc/%d/cgroup", pid);
+
+	fp = fopen(cgroup_path, "r");
+	if (!fp)
+		return errno;
+
+	buf = malloc(4096*sizeof(char));
+	if (!buf) {
+		ret = errno;
+		goto out2;
+	}
+
+	while(fgets(buf, 4096, fp)) {
+		int stat = 0;
+		char *token, *pbuf = buf;
+		while((token = strsep(&pbuf, "/")) != NULL) {
+			if (stat == 1) {
+				stat++;
+				break;
+			}
+			if (!strncmp("docker", token, strlen("docker")))
+				stat++;
+		}
+
+		if (stat == 2) {
+			strncpy(dockerid, token, CONID_LEN - 1);
+			ret = 0;
+			goto out1;
+		}
+	}
+out1:
+	free(buf);	
+out2:
+	fclose(fp);
+	return ret;
+}
+
 static void update_summary(struct summary* summary, const struct event *e)
 {
 	int idx;
+	char buf[CONID_LEN] = {0};
 
 	summary->num++;
 	idx = summary->num % CPU_ARRY_LEN;
 	summary->total += e->delay;
 	summary->cpus[idx] = e->cpu;
+	summary->jitter[idx] = e->delay/1000;
+	if (get_container(buf, e->pid))
+		strncpy(summary->container[idx], "000000000000", sizeof(summary->container[idx]));
+	else
+		strncpy(summary->container[idx], buf, sizeof(summary->container[idx]));
+
 	if (summary->max.value < e->delay) {
 		summary->max.value = e->delay;
 		summary->max.cpu = e->cpu;
@@ -210,12 +261,22 @@ static int record_summary(struct summary *summary, long offset, bool total)
 			p = p+pos;
 			pos = sprintf(p, " %d", summary->cpus[(idx+i)%CPU_ARRY_LEN]);
 		}
+		for (i = 1; i <= CPU_ARRY_LEN; i++) {
+			p = p+pos;
+			pos = sprintf(p, " %5d", summary->jitter[(idx+i)%CPU_ARRY_LEN]);
+		}
+		for (i = 1; i <= CPU_ARRY_LEN; i++) {
+			p = p+pos;
+			pos = sprintf(p, " %s", summary->container[(idx+i)%CPU_ARRY_LEN]);
+		}
+		p = p+pos;
+		pos = sprintf(p, "\n");
+	} else {
+		p = p+pos;
+		pos = sprintf(p, "   %-4llu %-12llu %-3d %-9d %-15s\n",
+			summary->max.value/1000, summary->max.stamp/1000,
+			summary->max.cpu, summary->max.pid, summary->max.comm);
 	}
-
-	p = p+pos;
-	pos = sprintf(p, "   %-4llu %-12llu %-3d %-9d %-15s\n",
-		summary->max.value/1000, summary->max.stamp/1000,
-		summary->max.cpu, summary->max.pid, summary->max.comm);
 
 	if (total)
 		fseek(filep, 0, SEEK_SET);
@@ -266,11 +327,13 @@ void nosched_handler(int poll_fd)
 			"TIME(nosched)", "CPU", "COMM", "TID", "LAT(us)");
 	} else {
 		int i;
-		char buf[78] = {' '};
+		char buf[128] = {' '};
 		fprintf(filep, "nosche\n");
 		for (i = 0; i < nr_cpus; i++)
 			fprintf(filep, "cpu%d  %s\n", i, buf);
 		fseek(filep, 0, SEEK_SET);
+		for (i=0; i < CPU_ARRY_LEN; i++)
+			strncpy(summary.container[i], "000000000000", sizeof(summary.container[i]));
 	}
 	pb_opts.sample_cb = handle_event;
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);

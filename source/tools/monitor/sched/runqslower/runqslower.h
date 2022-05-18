@@ -4,6 +4,7 @@
 
 #define TASK_COMM_LEN 16
 #define CPU_ARRY_LEN	4
+#define CONID_LEN	13
 
 struct event {
 	char task[TASK_COMM_LEN];
@@ -28,6 +29,8 @@ struct summary {
 	__u64	total;
 	struct max_sum max;
 	int cpus[CPU_ARRY_LEN];
+	int jitter[CPU_ARRY_LEN];
+	char container[CPU_ARRY_LEN][CONID_LEN];
 };
 
 struct args {

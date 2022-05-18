@@ -15,6 +15,7 @@
 #endif
 
 #define CPU_ARRY_LEN	4
+#define CONID_LEN	13
 
 struct args {
 	int flag;
@@ -53,5 +54,7 @@ struct summary {
 	__u64	total;
 	struct max_sum max;
 	int cpus[CPU_ARRY_LEN];
+	int jitter[CPU_ARRY_LEN];
+	char container[CPU_ARRY_LEN][CONID_LEN];
 };
 
