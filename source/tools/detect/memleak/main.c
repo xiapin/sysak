@@ -44,6 +44,7 @@ static int memleak_check_only(struct meminfo *mi)
     read_meminfo(mi);
     vmalloc = vmalloc_main(0, NULL);
     printf("allocPages:%dM, uslab:%dM vmalloc:%dM\n", (mi->kernel)/1024, mi->uslabkb/1024, vmalloc/1024);
+    printf("诊断结论:");
     if (mi->kernel < vmalloc)
         mi->kernel = vmalloc + 1;
 
@@ -57,6 +58,8 @@ static int memleak_check_only(struct meminfo *mi)
     } else if (vmalloc > 2*1024 * 1024) {
         printf("vmalloc memleak\n");
         return MEMLEAK_TYPE_VMALLOC;
+    } else {
+        printf(" no memleak\n");
     }
     return 0;
 }

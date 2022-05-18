@@ -96,7 +96,7 @@ int read_meminfo(struct meminfo *mem)
         st_mem.huge2M = hugeTotal * hugeSize;
 
     st_mem.kernel = st_mem.tlmkb - st_mem.frmkb - st_mem.acmkb - st_mem.iamkb - st_mem.lock -\
-                st_mem.bufkb - st_mem.slmkb - st_mem.huge2M - st_mem.huge1G;
+                /*st_mem.bufkb - */st_mem.slmkb - st_mem.huge2M - st_mem.huge1G;
 
     if (st_mem.kernel < 0)
         st_mem.kernel = (1 << 10);

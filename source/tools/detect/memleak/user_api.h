@@ -20,7 +20,7 @@ struct meminfo {
     unsigned long comkb;
     unsigned long uslabkb;
     unsigned long slabkb;
-    unsigned long kernel;
+    long kernel;
     unsigned long huge2M;
     unsigned long huge1G;
     unsigned long lock;
