@@ -107,7 +107,7 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 				struct event event = {};
 				event.stamp = now;
 				event.cpu = cpuid;
-				event.delay = resched_latency/1000;
+				event.delay = resched_latency;
 				event.pid = bpf_get_current_pid_tgid();
 				bpf_get_current_comm(&event.comm, sizeof(event.comm));
 				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);

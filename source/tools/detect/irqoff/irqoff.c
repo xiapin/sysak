@@ -23,7 +23,7 @@ struct env {
 	__u64 threshold;
 } env = {
 	.duration = 0,
-	.threshold = 10,	/* 10ms */
+	.threshold = 10*1000*1000,	/* 10ms */
 	.summary = false,
 };
 
@@ -266,7 +266,7 @@ static void update_summary(struct summary* summary, const struct event *e)
 	idx = summary->num % CPU_ARRY_LEN;
 	summary->total += e->delay;
 	summary->cpus[idx] = e->cpu;
-	summary->jitter[idx] = e->delay/1000;
+	summary->jitter[idx] = e->delay;
 	if (get_container(buf, e->pid))
 		strncpy(summary->container[idx], "000000000000", sizeof(summary->container[idx]));
 	else
@@ -292,7 +292,7 @@ static int record_summary(struct summary *summary, long offset, bool total)
 	p = buf;
 	pos = sprintf(p,"%-7s %-5lu %-6llu",
 		total?"irqoff":header,
-		summary->num, summary->total/1000);
+		summary->num, summary->total);
 
 	if (total) {
 		idx = summary->num % CPU_ARRY_LEN;
@@ -313,7 +313,7 @@ static int record_summary(struct summary *summary, long offset, bool total)
 	} else {
 		p = p+pos;
 		pos = sprintf(p, "   %-4llu %-12llu %-3d %-9d %-15s\n",
-			summary->max.value/1000, summary->max.stamp/1000,
+			summary->max.value, summary->max.stamp/1000,
 			summary->max.cpu, summary->max.pid, summary->max.comm);
 	}
 
@@ -328,14 +328,18 @@ static int record_summary(struct summary *summary, long offset, bool total)
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	const struct event *e = data;
+	struct event ev, *e;
+	const struct event *ep = data;
 	struct tm *tm;
 	char ts[64];
 	time_t t;
 
+	ev = *ep;
+	e = &ev;
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%F_%H:%M:%S", tm);
+	e->delay = e->delay/(1000*1000);
 	if (env.summary) {
 		struct summary *sumi;
 

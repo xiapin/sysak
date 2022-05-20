@@ -25,25 +25,25 @@ struct env {
 	pid_t pid;
 	pid_t tid;
 	unsigned long span;
-	__u64 min_us;
+	__u64 threshold;
 	bool previous;
 	bool verbose;
 	bool summary;
 } env = {
 	.span = 0,
-	.min_us = 10000,
+	.threshold = 10*1000*1000,
 };
 
 const char *argp_program_version = "runqslower 0.1";
 const char argp_program_doc[] =
 "Trace high run queue latency.\n"
 "\n"
-"USAGE: runqslower [--help] [-s SPAN] [-t TID] [-P] [min_us] [-f ./runslow.log]\n"
+"USAGE: runqslower [--help] [-s SPAN] [-t TID] [-P] [threshold] [-f ./runslow.log]\n"
 "\n"
 "EXAMPLES:\n"
-"    runqslower          # trace latency higher than 10000 us (default)\n"
+"    runqslower          # trace latency higher than 10ms (default)\n"
 "    runqslower -f a.log # trace latency and record result to a.log (default to /var/log/sysak/runqslow/runqslow.log)\n"
-"    runqslower 1000     # trace latency higher than 1000 us\n"
+"    runqslower 12     # trace latency higher than 12 ms\n"
 "    runqslower -p 123   # trace pid 123\n"
 "    runqslower -t 123   # trace tid 123 (use for threads only)\n"
 "    schedmoni -s 10     # monitor for 10 seconds\n"
@@ -89,7 +89,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	static int pos_args;
 	int pid;
-	long long min_us;
+	long long threshold;
 	unsigned long span;
 
 	switch (key) {
@@ -156,12 +156,12 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		errno = 0;
-		min_us = strtoll(arg, NULL, 10);
-		if (errno || min_us <= 0) {
-			fprintf(stderr, "Invalid delay (in us): %s\n", arg);
+		threshold = strtoll(arg, NULL, 10);
+		if (errno || threshold <= 0) {
+			fprintf(stderr, "Invalid delay (in ms): %s\n", arg);
 			argp_usage(state);
 		}
-		env.min_us = min_us;
+		env.threshold = threshold*1000*1000;
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
@@ -246,16 +246,16 @@ static void update_summary(struct summary* summary, const struct event *e)
 
 	summary->num++;
 	idx = summary->num % CPU_ARRY_LEN;
-	summary->total += e->delta_us;
+	summary->total += e->delay;
 	summary->cpus[idx] = e->cpuid;
-	summary->jitter[idx] = e->delta_us/1000;
+	summary->jitter[idx] = e->delay;
 	if (get_container(buf, e->pid))
 		strncpy(summary->container[idx], "000000000000", sizeof(summary->container[idx]));
 	else
 		strncpy(summary->container[idx], buf, sizeof(summary->container[idx]));
 
-	if (summary->max.value < e->delta_us) {
-		summary->max.value = e->delta_us;
+	if (summary->max.value < e->delay) {
+		summary->max.value = e->delay;
 		summary->max.cpu = e->cpuid;
 		summary->max.pid = e->pid;
 		summary->max.stamp = e->stamp;
@@ -274,7 +274,7 @@ static int record_summary(struct summary *summary, long offset, bool total)
 	p = buf;
 	pos = sprintf(p,"%-7s %-5lu %-6llu",
 		total?"rqslow":header,
-		summary->num, summary->total/1000);
+		summary->num, summary->total);
 
 	if (total) {
 		idx = summary->num % CPU_ARRY_LEN;
@@ -295,7 +295,7 @@ static int record_summary(struct summary *summary, long offset, bool total)
 	} else {
 		p = p+pos;
 		pos = sprintf(p, "   %-4llu %-12llu %-3d %-9d %-15s\n",
-			summary->max.value/1000, summary->max.stamp/1000,
+			summary->max.value, summary->max.stamp/1000,
 			summary->max.cpu, summary->max.pid, summary->max.comm);
 	}
 	if (total)
@@ -308,19 +308,22 @@ static int record_summary(struct summary *summary, long offset, bool total)
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	const struct event *e = data;
+	struct event tmpe, *e;
+	const struct event *ep = data;
 	struct tm *tm;
 	char ts[64];
 	time_t t;
 
+	tmpe = *ep;
+	e = &tmpe;
 	time(&t);
 	tm = localtime(&t);
 	strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
+	e->delay = e->delay/(1000*1000);
 	if (env.summary) {
 		struct summary *sumi;
 		if (e->cpuid > nr_cpus - 1)
 			return;
-
 		sumi = &percpu_summary[e->cpuid];
 		update_summary(&summary, e);
 		update_summary(sumi, e);
@@ -331,10 +334,10 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		if (env.previous)
 			fprintf(filep, "%-21s %-6d %-16s %-8d %-10llu %-16s %-6d\n",
 				ts, e->cpuid, e->task, e->pid,
-				e->delta_us, e->prev_task, e->prev_pid);
+				e->delay, e->prev_task, e->prev_pid);
 		else
 			fprintf(filep, "%-21s %-6d %-16s %-8d %-10llu\n",
-				ts, e->cpuid, e->task, e->pid, e->delta_us);
+				ts, e->cpuid, e->task, e->pid, e->delay);
 	}
 }
 
@@ -391,15 +394,15 @@ int main(int argc, char **argv)
 	args.targ_tgid = env.pid;
 	args.targ_pid = env.tid;
 	args.filter_pid = getpid();
-	args.min_us = env.min_us;
+	args.threshold = env.threshold;
 
 	if (!env.summary) {
 		if (env.previous)
 			fprintf(filep, "%-21s %-6s %-16s %-8s %-10s %-16s %-6s\n",
-				"TIME(runslw)", "CPU", "COMM", "TID", "LAT(us)", "PREV COMM", "PREV TID");
+				"TIME(runslw)", "CPU", "COMM", "TID", "LAT(ms)", "PREV COMM", "PREV TID");
 		else
 			fprintf(filep, "%-21s %-6s %-16s %-8s %-10s\n",
-				"TIME(runslw)", "CPU", "COMM", "TID", "LAT(us)");
+				"TIME(runslw)", "CPU", "COMM", "TID", "LAT(ms)");
 	} else {
 		int i;
 		char buf[128] = {' '};

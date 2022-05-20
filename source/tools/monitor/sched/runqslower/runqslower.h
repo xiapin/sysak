@@ -9,7 +9,7 @@ struct event {
 	char task[TASK_COMM_LEN];
 	char prev_task[TASK_COMM_LEN];
 	
-	__u64 delta_us;
+	__u64 delay;
 	__u64 stamp;
 	pid_t pid;
 	pid_t prev_pid;
@@ -33,7 +33,7 @@ struct summary {
 };
 
 struct args {
-	__u64 min_us;
+	__u64 threshold;
 	pid_t targ_pid;
 	pid_t targ_tgid;
 	pid_t filter_pid;

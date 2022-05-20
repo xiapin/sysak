@@ -78,7 +78,7 @@ int hw_irqoff_event(struct bpf_perf_event_data *ctx)
 			if (delta > thresh) {
 				event.cpu = cpu;
 				event.stamp = now;
-				event.delay = delta/1000;
+				event.delay = delta;
 				event.pid = bpf_get_current_pid_tgid();
 				bpf_get_current_comm(&event.comm, sizeof(event.comm));
 				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);
@@ -128,7 +128,7 @@ int sw_irqoff_event2(struct bpf_perf_event_data *ctx)
 			delta = now - stamp;
 			if (delta > thresh) {
 				event.cpu = cpu;
-				event.delay = delta/1000;
+				event.delay = delta;
 				event.pid = bpf_get_current_pid_tgid();
 				bpf_get_current_comm(&event.comm, sizeof(event.comm));
 				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);

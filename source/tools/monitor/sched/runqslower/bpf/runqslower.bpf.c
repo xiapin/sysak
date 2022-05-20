@@ -92,7 +92,7 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 	u32 pid, prev_pid;
 	long int prev_state;
 	struct event event = {};
-	u64 *tsp, delta_us, min_us, now;
+	u64 *tsp, delta, threshold, now;
 	struct args *argp;
 
 	prev_pid = ctx->prev_pid;
@@ -108,15 +108,15 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 	if (!tsp)
 		return 0;   /* missed enqueue */
 	now = bpf_ktime_get_ns();
-	delta_us = (now - *tsp) / 1000;
-	min_us = GETARG_FROM_ARRYMAP(argmap, argp, u64, min_us);
-	if (min_us && delta_us <= min_us)
+	delta = (now - *tsp);
+	threshold = GETARG_FROM_ARRYMAP(argmap, argp, u64, threshold);
+	if (threshold && delta <= threshold)
 		return 0;
 
 	event.cpuid = cpuid;
 	event.pid = pid;
 	event.prev_pid = prev_pid;
-	event.delta_us = delta_us;
+	event.delay = delta;
 	event.stamp = now;
 	bpf_probe_read(event.task, sizeof(event.task), &(ctx->next_comm));
 	bpf_probe_read(event.prev_task, sizeof(event.prev_task), &(ctx->prev_comm));
