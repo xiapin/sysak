@@ -47,6 +47,11 @@ def set_to_list(setstr):
     resset = []
     for line in setstr:
         line = line.strip()
+        if line[0] == '(' and line[-1] == ')':
+            line = line[1:-1]
+        if line.find('null') >= 0:
+            resset.append(-1)
+            break
         if line.find('-') >= 0:
             resset.extend([i for i in range(int(line.split('-')[0]), int(line.split('-')[1])+1)])
         else:
@@ -266,7 +271,7 @@ def oom_host_output(oom_result, num):
     is_low = False
     if free * 0.9  < low:
         is_low = True
-    if oom_result['node_num'] != len(oom['mems_allowed']) and is_low:
+    if oom['mems_allowed'][0] != -1 and oom_result['node_num'] != len(oom['mems_allowed']) and is_low:
         oom['reason'] = OOM_REASON_NODE
         summary += "Node总内存:%d\n"%(oom_result['node_num'])
         summary += "Cpuset名:%s,"%(oom['cpuset'])
@@ -277,7 +282,7 @@ def oom_host_output(oom_result, num):
         summary += "Node剩余内存:%s,"%(oom['host_free'])
         summary += "Node low水线:%s\n"%(oom['host_low'])
         return summary
-    elif 'nodemask' in oom and len(oom['nodemask']) != oom_result['node_num'] and free > low * 2:
+    elif 'nodemask' in oom and oom['nodemask'][0] != -1 and len(oom['nodemask']) != oom_result['node_num'] and free > low * 2:
         oom['reason'] = OOM_REASON_NODEMASK
         summary += "Node总内存:%d\n"%(oom_result['node_num'])
         summary += "nodemask内存配置:"
