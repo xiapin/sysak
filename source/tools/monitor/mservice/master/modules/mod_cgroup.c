@@ -25,8 +25,28 @@ char *cg_usage = "    --cg                Linux container stats";
 /*Todo,user configure ?*/
 #define CGROUP_INFO_AGING_TIME  7200
 #define NCONF_HW	2
+#define JITITEM		4
+#define	CONID_LEN	13
 
+static int cg_jitter_init = 0;
 int nr_cpus;
+//extern char *cg_jit_mod[];
+char *cg_jit_mod[] = {"rqslow", "noschd", "irqoff"};
+char *log_path[] = {
+	"/var/log/sysak/mservice/runqslower",
+	"/var/log/sysak/mservice/nosched",
+	"/var/log/sysak/mservice/irqoff",
+};
+//extern char *log_path[];
+//int init_sysak(void);
+//int prepare_jitter_dictory(char *path);
+enum jitter_types {
+	RQSLOW,
+	NOSCHE,
+	IRQOFF,
+	JITTER_NTYPE,
+};
+
 int hwconfigs[] = {
 	PERF_COUNT_HW_CACHE_MISSES,
 	PERF_COUNT_HW_CACHE_REFERENCES};
@@ -100,6 +120,30 @@ struct cg_hwres_info {
 	long long hw_sum[NCONF_HW];
 };
 
+struct sum_jitter_info {
+	unsigned long num, lastnum;
+	unsigned long long total;
+	int lastcpu[JITITEM];
+	unsigned long lastjit[JITITEM];
+	char container[JITITEM][CONID_LEN];
+};
+
+struct sum_jitter_infos {
+	struct sum_jitter_info sum[JITTER_NTYPE];
+};
+
+struct jitter_info {
+	int idx;
+	unsigned long num;
+	unsigned long long time;
+	int lastcpu[JITITEM];
+	char container[JITITEM][CONID_LEN];
+};
+
+struct cg_jitter_info {
+	struct jitter_info info[JITTER_NTYPE];
+};
+
 struct cgroup_info {
 	char name[LEN_32];
 	int valid;
@@ -108,6 +152,7 @@ struct cgroup_info {
 	struct cg_mem_info mem;
 	struct cg_blkio_info blkio;
 	struct cg_hwres_info hwres;
+	struct cg_jitter_info jitter;
 } cgroups[MAX_CGROUPS];
 
 unsigned int n_cgs = 0;  /* Number of cgroups */
@@ -188,6 +233,13 @@ static struct mod_info cg_info[] = {
 	{"cahmis", DETAIL_BIT,  0,  STATS_NULL},
 	{"_cahrf", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	{"cahref", DETAIL_BIT,  0,  STATS_NULL},
+	/* jitter info 69-74 */
+	{"numrsw", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of runqslow jitter */
+	{" tmrsw", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of runqslow delay */
+	{"numnsc", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of nosched jitter */
+	{" tmnsc", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of nosched delay */
+	{"numirq", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of irqoff jitter */
+	{" tmirq", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of irqoff delay */
 };
 
 #define NR_CGROUP_INFO sizeof(cg_info)/sizeof(struct mod_info)
@@ -298,6 +350,52 @@ static int perf_event_init(struct cgroup_info *cgroup)
 	return ret;
 }
 
+static int cg_prepare_jitter_dictory(char *path)
+{
+	int ret;
+
+	ret = mkdir(path, 0777);
+	if (ret < 0 && errno != EEXIST)
+		return errno;
+	else
+		return 0;
+}
+
+static int cg_init_sysak(void)
+{
+	int ret;
+	FILE *fp1, *fp2, *fp3;
+	char *mservice_log_dir = "/var/log/sysak/mservice/";
+
+	if (cg_jitter_init)
+		return 0;
+
+	ret = cg_prepare_jitter_dictory(mservice_log_dir);
+	if (ret)
+		return ret;
+
+	/* todo: what if command can't be find? */
+	/* threshold is 40ms */
+	fp1 = popen("sysak runqslower -S -f /var/log/sysak/mservice/runqslower 40 2>/dev/null &", "r");
+	if (!fp1) {
+		perror("popen runqslower");
+		return -1;
+	}
+
+	fp2 = popen("sysak nosched -S -f /var/log/sysak/mservice/nosched -t 10 2>/dev/null &", "r");
+	if (!fp2) {
+		perror("popen nosched");
+		return -1;
+	}
+
+	fp3 = popen("sysak irqoff -S -f /var/log/sysak/mservice/irqoff 10 2>/dev/null &", "r");
+	if (!fp3) {
+		perror("popen irqoff");
+		return -1;
+	}
+	cg_jitter_init = 1;
+	return 0;
+}
 static void init_cgroups(void)
 {
 	int i, ret;
@@ -329,6 +427,7 @@ static void init_cgroups(void)
 		n_cgs++;
 	}
 	pclose(result);
+	cg_init_sysak();
 	cgroup_init_time = time(NULL);
 }
 
@@ -738,10 +837,137 @@ static int get_hwres_stats(int cg_idx)
 	return nr_cpus*sizeof(long long);
 }
 
+static unsigned long jitter_cgroup_matched(int cg_idx, struct sum_jitter_info *sum)
+{
+	int num, cpu, i;
+	FILE *file;
+	char *token, *pbuf;
+	char filepath[LEN_1024];
+	unsigned long long cpusets, mask;
+
+	if (!get_cgroup_path(cgroups[cg_idx].name, "cpuset", filepath))
+		return 0;
+
+	strcat(filepath, "/cpuset.cpus");
+	file = fopen(filepath, "r");
+	if (!file)
+		return 0;
+	memset(buffer, 0, sizeof(buffer));
+	if (!fgets(buffer, sizeof(buffer), file))
+		return 0;
+	pbuf = buffer;
+	cpusets = 0;
+	while((token = strsep(&pbuf, ",")) != NULL) {
+		unsigned long long tmp;
+		int vals[2], val, ret;
+		char *token1, *pbuf1=token;
+
+		i = 0;
+		tmp = 0;
+		while(((token1 = strsep(&pbuf1, "-")) != NULL) && i < 2) {
+			errno = 0;
+			val = strtol(token1, NULL, 10);
+			ret = errno;
+			if ((ret == ERANGE && (val == LONG_MAX || val == LONG_MIN))
+				|| (ret != 0 && val == 0)) {
+				printf("strtol:(val=%d,str=%s)%s fail\n", val, token1,strerror(ret));
+				break;
+			}
+			vals[i++] = val;
+		}
+		if (i == 1)
+			tmp = tmp | 1 << vals[0];
+		else if (i == 2) {
+			tmp = tmp | ((1 << (vals[1]+1)) - 1);
+			tmp = tmp & ~((1 << vals[0]) -1);
+		}
+		cpusets = cpusets | tmp;	
+	}
+	mask = 0;
+	num = sum->num - sum->lastnum;
+	num = num > 4?4:num; 
+	for (i = 0; i < num; i++) {
+		cpu = sum->lastcpu[i];
+		if ((1 << cpu) & cpusets)
+			mask |= 1 << i;
+	}
+	sum->lastnum = sum->num;
+	return mask;
+}
+
+static int get_jitter_stats(int cg_idx, struct sum_jitter_infos *sums)
+{
+	int i = 0, j, idx;
+	unsigned long long mask = 0;
+	struct cg_jitter_info *jits;
+
+	jits = &cgroups[cg_idx].jitter;
+	for (j = 0; j < JITTER_NTYPE; j++) {
+		struct jitter_info *jit;
+		struct sum_jitter_info *sum;
+
+		jit = &jits->info[j];
+		sum = &sums->sum[j];	
+		if (!(mask = jitter_cgroup_matched(cg_idx, sum))) 
+			continue;
+		while(i < JITITEM) {
+			if (mask & (1 << i)) {
+				jit->idx = idx = (jit->idx+1)%JITITEM;
+				jit->num = jit->num + 1;
+				jit->time = jit->time + sum->lastjit[i];
+				jit->lastcpu[idx] = sum->lastcpu[i];
+				strncpy(jit->container[idx], sum->container[i], CONID_LEN - 1);
+			}
+			i++;
+		}
+	}
+	return 0;
+}
+
+int get_jitter_summary(struct sum_jitter_infos *sums)
+{
+	int i, ret = -1;
+	char line[512];
+	FILE *fp;
+
+	for (i = 0; i < JITTER_NTYPE; i++) {
+		struct sum_jitter_info *sump = &sums->sum[i];
+		if((fp = fopen(log_path[i], "r")) == NULL) {
+			fprintf(stderr, "fopen %s fail\n", log_path[i]);
+			continue;
+		}
+		memset(line, 0, sizeof(line));
+		if (fgets(line, 512, fp) != NULL) {
+			if (strlen(line) < 32) {
+				memset(sump, 0, sizeof(*sump));
+				memset(sump->container, '0', sizeof(sump->container));
+				goto retry;
+			}
+			sscanf(line+6, "%lu %llu %d %d %d %d %lu %lu %lu %lu %s %s %s %s",
+				&sump->num, &sump->total,
+				&sump->lastcpu[0], &sump->lastcpu[1],
+				&sump->lastcpu[2], &sump->lastcpu[3],
+				&sump->lastjit[0], &sump->lastjit[1],
+				&sump->lastjit[2], &sump->lastjit[3],
+				sump->container[0], sump->container[1],
+				sump->container[2], sump->container[3]);
+			ret = 0;
+		} else {
+			fprintf(stderr, "fgets %s fail:%s\n", log_path[i], strerror(errno));
+		}
+retry:
+		rewind(fp);
+		fclose(fp);
+	}
+	return ret;
+}
+
 void get_cgroup_stats(void)
 {
 	int i, items;
+	struct sum_jitter_infos sums;
 
+	get_jitter_summary(&sums);
 	for (i = 0; i < n_cgs; i++) {
 		items = 0;
 		items += get_load_and_enhanced_cpu_stats(i);
@@ -749,6 +975,7 @@ void get_cgroup_stats(void)
 		items += get_memory_stats(i);
 		items += get_blkinfo_stats(i);
 		items += get_hwres_stats(i);
+		items += get_jitter_stats(i, &sums);
 		cgroups[i].valid = !!items;
 	}
 }
@@ -818,9 +1045,30 @@ static int print_cgroup_hwres(char *buf, int len, struct cg_hwres_info *info)
 {
 	int i, pos = 0;
 
-	for (i = 0; i < NCONF_HW - 1; i++)
+	for (i = 0; i < NCONF_HW; i++)
 		pos += snprintf(buf + pos, len - pos, "%lld,", info->hw_sum[i]);
-	pos += snprintf(buf + pos, len - pos, "%lld", info->hw_sum[i]);
+	return pos;
+}
+
+static int print_cgroup_jitter(char *buf, int len, struct cg_jitter_info *infos)
+{
+	int i, pos = 0;
+	struct jitter_info *info;
+
+	for (i = 0; i <  JITTER_NTYPE - 1; i++) {
+		info = &infos->info[i];
+		pos += snprintf(buf + pos, len - pos,
+			"%s,%lu,%llu,%s,%s,%s,%s,",
+			cg_jit_mod[i], info->num, info->time,
+			info->container[0], info->container[1],
+			info->container[2], info->container[3]);
+	}
+	info = &infos->info[i];
+	pos += snprintf(buf + pos, len - pos,
+		"%s,%lu,%llu,%s,%s,%s,%s",
+		cg_jit_mod[i],info->num, info->time,
+		info->container[0], info->container[1],
+		info->container[2], info->container[3]);
 	return pos;
 }
 
@@ -841,6 +1089,7 @@ print_cgroup_stats(struct module *mod)
 		pos += print_cgroup_memory(buf + pos, LEN_1M - pos, &cgroups[i].mem);
 		pos += print_cgroup_blkio(buf + pos, LEN_1M - pos, &cgroups[i].blkio);
 		pos += print_cgroup_hwres(buf + pos, LEN_1M - pos, &cgroups[i].hwres);
+		pos += print_cgroup_jitter(buf + pos, LEN_1M - pos, &cgroups[i].jitter);
 		pos += snprintf(buf + pos, LEN_1M - pos, ITEM_SPLIT);
 	}
 	set_mod_record(mod, buf);
@@ -996,6 +1245,24 @@ set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 }
 
 static void
+set_cg_jit_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
+{
+	/*
+ 	 * numrqs: numbers of runqueue-slower jitter	69
+ 	 * tmrqs:  time of runqeueue-slower jitter	70
+ 	 * numnsc: numbers of system-delay jitter	71
+ 	 * tmnsc:  time of system-delay jitter		72
+ 	 * numirq: numbers of irqoff of jitter		73
+ 	 * tmirq:  time of irqoff jitter		74
+ 	* */
+	st_array[0] = cur_array[0];
+	st_array[1] = cur_array[1];
+	st_array[2] = cur_array[2];
+	st_array[3] = cur_array[3];
+	st_array[4] = cur_array[4];
+	st_array[5] = cur_array[5];
+}
+static void
 set_cgroup_record(struct module *mod, double st_array[],
     U_64 pre_array[], U_64 cur_array[], int inter)
 {
@@ -1004,6 +1271,7 @@ set_cgroup_record(struct module *mod, double st_array[],
 	set_memory_record(&st_array[16], &pre_array[16], &cur_array[16]);
 	set_blkio_record(&st_array[51], &pre_array[51], &cur_array[51], inter);
 	set_hwres_record(&st_array[65], &pre_array[65], &cur_array[65]);
+	set_cg_jit_record(&st_array[69], &pre_array[69], &cur_array[69]);
 }
 
 void

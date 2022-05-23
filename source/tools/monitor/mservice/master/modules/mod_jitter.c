@@ -15,9 +15,9 @@
 #define NR_MODS	3
 #define BUF_SIZE	(NR_MODS * 4096)
 char g_buf[BUF_SIZE];
+char line[512];
 static int jitter_init = 0;
 char *jitter_usage = "    --jit                Application jitter stats";
-char *mservice_log_dir = "/var/log/sysak/mservice/";
 char *jit_mod[] = {"rqslow", "noschd", "irqoff"};
 char *log_path[] = {
 	"/var/log/sysak/mservice/runqslower",
@@ -28,10 +28,8 @@ char *log_path[] = {
 struct summary {
 	unsigned long num;
 	unsigned long long total;
-	unsigned long long max_value;
-	unsigned long long max_stamp;
-	int max_cpu, max_pid;
 	int lastcpu0, lastcpu1, lastcpu2, lastcpu3;
+	unsigned long lastjit0, lastjit1, lastjit2, lastjit3;
 };
 
 static struct mod_info jitter_info[] = {
@@ -41,10 +39,6 @@ static struct mod_info jitter_info[] = {
 	{" lCPU1", DETAIL_BIT,  0,  STATS_NULL},	/* last happened cpu[1] */
 	{" lCPU2", DETAIL_BIT,  0,  STATS_NULL},	/* last happened cpu[2] */
 	{" lCPU3", DETAIL_BIT,  0,  STATS_NULL},	/* last happened cpu[3] */
-	{"mvalue", DETAIL_BIT,  0,  STATS_NULL},	/* max-delay event value */
-	{"mstamp", HIDE_BIT,  0,  STATS_NULL},		/* max-delay event time-stamp */
-	{"  mcpu", DETAIL_BIT,  0,  STATS_NULL},	/* max-delay event of cpu */
-	{"  mpid", HIDE_BIT,  0,  STATS_NULL},		/* max-delay event of pid */
 	{"dltnum", SUMMARY_BIT,  0,  STATS_NULL},	/* delta numbers of happend */
 	{" dlttm", SUMMARY_BIT,  0,  STATS_NULL},	/* the delta time of delay */
 };
@@ -52,7 +46,7 @@ static struct mod_info jitter_info[] = {
 #define NR_JITTER_INFO sizeof(jitter_info)/sizeof(struct mod_info)
 struct summary summary;
 
-static int prepare_dictory(char *path)
+int prepare_jitter_dictory(char *path)
 {
 	int ret;
 
@@ -63,15 +57,16 @@ static int prepare_dictory(char *path)
 		return 0;
 }
 
-static int init_sysak(void)
+int init_sysak(void)
 {
-	FILE *fp1, *fp2, *fp3;
 	int ret;
+	FILE *fp1, *fp2, *fp3;
+	char *mservice_log_dir = "/var/log/sysak/mservice/";
 
 	if (jitter_init)
 		return 0;
 
-	ret = prepare_dictory(mservice_log_dir);
+	ret = prepare_jitter_dictory(mservice_log_dir);
 	if (ret)
 		return ret;
 
@@ -101,23 +96,21 @@ static int init_sysak(void)
 static int get_jitter_info(char *path, struct summary *sump)
 {
 	int ret = -1;
-	char line[4096];
 	FILE *fp;
 
 	if((fp = fopen(path, "r")) == NULL) {
 		fprintf(stderr, "fopen %s fail\n", path);
 		return ret;
 	}
-
 	memset(line, 0, sizeof(line));
-	if (fgets(line, 4096, fp) != NULL) {
+	if (fgets(line, sizeof(line), fp) != NULL) {
 		/* "irqoff", "noschd", "rqslow" has 6 charactors */
-		sscanf(line+6, "%lu %llu %d %d %d %d %llu %llu %d %d",
+		sscanf(line+6, "%lu %llu %d %d %d %d %lu %lu %lu %lu",
 			&sump->num, &sump->total,
 			&sump->lastcpu0, &sump->lastcpu1,
 			&sump->lastcpu2, &sump->lastcpu3,
-			&sump->max_value, &sump->max_stamp,
-			&sump->max_cpu, &sump->max_pid);
+			&sump->lastjit0, &sump->lastjit1,
+			&sump->lastjit2, &sump->lastjit3);
 		ret = 0;
 	} else {
 		fprintf(stderr, "fgets %s fail:%s\n", path, strerror(errno));
@@ -138,12 +131,12 @@ void print_jitter_stats(struct module *mod)
 		ret = get_jitter_info(log_path[i], &summary);
 		if (ret < 0)
 			continue;
-		pos += snprintf(g_buf + pos, BUF_SIZE - pos, "%s=%ld,%llu,%d,%d,%d,%d,%llu,%llu,%d,%d,%d" ITEM_SPLIT,
+		pos += snprintf(g_buf + pos, BUF_SIZE - pos, "%s=%ld,%llu,%d,%d,%d,%d,%lu,%lu,%lu,%lu,%d" ITEM_SPLIT,
 			jit_mod[i], summary.num, summary.total,
 			summary.lastcpu0, summary.lastcpu1,
 			summary.lastcpu2, summary.lastcpu3,
-			summary.max_value, summary.max_stamp,
-			summary.max_cpu, summary.max_pid, pos);
+			summary.lastjit0, summary.lastjit1,
+			summary.lastjit2, summary.lastjit3, pos);
 	}
 	set_mod_record(mod, g_buf);
 }
@@ -151,7 +144,6 @@ void print_jitter_stats(struct module *mod)
 void read_jitter_stat(struct module *mod, char *parameter)
 {
 	int ret;
-
 	ret = init_sysak();
 	if (ret)
 		fprintf(stderr, "init_sysak failed\n");/*todo*/
@@ -169,20 +161,15 @@ set_jitter_record(struct module *mod, double st_array[],
 	st_array[3] = cur_array[3];
 	st_array[4] = cur_array[4];
 	st_array[5] = cur_array[5];
-	st_array[6] = cur_array[6];
-	st_array[7] = cur_array[7];
-
-	st_array[8] = cur_array[8];
-	st_array[9] = cur_array[9];
 
 	if (cur_array[0] >= pre_array[0])
-		st_array[10] = cur_array[0] - pre_array[0];
+		st_array[6] = cur_array[0] - pre_array[0];
 	else
-		st_array[10] = -1;
+		st_array[6] = -1;
 	if (cur_array[1] >= pre_array[1])
-		st_array[11] = cur_array[1] - pre_array[1];
+		st_array[7] = cur_array[1] - pre_array[1];
 	else
-		st_array[11] = -1;
+		st_array[7] = -1;
 }
 
 void
