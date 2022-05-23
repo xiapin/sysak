@@ -853,8 +853,10 @@ static unsigned long jitter_cgroup_matched(int cg_idx, struct sum_jitter_info *s
 	if (!file)
 		return 0;
 	memset(buffer, 0, sizeof(buffer));
-	if (!fgets(buffer, sizeof(buffer), file))
+	if (!fgets(buffer, sizeof(buffer), file)) {
+		fclose(file);
 		return 0;
+	}
 	pbuf = buffer;
 	cpusets = 0;
 	while((token = strsep(&pbuf, ",")) != NULL) {
@@ -892,6 +894,7 @@ static unsigned long jitter_cgroup_matched(int cg_idx, struct sum_jitter_info *s
 			mask |= 1 << i;
 	}
 	sum->lastnum = sum->num;
+	fclose(file);
 	return mask;
 }
 
