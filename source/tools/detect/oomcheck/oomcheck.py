@@ -16,7 +16,7 @@ import argparse
 import getopt
 
 OOM_REASON_CGROUP = '内存使用达到cgroup limit',
-OOM_REASON_PCGROUP = '父Cgroup内存使用达到limit',
+OOM_REASON_PCGROUP = '内存使用达到父cgroup limit',
 OOM_REASON_HOST = '主机内存不足',
 OOM_REASON_MEMLEAK = '主机内存不足,存在内存泄漏',
 OOM_REASON_NODEMASK = 'mempolicy配置不合理',
@@ -309,9 +309,33 @@ def oom_cgroup_output(oom_result, num):
     reason = oom['reason']
     if not oom_is_cgroup_oom(reason):
         return summary
-    summary += "cgroup内存使用量:%s,"%(oom['cg_usage'])
-    summary += "cgroup内存限制:%s\n"%(oom['cg_limit'])
+    pre = "cgroup"
+    if oom['podName'] != 'unknow':
+        pre = 'pod'
+    elif oom['containerID '] != 'unknow':
+        pre = 'container'
+    summary += "%s memory usage: %s,"%(pre, oom['cg_usage'])
+    summary += " limit: %s\n"%(oom['cg_limit'])
+    summary += "oom cgroup: %s\n"%(oom['cg_name'])
     return summary
+
+def oom_get_ipcs(shmem):
+    if not os.path.exists('/proc/sysvipc/shm'):
+        return False
+    fd = open('/proc/sysvipc/shm', 'r')
+    lines = fd.readlines()
+    fd.close()
+    ipcs = 0
+    for line in lines:
+        if line.find('nattch') != -1 or line.find('shmid') != -1:
+            continue
+        line = line.split()
+        ipcs += int(line[-2])
+    if ipcs > shmem:
+        return False
+    if ipcs > shmem*0.55 * 1024:
+        return True
+    return False
 
 def oom_cgroup_output_ext(oom_result, num):
     summary = ''
@@ -320,8 +344,14 @@ def oom_cgroup_output_ext(oom_result, num):
     if not oom_is_cgroup_oom(reason):
         return summary
     anon = int(oom["cg_inanon"]) + int(oom["cg_anon"]) - int(oom["cg_rss"])
+    ipcs = False
     if anon > int(oom['cg_usage'][:-2])*0.3:
-        summary = ",且shmem内存使用量%dKB,需要清理tmpfs文件或ipcs"%(anon)
+        ipcs = oom_get_ipcs(anon)
+        if ipcs == True:
+            msg = "需要清理共享内存ipcs"
+        else:
+            msg = "需要清理tmpfs文件"
+        summary = ",并且shmem内存使用量%dKB,%s"%(anon, msg)
     return summary
 
 
@@ -356,6 +386,7 @@ def oom_get_podName(cgName, cID):
 
 def oom_get_k8spod(oom_result,num):
     oom = oom_result['sub_msg'][num]
+    summary = ''
     cgName = oom['cg_name']
     oom['podName'] = 'unknow'
     oom['containerID '] = 'unknow'
@@ -366,11 +397,9 @@ def oom_get_k8spod(oom_result,num):
         index = cgName.find("docker-")
         if index != -1:
             index = index + 7
-    if index == -1:
-        return ''
-    oom['containerID '] = cgName[index: index+13]
-    oom['podName'] = oom_get_podName(cgName, oom['containerID '])
-    summary = ''
+    if index != -1:
+        oom['containerID '] = cgName[index: index+13]
+        oom['podName'] = oom_get_podName(cgName, oom['containerID '])
     summary += "podName: %s, containerID: %s\n"%(oom['podName'], oom['containerID '])
     return summary
 
@@ -379,15 +408,16 @@ def oom_output_msg(oom_result,num):
     summary = ''
     #print("oom time = {} spectime = {}".format(oom['time'], oom_result['spectime']))
     task = oom['task_name']
-    summary += "Kill进程: %s,Pid:%s\n"%(task[1:-1], oom['pid'])
-    summary += "进程Kill次数:%s,进程内存占用量:%sKB\n"%(oom_result['task'][task], oom['killed_task_mem']/1024)
-    summary += "进程所属cgroup:%s,"%(oom['cg_name'])
+    summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], oom['killed_task_mem']/1024)
+    #summary += "进程Kill次数:%s,进程内存占用量:%sKB\n"%(oom_result['task'][task], oom['killed_task_mem']/1024)
+    #summary += "oom cgroup:%s"%(oom['cg_name'])
     if oom['cg_name'] in oom_result['cgroup']:
-        summary += "cgroup OOM总次数:%s\n"%(oom_result['cgroup'][oom['cg_name']])
+        #summary += "oom总次数:%s\n"%(oom_result['cgroup'][oom['cg_name']])
         summary += oom_get_k8spod(oom_result, num)
     summary += oom_cgroup_output(oom_result, num)
+    #summary += "oom cgroup: %s\n"%(oom['cg_name'])
     summary += oom_host_output(oom_result, num)
-    summary += "诊断结论:%s"%(oom['reason'])
+    summary += "诊断结论: %s "%(oom['reason'])
     summary += oom_cgroup_output_ext(oom_result, num)
     summary += oom_check_score(oom, oom_result)
     return summary
@@ -557,7 +587,7 @@ def oom_diagnose(sn, data, mode):
         dmesgs = data['dmesg']
         if OOM_BEGIN_KEYWORD in dmesgs:
             oom_dmesg_analyze(dmesgs, oom_result)
-            oom_result['summary'] += "主机OOM总次数: %s\n"%oom_result['oom_total_num']
+            oom_result['summary'] += "total oom: %s\n"%oom_result['oom_total_num']
 
             sorted_tasks = sorted(oom_result['task'].items(), key = lambda kv:(kv[1], kv[0]), reverse=True)
             sorted_cgroups = sorted(oom_result['cgroup'].items(), key = lambda kv:(kv[1], kv[0]), reverse=True)
