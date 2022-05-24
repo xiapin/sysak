@@ -319,7 +319,9 @@ def oom_cgroup_output(oom_result, num):
     summary += "oom cgroup: %s\n"%(oom['cg_name'])
     return summary
 
-def oom_get_ipcs(shmem):
+def oom_get_ipcs(oom_result, shmem):
+    if oom_result['mode'] == 2:
+        return False
     if not os.path.exists('/proc/sysvipc/shm'):
         return False
     fd = open('/proc/sysvipc/shm', 'r')
@@ -346,7 +348,7 @@ def oom_cgroup_output_ext(oom_result, num):
     anon = int(oom["cg_inanon"]) + int(oom["cg_anon"]) - int(oom["cg_rss"])
     ipcs = False
     if anon > int(oom['cg_usage'][:-2])*0.3:
-        ipcs = oom_get_ipcs(anon)
+        ipcs = oom_get_ipcs(oom_result, anon)
         if ipcs == True:
             msg = "需要清理共享内存ipcs"
         else:
@@ -381,17 +383,19 @@ def oom_check_dup(oom, oom_result):
        summary = '并且%d个%s进程累加消耗内存%dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
     return summary
 
-def oom_get_podName(cgName, cID):
+def oom_get_podName(cgName, cID, oom_result):
     podName = 'unknow'
+    if oom_result['mode'] == 2:
+        return podName
     if cgName.find("kubepods") == -1:
-        return "unknow"
+        return podName
     cmd = "crictl inspect " + cID +" 2>/dev/null" +" | grep -w io.kubernetes.pod.name "
     res = os.popen(cmd).read().strip()
     if res.find("io.kubernetes.pod.name") == -1:
-        return 'unknow'
+        return podName
     res = res.split()
     if len(res) < 2:
-        return 'unkonw'
+        return podName
     if res[0].find("io.kubernetes.pod.name") != -1:
         podName = res[1][1:-2]
     return podName
@@ -411,7 +415,7 @@ def oom_get_k8spod(oom_result,num):
             index = index + 7
     if index != -1:
         oom['containerID '] = cgName[index: index+13]
-        oom['podName'] = oom_get_podName(cgName, oom['containerID '])
+        oom['podName'] = oom_get_podName(cgName, oom['containerID '], oom_result)
     summary += "podName: %s, containerID: %s\n"%(oom['podName'], oom['containerID '])
     return summary
 
@@ -602,6 +606,7 @@ def oom_diagnose(sn, data, mode):
     try:
         oom_result = {}
         oom_result['task'] = ""
+        oom_result['mode'] = mode
         oom_result['summary'] = ""
         oom_result['oom_total_num'] = 0
         oom_result['cgroup'] = {}
