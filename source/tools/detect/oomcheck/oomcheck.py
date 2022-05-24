@@ -14,9 +14,10 @@ import importlib
 import json
 import argparse
 import getopt
+import traceback
 
-OOM_REASON_CGROUP = '内存使用达到cgroup limit',
-OOM_REASON_PCGROUP = '内存使用达到父cgroup limit',
+OOM_REASON_CGROUP = '内存使用达到cgroup限制',
+OOM_REASON_PCGROUP = '内存使用达到父cgroup限制',
 OOM_REASON_HOST = '主机内存不足',
 OOM_REASON_MEMLEAK = '主机内存不足,存在内存泄漏',
 OOM_REASON_NODEMASK = 'mempolicy配置不合理',
@@ -153,7 +154,6 @@ def oom_get_task_mem(oom_result, line, num):
     shmem_rss = line.strip().split('shmem-rss:')[1].split()[0].strip(',')
     oom_result['sub_msg'][num]['killed_task_mem'] = (
         int(bignum_to_num(anon_rss)) + int(bignum_to_num(file_rss)) + int(bignum_to_num(shmem_rss)))
-
 def oom_get_host_mem(oom_result, line, num):
     oom_result['sub_msg'][num]['reason'] = OOM_REASON_HOST
     memory_free = line.strip().split('Normal free:')[1].split()[0]
@@ -358,16 +358,29 @@ def oom_cgroup_output_ext(oom_result, num):
 def oom_check_score(oom, oom_result):
     res = oom_result['max']
     res_total = oom_result['max_total']
+    summary = ''
     if res['pid'] == 0:
-        return '\n'
+        return False, "\n"
     if int(oom['pid'].strip()) == res['pid']:
-        return '\n'
+        return False, '\n'
     if res['score'] >= 0:
-        return '\n'
-    if res['task'] == res_total['task']:
-        return '，进程%s(%s)消耗内存%dKB,oom_score_adj:%s. 另需进一步确认进程oom score设置是否合理.'%(res['task'],res['pid'],res['rss']*4,res['score'])
-    else:
-        return '，%d个进程%s累加消耗内存%dKB,oom_score_adj:%s. 另需进一步确认进程oom score设置是否合理.'%(res_total['cnt'],res_total['task'],res_total['rss']*4,res_total['score'])
+        return False, "\n"
+    many = False
+    if (res_total['cnt']) > 2 and (res_total['rss']*0.8 > res['rss']):
+        many = True
+    if res['task'] == res_total['task'] or many == False:
+        return True, '，进程%s(%s)消耗内存%dKB,oom_score_adj:%s，需进一步确认oom score设置是否合理\n'%(res['task'],res['pid'],res['rss']*4,res['score'])
+
+    return False, "\n"
+
+def oom_check_dup(oom, oom_result):
+    res = oom_result['max']
+    res_total = oom_result['max_total']
+    cg_usage = oom['cg_usage']
+    summary = '\n'
+    if (res_total['rss'] *4 > int(cg_usage[:-2])*0.35) and (res_total['cnt'] > 2):
+       summary = '并且%d个%s进程累加消耗内存%dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
+    return summary
 
 def oom_get_podName(cgName, cID):
     podName = 'unknow'
@@ -403,12 +416,15 @@ def oom_get_k8spod(oom_result,num):
     summary += "podName: %s, containerID: %s\n"%(oom['podName'], oom['containerID '])
     return summary
 
-def oom_output_msg(oom_result,num):
+def oom_output_msg(oom_result,num, summary):
     oom = oom_result['sub_msg'][num]
-    summary = ''
+    reason = ''
     #print("oom time = {} spectime = {}".format(oom['time'], oom_result['spectime']))
     task = oom['task_name']
-    summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], oom['killed_task_mem']/1024)
+    task_mem = oom['killed_task_mem']
+    if task_mem == 0 and oom['pid'] in oom['state_mem']:
+        task_mem = oom['state_mem'][oom['pid']]
+    summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], task_mem/1024)
     #summary += "进程Kill次数:%s,进程内存占用量:%sKB\n"%(oom_result['task'][task], oom['killed_task_mem']/1024)
     #summary += "oom cgroup:%s"%(oom['cg_name'])
     if oom['cg_name'] in oom_result['cgroup']:
@@ -417,10 +433,18 @@ def oom_output_msg(oom_result,num):
     summary += oom_cgroup_output(oom_result, num)
     #summary += "oom cgroup: %s\n"%(oom['cg_name'])
     summary += oom_host_output(oom_result, num)
-    summary += "诊断结论: %s "%(oom['reason'])
-    summary += oom_cgroup_output_ext(oom_result, num)
-    summary += oom_check_score(oom, oom_result)
-    return summary
+    reason = "诊断结论: %s "%(oom['reason'])
+    reason += oom_cgroup_output_ext(oom_result, num)
+    ret, res = oom_check_score(oom, oom_result)
+    if ret == False:
+        reason+= oom_check_dup(oom, oom_result)
+    else:
+        reason += res
+    if 'msg' in oom['state_mem']:
+        summary += "memory stats:\n"
+        for line in oom['state_mem']['msg']:
+            summary += line +'\n'
+    return reason + summary
 
 def oom_get_max_task(num, oom_result):
     oom = oom_result['sub_msg'][num]
@@ -428,10 +452,12 @@ def oom_get_max_task(num, oom_result):
     res = oom_result['max']
     res_total = oom_result['max_total']
     rss_all = {}
-
+    state = oom['state_mem']
+    state['msg'] = []
     for line in oom['oom_msg']:
         if 'rss' in line and 'oom_score_adj' in line and 'name' in line:
             dump_task = True
+            state['msg'].append(line)
             continue
         if not dump_task:
             continue
@@ -455,7 +481,8 @@ def oom_get_max_task(num, oom_result):
         else:
             rss_all[last[-1]]['rss'] += int(last[3])
             rss_all[last[-1]]['cnt'] += 1
-
+        state['msg'].append(line)
+        state[str(pid)] = int(last[3]) *4
         if int(last[3]) >  res['rss']:
             res['rss'] = int(last[3])
             res['score'] = int(last[-2])
@@ -468,9 +495,8 @@ def oom_get_max_task(num, oom_result):
             res_total['task'] = last[-1]
     return res
 
-def oom_reason_analyze(num, oom_result):
+def oom_reason_analyze(num, oom_result, summary):
     try:
-        summary = ""
         node_num = 0
         for line in oom_result['sub_msg'][num]['oom_msg']:
             #print line
@@ -498,11 +524,11 @@ def oom_reason_analyze(num, oom_result):
                 oom_get_task_mem(oom_result, line, num)
                 oom_get_pid(oom_result, line, num)
         oom_result['node_num'] = node_num
-        summary = oom_output_msg(oom_result, num)
+        summary = oom_output_msg(oom_result, num, summary)
         oom_result['sub_msg'][num]['summary'] = summary
         return summary
     except Exception as err:
-        print ("oom_reason_analyze err {}\n".format(err))
+        print ("oom_reason_analyze err {} lines {}\n".format(err, traceback.print_exc()))
         return ""
 
 def oom_dmesg_analyze(dmesgs, oom_result):
@@ -527,6 +553,7 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_result['sub_msg'][oom_result['oom_total_num']]['task_name'] = task_name
                 oom_result['sub_msg'][oom_result['oom_total_num']]['pid'] = "0"
                 oom_result['sub_msg'][oom_result['oom_total_num']]['killed_task_mem'] = 0
+                oom_result['sub_msg'][oom_result['oom_total_num']]['state_mem'] = {}
                 if line.find('[') != -1:
                     oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = oom_time_to_normal_time(line.split('[')[1].split(']')[0])
                 oom_result['time'].append(oom_result['sub_msg'][oom_result['oom_total_num']]['time'])
@@ -596,8 +623,8 @@ def oom_diagnose(sn, data, mode):
             if num < 0 or num > last_oom:
                 num = last_oom
             res = oom_get_max_task(num, oom_result)
-            submsg = oom_reason_analyze(num, oom_result)
-            oom_result['summary'] += submsg
+            submsg = oom_reason_analyze(num, oom_result, oom_result['summary'])
+            oom_result['summary'] = submsg
         data['oom_result'] = oom_result
         return oom_result['summary']
 
