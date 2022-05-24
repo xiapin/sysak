@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
-/* Copyright (c) 2021 Sartura */
-/*
- * Todo: 1. how to distinguish CONFIG_THREAD_INFO_IN_TASK configured?
- *       2. why #ifdef __x86_64__ not work at nosched.bpf.c?
- *       3. some magic NUMBER, like max_entries, need to be configable
- * */
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>

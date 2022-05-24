@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
-// Copyright (c) 2019 Facebook
-//
-// Based on runqslower(8) from BCC by Ivan Babrou.
-// 11-Feb-2020   Andrii Nakryiko   Created this.
 #include <argp.h>
 #include <unistd.h>
 #include <signal.h>
@@ -40,8 +35,6 @@ struct env {
 };
 
 const char *argp_program_version = "runqslower 0.1";
-const char *argp_program_bug_address =
-	"https://github.com/iovisor/bcc/tree/master/libbpf-tools";
 const char argp_program_doc[] =
 "Trace high run queue latency.\n"
 "\n"

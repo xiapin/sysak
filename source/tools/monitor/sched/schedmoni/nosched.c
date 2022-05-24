@@ -1,7 +1,3 @@
-// SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
-/* Copyright (c) 2021 Sartura
- * Based on minimal.c by Facebook */
-
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
