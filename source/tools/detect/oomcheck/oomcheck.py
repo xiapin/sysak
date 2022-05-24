@@ -153,7 +153,7 @@ def oom_get_task_mem(oom_result, line, num):
     file_rss = line.strip().split('file-rss:')[1].split()[0].strip(',')
     shmem_rss = line.strip().split('shmem-rss:')[1].split()[0].strip(',')
     oom_result['sub_msg'][num]['killed_task_mem'] = (
-        int(bignum_to_num(anon_rss)) + int(bignum_to_num(file_rss)) + int(bignum_to_num(shmem_rss)))
+        int(bignum_to_num(anon_rss)) + int(bignum_to_num(file_rss)) + int(bignum_to_num(shmem_rss)))/1024
 def oom_get_host_mem(oom_result, line, num):
     oom_result['sub_msg'][num]['reason'] = OOM_REASON_HOST
     memory_free = line.strip().split('Normal free:')[1].split()[0]
@@ -273,34 +273,34 @@ def oom_host_output(oom_result, num):
         is_low = True
     if oom['mems_allowed'][0] != -1 and oom_result['node_num'] != len(oom['mems_allowed']) and is_low:
         oom['reason'] = OOM_REASON_NODE
-        summary += "Node总内存:%d\n"%(oom_result['node_num'])
-        summary += "Cpuset名:%s,"%(oom['cpuset'])
-        summary += "Cpuset内存配置:"
+        summary += "total node:%d\n"%(oom_result['node_num'])
+        summary += "cpuset:%s,"%(oom['cpuset'])
+        summary += "cpuset config:"
         for node in oom['mems_allowed']:
             summary +="%s "%(node)
         summary += "\n"
-        summary += "Node剩余内存:%s,"%(oom['host_free'])
-        summary += "Node low水线:%s\n"%(oom['host_low'])
+        summary += "node free:%s,"%(oom['host_free'])
+        summary += "low:%s\n"%(oom['host_low'])
         return summary
     elif 'nodemask' in oom and oom['nodemask'][0] != -1 and len(oom['nodemask']) != oom_result['node_num'] and free > low * 2:
         oom['reason'] = OOM_REASON_NODEMASK
-        summary += "Node总内存:%d\n"%(oom_result['node_num'])
-        summary += "nodemask内存配置:"
+        summary += "total node:%d\n"%(oom_result['node_num'])
+        summary += "nodemask config:"
         for node in oom['nodemask']:
             summary +="%s "%(node)
         summary += "\n"
-        summary += "Node剩余内存:%s,"%(oom['host_free'])
-        summary += "Node low水线:%s\n"%(oom['host_low'])
+        summary += "node free:%s,"%(oom['host_free'])
+        summary += "low:%s\n"%(oom['host_low'])
         return summary
     elif oom_is_memfrag_oom(oom):
-        summary += "分配Order:%d\n"%(oom['order'])
+        summary += "分配order:%d\n"%(oom['order'])
         oom['reason'] = OOM_REASON_MEMFRAG
     elif oom_is_memleak(oom, oom_result):
         summary += "SUnreclaim:%d\n"%(oom['slab'])
         oom['reason'] = OOM_REASON_MEMLEAK
 
-    summary += "主机剩余内存:%s,"%(oom['host_free'])
-    summary += "主机Low水线:%s\n"%(oom['host_low'])
+    summary += "host free:%s,"%(oom['host_free'])
+    summary += "low:%s\n"%(oom['host_low'])
     return summary
 
 def oom_cgroup_output(oom_result, num):
@@ -376,9 +376,8 @@ def oom_check_score(oom, oom_result):
 def oom_check_dup(oom, oom_result):
     res = oom_result['max']
     res_total = oom_result['max_total']
-    cg_usage = oom['cg_usage']
     summary = '\n'
-    if (res_total['rss'] *4 > int(cg_usage[:-2])*0.35) and (res_total['cnt'] > 2):
+    if (res_total['rss']*4 > oom['killed_task_mem']*1.5) and (res_total['cnt'] > 2):
        summary = '并且%d个%s进程累加消耗内存%dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
     return summary
 
@@ -386,7 +385,7 @@ def oom_get_podName(cgName, cID):
     podName = 'unknow'
     if cgName.find("kubepods") == -1:
         return "unknow"
-    cmd = "crictl inspect " + cID + " | grep -w io.kubernetes.pod.name "
+    cmd = "crictl inspect " + cID +" 2>/dev/null" +" | grep -w io.kubernetes.pod.name "
     res = os.popen(cmd).read().strip()
     if res.find("io.kubernetes.pod.name") == -1:
         return 'unknow'
@@ -424,7 +423,9 @@ def oom_output_msg(oom_result,num, summary):
     task_mem = oom['killed_task_mem']
     if task_mem == 0 and oom['pid'] in oom['state_mem']:
         task_mem = oom['state_mem'][oom['pid']]
-    summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], task_mem/1024)
+        oom['killed_task_mem'] = task_mem
+    summary += "total rss: %d KB\n"%(oom['state_mem']['total_rss'])
+    summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], task_mem)
     #summary += "进程Kill次数:%s,进程内存占用量:%sKB\n"%(oom_result['task'][task], oom['killed_task_mem']/1024)
     #summary += "oom cgroup:%s"%(oom['cg_name'])
     if oom['cg_name'] in oom_result['cgroup']:
@@ -454,6 +455,7 @@ def oom_get_max_task(num, oom_result):
     rss_all = {}
     state = oom['state_mem']
     state['msg'] = []
+    state['total_rss'] = 0
     for line in oom['oom_msg']:
         if 'rss' in line and 'oom_score_adj' in line and 'name' in line:
             dump_task = True
@@ -483,6 +485,7 @@ def oom_get_max_task(num, oom_result):
             rss_all[last[-1]]['cnt'] += 1
         state['msg'].append(line)
         state[str(pid)] = int(last[3]) *4
+        state['total_rss'] += int(last[3]) *4
         if int(last[3]) >  res['rss']:
             res['rss'] = int(last[3])
             res['score'] = int(last[-2])
