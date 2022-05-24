@@ -16,7 +16,7 @@
 #define BUF_SIZE	(NR_MODS * 4096)
 char g_buf[BUF_SIZE];
 char line[512];
-static int jitter_init = 0;
+int jitter_init = 0;
 char *jitter_usage = "    --jit                Application jitter stats";
 char *jit_mod[] = {"rqslow", "noschd", "irqoff"};
 char *log_path[] = {
@@ -35,12 +35,12 @@ struct summary {
 static struct mod_info jitter_info[] = {
 	{"   num", HIDE_BIT,  0,  STATS_NULL},		/* total numbers of happend */
 	{"  time", HIDE_BIT,  0,  STATS_NULL},		/* the sum-time of delay */
-	{" lCPU0", DETAIL_BIT,  0,  STATS_NULL},	/* last happened cpu[0] */
-	{" lCPU1", DETAIL_BIT,  0,  STATS_NULL},	/* last happened cpu[1] */
-	{" lCPU2", DETAIL_BIT,  0,  STATS_NULL},	/* last happened cpu[2] */
-	{" lCPU3", DETAIL_BIT,  0,  STATS_NULL},	/* last happened cpu[3] */
-	{"dltnum", SUMMARY_BIT,  0,  STATS_NULL},	/* delta numbers of happend */
-	{" dlttm", SUMMARY_BIT,  0,  STATS_NULL},	/* the delta time of delay */
+	{" lCPU0", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[0] */
+	{" lCPU1", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[1] */
+	{" lCPU2", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[2] */
+	{" lCPU3", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[3] */
+	{"dltnum", HIDE_BIT,  0,  STATS_NULL},	/* delta numbers of happend */
+	{" dlttm", HIDE_BIT,  0,  STATS_NULL},	/* the delta time of delay */
 };
 
 #define NR_JITTER_INFO sizeof(jitter_info)/sizeof(struct mod_info)
@@ -57,14 +57,35 @@ int prepare_jitter_dictory(char *path)
 		return 0;
 }
 
-int init_sysak(void)
+static int cg_jitter_inited(void)
+{
+	int *cg_jitter_symbol;
+	int jit_inited;
+	void *handle = dlopen(NULL, RTLD_LAZY);
+	if (handle) {
+		cg_jitter_symbol = dlsym(handle, "cg_jitter_init");
+		if (cg_jitter_symbol)
+			jit_inited = *cg_jitter_symbol + jitter_init;
+		else
+			jit_inited = jitter_init;
+	} else {
+		fprintf(stderr, "jitter:dlopen NULL fail\n");
+		jit_inited = -1;
+	}
+	return jit_inited;
+}
+
+int init_jitter(void)
 {
 	int ret;
 	FILE *fp1, *fp2, *fp3;
 	char *mservice_log_dir = "/var/log/sysak/mservice/";
 
-	if (jitter_init)
+	ret = cg_jitter_inited();
+	if (ret > 0)
 		return 0;
+	else if (ret < 0)
+		return ret;
 
 	ret = prepare_jitter_dictory(mservice_log_dir);
 	if (ret)
@@ -90,6 +111,8 @@ int init_sysak(void)
 		return -1;
 	}
 	jitter_init = 1;
+	jitter_info[2].summary_bit = jitter_info[3].summary_bit = jitter_info[4].summary_bit = jitter_info[5].summary_bit = DETAIL_BIT;
+	jitter_info[6].summary_bit = jitter_info[7].summary_bit = SUMMARY_BIT;
 	return 0;
 }
 
@@ -144,9 +167,9 @@ void print_jitter_stats(struct module *mod)
 void read_jitter_stat(struct module *mod, char *parameter)
 {
 	int ret;
-	ret = init_sysak();
+	ret = init_jitter();
 	if (ret)
-		fprintf(stderr, "init_sysak failed\n");/*todo*/
+		fprintf(stderr, "init_jitter failed\n");/*todo*/
 
 	print_jitter_stats(mod);
 }

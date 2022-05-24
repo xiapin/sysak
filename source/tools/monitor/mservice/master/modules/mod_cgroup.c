@@ -28,18 +28,15 @@ char *cg_usage = "    --cg                Linux container stats";
 #define JITITEM		4
 #define	CONID_LEN	13
 
-static int cg_jitter_init = 0;
+int cg_jitter_init = 0;
 int nr_cpus;
-//extern char *cg_jit_mod[];
 char *cg_jit_mod[] = {"rqslow", "noschd", "irqoff"};
-char *log_path[] = {
+char *cg_log_path[] = {
 	"/var/log/sysak/mservice/runqslower",
 	"/var/log/sysak/mservice/nosched",
 	"/var/log/sysak/mservice/irqoff",
 };
-//extern char *log_path[];
-//int init_sysak(void);
-//int prepare_jitter_dictory(char *path);
+
 enum jitter_types {
 	RQSLOW,
 	NOSCHE,
@@ -229,17 +226,17 @@ static struct mod_info cg_info[] = {
 	{"rarqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	{"warqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	/* hw_events info 65-68 */
-	{"_cahms", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
-	{"cahmis", DETAIL_BIT,  0,  STATS_NULL},
-	{"_cahrf", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
-	{"cahref", DETAIL_BIT,  0,  STATS_NULL},
+	{"_cahms", HIDE_BIT,  MERGE_AVG,  STATS_NULL},
+	{"cahmis", HIDE_BIT,  0,  STATS_NULL},
+	{"_cahrf", HIDE_BIT,  MERGE_AVG,  STATS_NULL},
+	{"cahref", HIDE_BIT,  0,  STATS_NULL},
 	/* jitter info 69-74 */
-	{"numrsw", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of runqslow jitter */
-	{" tmrsw", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of runqslow delay */
-	{"numnsc", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of nosched jitter */
-	{" tmnsc", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of nosched delay */
-	{"numirq", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of irqoff jitter */
-	{" tmirq", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of irqoff delay */
+	{"numrsw", HIDE_BIT,  0,  STATS_NULL},	/* total numbers of runqslow jitter */
+	{" tmrsw", HIDE_BIT,  0,  STATS_NULL},	/* the sum-time of runqslow delay */
+	{"numnsc", HIDE_BIT,  0,  STATS_NULL},	/* total numbers of nosched jitter */
+	{" tmnsc", HIDE_BIT,  0,  STATS_NULL},	/* the sum-time of nosched delay */
+	{"numirq", HIDE_BIT,  0,  STATS_NULL},	/* total numbers of irqoff jitter */
+	{" tmirq", HIDE_BIT,  0,  STATS_NULL},	/* the sum-time of irqoff delay */
 };
 
 #define NR_CGROUP_INFO sizeof(cg_info)/sizeof(struct mod_info)
@@ -361,15 +358,35 @@ static int cg_prepare_jitter_dictory(char *path)
 		return 0;
 }
 
-static int cg_init_sysak(void)
+static int cg_jitter_inited(void)
+{
+	int *jitter_symbol;
+	int jit_inited;
+	void *handle = dlopen(NULL, RTLD_LAZY);
+	if (handle) {
+		jitter_symbol = dlsym(handle, "jitter_init");
+		if (jitter_symbol)
+			jit_inited = *jitter_symbol + cg_jitter_init;
+		else
+			jit_inited = cg_jitter_init; 
+	} else {
+		fprintf(stderr, "cgroup:dlopen NULL fail\n");
+		jit_inited = -1;
+	}
+	return jit_inited;
+}
+
+static int cg_init_jitter(void)
 {
 	int ret;
 	FILE *fp1, *fp2, *fp3;
 	char *mservice_log_dir = "/var/log/sysak/mservice/";
 
-	if (cg_jitter_init)
+	ret = cg_jitter_inited();
+	if (ret > 0)
 		return 0;
-
+	else if (ret < 0)
+		return ret;
 	ret = cg_prepare_jitter_dictory(mservice_log_dir);
 	if (ret)
 		return ret;
@@ -416,6 +433,7 @@ static void init_cgroups(void)
 	}
 
 	result = popen("docker ps -q", "r");
+	ret = -1;
 	for (i = 0; i < MAX_CGROUPS && !feof(result); i++) {
 		if (feof(result) || !fgets(buffer, sizeof(buffer), result))
 			break;
@@ -426,8 +444,16 @@ static void init_cgroups(void)
 		}
 		n_cgs++;
 	}
+	if (!ret) {
+		for (i = 65; i < 69; i++)
+			cg_info[i].summary_bit = DETAIL_BIT;
+	}
 	pclose(result);
-	cg_init_sysak();
+	ret = cg_init_jitter();
+	if (!ret) {
+		for (i = 69; i < 75; i++)
+			cg_info[i].summary_bit = DETAIL_BIT;
+	}
 	cgroup_init_time = time(NULL);
 }
 
@@ -935,8 +961,8 @@ int get_jitter_summary(struct sum_jitter_infos *sums)
 
 	for (i = 0; i < JITTER_NTYPE; i++) {
 		struct sum_jitter_info *sump = &sums->sum[i];
-		if((fp = fopen(log_path[i], "r")) == NULL) {
-			fprintf(stderr, "fopen %s fail\n", log_path[i]);
+		if((fp = fopen(cg_log_path[i], "r")) == NULL) {
+			fprintf(stderr, "fopen %s fail\n", cg_log_path[i]);
 			continue;
 		}
 		memset(line, 0, sizeof(line));
@@ -956,7 +982,7 @@ int get_jitter_summary(struct sum_jitter_infos *sums)
 				sump->container[2], sump->container[3]);
 			ret = 0;
 		} else {
-			fprintf(stderr, "fgets %s fail:%s\n", log_path[i], strerror(errno));
+			fprintf(stderr, "fgets %s fail:%s\n", cg_log_path[i], strerror(errno));
 		}
 retry:
 		rewind(fp);
