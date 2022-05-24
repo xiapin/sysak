@@ -47,15 +47,15 @@ static int memleak_check_only(struct meminfo *mi)
     printf("诊断结论:");
     if (mi->kernel < vmalloc)
         mi->kernel = vmalloc + 1;
-
-    if ((mi->kernel - vmalloc) > 1024*1024*1.5) {
+    ret = mi->kernel - vmalloc;
+    if ((ret > 1024*1024*1.5) && (ret > mi->tlmkb*0.1) || ret > 1024*1024*5) {
         printf("alloc page memleak\n");
         return MEMLEAK_TYPE_PAGE;
-    } else if (mi->uslabkb > 5*1024*1024 ||
+    } else if (mi->uslabkb > 4*1024*1024 ||
                 mi->uslabkb > mi->tlmkb*0.15) {
         printf("slab memleak\n");
         return MEMLEAK_TYPE_SLAB;
-    } else if (vmalloc > 2*1024 * 1024) {
+    } else if (vmalloc > 4*1024 * 1024 || (vmalloc > mi->tlmkb*0.10)&& (vmalloc > 1024*1024)) {
         printf("vmalloc memleak\n");
         return MEMLEAK_TYPE_VMALLOC;
     } else {
