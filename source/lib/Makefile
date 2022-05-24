@@ -3,6 +3,7 @@
 all:
 ifeq ($(BUILD_KERNEL_MODULE), YES)
 	make -C internal/kernel_module
+	cp internal/kernel_module/sysak.ko $(OBJ_LIB_PATH)/
 endif
 	make -C uapi
 ifeq ($(BUILD_LIBBPF), YES)
