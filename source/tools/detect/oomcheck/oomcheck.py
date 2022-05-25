@@ -23,8 +23,8 @@ OOM_REASON_MEMLEAK = '主机内存不足,存在内存泄漏',
 OOM_REASON_NODEMASK = 'mempolicy配置不合理',
 OOM_REASON_NODE = 'CPUSET 的mems值设置不合理',
 OOM_REASON_MEMFRAG = '内存碎片化,需要进行内存规整',
-OOM_RESAON_SYSRQ = 'sysrq',
-OOM_RESAON_OTHER = 'other'
+OOM_REASON_SYSRQ = 'sysrq',
+OOM_REASON_OTHER = 'other'
 
 
 OOM_BEGIN_KEYWORD = "invoked oom-killer"
@@ -157,6 +157,7 @@ def oom_get_task_mem(oom_result, line, num):
 
 def oom_get_host_mem(oom_result, line, num):
     oom_result['sub_msg'][num]['reason'] = OOM_REASON_HOST
+    oom_result['sub_msg'][num]['type'] = 'host'
     memory_free = line.strip().split('Normal free:')[1].split()[0]
     memory_low = line.strip().split('low:')[1].split()[0]
     oom_result['sub_msg'][num]['host_free'] = memory_free
@@ -198,6 +199,7 @@ def oom_get_cgroup_name(oom_result, line, num):
         is_host = True
     if is_host == False:
         oom_result['sub_msg'][num]['reason'] = OOM_REASON_CGROUP
+        oom_result['sub_msg'][num]['type'] = 'cgroup'
     task_list = line.strip().split("Task in")[1].strip().split()
     cgroup = task_list[0]
     pcgroup = task_list[-1]
@@ -219,6 +221,7 @@ def oom_set_node_oom(oom_result, num, node_num):
     is_host = oom_is_host_oom(oom_result['sub_msg'][num]['reason'])
     if is_host and len(task_mem_allow) != node_num:
             oom_result['sub_msg'][num]['reason'] = OOM_REASON_NODE
+            oom_result['sub_msg'][num]['type'] = 'node'
 
 def oom_get_hugepage(oom_result, line, num):
     if line.find('hugepages_total') == -1 or line.find('hugepages_size') == -1:
@@ -368,8 +371,10 @@ def oom_host_output(oom_result, num):
     is_low = False
     if free * 0.9  < low:
         is_low = True
+    oom['root'] = 'limit'
     if oom['mems_allowed'][0] != -1 and oom_result['node_num'] != len(oom['mems_allowed']) and is_low:
         oom['reason'] = OOM_REASON_NODE
+        oom['root'] = 'cpuset'
         summary += "total node:%d\n"%(oom_result['node_num'])
         summary += "cpuset:%s,"%(oom['cpuset'])
         summary += "cpuset config:"
@@ -381,6 +386,7 @@ def oom_host_output(oom_result, num):
         return summary
     elif 'nodemask' in oom and oom['nodemask'][0] != -1 and len(oom['nodemask']) != oom_result['node_num'] and free > low * 2:
         oom['reason'] = OOM_REASON_NODEMASK
+        oom['root'] = 'policy'
         summary += "total node:%d\n"%(oom_result['node_num'])
         summary += "nodemask config:"
         for node in oom['nodemask']:
@@ -392,9 +398,11 @@ def oom_host_output(oom_result, num):
     elif oom_is_memfrag_oom(oom):
         summary += "分配order:%d\n"%(oom['order'])
         oom['reason'] = OOM_REASON_MEMFRAG
+        oom['root'] = 'frag'
     leak = oom_is_memleak(oom, oom_result)
     if leak != False:
         oom['reason'] = OOM_REASON_MEMLEAK
+        oom['root'] = 'memleak'
         summary += leak
     summary += "host free:%s,"%(oom['host_free'])
     summary += "low:%s\n"%(oom['host_low'])
@@ -451,6 +459,7 @@ def oom_cgroup_output_ext(oom_result, num):
         else:
             msg = "需要清理tmpfs文件"
         summary = ",并且shmem内存使用量%dKB,%s"%(anon, msg)
+        oom['root'] = 'shmem'
     return summary
 
 
@@ -477,7 +486,8 @@ def oom_check_dup(oom, oom_result):
     res_total = oom_result['max_total']
     summary = '\n'
     if (res_total['rss']*4 > oom['killed_task_mem']*1.5) and (res_total['cnt'] > 2):
-       summary = '并且%d个%s进程累加消耗内存%dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
+        oom['root'] = 'fork'
+        summary = ',并且%d个%s进程累加消耗内存%dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
     return summary
 
 def oom_get_podName(cgName, cID, oom_result):
@@ -529,6 +539,7 @@ def oom_output_msg(oom_result,num, summary):
     summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], task_mem)
     #summary += "进程Kill次数:%s,进程内存占用量:%sKB\n"%(oom_result['task'][task], oom['killed_task_mem']/1024)
     #summary += "oom cgroup:%s"%(oom['cg_name'])
+    oom['root'] = 'limit'
     if oom['cg_name'] in oom_result['cgroup']:
         #summary += "oom总次数:%s\n"%(oom_result['cgroup'][oom['cg_name']])
         summary += oom_get_k8spod(oom_result, num)
@@ -666,6 +677,8 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_result['sub_msg'][oom_result['oom_total_num']]['killed_task_mem'] = 0
                 oom_result['sub_msg'][oom_result['oom_total_num']]['state_mem'] = {}
                 oom_result['sub_msg'][oom_result['oom_total_num']]['meminfo'] = {}
+                oom_result['sub_msg'][oom_result['oom_total_num']]['type'] = 'unknow'
+                oom_result['sub_msg'][oom_result['oom_total_num']]['root'] = 'unknow'
                 if line.find('[') != -1:
                     oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = oom_time_to_normal_time(line.split('[')[1].split(']')[0])
                 oom_result['time'].append(oom_result['sub_msg'][oom_result['oom_total_num']]['time'])
