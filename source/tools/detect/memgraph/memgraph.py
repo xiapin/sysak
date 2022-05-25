@@ -249,13 +249,12 @@ def memgraph_graph(meminfo):
 def kmemleak_check(meminfo, memType):
     kmem = meminfo[memType]/1024
     total = meminfo["MemTotal"]/1024
-    if kmem > 10240:
+    ''' 6G '''
+    if kmem > 1024*6:
         return True
-    elif kmem*100 < total*10:
-        return False
-    elif kmem < 1024:
-        return False
-    return True
+    elif (kmem*100 > total*10) and (kmem > 1024*1.5):
+        return True
+    return False
 
 def get_proc_file(meminfo,pid):
     filename = "/proc/" + pid + "/fd"

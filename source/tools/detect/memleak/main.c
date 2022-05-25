@@ -35,7 +35,10 @@ static void show_usage(void)
 	printf("-n: trace slab name, defualt select the max size or objects \n");
 
 }
-
+static int check_memleak(int total, int used)
+{
+    return !!((used >=6*1024*1024)||((used > total*0.1)&&(used > 1024*1024*1.5)));
+}
 static int memleak_check_only(struct meminfo *mi)
 {
     int ret = 0;
@@ -48,14 +51,13 @@ static int memleak_check_only(struct meminfo *mi)
     if (mi->kernel < vmalloc)
         mi->kernel = vmalloc + 1;
     ret = mi->kernel - vmalloc;
-    if ((ret > 1024*1024*1.5) && (ret > mi->tlmkb*0.1) || ret > 1024*1024*5) {
+    if (check_memleak(mi->tlmkb, ret)) {
         printf("alloc page memleak\n");
         return MEMLEAK_TYPE_PAGE;
-    } else if (mi->uslabkb > 4*1024*1024 ||
-                mi->uslabkb > mi->tlmkb*0.15) {
+    } else if (check_memleak(mi->tlmkb, mi->uslabkb)) {
         printf("slab memleak\n");
         return MEMLEAK_TYPE_SLAB;
-    } else if (vmalloc > 4*1024 * 1024 || (vmalloc > mi->tlmkb*0.10)&& (vmalloc > 1024*1024)) {
+    } else if (check_memleak(mi->tlmkb, vmalloc)) {
         printf("vmalloc memleak\n");
         return MEMLEAK_TYPE_VMALLOC;
     } else {
