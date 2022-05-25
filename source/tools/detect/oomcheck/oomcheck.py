@@ -154,6 +154,7 @@ def oom_get_task_mem(oom_result, line, num):
     shmem_rss = line.strip().split('shmem-rss:')[1].split()[0].strip(',')
     oom_result['sub_msg'][num]['killed_task_mem'] = (
         int(bignum_to_num(anon_rss)) + int(bignum_to_num(file_rss)) + int(bignum_to_num(shmem_rss)))/1024
+
 def oom_get_host_mem(oom_result, line, num):
     oom_result['sub_msg'][num]['reason'] = OOM_REASON_HOST
     memory_free = line.strip().split('Normal free:')[1].split()[0]
@@ -219,26 +220,99 @@ def oom_set_node_oom(oom_result, num, node_num):
     if is_host and len(task_mem_allow) != node_num:
             oom_result['sub_msg'][num]['reason'] = OOM_REASON_NODE
 
-def oom_get_slab_unrecl(oom_result, line, num):
-    if "min:" in line or "low:" in line:
-        oom_result['sub_msg'][num]['slab'] = 0
+def oom_get_hugepage(oom_result, line, num):
+    if line.find('hugepages_total') == -1 or line.find('hugepages_size') == -1:
         return True
-    slab_str = line.strip().split("slab_unreclaimable:")[1].split()[0]
-    if slab_str.endswith('kB'):
-        slab = int(slab_str[:-2])
-    else:
-        slab = int(slab_str)
-    oom_result['sub_msg'][num]['slab'] = slab
+    oom = oom_result['sub_msg'][num]
+    if 'hugepage' not in oom['meminfo']:
+        oom['meminfo']['hugepage'] = 0
+
+    hugetotal = line.split('hugepages_total=')[1]
+    hugetotal = int(hugetotal.strip().split()[0])
+
+    hugesize = line.split('hugepages_size=')[1]
+    hugesize = int(hugesize.strip()[:-2])
+    oom['meminfo']['hugepage'] = oom['meminfo']['hugepage'] + hugetotal*hugesize
+    #print("hugetotal: {} size:{}".format(hugetotal, hugesize))
+
+def oom_get_meminfo(oom_result, lines, index, num):
+    oom = oom_result['sub_msg'][num]
+    oom['meminfo']['slab'] = 0
+    oom['meminfo']['slabr'] = 0
+    oom['meminfo']['active_anon'] = 0
+    oom['meminfo']['inactive_anon'] = 0
+    oom['meminfo']['active_file'] = 0
+    oom['meminfo']['inactive_file'] = 0
+    oom['meminfo']['unevictable'] = 0
+    oom['meminfo']['pagetables'] = 0
+    oom['meminfo']['free'] = 0
+    oom['meminfo']['rmem'] = 0
+    oom['meminfo']['hugepage'] = 0
+    oom['meminfo']['total_mem'] = 0
+    if len(lines) < 10:
+        return True
+    line = lines[index+1]
+    if line.find('active_anon:') != -1:
+        str_list = line.split(']')[1].strip().split()
+        active_anon = int(str_list[0].strip().split(':')[1])
+        inactive_anon = int(str_list[1].strip().split(':')[1])
+        #print("active_anon: {} inactive_anon: {}".format(active_anon, inactive_anon))
+        oom['meminfo']['active_anon'] = active_anon*4
+        oom['meminfo']['inactive_anon'] = inactive_anon*4
+
+    line= lines[index+2]
+    if line.find('active_file:') != -1:
+        str_list = line.split()
+        active_file = int(str_list[0].strip().split(':')[1])
+        inactive_file = int(str_list[0].strip().split(':')[1])
+        #print("active_file : {} inactive_file: {}".format(active_file, inactive_file))
+        oom['meminfo']['active_file'] = active_file*4
+        oom['meminfo']['inactive_file'] = inactive_file*4
+    line = lines[index+3]
+    if line.find('unevictable:') != -1:
+        str_list = line.split()
+        unevictable = int(str_list[0].strip().split(':')[1])
+        #print("unevictable: {}".format(unevictable))
+        oom['meminfo']['unevictable'] = unevictable*4
+
+    line = lines[index+4]
+    if line.find('slab_unreclaimable:') != -1:
+        str_list = line.split()
+        slab_reclaimable = int(str_list[0].strip().split(':')[1])
+        slab_unreclaimable = int(str_list[1].strip().split(':')[1])
+        #print("slab_reclaimable: {} slab_unreclaimable:{}".format(slab_reclaimable, slab_unreclaimable))
+        oom['meminfo']['slab'] = slab_unreclaimable*4
+        oom['meminfo']['slabr'] = slab_reclaimable*4
+
+    line = lines[index+5]
+    if line.find('pagetables:') != -1:
+        str_list = line.split()
+        pagetables = int(str_list[2].strip().split(':')[1])
+        #print("pagetables:{}".format(pagetables))
+        oom['meminfo']['pagetables'] = pagetables*4
+
+    line = lines[index+6]
+    if line.find('free_pcp:') != -1:
+        str_list = line.split()
+        free = int(str_list[0].strip().split(':')[1])
+        #print("free:{}".format(free))
+        oom['meminfo']['free'] = free*4
     return True
 
 def oom_get_total_mem(oom_result, line, num):
     if "pages RAM" not in line:
-        oom_result['total_mem'] = 0
         return True
     total = line.strip().split(']')[1].strip().split()[0]
-    total = int(total)
-    oom_result['total_mem'] = total
+    total = int(total)*4
+    oom_result['sub_msg'][num]['meminfo']['total_mem'] = total
     return True
+
+def oom_get_rmem(oom_result, line, num):
+    if "pages reserved" not in line:
+        return True
+    rmem = line.strip().split(']')[1].strip().split()[0]
+    rmem = int(rmem)*4
+    oom_result['sub_msg'][num]['meminfo']['rmem'] = rmem
 
 def oom_is_cgroup_oom(cgroup):
     return cgroup == OOM_REASON_PCGROUP or cgroup == OOM_REASON_CGROUP
@@ -257,8 +331,31 @@ def oom_is_memfrag_oom(oom):
     return memfrag
 
 
+def memleak_check(total, kmem):
+    kmem = kmem/1024
+    total = total/1024
+    ''' 6G '''
+    if kmem > 1024*6:
+        return True
+    elif (kmem > total*0.1) and (kmem > 1024*1.5):
+        return True
+    return False
+
 def oom_is_memleak(oom, oom_result):
-    return oom['slab'] > oom_result['total_mem'] * 0.1
+    if 'meminfo' not in oom:
+        return False
+    meminfo = oom['meminfo']
+    total = meminfo['total_mem']
+    used = total - meminfo['slab'] - meminfo['slabr']
+    used = used - (meminfo['active_anon'] + meminfo['inactive_anon'])
+    used -= (meminfo['active_file'] + meminfo['inactive_file'])
+    used -= (meminfo['unevictable'] + meminfo['pagetables'])
+    used -= (meminfo['free'] + meminfo['hugepage'] + meminfo['rmem'])
+    if memleak_check(total, meminfo['slab']):
+        return "slab memleak, usage:%dkb\n"%(meminfo['slab'])
+    elif memleak_check(total, used):
+        return "allocpage memleak, usage:%dkb\n"%(used)
+    return False
 
 def oom_host_output(oom_result, num):
     oom = oom_result['sub_msg'][num]
@@ -295,10 +392,10 @@ def oom_host_output(oom_result, num):
     elif oom_is_memfrag_oom(oom):
         summary += "分配order:%d\n"%(oom['order'])
         oom['reason'] = OOM_REASON_MEMFRAG
-    elif oom_is_memleak(oom, oom_result):
-        summary += "SUnreclaim:%d\n"%(oom['slab'])
+    leak = oom_is_memleak(oom, oom_result)
+    if leak != False:
         oom['reason'] = OOM_REASON_MEMLEAK
-
+        summary += leak
     summary += "host free:%s,"%(oom['host_free'])
     summary += "low:%s\n"%(oom['host_low'])
     return summary
@@ -505,8 +602,11 @@ def oom_get_max_task(num, oom_result):
 def oom_reason_analyze(num, oom_result, summary):
     try:
         node_num = 0
-        for line in oom_result['sub_msg'][num]['oom_msg']:
-            #print line
+        lines = oom_result['sub_msg'][num]['oom_msg']
+        line_len = len(lines)
+        for key in range(line_len):
+            #print(key, lines[key])
+            line = lines[key]
             if "invoked oom-killer" in line:
                 oom_get_order(oom_result, line, num)
                 if 'nodemask' in line:
@@ -523,10 +623,14 @@ def oom_reason_analyze(num, oom_result, summary):
                 oom_get_cgroup_shmem(oom_result, line, num)
             elif "Normal free:" in line:
                 oom_get_host_mem(oom_result, line, num)
-            elif "slab_unreclaimable:" in line:
-                oom_get_slab_unrecl(oom_result, line, num)
+            elif "Mem-Info:" in line:
+                oom_get_meminfo(oom_result, lines, key,num)
             elif "pages RAM" in line:
                 oom_get_total_mem(oom_result, line, num)
+            elif "pages reserved" in line:
+                oom_get_rmem(oom_result, line, num)
+            elif "hugepages_total" in line:
+                oom_get_hugepage(oom_result, line, num)
             elif OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
                 oom_get_task_mem(oom_result, line, num)
                 oom_get_pid(oom_result, line, num)
@@ -561,6 +665,7 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_result['sub_msg'][oom_result['oom_total_num']]['pid'] = "0"
                 oom_result['sub_msg'][oom_result['oom_total_num']]['killed_task_mem'] = 0
                 oom_result['sub_msg'][oom_result['oom_total_num']]['state_mem'] = {}
+                oom_result['sub_msg'][oom_result['oom_total_num']]['meminfo'] = {}
                 if line.find('[') != -1:
                     oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = oom_time_to_normal_time(line.split('[')[1].split(']')[0])
                 oom_result['time'].append(oom_result['sub_msg'][oom_result['oom_total_num']]['time'])
@@ -615,8 +720,6 @@ def oom_diagnose(sn, data, mode):
         oom_result['last_time'] = {}
         oom_result['time'] = []
         oom_result['spectime'] = data['spectime']
-        oom_result['total_mem'] = 0
-        oom_result['slab'] = 0
         oom_result['max'] = {'rss':0,'task':"",'score':0,'pid':0}
         oom_result['max_total'] = {'rss':0,'task':"",'score':0,'cnt':0}
         dmesgs = data['dmesg']
