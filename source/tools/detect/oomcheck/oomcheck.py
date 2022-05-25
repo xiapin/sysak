@@ -348,6 +348,7 @@ def oom_is_memleak(oom, oom_result):
     if 'meminfo' not in oom:
         return False
     meminfo = oom['meminfo']
+    res = oom['json']
     total = meminfo['total_mem']
     used = total - meminfo['slab'] - meminfo['slabr']
     used = used - (meminfo['active_anon'] + meminfo['inactive_anon'])
@@ -355,14 +356,19 @@ def oom_is_memleak(oom, oom_result):
     used -= (meminfo['unevictable'] + meminfo['pagetables'])
     used -= (meminfo['free'] + meminfo['hugepage'] + meminfo['rmem'])
     if memleak_check(total, meminfo['slab']):
+        res['leaktype'] = 'slab'
+        res['leakusage'] = meminfo['slab']
         return "slab memleak, usage:%dkb\n"%(meminfo['slab'])
     elif memleak_check(total, used):
+        res['leaktype'] = 'allocpage'
+        res['leakusage'] = used
         return "allocpage memleak, usage:%dkb\n"%(used)
     return False
 
 def oom_host_output(oom_result, num):
     oom = oom_result['sub_msg'][num]
     reason = oom['reason']
+    res = oom['json']
     summary = ''
     if not oom_is_host_oom(reason):
         return summary
@@ -406,22 +412,27 @@ def oom_host_output(oom_result, num):
         summary += leak
     summary += "host free:%s,"%(oom['host_free'])
     summary += "low:%s\n"%(oom['host_low'])
+    res['host_free'] = oom['host_free']
+    res['host_low'] = oom['host_low']
     return summary
 
 def oom_cgroup_output(oom_result, num):
     summary = ''
     oom = oom_result['sub_msg'][num]
     reason = oom['reason']
+    res = oom['json']
     if not oom_is_cgroup_oom(reason):
         return summary
     pre = "cgroup"
     if oom['podName'] != 'unknow':
         pre = 'pod'
-    elif oom['containerID '] != 'unknow':
+    elif oom['containerID'] != 'unknow':
         pre = 'container'
     summary += "%s memory usage: %s,"%(pre, oom['cg_usage'])
     summary += " limit: %s\n"%(oom['cg_limit'])
     summary += "oom cgroup: %s\n"%(oom['cg_name'])
+    res['cg_usage'] = oom['cg_usage']
+    res['cg_limit'] = oom['cg_limit']
     return summary
 
 def oom_get_ipcs(oom_result, shmem):
@@ -448,6 +459,7 @@ def oom_cgroup_output_ext(oom_result, num):
     summary = ''
     oom = oom_result['sub_msg'][num]
     reason = oom['reason']
+    res = oom['json']
     if not oom_is_cgroup_oom(reason):
         return summary
     anon = int(oom["cg_inanon"]) + int(oom["cg_anon"]) - int(oom["cg_rss"])
@@ -460,6 +472,7 @@ def oom_cgroup_output_ext(oom_result, num):
             msg = "需要清理tmpfs文件"
         summary = ",并且shmem内存使用量%dKB,%s"%(anon, msg)
         oom['root'] = 'shmem'
+        res['shmem'] = anon
     return summary
 
 
@@ -486,7 +499,8 @@ def oom_check_dup(oom, oom_result):
     res_total = oom_result['max_total']
     summary = '\n'
     if (res_total['rss']*4 > oom['killed_task_mem']*1.5) and (res_total['cnt'] > 2):
-        oom['root'] = 'fork'
+        if oom['type'] == 'cgroup':
+            oom['root'] = 'fork'
         summary = ',并且%d个%s进程累加消耗内存%dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
     return summary
 
@@ -509,10 +523,11 @@ def oom_get_podName(cgName, cID, oom_result):
 
 def oom_get_k8spod(oom_result,num):
     oom = oom_result['sub_msg'][num]
+    res = oom['json']
     summary = ''
     cgName = oom['cg_name']
     oom['podName'] = 'unknow'
-    oom['containerID '] = 'unknow'
+    oom['containerID'] = 'unknow'
     index = cgName.find("cri-containerd-")
     if index != -1:
         index = index + 15
@@ -521,13 +536,36 @@ def oom_get_k8spod(oom_result,num):
         if index != -1:
             index = index + 7
     if index != -1:
-        oom['containerID '] = cgName[index: index+13]
-        oom['podName'] = oom_get_podName(cgName, oom['containerID '], oom_result)
-    summary += "podName: %s, containerID: %s\n"%(oom['podName'], oom['containerID '])
+        oom['containerID'] = cgName[index: index+13]
+        oom['podName'] = oom_get_podName(cgName, oom['containerID'], oom_result)
+    summary += "podName: %s, containerID: %s\n"%(oom['podName'], oom['containerID'])
+    res['podName'] = oom['podName']
+    res['containerID'] = oom['containerID']
     return summary
+
+def oom_init_json(oom_result, num):
+    oom = oom_result['sub_msg'][num]
+    oom['json'] = {}
+    res = oom['json']
+    res['task'] = 'unknow'
+    res['pid'] = 'unknow'
+    res['task_mem'] = 0
+    res['total_rss'] = 0
+    res['root'] = 'unknow'
+    res['type'] = 'unknow'
+    res['podName'] = 'unknow'
+    res['containerID'] = 'unkonw'
+    res['cg_usage'] = 0
+    res['cg_limit'] = 0
+    res['leaktype'] = 'unknow'
+    res['leakusage'] = 0
+    res['shmem'] = 0
 
 def oom_output_msg(oom_result,num, summary):
     oom = oom_result['sub_msg'][num]
+
+    oom_init_json(oom_result, num)
+    res = oom['json']
     reason = ''
     #print("oom time = {} spectime = {}".format(oom['time'], oom_result['spectime']))
     task = oom['task_name']
@@ -535,6 +573,10 @@ def oom_output_msg(oom_result,num, summary):
     if task_mem == 0 and oom['pid'] in oom['state_mem']:
         task_mem = oom['state_mem'][oom['pid']]
         oom['killed_task_mem'] = task_mem
+    res['task'] = task[1:-1]
+    res['pid'] = oom['pid']
+    res['task_mem'] = task_mem
+    res['total_rss'] = oom['state_mem']['total_rss']
     summary += "total rss: %d KB\n"%(oom['state_mem']['total_rss'])
     summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], task_mem)
     #summary += "进程Kill次数:%s,进程内存占用量:%sKB\n"%(oom_result['task'][task], oom['killed_task_mem']/1024)
@@ -548,15 +590,20 @@ def oom_output_msg(oom_result,num, summary):
     summary += oom_host_output(oom_result, num)
     reason = "诊断结论: %s "%(oom['reason'])
     reason += oom_cgroup_output_ext(oom_result, num)
-    ret, res = oom_check_score(oom, oom_result)
+    ret, sss = oom_check_score(oom, oom_result)
     if ret == False:
         reason+= oom_check_dup(oom, oom_result)
     else:
-        reason += res
-    if 'msg' in oom['state_mem']:
-        summary += "memory stats:\n"
-        for line in oom['state_mem']['msg']:
-            summary += line +'\n'
+        reason += sss
+    if oom['type']  == 'cgroup':
+        if 'msg' in oom['state_mem']:
+            summary += "memory stats:\n"
+            for line in oom['state_mem']['msg']:
+                summary += line +'\n'
+    res['root'] = oom['root']
+    res['type'] = oom['type']
+    res['result'] = reason
+    res['msg'] = summary
     return reason + summary
 
 def oom_get_max_task(num, oom_result):
@@ -648,6 +695,10 @@ def oom_reason_analyze(num, oom_result, summary):
         oom_result['node_num'] = node_num
         summary = oom_output_msg(oom_result, num, summary)
         oom_result['sub_msg'][num]['summary'] = summary
+        if oom_result['json'] == 1:
+            print(json.dumps(oom_result['sub_msg'][num]['json'], encoding='utf-8', ensure_ascii=False))
+        else:
+            print(summary)
         return summary
     except Exception as err:
         print ("oom_reason_analyze err {} lines {}\n".format(err, traceback.print_exc()))
@@ -724,6 +775,7 @@ def oom_diagnose(sn, data, mode):
     try:
         oom_result = {}
         oom_result['task'] = ""
+        oom_result['json'] = data['json']
         oom_result['mode'] = mode
         oom_result['summary'] = ""
         oom_result['oom_total_num'] = 0
@@ -766,11 +818,12 @@ def main():
     sn = ''
     data = {}
     data['mode'] = 1
+    data['json'] = 0
     data['filename'] = ''
     data['spectime'] = int(time.time())
     get_opts(data)
     oom_read_dmesg(data, data['mode'], data['filename'])
-    print(oom_diagnose(sn, data, data['mode']))
+    oom_diagnose(sn, data, data['mode'])
 
 
 def usage():
@@ -780,6 +833,7 @@ def usage():
             -f --dmesg file
             -l --live mode
             -t --time mode
+            -j --output json
            for example:
            python oomcheck.py
            python oomcheck.py -t "2021-09-13 15:32:22" 
@@ -790,7 +844,7 @@ def usage():
     )
 
 def get_opts(data):
-    options,args = getopt.getopt(sys.argv[1:],"hlf:t:",["help","file=","live=","time="])
+    options,args = getopt.getopt(sys.argv[1:],"jhlf:t:",["json","help","file=","live=","time="])
     for name,value in options:
         if name in ("-h","--help"):
             usage()
@@ -800,6 +854,8 @@ def get_opts(data):
             data['filename'] = value
         elif name in ("-l","--live"):
             data['mode'] = 1
+        elif name in ("-j","--json"):
+            data['json'] = 1
         elif name in ("-t","--time"):
             if '-' in value:
                 value = normal_time2ts(value)
