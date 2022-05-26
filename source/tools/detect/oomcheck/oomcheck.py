@@ -19,7 +19,7 @@ import traceback
 OOM_REASON_CGROUP = '内存使用达到cgroup限制',
 OOM_REASON_PCGROUP = '内存使用达到父cgroup限制',
 OOM_REASON_HOST = '主机内存不足',
-OOM_REASON_MEMLEAK = '主机内存不足,存在内存泄漏',
+OOM_REASON_MEMLEAK = '主机内存不足,疑似存在内存泄漏',
 OOM_REASON_NODEMASK = 'mempolicy配置不合理',
 OOM_REASON_NODE = 'CPUSET 的mems值设置不合理',
 OOM_REASON_MEMFRAG = '内存碎片化,需要进行内存规整',
@@ -129,7 +129,7 @@ def oomcheck_get_spectime(time, oom_result):
         print ("oomcheck_spectime error {}".format(err))
 
 def oom_is_node_num(line):
-    return "hugepages_size=2048" in line
+    return "hugepages_size=1048576" in line
 
 def oom_get_mem_allowed(oom_result, line, num):
     cpuset = line.strip().split("cpuset=")[1].split()[0]
@@ -149,9 +149,15 @@ def oom_get_pid(oom_result, line, num):
     oom_result['sub_msg'][num]['pid'] = pid
 
 def oom_get_task_mem(oom_result, line, num):
-    anon_rss = line.strip().split('anon-rss:')[1].split()[0].strip(',')
-    file_rss = line.strip().split('file-rss:')[1].split()[0].strip(',')
-    shmem_rss = line.strip().split('shmem-rss:')[1].split()[0].strip(',')
+    anon_rss = 0
+    file_rss = 0
+    shmem_rss = 0
+    if line.find('anon-rss') != -1:
+        anon_rss = line.strip().split('anon-rss:')[1].split()[0].strip(',')
+    if line.find('file-rss') != -1:
+        file_rss = line.strip().split('file-rss:')[1].split()[0].strip(',')
+    if line.find('shmem-rss') != -1:
+        shmem_rss = line.strip().split('shmem-rss:')[1].split()[0].strip(',')
     oom_result['sub_msg'][num]['killed_task_mem'] = (
         int(bignum_to_num(anon_rss)) + int(bignum_to_num(file_rss)) + int(bignum_to_num(shmem_rss)))/1024
 
@@ -254,7 +260,13 @@ def oom_get_meminfo(oom_result, lines, index, num):
     oom['meminfo']['total_mem'] = 0
     if len(lines) < 10:
         return True
-    line = lines[index+1]
+    line = lines
+    for key in range(index, len(lines)):
+        line = lines[key]
+        if line.find('active_anon:') != -1 and line.find('inactive_anon:') != -1:
+            break
+    if key >= len(lines) -5:
+        return True
     if line.find('active_anon:') != -1:
         str_list = line.split(']')[1].strip().split()
         active_anon = int(str_list[0].strip().split(':')[1])
@@ -262,8 +274,8 @@ def oom_get_meminfo(oom_result, lines, index, num):
         #print("active_anon: {} inactive_anon: {}".format(active_anon, inactive_anon))
         oom['meminfo']['active_anon'] = active_anon*4
         oom['meminfo']['inactive_anon'] = inactive_anon*4
-
-    line= lines[index+2]
+    index = key
+    line= lines[index+1]
     if line.find('active_file:') != -1:
         str_list = line.split()
         active_file = int(str_list[0].strip().split(':')[1])
@@ -271,14 +283,14 @@ def oom_get_meminfo(oom_result, lines, index, num):
         #print("active_file : {} inactive_file: {}".format(active_file, inactive_file))
         oom['meminfo']['active_file'] = active_file*4
         oom['meminfo']['inactive_file'] = inactive_file*4
-    line = lines[index+3]
+    line = lines[index+2]
     if line.find('unevictable:') != -1:
         str_list = line.split()
         unevictable = int(str_list[0].strip().split(':')[1])
         #print("unevictable: {}".format(unevictable))
         oom['meminfo']['unevictable'] = unevictable*4
 
-    line = lines[index+4]
+    line = lines[index+3]
     if line.find('slab_unreclaimable:') != -1:
         str_list = line.split()
         slab_reclaimable = int(str_list[0].strip().split(':')[1])
@@ -287,14 +299,14 @@ def oom_get_meminfo(oom_result, lines, index, num):
         oom['meminfo']['slab'] = slab_unreclaimable*4
         oom['meminfo']['slabr'] = slab_reclaimable*4
 
-    line = lines[index+5]
+    line = lines[index+4]
     if line.find('pagetables:') != -1:
         str_list = line.split()
         pagetables = int(str_list[2].strip().split(':')[1])
         #print("pagetables:{}".format(pagetables))
         oom['meminfo']['pagetables'] = pagetables*4
 
-    line = lines[index+6]
+    line = lines[index+5]
     if line.find('free_pcp:') != -1:
         str_list = line.split()
         free = int(str_list[0].strip().split(':')[1])
@@ -354,7 +366,7 @@ def oom_is_memleak(oom, oom_result):
     used = used - (meminfo['active_anon'] + meminfo['inactive_anon'])
     used -= (meminfo['active_file'] + meminfo['inactive_file'])
     used -= (meminfo['unevictable'] + meminfo['pagetables'])
-    used -= (meminfo['free'] + meminfo['hugepage'] + meminfo['rmem'])
+    used -= (meminfo['free'] + meminfo['hugepage'])
     if memleak_check(total, meminfo['slab']):
         res['leaktype'] = 'slab'
         res['leakusage'] = meminfo['slab']
@@ -622,6 +634,8 @@ def oom_get_max_task(num, oom_result):
             continue
         if not dump_task:
             continue
+        if 'Out of memory' in line:
+            break
         if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
             break
         if line.count('[') !=2 or line.count(']') !=2:
@@ -663,14 +677,11 @@ def oom_reason_analyze(num, oom_result, summary):
         lines = oom_result['sub_msg'][num]['oom_msg']
         line_len = len(lines)
         for key in range(line_len):
-            #print(key, lines[key])
             line = lines[key]
             if "invoked oom-killer" in line:
                 oom_get_order(oom_result, line, num)
                 if 'nodemask' in line:
                     oom_get_nodemask(oom_result, line, num)
-            elif oom_is_node_num(line):
-                node_num += 1
             elif "mems_allowed=" in line:
                 oom_get_mem_allowed(oom_result, line, num)
             elif "Task in" in line:
@@ -687,7 +698,9 @@ def oom_reason_analyze(num, oom_result, summary):
                 oom_get_total_mem(oom_result, line, num)
             elif "pages reserved" in line:
                 oom_get_rmem(oom_result, line, num)
-            elif "hugepages_total" in line:
+            elif line.find('hugepages_total')!=-1:
+                if oom_is_node_num(line):
+                    node_num += 1
                 oom_get_hugepage(oom_result, line, num)
             elif OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
                 oom_get_task_mem(oom_result, line, num)
