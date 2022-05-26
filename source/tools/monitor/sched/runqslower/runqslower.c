@@ -166,15 +166,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
-	if (!filep) {
-		filep = fopen(defaultfile, "w+");
-		if (!filep) {
-			int ret = errno;
-			fprintf(stderr, "%s :fopen %s\n",
-				strerror(errno), defaultfile);
-			return ret;
-		}
-	}
 	return 0;
 }
 
@@ -366,6 +357,15 @@ int main(int argc, char **argv)
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
+	if (!filep) {
+		filep = fopen(defaultfile, "w+");
+		if (!filep) {
+			err = errno;
+			fprintf(stderr, "%s :fopen %s\n",
+				strerror(errno), defaultfile);
+			return err;
+		}
+	}
 
 	libbpf_set_print(libbpf_print_fn);
 	

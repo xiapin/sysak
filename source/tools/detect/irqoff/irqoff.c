@@ -125,15 +125,6 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
-	if (!filep) {
-		filep = fopen(defaultfile, "w+");
-		if (!filep) {
-			ret = errno;
-			fprintf(stderr, "%s :fopen %s\n",
-				strerror(errno), defaultfile);
-			return ret;
-		}
-	}
 
 	/* refer to watchdog.c:set_sample_period, sample_period set to thres*2/5. */
 	env.sample_period = env.threshold*2/5;
@@ -466,6 +457,15 @@ int main(int argc, char **argv)
 	if (err) {
 		fprintf(stderr, "argp_parse fail\n");
 		return err;
+	}
+	if (!filep) {
+		filep = fopen(defaultfile, "w+");
+		if (!filep) {
+			err = errno;
+			fprintf(stderr, "%s :fopen %s\n",
+				strerror(errno), defaultfile);
+			return err;
+		}
 	}
 	libbpf_set_print(libbpf_print_fn);
 
