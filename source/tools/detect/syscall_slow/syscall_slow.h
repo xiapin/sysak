@@ -13,11 +13,13 @@ struct tm_info {
 };
 
 struct filter {
+	__u32 pid, sysnr;
 	int size;
 	char comm[16];
 };
 
 struct arg_info {
+	__u32 pid, sysnr;
 	__u64	thresh;
 	struct filter filter;
 };

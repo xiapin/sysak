@@ -141,22 +141,27 @@ int handle_raw_sys_enter(struct raw_sys_enter_arg *ctx)
 
 	__builtin_memset(&filter, 0, sizeof(filter));
 	bpf_get_current_comm(&comm, sizeof(comm));
+	pid = bpf_get_current_pid_tgid();
 	argp = bpf_map_lookup_elem(&arg_map, &i);
 	if (argp)
 		filter = _(argp->filter);
 	else 
 		return 0;
+
 	if (filter.size && filter.size != -1) {
 		unsigned long size = filter.size;
 		match = name_n_equal(comm, filter.comm, size, 16);
-		if (!match)
-			return 0;
-	} else if (filter.size == -1) {
-		;/*todo*/
-	} else {
-		return 0;	/* size==0, skip */
+		if (!match && filter.pid != -1) {
+			if (filter.pid == pid)
+				match = true;
+		} else {
+			match = true;
+		}
 	}
-	pid = bpf_get_current_pid_tgid();
+
+	if (!match || (filter.sysnr != ctx->id))
+		return 0;
+
 	task = (void *)bpf_get_current_task();
 	enterp = bpf_map_lookup_elem(&enter_map, &pid);
 	if (!enterp) {
@@ -178,7 +183,7 @@ SEC("tp/raw_syscalls/sys_exit")
 int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 {
 	int pid, i = 0;
-	bool match;
+	bool match = false;
 	char comm[16] = {0};
 	struct arg_info *argp;
 	struct task_struct *task;
@@ -189,22 +194,26 @@ int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 	__builtin_memset(&filter, 0, sizeof(filter));
 	bpf_get_current_comm(&comm, sizeof(comm));
 	argp = bpf_map_lookup_elem(&arg_map, &i);
+	pid = bpf_get_current_pid_tgid();
 	if (argp)
 		filter = _(argp->filter);
 	else 
 		return 0;
+
 	if (filter.size && filter.size != -1) {
 		unsigned long size = filter.size;
 		match = name_n_equal(comm, filter.comm, size, 16);
-		if (!match)
-			return 0;
-	} else if (filter.size == -1) {
-		;/* todo: shell we monitor all threads?  */
-	} else {
-		return 0;	/* size==0, we skip because its too much... */
+		if (!match && filter.pid != -1) {
+			if (filter.pid == pid)
+				match = true;
+		} else {
+			match = true;
+		}
 	}
 
-	pid = bpf_get_current_pid_tgid();
+	if (!match || (filter.sysnr != ctx->id))
+		return 0;
+
 	task = (void *)bpf_get_current_task();
 	enterp = bpf_map_lookup_elem(&enter_map, &pid);
 	if (enterp) {
