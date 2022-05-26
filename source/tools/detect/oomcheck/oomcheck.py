@@ -16,13 +16,13 @@ import argparse
 import getopt
 import traceback
 
-OOM_REASON_CGROUP = '内存使用达到cgroup限制',
-OOM_REASON_PCGROUP = '内存使用达到父cgroup限制',
-OOM_REASON_HOST = '主机内存不足',
-OOM_REASON_MEMLEAK = '主机内存不足,疑似存在内存泄漏',
-OOM_REASON_NODEMASK = 'mempolicy配置不合理',
-OOM_REASON_NODE = 'CPUSET 的mems值设置不合理',
-OOM_REASON_MEMFRAG = '内存碎片化,需要进行内存规整',
+OOM_REASON_CGROUP = 'cgroup memory limit',
+OOM_REASON_PCGROUP = 'parent cgroup memory limit',
+OOM_REASON_HOST = 'host memory limit',
+OOM_REASON_MEMLEAK = 'host memory limit,may caused by memory leak',
+OOM_REASON_NODEMASK = 'mempolicy not allowed process to use all the memory of NUMA system'
+OOM_REASON_NODE = 'cpuset cgroup not allowed process to use all the memory of NUMA system',
+OOM_REASON_MEMFRAG = 'memory fragment',
 OOM_REASON_SYSRQ = 'sysrq',
 OOM_REASON_OTHER = 'other'
 
@@ -349,8 +349,12 @@ def oom_is_memfrag_oom(oom):
 def memleak_check(total, kmem):
     kmem = kmem/1024
     total = total/1024
-    ''' 6G '''
-    if kmem > 1024*6:
+    thres = 1024*6
+
+    ''' 100G '''
+    if total > 100*1024:
+        thres = 1024*10
+    if kmem > thres:
         return True
     elif (kmem > total*0.1) and (kmem > 1024*1.5):
         return True
@@ -414,7 +418,7 @@ def oom_host_output(oom_result, num):
         summary += "low:%s\n"%(oom['host_low'])
         return summary
     elif oom_is_memfrag_oom(oom):
-        summary += "分配order:%d\n"%(oom['order'])
+        summary += "order:%d\n"%(oom['order'])
         oom['reason'] = OOM_REASON_MEMFRAG
         oom['root'] = 'frag'
     leak = oom_is_memleak(oom, oom_result)
@@ -479,10 +483,10 @@ def oom_cgroup_output_ext(oom_result, num):
     if anon > int(oom['cg_usage'][:-2])*0.3:
         ipcs = oom_get_ipcs(oom_result, anon)
         if ipcs == True:
-            msg = "需要清理共享内存ipcs"
+            msg = "need to cleanup ipcs"
         else:
-            msg = "需要清理tmpfs文件"
-        summary = ",并且shmem内存使用量%dKB,%s"%(anon, msg)
+            msg = "need to cleanup tmpfs file"
+        summary = ",but shmem usage %dKB,%s"%(anon, msg)
         oom['root'] = 'shmem'
         res['shmem'] = anon
     return summary
@@ -502,7 +506,7 @@ def oom_check_score(oom, oom_result):
     if (res_total['cnt']) > 2 and (res_total['rss']*0.8 > res['rss']):
         many = True
     if res['task'] == res_total['task'] or many == False:
-        return True, '，进程%s(%s)消耗内存%dKB,oom_score_adj:%s，需进一步确认oom score设置是否合理\n'%(res['task'],res['pid'],res['rss']*4,res['score'])
+        return True, '，process:%s(%s) memory usage: %dKB,oom_score_adj:%s\n'%(res['task'],res['pid'],res['rss']*4,res['score'])
 
     return False, "\n"
 
@@ -513,7 +517,7 @@ def oom_check_dup(oom, oom_result):
     if (res_total['rss']*4 > oom['killed_task_mem']*1.5) and (res_total['cnt'] > 2):
         if oom['type'] == 'cgroup':
             oom['root'] = 'fork'
-        summary = ',并且%d个%s进程累加消耗内存%dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
+            summary = ',%d process:%s total memory usage: %dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
     return summary
 
 def oom_get_podName(cgName, cID, oom_result):
@@ -600,7 +604,7 @@ def oom_output_msg(oom_result,num, summary):
     summary += oom_cgroup_output(oom_result, num)
     #summary += "oom cgroup: %s\n"%(oom['cg_name'])
     summary += oom_host_output(oom_result, num)
-    reason = "诊断结论: %s "%(oom['reason'])
+    reason = "diagnones result: %s "%(oom['reason'])
     reason += oom_cgroup_output_ext(oom_result, num)
     ret, sss = oom_check_score(oom, oom_result)
     if ret == False:
@@ -612,6 +616,7 @@ def oom_output_msg(oom_result,num, summary):
             summary += "memory stats:\n"
             for line in oom['state_mem']['msg']:
                 summary += line +'\n'
+    summary += "type: %s, root: %s\n"%(oom['type'], oom['root'])
     res['root'] = oom['root']
     res['type'] = oom['type']
     res['result'] = reason
