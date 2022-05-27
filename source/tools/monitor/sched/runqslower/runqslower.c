@@ -10,6 +10,7 @@
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include "pidComm.h"
 #include "runqslower.h"
 #include "bpf/runqslower.skel.h"
 
@@ -184,50 +185,6 @@ static void sig_alarm(int signo)
 static void sig_int(int signo)
 {
 	exiting = 1;
-}
-
-static int get_container(char *dockerid, int pid)
-{
-	char *buf;
-	FILE *fp;
-	int ret = -1;
-	char cgroup_path[32] = {0};
-
-	snprintf(cgroup_path, sizeof(cgroup_path), "/proc/%d/cgroup", pid);
-
-	fp = fopen(cgroup_path, "r");
-	if (!fp)
-		return errno;
-
-	buf = malloc(4096*sizeof(char));
-	if (!buf) {
-		ret = errno;
-		goto out2;
-	}
-
-	while(fgets(buf, 4096, fp)) {
-		int stat = 0;
-		char *token, *pbuf = buf;
-		while((token = strsep(&pbuf, "/")) != NULL) {
-			if (stat == 1) {
-				stat++;
-				break;
-			}
-			if (!strncmp("docker", token, strlen("docker")))
-				stat++;
-		}
-
-		if (stat == 2) {
-			strncpy(dockerid, token, CONID_LEN - 1);
-			ret = 0;
-			goto out1;
-		}
-	}
-out1:
-	free(buf);	
-out2:
-	fclose(fp);
-	return ret;
 }
 
 static void update_summary(struct summary* summary, const struct event *e)
