@@ -9,10 +9,14 @@ else
 TARGET_PATH := $(OBJ_TOOLS_ROOT)
 endif
 
+all: $(target) target_rule
+
 $(target): $(objs)
 	gcc -o $(TARGET_PATH)/$@ $^ -L$(OBJ_LIB_PATH) $(LDFLAGS)
-	echo $(target):$(DEPEND) >> $(TARGET_PATH)/$(SYSAK_RULES)
+
 $(objs): $(mods)
 
 $(mods): %.o : %.c
 	gcc -I. $(CFLAGS) -c -o $(OBJPATH)/$@ $<
+
+include $(SRC)/mk/target.inc

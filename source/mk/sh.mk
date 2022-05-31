@@ -6,9 +6,12 @@ endif
 
 .PHONY: $(mods)
 
+all: $(target) target_rule
+
 $(target): $(mods)
 	cp $@.sh $(TARGET_PATH)/$@
-	echo $(target):$(DEPEND) >> $(TARGET_PATH)/$(SYSAK_RULES)
 
 $(mods):
 	cp $@ $(TARGET_PATH)/ -rf
+
+include $(SRC)/mk/target.inc

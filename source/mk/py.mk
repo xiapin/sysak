@@ -4,8 +4,12 @@ else
 TARGET_PATH := $(OBJ_TOOLS_ROOT)
 endif
 
-target: $(mods)
+all: $(target) target_rule
+
+$(target): $(mods)
+	cp $@.py $(TARGET_PATH)/$@
 
 $(mods): %: %.py
 	cp $< $(TARGET_PATH)/$@
-	echo $(target):$(DEPEND) >> $(TARGET_PATH)/$(SYSAK_RULES)
+
+include $(SRC)/mk/target.inc

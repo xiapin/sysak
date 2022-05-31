@@ -7,7 +7,16 @@ SUBDIRS := $(dirs)
 
 .PHONY: subdirs $(SUBDIRS) clean
 
+all: subdirs target_rule
+
 subdirs: $(SUBDIRS)
 $(SUBDIRS):
 	make -C $@
 
+ifeq ($(KERNEL_DEPEND), Y)
+TARGET_PATH := $(OBJ_TOOLS_PATH)
+else
+TARGET_PATH := $(OBJ_TOOLS_ROOT)
+endif
+
+include $(SRC)/mk/target.inc

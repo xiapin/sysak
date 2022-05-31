@@ -37,12 +37,11 @@ bpfobjs := $(patsubst %.c, %.o, $(bpfsrcs))
 target_bpfobjs := $(foreach n, $(bpfobjs), $(OBJPATH)/$(n))
 bpfskel := $(patsubst %.bpf.o, %.skel.h, $(target_bpfobjs))
 
-
+all: $(target) target_rule
 
 $(target): $(target_cppobjs) $(bpfskel) $(LIBBPF_OBJ)
 	$(call msg,BINARY,$@)
 	$(Q)$(CXX) $(CFLAGS) $(INCLUDES) $^ -o $(OUTPUT)/$@ $(LDFLAGS)
-	echo $(target):$(DEPEND) >> $(OUTPUT)/$(SYSAK_RULES)
 
 $(target_cppobjs) : $(cppobjs)
 
@@ -70,3 +69,4 @@ dirs:
 # keep intermediate (.skel.h, .bpf.o, etc) targets
 # .SECONDARY:
 
+include $(SRC)/mk/target.inc

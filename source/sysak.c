@@ -10,7 +10,7 @@
 #define KVERSION 64
 #define MAX_SUBCMD_ARGS 512
 #define MAX_DEPEND_LEN 128
-#define MAX_NAME_LEM 64
+#define MAX_NAME_LEN 64
 #define MAX_WORK_PATH_LEN 512
 #define ERR_NOSUBTOOL 2
 #define ERR_MISSARG 3
@@ -18,6 +18,29 @@
 #define bool int
 #define true 1
 #define false 0
+
+enum TOOL_TYPE {
+    USER_TOOL,
+    EXPERT_TOOL,
+    MONITOR_TOOL,
+    MAX_TOOL_TYPE
+};
+
+struct tool_info {
+    char module[MAX_NAME_LEN];
+    char name[MAX_NAME_LEN];
+    char helpinfo[MAX_SUBCMD_ARGS];
+};
+
+struct tool_list_node {
+    struct tool_list_node *next;
+    struct tool_info tool;
+};
+
+struct tool_list {
+    char *type_name;
+    struct tool_list_node *head;
+};
 
 char *module = "/sysak.ko";
 char *log_path="/var/log/sysak";
@@ -37,12 +60,18 @@ char sysak_other_rule[MAX_WORK_PATH_LEN];
 bool pre_module = false;
 bool post_module = false;
 
+static struct tool_list tool_lists[MAX_TOOL_TYPE]={
+{"sysak tools for user self-help analysis", NULL},
+{"sysak tools for system detail info", NULL},
+{"sysak monitor service", NULL}
+};
+
 static void usage(void)
 {
 	fprintf(stdout,
 	            "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
                 "       cmd:\n"
-                "              list, show all of subcmds\n"
+                "              list [-a], show subcmds\n"
                 "              help, help information for specify subcmd\n"
                 "       subcmd: see the result of list\n");
 }
@@ -108,9 +137,9 @@ static int exectue(int argc, char *argv[])
 {
     int i;
     int ret = 0;
-    char subcmd_name[MAX_NAME_LEM+MAX_SUBCMD_ARGS];
+    char subcmd_name[MAX_NAME_LEN+MAX_SUBCMD_ARGS];
     char subcmd_args[MAX_SUBCMD_ARGS];
-    char subcmd_exec_final[MAX_NAME_LEM+MAX_SUBCMD_ARGS];
+    char subcmd_exec_final[MAX_NAME_LEN+MAX_SUBCMD_ARGS];
 
     if (pre_module)
         mod_ctrl(true);
@@ -138,40 +167,112 @@ static int exectue(int argc, char *argv[])
     return ret;
 }
 
-static void print_each_tool(char *path)
+static void print_each_tool(bool all)
 {
-    FILE *fp;
-    char buf[MAX_NAME_LEM + MAX_SUBCMD_ARGS];
-    char tools_name[MAX_NAME_LEM];
+    int i, max_idx = all ? MONITOR_TOOL : USER_TOOL;
+    struct tool_list_node *curr;
+    char last_module[MAX_NAME_LEN] = {0};
 
-    if (access(path,0) != 0)
-        return;
+    for (i = 0; i <= max_idx; i++) {
+        if (!tool_lists[i].head)
+            continue;
 
-    fp = fopen(path, "r");
-    if (!fp){
-        printf("open %s failed\n", path);
-		return;
+        printf("%s\n", tool_lists[i].type_name);
+        curr = tool_lists[i].head;
+        while (curr) {
+            if(curr->tool.module[0] && strcmp(curr->tool.module, last_module)) {
+                strncpy(last_module, curr->tool.module, MAX_NAME_LEN);
+                printf("  %s:\n", curr->tool.module);
+            }
+            printf("    %-16s    %s\n", curr->tool.name, curr->tool.helpinfo);
+            curr = curr->next;
+        }
+        printf("\n");
     }
+
+    if (!all)
+        printf("If you want to known the detail about the system, please use 'sysak list -a'.\n");
+}
+
+static int build_subcmd_info_from_file(FILE *fp, bool all)
+{
+    struct tool_list *list;
+    struct tool_list_node *node;
+    char buf[MAX_NAME_LEN + MAX_SUBCMD_ARGS], *sptr;
+    char tools_name[MAX_NAME_LEN];
+    char tools_class_module[MAX_NAME_LEN];
+    int ret = 0;
 
     while(fgets(buf, sizeof(buf), fp))
     {
-        sscanf(buf,"%[^:]",tools_name);
-        printf("  %s\n",tools_name);
+        sscanf(buf,"%[^:]:%[^:]",tools_class_module, tools_name);
+	if (!all) {
+	    if (strcmp(tools_class_module, "combine"))
+                continue;
+	}
+        node = malloc(sizeof(struct tool_list_node));
+        if (!node) {
+            fclose(fp);
+            return -1;
+        }
+
+        memset(node, 0, sizeof(struct tool_list_node));
+	if (strcmp(tools_class_module, "combine") == 0) {
+            list = &tool_lists[USER_TOOL];
+        } else if (strncmp(tools_class_module, "detect", 6) == 0) {
+            list = &tool_lists[EXPERT_TOOL];
+            sscanf(tools_class_module, "detect/%[^:]", node->tool.module);
+        } else if (strncmp(tools_class_module, "monitor", 7) == 0) {
+            list = &tool_lists[MONITOR_TOOL];
+        } else {
+            free(node);
+            continue;
+        }
+
+        strcpy(node->tool.name, tools_name);
+        sptr = strstr(buf, ":help{");
+        if (sptr)
+            sscanf(sptr, ":help{%[^}]}",node->tool.helpinfo);
+        node->next = list->head;
+        list->head = node;
+        ret++;
     }
+
     fclose(fp);
+    return ret;
 }
 
-static void subcmd_list(void)
+static int build_subcmd_info(bool all)
 {
-    fputs("subcmd list:\n",stdout);
-    print_each_tool(sysak_rule);
-    print_each_tool(sysak_other_rule);
+    FILE *fp;
+    int ret = 0;
+
+    if (access(sysak_rule,0) != 0 && access(sysak_other_rule,0) != 0)
+        return 0;
+
+    fp = fopen(sysak_rule, "r");
+    if (fp)
+        ret += build_subcmd_info_from_file(fp, all);
+
+    fp = fopen(sysak_other_rule, "r");
+    if (fp)
+        ret += build_subcmd_info_from_file(fp, all);
+
+    return ret;
+}
+
+static void subcmd_list(bool show_all)
+{
+    if (build_subcmd_info(show_all) <= 0)
+       return;
+
+    print_each_tool(show_all);
 }
 
 static bool tool_lookup(char *path, char *tool)
 {
     FILE *fp;
-    char buf[MAX_NAME_LEM + MAX_SUBCMD_ARGS];
+    char buf[MAX_NAME_LEN + MAX_SUBCMD_ARGS];
 
     if (access(path,0) != 0)
         return false;
@@ -183,9 +284,9 @@ static bool tool_lookup(char *path, char *tool)
     }
     while(fgets(buf, sizeof(buf), fp))
     {
-        char tools_name[MAX_NAME_LEM];
+        char tools_name[MAX_NAME_LEN];
 
-        sscanf(buf,"%[^:]",tools_name);
+        sscanf(buf,"%*[^:]:%[^:]",tools_name);
         if (strcmp(tools_name, tool)){
             continue;
         }
@@ -231,13 +332,18 @@ exec:
 
 static int parse_arg(int argc, char *argv[])
 {
-	if (argc < 2){
-		usage();
+    bool show_all = false;
+
+    if (argc < 2){
+        usage();
         return -ERR_MISSARG;
     }
 
     if (!strcmp(argv[1],"list")){
-        subcmd_list();
+        if (argc == 3 && !strcmp(argv[2],"-a"))
+            show_all = true;
+
+        subcmd_list(show_all);
         return 0;
     }
 
