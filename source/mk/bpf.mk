@@ -14,7 +14,7 @@ endif
 
 CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall
 LDFLAGS += $(EXTRA_LDFLAGS)
-INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(OUTPUT) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi 
+INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(OUTPUT) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi -I$(SRC)/lib/uapi/include
 
 ifeq ($(V),1)
 	Q =
@@ -42,7 +42,7 @@ all: $(target) target_rule
 
 $(target): $(target_cobjs) $(bpfskel) $(LIBBPF_OBJ)
 	$(call msg,BINARY,$@)
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) $^ -lelf -lz -o $(OUTPUT)/$@ $(LDFLAGS)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) $^ -lelf -lz -o $(OUTPUT)/$@ -L$(OBJ_LIB_PATH) $(LDFLAGS)
 $(target_cobjs): $(cobjs)
 
 $(cobjs): %.o : %.c $(bpfskel)
