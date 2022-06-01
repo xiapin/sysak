@@ -244,6 +244,12 @@ def oom_get_hugepage(oom_result, line, num):
     oom['meminfo']['hugepage'] = oom['meminfo']['hugepage'] + hugetotal*hugesize
     #print("hugetotal: {} size:{}".format(hugetotal, hugesize))
 
+meminfo_pattern = ([re.compile("(active_anon):(\S+) (inactive_anon):(\S+) isolated_anon:\S+")
+, re.compile("(active_file):(\S+) (inactive_file):(\S+) isolated_file:\S+")
+, re.compile("(unevictable):(\S+) dirty:\S+ writeback:\S+ unstable:\S+")
+, re.compile("(slab_reclaimable):(\S+) (slab_unreclaimable):(\S+)")
+, re.compile("mapped:\S+ shmem:\S+ (pagetables):(\S+) bounce:\S+")
+, re.compile("free:\S+ (free_pcp):(\S+) free_cma:\S+")])
 def oom_get_meminfo(oom_result, lines, index, num):
     oom = oom_result['sub_msg'][num]
     oom['meminfo']['slab'] = 0
@@ -267,51 +273,20 @@ def oom_get_meminfo(oom_result, lines, index, num):
             break
     if key >= len(lines) -5:
         return True
-    if line.find('active_anon:') != -1:
-        str_list = line.split(']')[1].strip().split()
-        active_anon = int(str_list[0].strip().split(':')[1])
-        inactive_anon = int(str_list[1].strip().split(':')[1])
-        #print("active_anon: {} inactive_anon: {}".format(active_anon, inactive_anon))
-        oom['meminfo']['active_anon'] = active_anon*4
-        oom['meminfo']['inactive_anon'] = inactive_anon*4
-    index = key
-    line= lines[index+1]
-    if line.find('active_file:') != -1:
-        str_list = line.split()
-        active_file = int(str_list[0].strip().split(':')[1])
-        inactive_file = int(str_list[0].strip().split(':')[1])
-        #print("active_file : {} inactive_file: {}".format(active_file, inactive_file))
-        oom['meminfo']['active_file'] = active_file*4
-        oom['meminfo']['inactive_file'] = inactive_file*4
-    line = lines[index+2]
-    if line.find('unevictable:') != -1:
-        str_list = line.split()
-        unevictable = int(str_list[0].strip().split(':')[1])
-        #print("unevictable: {}".format(unevictable))
-        oom['meminfo']['unevictable'] = unevictable*4
 
-    line = lines[index+3]
-    if line.find('slab_unreclaimable:') != -1:
-        str_list = line.split()
-        slab_reclaimable = int(str_list[0].strip().split(':')[1])
-        slab_unreclaimable = int(str_list[1].strip().split(':')[1])
-        #print("slab_reclaimable: {} slab_unreclaimable:{}".format(slab_reclaimable, slab_unreclaimable))
-        oom['meminfo']['slab'] = slab_unreclaimable*4
-        oom['meminfo']['slabr'] = slab_reclaimable*4
-
-    line = lines[index+4]
-    if line.find('pagetables:') != -1:
-        str_list = line.split()
-        pagetables = int(str_list[2].strip().split(':')[1])
-        #print("pagetables:{}".format(pagetables))
-        oom['meminfo']['pagetables'] = pagetables*4
-
-    line = lines[index+5]
-    if line.find('free_pcp:') != -1:
-        str_list = line.split()
-        free = int(str_list[0].strip().split(':')[1])
-        #print("free:{}".format(free))
-        oom['meminfo']['free'] = free*4
+    for pattern in meminfo_pattern:
+        index += 1
+        line = lines[index]
+        gp = pattern.search(line)
+        if gp:
+            for i in range(1,len(gp.groups()),2):
+                if gp.group(i) == 'slab_unreclaimable':
+                    oom['meminfo']['slab'] = int(gp.group(i+1))*4
+                if gp.group(i) == 'slab_reclaimable':
+                    oom['meminfo']['slabr'] = int(gp.group(i+1))*4
+                else:
+                    oom['meminfo'][gp.group(i)] = int(gp.group(i+1))*4
+    #print oom['meminfo']
     return True
 
 def oom_get_total_mem(oom_result, line, num):
@@ -362,6 +337,8 @@ def memleak_check(total, kmem):
 
 def oom_is_memleak(oom, oom_result):
     if 'meminfo' not in oom:
+        return False
+    if 'slab' not in oom['meminfo']:
         return False
     meminfo = oom['meminfo']
     res = oom['json']
