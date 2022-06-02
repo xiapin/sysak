@@ -7,6 +7,9 @@ enum {
 	REQUEST_METRIC_ROOT,
 	REQUEST_METRIC_CGROUP,
 	REQUEST_METRIC_CGROUP_ALL,
+	REQUEST_METRIC_ROOT_RAW,
+	REQUEST_METRIC_CGROUP_RAW,
+	REQUEST_METRIC_CGROUP_ALL_RAW,
 	REQUEST_MAX
 };
 
@@ -25,6 +28,16 @@ static int get_request(const char *buf, char *sub_req, int len)
 		strncpy(sub_req, req_str + 15, len - 1);
 		return REQUEST_METRIC_CGROUP;
 	}
+	if (strcmp(req_str, "metric/raw") == 0 || strcmp(req_str, "metric/raw/") == 0) {
+		return REQUEST_METRIC_ROOT_RAW;
+	}
+	else if (strcmp(req_str, "metric/cgroups/raw") == 0 || strcmp(req_str, "metric/cgroups/raw") == 0) {
+		return REQUEST_METRIC_CGROUP_ALL_RAW;
+	}
+	else if (strncmp(req_str, "metric/cgroups/raw/", 19) == 0) {
+		strncpy(sub_req, req_str + 19, len - 1);
+		return REQUEST_METRIC_CGROUP_RAW;
+	}
 	return REQUEST_MAX;
 }
 
@@ -37,6 +50,7 @@ int output_http(int sk, int req, const char*sub_req)
 	char http_header[LEN_64];
 	char opt_line[LEN_64];
 	char *precord, *psub;
+	U_64 *raw_array;
 	double    *st_array;
 
 	line[0] = 0;
@@ -44,7 +58,10 @@ int output_http(int sk, int req, const char*sub_req)
 	for (i = 0; i < statis.total_mod_num; i++) {
 		mod = mods[i];
 		if (req != REQUEST_METRIC_ROOT) {
-			if ((req == REQUEST_METRIC_CGROUP_ALL || req == REQUEST_METRIC_CGROUP)
+			if ((req == REQUEST_METRIC_CGROUP_ALL
+				||req == REQUEST_METRIC_CGROUP
+				||req == REQUEST_METRIC_CGROUP_ALL_RAW
+				||req == REQUEST_METRIC_CGROUP_RAW )
 				&& strcmp(mod->name, "mod_cgroup"))
 				continue;
 		}
@@ -69,13 +86,20 @@ int output_http(int sk, int req, const char*sub_req)
                                 } else {
                                         snprintf(opt_line, LEN_64, "%s{", mod->opt_line+2);
                                 }
-
-                                st_array = &mod->st_array[j * mod->n_col];
+				if (req > REQUEST_METRIC_CGROUP_ALL && req < REQUEST_MAX)
+					raw_array = &mod->cur_array[j * mod->n_col];
+				else
+                                	st_array = &mod->st_array[j * mod->n_col];
                                 for (k = 0; k < mod->n_col; k++) {
 					if (HIDE_BIT == mod->info[k].summary_bit)
 						continue;
 
-                                        n = snprintf(detail, LEN_1M, "%s%s} %6.2f\n", opt_line, trim(mod->info[k].hdr, LEN_128), st_array[k]);
+					if (req > REQUEST_METRIC_CGROUP_ALL && req < REQUEST_MAX)
+                                        	n = snprintf(detail, LEN_1M, "%s%s} %6llu\n", 
+							opt_line, trim(mod->info[k].hdr, LEN_128), raw_array[k]);
+					else
+                                        	n = snprintf(detail, LEN_1M, "%s%s} %6.2f\n",
+							opt_line, trim(mod->info[k].hdr, LEN_128), st_array[k]);
                                         if (n >= LEN_1M - 1) {
                                                 do_debug(LOG_FATAL, "mod %s lenth is overflow %d\n", mod->name, n);
                                         }

@@ -614,12 +614,12 @@ static int get_mem_latency(FILE *file, struct cg_memlat_info *info)
 		}
 		ret = sscanf(buffer, "500-1000ms: %llu", &info->lat_1s);
 		if (ret != 0) {
-			info->total_lat_cnt += info->lat_1;
+			info->total_lat_cnt += info->lat_1s;
 			continue;
 		}
 		ret = sscanf(buffer, ">=1000ms: %llu", &info->lat_over1s);
 		if (ret != 0) {
-			info->total_lat_cnt += info->lat_1;
+			info->total_lat_cnt += info->lat_over1s;
 			continue;
 		}
 
