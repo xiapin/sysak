@@ -7,14 +7,14 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 LIBBPF_OBJ += $(OBJ_LIB_PATH)/libbpf.a
 
 ifeq ($(KERNEL_DEPEND), Y)
-OUTPUT := $(OBJ_TOOLS_PATH)
+TARGET_PATH := $(OBJ_TOOLS_PATH)
 else
-OUTPUT := $(OBJ_TOOLS_ROOT)
+TARGET_PATH := $(OBJ_TOOLS_ROOT)
 endif
 
 CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall
 LDFLAGS += $(EXTRA_LDFLAGS)
-INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(OUTPUT) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi -I$(SRC)/lib/uapi/include
+INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(TARGET_PATH) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi -I$(SRC)/lib/uapi/include
 
 ifeq ($(V),1)
 	Q =
@@ -23,7 +23,7 @@ else
 	Q = @
 	msg = @printf '  %-8s %s%s\n'                                   \
 		"$(1)"                                            \
-		"$(patsubst $(abspath $(OUTPUT))/%,%,$(2))"       \
+		"$(patsubst $(abspath $(TARGET_PATH))/%,%,$(2))"       \
 		"$(if $(3), $(3))";
 	MAKEFLAGS += --no-print-directory
 endif
@@ -42,7 +42,7 @@ all: $(target) target_rule
 
 $(target): $(target_cobjs) $(bpfskel) $(LIBBPF_OBJ)
 	$(call msg,BINARY,$@)
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) $^ -lelf -lz -o $(OUTPUT)/$@ -L$(OBJ_LIB_PATH) $(LDFLAGS)
+	$(Q)$(CC) $(CFLAGS) $(INCLUDES) $^ -lelf -lz -o $(TARGET_PATH)/$@ -L$(OBJ_LIB_PATH) $(LDFLAGS)
 $(target_cobjs): $(cobjs)
 
 $(cobjs): %.o : %.c $(bpfskel)
