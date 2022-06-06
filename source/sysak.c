@@ -48,8 +48,8 @@ char *system_modules = "/proc/modules";
 char *bin_path = "/usr/local/sbin";
 
 char kern_version[KVERSION];
-char modin[MAX_DEPEND_LEN];
-char modun[MAX_DEPEND_LEN];
+char prev_dep[MAX_DEPEND_LEN];
+char post_dep[MAX_DEPEND_LEN];
 char run_depend[MAX_DEPEND_LEN]= {0};
 char tools_path[MAX_WORK_PATH_LEN];
 char tools_exec[MAX_WORK_PATH_LEN] = {0};
@@ -59,6 +59,7 @@ char sysak_work_path[MAX_WORK_PATH_LEN];
 char sysak_other_rule[MAX_WORK_PATH_LEN];
 bool pre_module = false;
 bool post_module = false;
+bool btf_depend = false;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
 {"sysak tools for user self-help analysis", NULL},
@@ -87,24 +88,25 @@ static void kern_release(void)
     strncpy(kern_version, name.release, sizeof(name.release));
 }
 
-static void mod_ctrl(bool enable)
+static int mod_ctrl(bool enable)
 {
     FILE *modlist_fp;
     char exec_mod[4*KVERSION];
     bool has_ko = false;
     char modinfo[MAX_SUBCMD_ARGS];
+    int ret = -1;
 
     if (access(system_modules,0) != 0)
-        return;
+        return ret;
 
     modlist_fp = fopen(system_modules, "r");
     if (!modlist_fp){
         printf("open %s failed\n", system_modules);
-		return;
+        return ret;
     }
     while(fgets(modinfo, sizeof(modinfo), modlist_fp))
     {
-        if (strstr(modinfo,"sysak")){
+        if (strstr(modinfo, "sysak")){
             has_ko = true;
             break;
         }
@@ -114,14 +116,60 @@ static void mod_ctrl(bool enable)
 
     if (enable && !has_ko) {
         snprintf(exec_mod, sizeof(exec_mod), "insmod %s%s%s", module_path, kern_version, module);
-        system(exec_mod);
+        ret = system(exec_mod);
 
     }
     else if (!enable && has_ko) {
         snprintf(exec_mod, sizeof(exec_mod), "rmmod %s%s%s", module_path, kern_version, module);
-        system(exec_mod);
+        ret = system(exec_mod);
     }
 }
+
+static int down_install(const char *compoent_name)
+{
+    /* TBD*/
+    return -1;
+}
+
+static int check_or_install_compoents(const char *name)
+{
+    char compents_path[MAX_WORK_PATH_LEN];
+    const char *promt = "has not been installed, do you want to auto download and install ? Enter Y/N:";
+    char user_input;
+    int ret = 0;
+
+    if (strcmp(name, "sysak_modules") == 0)
+        sprintf(compents_path, "%s%s%s", module_path, kern_version, module);
+    else if (strcmp(name, "btf") == 0)
+        sprintf(compents_path, "%s%s/vmlinux-%s", module_path, kern_version, kern_version);
+
+    if (access(compents_path, 0) != 0){
+        printf("%s %s", name, promt);
+        scanf("%c", &user_input);
+        if (user_input == 'y' || user_input == 'Y')
+            ret = down_install(name);
+        else
+            ret = -EEXIST;
+    }
+
+    return ret;
+}
+
+static int do_prev_depend(void)
+{
+    if (pre_module) {
+        if (!check_or_install_compoents("sysak_modules"))
+            return mod_ctrl(true);
+        printf("sysak_modules not installed, exit ...\n");
+        return -1;
+    }
+
+    if (btf_depend)
+        return check_or_install_compoents("btf");
+
+    return 0;
+}
+
 static void add_python_depend(char *depend,char *cmd)
 {
     if (!strcmp(depend, "all")){
@@ -141,8 +189,8 @@ static int exectue(int argc, char *argv[])
     char subcmd_args[MAX_SUBCMD_ARGS];
     char subcmd_exec_final[MAX_NAME_LEN+MAX_SUBCMD_ARGS];
 
-    if (pre_module)
-        mod_ctrl(true);
+    if (do_prev_depend() < 0)
+        return -1;
 
     snprintf(subcmd_name, sizeof(subcmd_name), "%s%s", tools_path, argv[1]);
 
@@ -273,6 +321,7 @@ static bool tool_lookup(char *path, char *tool)
 {
     FILE *fp;
     char buf[MAX_NAME_LEN + MAX_SUBCMD_ARGS];
+    char *pstr;
 
     if (access(path,0) != 0)
         return false;
@@ -286,13 +335,18 @@ static bool tool_lookup(char *path, char *tool)
     {
         char tools_name[MAX_NAME_LEN];
 
+        pstr = buf;
         sscanf(buf,"%*[^:]:%[^:]",tools_name);
         if (strcmp(tools_name, tool)){
             continue;
         }
-        sscanf(buf,"%*[^:]:prev{%[^}]};post{%[^}]};python-dep{%[^}]}", modin, modun, run_depend);
-        if (!run_depend[0])
-            sscanf(buf,"%*[^:]:python-dep{%[^}]}", run_depend);
+        pstr = strstr(buf, ":prev{");
+        if (pstr)
+            sscanf(pstr, ":prev{%[^}]};post{%[^}]}", prev_dep, post_dep, run_depend);
+        pstr = strstr(buf, ":python-dep{");
+        if (pstr)
+            sscanf(pstr, ":python-dep{%[^}]}", run_depend);
+
         return true;
     }
     fclose(fp);
@@ -309,7 +363,12 @@ static int subcmd_parse(int argc, char *argv[])
         return -ERR_NOSUBTOOL;
     }
 
-    if (strstr(modin, "default") != NULL|| strstr(modun, "default") != NULL){
+    if (strstr(prev_dep, "btf") != NULL) {
+        btf_depend = true;
+        goto exec;
+    }
+
+    if (strstr(prev_dep, "default") != NULL|| strstr(post_dep, "default") != NULL){
         pre_module = true;
         post_module = true;
         goto exec;
@@ -317,11 +376,11 @@ static int subcmd_parse(int argc, char *argv[])
 
     for(i = 2; i <= (argc-1); i++)
     {
-        if (strstr(modin, argv[i])){
+        if (strstr(prev_dep, argv[i])){
             pre_module = true;
             break;
         }
-        else if (strstr(modun, argv[i])){
+        else if (strstr(post_dep, argv[i])){
             post_module = true;
             break;
         }
