@@ -725,7 +725,7 @@ static int get_memory_stats(int cg_idx)
 	file = fopen(filepath, "r");
 	if (!file)
 		return 0;
-	ret = get_mem_latency(file, &cgroups[cg_idx].mem.drgl);
+	ret = get_mem_latency(file, &cgroups[cg_idx].mem.drml);
 	fclose(file);
 	if (ret <=0)
 		return 0;
@@ -1053,8 +1053,8 @@ static int print_cgroup_memory(char *buf, int len, struct cg_mem_info *info)
 			info->failcnt);
 
 	ret += print_memlat_info(buf + ret, len - ret, &info->drgl);
-	ret += print_memlat_info(buf + ret, len - ret, &info->drgl);
-	ret += print_memlat_info(buf + ret, len - ret, &info->drgl);
+	ret += print_memlat_info(buf + ret, len - ret, &info->drml);
+	ret += print_memlat_info(buf + ret, len - ret, &info->dcl);
 
 	return ret;
 }
