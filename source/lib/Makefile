@@ -17,5 +17,7 @@ clean:
 ifeq ($(BUILD_KERNEL_MODULE), YES)
 	make -C internal/kernel_module clean
 endif
+ifeq ($(BUILD_LIBBPF), YES)
 	make -C internal/ebpf/libbpf/src clean
+endif
 

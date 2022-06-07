@@ -42,13 +42,18 @@ binary:
 	chmod +x $(OBJPATH)/sysak
 	chmod +x $(OBJPATH)/.sysak_compoents/tools/* -R
 
-.PHONY: clean clean_middle
+.PHONY: clean clean_middle dist_clean
 clean:
 	make -C $(SRC)/lib clean
+	make -C $(SRC)/tools/monitor/mservice/master clean
 	rm -rf $(OBJPATH)
 clean_middle:
 	make -C $(SRC)/lib clean
 	rm -rf $(OBJPATH)/*.o
+dist_clean: clean
+	rm -rf config-host.mak
+	rm -rf source/lib/internal/kernel_module
+	rm -rf source/lib/internal/ebpf/libbpf
 
 $(OBJ_LIB_PATH):
 	mkdir -p $(OBJ_LIB_PATH)
