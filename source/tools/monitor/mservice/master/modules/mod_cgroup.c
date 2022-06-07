@@ -18,6 +18,8 @@
 #include <linux/hw_breakpoint.h>
 #include <fcntl.h>
 #include <linux/major.h>
+#include <stdbool.h>
+#include <dirent.h>
 
 char *cg_usage = "    --cg                Linux container stats";
 
@@ -413,10 +415,130 @@ static int cg_init_jitter(void)
 	cg_jitter_init = 1;
 	return 0;
 }
+
+int enum_containers(void)
+{
+	int i, perf_fail = 0;
+	FILE *result;
+
+	result = popen("docker ps -q", "r");
+	memset(buffer, 0, sizeof(buffer));
+	for (i = 0; i < MAX_CGROUPS && !feof(result); i++) {
+		if (feof(result) || !fgets(buffer, sizeof(buffer), result))
+			break;
+		sscanf(buffer, "%31s", cgroups[n_cgs].name);
+		if (perf_event_init(&cgroups[n_cgs]) < 0) {
+			perf_fail++;
+			fprintf(stderr, "%s:Perf init failed\n", cgroups[n_cgs].name);
+		}
+		n_cgs++;
+	}
+	if (!perf_fail) {
+		for (i = 65; i < 69; i++)
+			cg_info[i].summary_bit = DETAIL_BIT;
+	}
+
+	pclose(result);
+	return 0;
+}
+
+bool is_docker_path(char *dentry)
+{
+	int i;
+
+	if (64 != strlen(dentry))
+		return false;
+
+	for (i = 0; i < strlen(dentry); i++) {
+		if ((dentry[i] >= '0' && dentry[i] <= '9')
+		   ||(dentry[i] >= 'a' && dentry[i] <= 'f'))
+			continue;
+		return false;
+	}
+	return true;
+}
+
+int enum_containers_ext(char *parent)
+{
+	int ret;
+	char path[256+64];
+	int perf_fail = 0;
+	DIR *d = NULL;
+	struct dirent *entp = NULL;
+	struct stat stats;
+
+	if (stat(parent, &stats) < 0 || !S_ISDIR(stats.st_mode)) {
+		ret = errno?errno:-1;
+		fprintf(stderr, "stat %s:%s", parent, strerror(ret));
+		return ret;
+	}
+
+	if(!(d = opendir(parent))) {
+		ret = errno;
+		fprintf(stderr, "opendir:%s", strerror(errno));
+		return ret;
+	}
+
+	while((entp = readdir(d)) != NULL) {
+		if((!strcmp(entp->d_name, ".")) || (!strcmp(entp->d_name, "..")))
+			continue;
+		snprintf(path, sizeof(path)-1, "%s/%s", parent, entp->d_name);
+		if (stat(path, &stats) < 0) {
+			fprintf(stderr, "stat %s:%s", path, strerror(errno));
+			continue;
+		}
+		if (S_ISDIR(stats.st_mode) && is_docker_path(entp->d_name)) {
+			sscanf(entp->d_name, "%12s", cgroups[n_cgs].name);
+			if (perf_event_init(&cgroups[n_cgs]) < 0) {
+				perf_fail++;
+				fprintf(stderr, "%s:Perf init failed\n", cgroups[n_cgs].name);
+			}
+			n_cgs++;
+		}
+		if (!perf_fail) {
+			int i;
+			for (i = 65; i < 69; i++)
+				cg_info[i].summary_bit = DETAIL_BIT;
+		}
+	}
+	return 0;
+}
+
+bool dockerd_alive(void)
+{
+	bool ret = false;
+	FILE *fp;
+	char comm[16];
+	char pid[16];
+	char proc_path[32];
+	char *dockerpid="/var/run/docker.pid";
+
+	fp = fopen(dockerpid, "r");
+	if (fp) {
+		if (!fgets(pid, sizeof(pid), fp))
+			goto out;
+		fclose(fp);
+		snprintf(proc_path, sizeof(proc_path), "/proc/%s/comm", pid);
+		fp = fopen(proc_path, "r");
+		if (fp) {
+			if (!fgets(comm, sizeof(comm), fp))
+				goto out;
+			if (!strcmp(comm, "dockerd")) {
+				ret =  true;
+				goto out;
+			}
+		}
+	}
+
+	return ret;
+out:
+	fclose(fp);
+	return ret;
+}
+
 static void init_cgroups(void)
 {
-	int i, ret;
-	FILE *result;
+	int i, ret = -1;
 
 	if (n_cgs > 0 && !need_reinit())
 		return;
@@ -425,30 +547,16 @@ static void init_cgroups(void)
 	n_cgs = 0;
 
 	/*check docker exit*/
-	if (access("/bin/docker", F_OK) != F_OK &&
+	if ((access("/bin/docker", F_OK) != F_OK &&
 		access("/usr/bin/docker", F_OK) != F_OK &&
 		access("/bin/docker", F_OK) != F_OK &&
-		access("/usr/bin/docker", F_OK) != F_OK) {
-		return;
+		access("/usr/bin/docker", F_OK) != F_OK) ||
+		!dockerd_alive()) {
+		ret = enum_containers_ext("/sys/fs/cgroup/cpu/docker/");
+	} else {
+		ret = enum_containers();
 	}
 
-	result = popen("docker ps -q", "r");
-	ret = -1;
-	for (i = 0; i < MAX_CGROUPS && !feof(result); i++) {
-		if (feof(result) || !fgets(buffer, sizeof(buffer), result))
-			break;
-		sscanf(buffer, "%31s", cgroups[n_cgs].name);
-		ret = perf_event_init(&cgroups[n_cgs]);
-		if (ret < 0) {
-			fprintf(stderr, "%s:Perf init failed\n", cgroups[n_cgs].name);
-		}
-		n_cgs++;
-	}
-	if (!ret) {
-		for (i = 65; i < 69; i++)
-			cg_info[i].summary_bit = DETAIL_BIT;
-	}
-	pclose(result);
 	ret = cg_init_jitter();
 	if (!ret) {
 		for (i = 69; i < 75; i++)
