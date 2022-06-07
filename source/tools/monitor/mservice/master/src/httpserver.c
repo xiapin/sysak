@@ -75,7 +75,8 @@ int output_http(int sk, int req, const char*sub_req)
 					int ignore = 0;
 					*psub = 0;
 					/*check if we want*/
-					if (req == REQUEST_METRIC_CGROUP && strcmp(precord, sub_req))
+					if ((req == REQUEST_METRIC_CGROUP || req == REQUEST_METRIC_CGROUP_RAW)
+						 && strcmp(precord, sub_req))
 						ignore = 1;
 					snprintf(opt_line, LEN_64, "%s{%s,", mod->opt_line+2, precord);
 					precord = strstr(psub + 1, ";");
@@ -167,6 +168,9 @@ static void handle_request(int sk)
 		case REQUEST_METRIC_ROOT:
 		case REQUEST_METRIC_CGROUP:
 		case REQUEST_METRIC_CGROUP_ALL:
+		case REQUEST_METRIC_ROOT_RAW:
+		case REQUEST_METRIC_CGROUP_RAW:
+		case REQUEST_METRIC_CGROUP_ALL_RAW:
 			break;
 		default:
 			goto error;
