@@ -360,8 +360,9 @@ static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct tcptrace_map_value *trace = (struct tcptrace_map_value*)data;
 	int direction;
+	int i = 0;
 
-	for (int i = 0; i < PT_MAX; i++) {
+	for (i; i < PT_MAX; i++) {
 		if (trace->entries[i].ns) {
 			direction = trace->entries[i].padding;
 			switch (direction) {

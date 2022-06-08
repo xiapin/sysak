@@ -100,9 +100,10 @@ static void print_cpuacct_load(struct cpuacct_load_bpf *obj, unsigned int knid)
 
 	/* print avenrun */
 	for (loop = 0; loop < 3; loop++) {
+            int i = 0;
 	    printf("avenrun%d:", loop);
 	    j = k;
-	    for (int i = 0; i < load.avenrun_n; i++) {
+	    for (i; i < load.avenrun_n; i++) {
 		printf(" %lu", load.run[j][loop]);
 		j = (j + 1) % 10;
 	    }
@@ -111,9 +112,10 @@ static void print_cpuacct_load(struct cpuacct_load_bpf *obj, unsigned int knid)
 
 	/* print load */
 	for (loop = 0; loop < 3; loop++) {
+            int i = 0;
 	    printf("load%d:", loop);
 	    j = k;
-	    for (int i = 0; i < load.avenrun_n; i++) {
+	    for (i; i < load.avenrun_n; i++) {
 		printf(" %lu.%02lu", cal_load_int(load.run[j][loop]), cal_load_frac(load.run[j][loop]));
 		j = (j + 1) % 10;
 	    }
