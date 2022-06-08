@@ -228,11 +228,9 @@ static struct mod_info cg_info[] = {
 	{"rarqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	{"warqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	/* hw_events info 65-68 */
-	{"_cahms", HIDE_BIT,  MERGE_AVG,  STATS_NULL},
 	{"cahmis", HIDE_BIT,  0,  STATS_NULL},
-	{"_cahrf", HIDE_BIT,  MERGE_AVG,  STATS_NULL},
 	{"cahref", HIDE_BIT,  0,  STATS_NULL},
-	/* jitter info 69-74 */
+	/* jitter info 67-72 */
 	{"numrsw", HIDE_BIT,  0,  STATS_NULL},	/* total numbers of runqslow jitter */
 	{" tmrsw", HIDE_BIT,  0,  STATS_NULL},	/* the sum-time of runqslow delay */
 	{"numnsc", HIDE_BIT,  0,  STATS_NULL},	/* total numbers of nosched jitter */
@@ -434,7 +432,7 @@ int enum_containers(void)
 		n_cgs++;
 	}
 	if (!perf_fail) {
-		for (i = 65; i < 69; i++)
+		for (i = 65; i < 67; i++)
 			cg_info[i].summary_bit = DETAIL_BIT;
 	}
 
@@ -497,7 +495,7 @@ int enum_containers_ext(char *parent)
 		}
 		if (!perf_fail) {
 			int i;
-			for (i = 65; i < 69; i++)
+			for (i = 65; i < 67; i++)
 				cg_info[i].summary_bit = DETAIL_BIT;
 		}
 	}
@@ -559,7 +557,7 @@ static void init_cgroups(void)
 
 	ret = cg_init_jitter();
 	if (!ret) {
-		for (i = 69; i < 75; i++)
+		for (i = 67; i < 73; i++)
 			cg_info[i].summary_bit = DETAIL_BIT;
 	}
 	cgroup_init_time = time(NULL);
@@ -1169,13 +1167,13 @@ static int print_cgroup_memory(char *buf, int len, struct cg_mem_info *info)
 
 static int print_cgroup_blkio(char *buf, int len, struct cg_blkio_info *info)
 {
-	return snprintf(buf, len, "%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,",
+	return snprintf(buf, len, "%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,",
 			info->rd_ios, info->wr_ios,
 			info->rd_bytes, info->wr_bytes,
 			info->rd_wait, info->wr_wait,
 			info->rd_time, info->wr_time,
 			info->rd_qios, info->wr_qios,
-			info->rd_qbytes, info->wr_qbytes);
+			info->rd_qbytes, info->wr_qbytes,0,0);
 }
 
 static int print_cgroup_hwres(char *buf, int len, struct cg_hwres_info *info)
@@ -1195,17 +1193,11 @@ static int print_cgroup_jitter(char *buf, int len, struct cg_jitter_info *infos)
 	for (i = 0; i <  JITTER_NTYPE - 1; i++) {
 		info = &infos->info[i];
 		pos += snprintf(buf + pos, len - pos,
-			"%s,%lu,%llu,%s,%s,%s,%s,",
-			cg_jit_mod[i], info->num, info->time,
-			info->container[0], info->container[1],
-			info->container[2], info->container[3]);
+			"%lu,%llu,", info->num, info->time);
 	}
 	info = &infos->info[i];
 	pos += snprintf(buf + pos, len - pos,
-		"%s,%lu,%llu,%s,%s,%s,%s",
-		cg_jit_mod[i],info->num, info->time,
-		info->container[0], info->container[1],
-		info->container[2], info->container[3]);
+		"%lu,%llu", info->num, info->time);
 	return pos;
 }
 
@@ -1375,29 +1367,27 @@ set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
  	 * _cachrf: delta(cache_refer)		67
  	 * cachref: cache_refer accumulated	68
  	* */
-	st_array[0] = cur_array[1] - pre_array[1];
-	st_array[1] = cur_array[1];
-	st_array[2] = cur_array[3] - pre_array[3];
-	st_array[3] = cur_array[3];
+	st_array[0] = cur_array[0] - pre_array[0];
+	st_array[1] = cur_array[1] - pre_array[1];
 }
 
 static void
 set_cg_jit_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 {
 	/*
- 	 * numrqs: numbers of runqueue-slower jitter	69
- 	 * tmrqs:  time of runqeueue-slower jitter	70
- 	 * numnsc: numbers of system-delay jitter	71
- 	 * tmnsc:  time of system-delay jitter		72
- 	 * numirq: numbers of irqoff of jitter		73
- 	 * tmirq:  time of irqoff jitter		74
+ 	 * numrqs: numbers of runqueue-slower jitter	67
+ 	 * tmrqs:  time of runqeueue-slower jitter	68
+ 	 * numnsc: numbers of system-delay jitter	69
+ 	 * tmnsc:  time of system-delay jitter		70
+ 	 * numirq: numbers of irqoff of jitter		71
+ 	 * tmirq:  time of irqoff jitter		72
  	* */
-	st_array[0] = cur_array[0];
-	st_array[1] = cur_array[1];
-	st_array[2] = cur_array[2];
-	st_array[3] = cur_array[3];
-	st_array[4] = cur_array[4];
-	st_array[5] = cur_array[5];
+	st_array[0] = cur_array[0] - pre_array[0];
+	st_array[1] = cur_array[1] - pre_array[1];
+	st_array[2] = cur_array[2] - pre_array[2];
+	st_array[3] = cur_array[3] - pre_array[3];
+	st_array[4] = cur_array[4] - pre_array[4];
+	st_array[5] = cur_array[5] - pre_array[5];
 }
 static void
 set_cgroup_record(struct module *mod, double st_array[],
@@ -1408,7 +1398,7 @@ set_cgroup_record(struct module *mod, double st_array[],
 	set_memory_record(&st_array[16], &pre_array[16], &cur_array[16]);
 	set_blkio_record(&st_array[51], &pre_array[51], &cur_array[51], inter);
 	set_hwres_record(&st_array[65], &pre_array[65], &cur_array[65]);
-	set_cg_jit_record(&st_array[69], &pre_array[69], &cur_array[69]);
+	set_cg_jit_record(&st_array[67], &pre_array[67], &cur_array[67]);
 }
 
 void

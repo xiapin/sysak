@@ -28,13 +28,13 @@ static int get_request(const char *buf, char *sub_req, int len)
 		strncpy(sub_req, req_str + 15, len - 1);
 		return REQUEST_METRIC_CGROUP;
 	}
-	if (strcmp(req_str, "metric/raw") == 0 || strcmp(req_str, "metric/raw/") == 0) {
+	else if (strcmp(req_str, "metric/raw") == 0 || strcmp(req_str, "metric/raw/") == 0) {
 		return REQUEST_METRIC_ROOT_RAW;
 	}
-	else if (strcmp(req_str, "metric/cgroups/raw") == 0 || strcmp(req_str, "metric/cgroups/raw") == 0) {
+	else if (strcmp(req_str, "metric/raw/cgroups") == 0 || strcmp(req_str, "metric/raw/cgroups/") == 0) {
 		return REQUEST_METRIC_CGROUP_ALL_RAW;
 	}
-	else if (strncmp(req_str, "metric/cgroups/raw/", 19) == 0) {
+	else if (strncmp(req_str, "metric/raw/cgroups/", 19) == 0) {
 		strncpy(sub_req, req_str + 19, len - 1);
 		return REQUEST_METRIC_CGROUP_RAW;
 	}
@@ -65,7 +65,6 @@ int output_http(int sk, int req, const char*sub_req)
 				&& strcmp(mod->name, "mod_cgroup"))
 				continue;
 		}
-
 		if (mod->enable && strlen(mod->record)) {
 			precord = mod->record;
 			j = 0;
