@@ -141,7 +141,7 @@ static int check_or_install_compoents(const char *name)
     if (strcmp(name, "sysak_modules") == 0)
         sprintf(compents_path, "%s%s%s", module_path, kern_version, module);
     else if (strcmp(name, "btf") == 0)
-        sprintf(compents_path, "%s%s/vmlinux-%s", module_path, kern_version, kern_version);
+        sprintf(compents_path, "%s%s/vmlinux-%s", tools_path, kern_version, kern_version);
 
     if (access(compents_path, 0) != 0){
         printf("%s %s", name, promt);
