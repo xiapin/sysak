@@ -1,81 +1,46 @@
 # 功能说明
-监控并分析系统长时不调度的情况
-
+监控并分析系统长时不调度的情况  
+nosched是一款基于ebpf的用于监控cpu长时间运行在系统态，使得内核无法进入调度流程从而导致其他任务得不到调度的工具。 
 # 使用说明
-1 run the nosched
- $ sudo ./out/sysak nosched	#default threshold 10ms
- or
- $ sudo ./out/sysak nosched -t 1  #set the threshold to 1ms
+```
+sysak nosched [--help] [-t THRESH(ms)]   [-f LOGFILE] [-s duration(s)]  
+    -t  门限：    当内核超过门限时间不调度就记录，单位ms； ｜可选，默认10ms
+    -f log文件：  将log记录到指定文件。                    ｜可选，默认在/var/log/nosched/nosched.log
+    -s durations：设置该程序运行多长时间，单位秒；         ｜ 可选，默认永远运行
+```
+# 使用举例
+## 运行说明
+下面的例子使用nosched采样30秒，采样的结果存放在当前目录a.log文件中
+```
+$sudo sysak nosched  -f a.log -s 30  
+```
+## 日志输出说明
+上面结果a.log输出说明如下：
+```
+时间戳             发生CPU      任务名字         线程ID       内核延时    
+    ｜                 \           ｜              ｜            ｜               
+TIME(nosched)          CPU        COMM            TID          LAT(ms)   
+2022-05-26_17:50:58     0         test            535832         10        
+<0xffffffff86a01b0f> apic_timer_interrupt
+<0xffffffff868744a7> clear_page_erms
+<0xffffffff861e6add> prep_new_page
+<0xffffffff861ead9f> get_page_from_freelist
+<0xffffffff861ec47e> __alloc_pages_nodemask
+<0xffffffff8624cee3> alloc_pages_vma
+<0xffffffff8621f2a8> do_anonymous_page
+<0xffffffff86224f75> __handle_mm_fault
+<0xffffffff86225436> handle_mm_fault
+<0xffffffff8606fc9a> __do_page_fault
+<0xffffffff8606ff92> do_page_fault
+<0xffffffff86a0119e> async_page_fault  
+```
+上面的日志记录了机器系统态长时间运行的现场信息。
+-    CPU      发生内核态长时间运行不调度时的现场CPU；
+-    COMM  发生内核态长时间运行不调度时的现场任务名字；
+-    TID         发生内核态长时间运行不调度时的现场的线程ID；
+-    LAT：    内核态长时间运行不调度的时长。
+-    堆栈：发生内核态长时间运行不调度时的现场的运行堆栈
+从上面的日志可以看出在17:50:58时刻任务test在内核运行了10ms左右，造成这个延时到原因是发生了缺页异常。
 
-The out looks like:
-sudo ./out/sysak nosched -t 1
-Threshold set to 1 ms
-libbpf: loading object 'nosched_bpf' from buffer
-.....  (#a lot of messages)
-Successfully started! Please run `sudo cat /sys/kernel/debug/tracing/trace_pipe` to see output of the BPF programs.
-Running....
- tips:Ctl+c show the result!
 
-2 get the result
-2.1 use trace_pipe(Optional， for debug)
- $ sudo cat /sys/kernel/debug/tracing/trace_pipe
-           <...>-110777 [014] dNh. 19777.314467: 0: cc1 :lat is 1001 us, 1 ticks
-           <...>-110849 [016] dNh. 19777.556471: 0: cc1 :lat is 1000 us, 1 ticks
-           <...>-110712 [000] dNh. 19777.932467: 0: cc1 :lat is 1005 us, 1 ticks
-2.2 stop the process and get the result
-We enter the "Ctl+c" to stop the process, the result looks as follows:
-Running....
- tips:Ctl+c show the result!
-^C
-***********************************
-cc1<116321> [19795.442018507]: lat=4000us, lat_tick=4
-<ffffffff9aa0191f> apic_timer_interrupt
-<ffffffff9a81a7d1> __lock_text_start
-<ffffffff9a1f0bc8> release_pages
-<ffffffff9a21c576> tlb_flush_mmu_free
-<ffffffff9a21c6c2> arch_tlb_finish_mmu
-<ffffffff9a21c83f> tlb_finish_mmu
-<ffffffff9a227edd> exit_mmap
-<ffffffff9a08e604> mmput
-<ffffffff9a098227> do_exit
-<ffffffff9a098c9a> do_group_exit
-<ffffffff9a0a53e5> get_signal
-<ffffffff9a01ed46> do_signal
-<ffffffff9a0021c5> exit_to_usermode_loop
-<ffffffff9a002614> prepare_exit_to_usermode
-<ffffffff9aa00a34> swapgs_restore_regs_and_return_to_usermode
-----------------------
-cc1<111581> [19775.265934964]: lat=1005us, lat_tick=1
-<ffffffff9aa0191f> apic_timer_interrupt
-<ffffffff9a1e533d> free_unref_page_list
-<ffffffff9a1f0bf7> release_pages
-<ffffffff9a21c576> tlb_flush_mmu_free
-<ffffffff9a21c6c2> arch_tlb_finish_mmu
-<ffffffff9a21c83f> tlb_finish_mmu
-<ffffffff9a227edd> exit_mmap
-<ffffffff9a08e604> mmput
-<ffffffff9a098227> do_exit
-<ffffffff9a098c9a> do_group_exit
-<ffffffff9a098d14> __x64_sys_exit_group
-<ffffffff9a0027eb> do_syscall_64
-<ffffffff9aa00088> entry_SYSCALL_64_after_hwframe
-..........(#a lot of messages)
 
-3 the results
-3.1 headers
- comm&pid       timestamp    latency(us)   latency(tick)
-    |               |            |             |
-cc1<111581> [19775.265934964]: lat=1005us, lat_tick=1
-
-comm&pid: The name(or comm) and pid of the task which with need_to_resched flag but didn't schedle() for threshold time.
-timestamp: The timestamp when no_sched happened.
-latency(us): How many us the task with need_to_resched flag has no schedule().
-latency(tick): Likes latency, but takes ticks as count.
-
-3.2 stack
-The stack back-trace of the current(the murderer) context.
-<ffffffff9aa0191f> apic_timer_interrupt
-<ffffffff9a1e533d> free_unref_page_list
-<ffffffff9a1f0bf7> release_pages
-<ffffffff9a21c576> tlb_flush_mmu_free
-......
