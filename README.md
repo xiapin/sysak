@@ -15,6 +15,6 @@ with usermode tools.
 Quick start to use sysAK:
 1) ./configure
 2) make
-3) ./out/sysak
+3) ./out/sysak list -a
 
 See more info about sysAK tools at doc/
