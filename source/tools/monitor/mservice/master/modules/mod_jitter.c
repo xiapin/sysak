@@ -126,6 +126,9 @@ static int get_jitter_info(char *path, struct summary *sump)
 		return ret;
 	}
 	memset(line, 0, sizeof(line));
+
+	/* null "line" is a real scene,so return 0 for continue walking*/
+	ret = 0;
 	if (fgets(line, sizeof(line), fp) != NULL) {
 		/* "irqoff", "noschd", "rqslow" has 6 charactors */
 		sscanf(line+6, "%lu %llu %d %d %d %d %lu %lu %lu %lu",
@@ -134,9 +137,6 @@ static int get_jitter_info(char *path, struct summary *sump)
 			&sump->lastcpu2, &sump->lastcpu3,
 			&sump->lastjit0, &sump->lastjit1,
 			&sump->lastjit2, &sump->lastjit3);
-		ret = 0;
-	} else {
-		fprintf(stderr, "fgets %s fail:%s\n", path, strerror(errno));
 	}
 	rewind(fp);
 	fclose(fp);
