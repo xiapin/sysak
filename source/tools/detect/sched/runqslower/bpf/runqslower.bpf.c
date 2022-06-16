@@ -39,6 +39,28 @@ struct {
 	retval;					\
 	})
 
+struct sched_wakeup_tp_args {
+	struct trace_entry ent;
+	char comm[16];
+	pid_t pid;
+	int prio;
+	int success;
+	int target_cpu;
+	char __data[0];
+};
+
+struct sched_switch_tp_args {
+	struct trace_entry ent;
+	char prev_comm[16];
+	pid_t prev_pid;
+	int prev_prio;
+	long int prev_state;
+	char next_comm[16];
+	pid_t next_pid;
+	int next_prio;
+	char __data[0];
+};
+
 /* record enqueue timestamp */
 static __always_inline
 int trace_enqueue(u32 tgid, u32 pid)
@@ -68,7 +90,7 @@ int trace_enqueue(u32 tgid, u32 pid)
 }
 
 SEC("tp/sched/sched_wakeup")
-int handle__sched_wakeup(struct trace_event_raw_sched_wakeup_template *ctx)
+int handle__sched_wakeup(struct sched_wakeup_tp_args *ctx)
 {
 	pid_t pid = 0;
 	bpf_probe_read(&pid, sizeof(pid), &(ctx->pid));
@@ -77,7 +99,7 @@ int handle__sched_wakeup(struct trace_event_raw_sched_wakeup_template *ctx)
 }
 
 SEC("tp/sched/sched_wakeup_new")
-int handle__sched_wakeup_new(struct trace_event_raw_sched_wakeup_template *ctx)
+int handle__sched_wakeup_new(struct sched_wakeup_tp_args *ctx)
 {
 	pid_t pid = 0;
 	bpf_probe_read(&pid, sizeof(pid), &(ctx->pid));
@@ -86,7 +108,7 @@ int handle__sched_wakeup_new(struct trace_event_raw_sched_wakeup_template *ctx)
 }
 
 SEC("tp/sched/sched_switch")
-int handle_switch(struct trace_event_raw_sched_switch *ctx)
+int handle_switch(struct sched_switch_tp_args *ctx)
 {
 	int cpuid;
 	u32 pid, prev_pid;

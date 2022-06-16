@@ -59,13 +59,7 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int nr)
 static inline int test_tsk_thread_flag(struct task_struct *tsk, int flag)
 {
 	struct thread_info tf, *tfp;
-//#ifdef CONFIG_THREAD_INFO_IN_TASK
-	tfp = &(tsk->thread_info);
-//#elif !defined(__HAVE_THREAD_FUNCTIONS)
-//# define task_thread_info(task) ((struct thread_info *)(task)->stack)
-//#endif
-	bpf_probe_read(&tf, sizeof(tf), &(tsk->thread_info));
-	tfp = &tf;
+	tfp = (struct thread_info *)(BPF_CORE_READ(tsk, stack));
 	return test_ti_thread_flag(tfp, flag);
 }
 
@@ -92,7 +86,6 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 		return 0;
 
 	now = bpf_ktime_get_ns();
-
 	__builtin_memset(&cpuid, 0, sizeof(u64));
 	cpuid = bpf_get_smp_processor_id();
 	latp = bpf_map_lookup_elem(&info_map, &cpuid);

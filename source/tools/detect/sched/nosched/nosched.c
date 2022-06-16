@@ -31,9 +31,11 @@ char *help_str = "sysak nosched";
 struct evn {
 	__u64 thresh;
 	bool summary;
+	bool verbose;
 } env = {
 	.thresh = LAT_THRESH_NS,
 	.summary = false,
+	.verbose = false,
 };
 
 static void usage(char *prog)
@@ -116,8 +118,10 @@ struct ksym *ksym_search(long key)
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
-	return 0;
-	//return vfprintf(stderr, format, args);
+	if (env.verbose)
+		return vfprintf(stderr, format, args);
+	else
+		return 0;
 }
 
 static void bump_memlock_rlimit(void)
@@ -335,7 +339,7 @@ int main(int argc, char **argv)
 		return err;
 
 	for (;;) {
-		c = getopt_long(argc, argv, "t:f:s:Sh", NULL, &option_index);
+		c = getopt_long(argc, argv, "t:f:s:Svh", NULL, &option_index);
 		if (c == -1)
 			break;
 
@@ -376,6 +380,9 @@ int main(int argc, char **argv)
 				if (!percpu_summary)
 					return -ENOMEM;
 				env.summary = 1;
+				break;
+			case 'v':
+				env.verbose = true;
 				break;
 			case 'h':
 				usage(help_str);
