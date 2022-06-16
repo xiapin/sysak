@@ -65,7 +65,9 @@ install:
 	cp $(OBJPATH)/.sysak_compoents /usr/local/sbin/ -rf
 	mkdir -p /etc/sysak
 	mkdir -p /var/log/sysak
-	cp $(OBJPATH)/.sysak_compoents/tools/monitor/sysakmon.conf /etc/sysak/
+ifneq ($(wildcard $(OBJPATH)/.sysak_compoents/tools/monitor/sysakmon.conf),)
+		cp $(OBJPATH)/.sysak_compoents/tools/monitor/sysakmon.conf /etc/sysak/
+endif
 
 uninstall:
 	rm -rf /etc/sysak
