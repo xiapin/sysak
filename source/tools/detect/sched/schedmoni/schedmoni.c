@@ -15,16 +15,20 @@
 #include "bpf/schedmoni.skel.h"
 
 extern int stk_fd;
-FILE *fp_nsc = NULL, *fp_rsw = NULL;
+extern struct ksym *ksyms;
+
+int nr_cpus;
+char filename[256] = {0};
 volatile sig_atomic_t exiting = 0;
+FILE *fp_nsc = NULL, *fp_rsw = NULL, *fp_irq = NULL;
 char log_dir[] = "/var/log/sysak/schedmoni";
 char rswf[] = "/var/log/sysak/schedmoni/runslow.log";
 char nscf[] = "/var/log/sysak/schedmoni/nosched.log";
-char filename[256] = {0};
+char irqf[] = "/var/log/sysak/schedmoni/irqoff.log";
 
 struct env env = {
 	.span = 0,
-	.min_us = 20000,
+	.thresh = 20*1000*1000,
 	.fp = NULL,
 };
 
@@ -32,7 +36,7 @@ const char *argp_program_version = "schedmoni 0.1";
 const char argp_program_doc[] =
 "Trace schedule latency.\n"
 "\n"
-"USAGE: schedmoni [--help] [-s SPAN] [-t TID] [-c COMM] [-P] [min_us] [-f LOGFILE]\n"
+"USAGE: schedmoni [--help] [-s SPAN] [-t TID] [-c COMM] [-P] [threshold] [-f LOGFILE]\n"
 "\n"
 "EXAMPLES:\n"
 "    schedmoni          # trace latency higher than 10000 us (default)\n"
@@ -49,6 +53,7 @@ static const struct argp_option opts[] = {
 	{ "tid", 't', "TID", 0, "Thread TID to trace"},
 	{ "comm", 'c', "COMM", 0, "Name of the application"},
 	{ "span", 's', "SPAN", 0, "How long to run"},
+	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ "previous", 'P', NULL, 0, "also show previous task name and TID" },
 	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
@@ -56,6 +61,8 @@ static const struct argp_option opts[] = {
 	{},
 };
 
+int load_kallsyms(struct ksym **pksyms);
+int attach_prog_to_perf(struct schedmoni_bpf *obj, struct bpf_link **sw_mlinks, struct bpf_link **hw_mlinks);
 static void bump_memlock_rlimit(void)
 {
 	struct rlimit rlim_new = {
@@ -67,6 +74,30 @@ static void bump_memlock_rlimit(void)
 		fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
 		exit(1);
 	}
+}
+
+static inline void close_logfile(FILE *fp0, FILE *fp1, FILE *fp2)
+{
+	if (fp0)
+		fclose(fp0);
+	if (fp1)
+		fclose(fp1);
+	if (fp2)
+		fclose(fp2);
+}
+
+static inline FILE* open_logfile(char *filename, FILE **fporig)
+{
+	FILE *fp = *fporig;
+
+	/* if original FILE is opened, just skip... */
+	if (fp)
+		return fp; 
+	fp = fopen(filename, "w+");
+	if (!fp)
+		fprintf(stderr, "%s :fopen %s\n",
+			strerror(errno), filename);
+	return fp;
 }
 
 static int prepare_dictory(char *path)
@@ -84,7 +115,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	int pid;
 	static int pos_args;
-	long long min_us, span;
+	long long thresh, span;
 
 	switch (key) {
 	case 'h':
@@ -140,42 +171,17 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.span = span;
 		break;
 	case 'f':
-		if (strlen(arg) < 2) {
-			strncpy(filename, rswf, sizeof(filename));
-			fp_rsw = fopen(filename, "w+");
-			if (!fp_rsw) {
-				int ret = errno;
-				fprintf(stderr, "%s :fopen %s\n",
-					strerror(errno), filename);
-				return ret;
-			}
-			memset(filename, 0, sizeof(filename));
-			strncpy(filename, nscf, sizeof(filename));
-			fp_nsc = fopen(filename, "w+");
-			if (!fp_nsc) {
-				int ret = errno;
-				fprintf(stderr, "%s :fopen %s\n",
-					strerror(errno), filename);
-				return ret;
-			}
-		} else {
+		if (strlen(arg) > 1) {
 			snprintf(filename, sizeof(filename), "%s.rswf", arg);
-			fp_rsw = fopen(filename, "w+");
-			if (!fp_rsw) {
-				int ret = errno;
-				fprintf(stderr, "%s :fopen %s\n",
-					strerror(errno), filename);
-				return ret;
-			}
+			fp_rsw = open_logfile(filename, &fp_rsw);
+
 			memset(filename, 0, sizeof(filename));
 			snprintf(filename, sizeof(filename), "%s.nscf", arg);
-			fp_nsc = fopen(filename, "w+");
-			if (!fp_nsc) {
-				int ret = errno;
-				fprintf(stderr, "%s :fopen %s\n",
-					strerror(errno), filename);
-				return ret;
-			}
+			fp_nsc = open_logfile(filename, &fp_nsc);
+
+			memset(filename, 0, sizeof(filename));
+			snprintf(filename, sizeof(filename), "%s.irqf", arg);
+			fp_irq = open_logfile(filename, &fp_irq);
 		}
 		break;
 	case ARGP_KEY_ARG:
@@ -185,34 +191,15 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		errno = 0;
-		min_us = strtoll(arg, NULL, 10);
-		if (errno || min_us <= 0) {
+		thresh = strtoll(arg, NULL, 10);
+		if (errno || thresh <= 0) {
 			fprintf(stderr, "Invalid delay (in us): %s\n", arg);
 			argp_usage(state);
 		}
-		env.min_us = min_us;
+		env.thresh = thresh*1000*1000;
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
-	}
-	if (!fp_rsw && !fp_nsc) {
-		strncpy(filename, rswf, sizeof(filename));
-		fp_rsw = fopen(filename, "w+");
-		if (!fp_rsw) {
-			int ret = errno;
-			fprintf(stderr, "%s :fopen %s\n",
-				strerror(errno), filename);
-			return ret;
-		}
-		memset(filename, 0, sizeof(filename));
-		strncpy(filename, nscf, sizeof(filename));
-		fp_nsc = fopen(filename, "w+");
-		if (!fp_nsc) {
-			int ret = errno;
-			fprintf(stderr, "%s :fopen %s\n",
-				strerror(errno), filename);
-			return ret;
-		}
 	}
 	return 0;
 }
@@ -224,12 +211,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static void sig_alarm(int signo)
-{
-	exiting = 1;
-}
-
-static void sig_int(int signo)
+static void sig_exiting(int signo)
 {
 	exiting = 1;
 }
@@ -238,35 +220,74 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz);
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt);
 void *runslw_handler(void *arg);
 void *runnsc_handler(void *arg);
+void *irqoff_handler(void *arg);
 
 int main(int argc, char **argv)
 {
 	void *res;
-	int i, err, err1, err2;
-	int arg_fd, ent_rslw_fd, ent_nsch_fd;
-	pthread_t pt_runslw, pt_runnsc;
+	int i, err;
+	int arg_fd, map_rslw_fd, map_nsch_fd, map_irqf_fd;
+	pthread_t pt_runslw, pt_runnsc, pt_irqoff;
 	struct schedmoni_bpf *obj;
 	struct args args = {};
-	struct tharg runslw = {};
-	struct tharg runnsc = {};
+	struct tharg runslw = {}, runnsc = {}, irqoff ={};
+	struct bpf_link **sw_mlinks, **hw_mlinks= NULL;
 	static const struct argp argp = {
 		.options = opts,
 		.parser = parse_arg,
 		.doc = argp_program_doc,
 	};
 
+	libbpf_set_print(libbpf_print_fn);
+	bump_memlock_rlimit();
+
 	err = prepare_dictory(log_dir);
 	if (err)
 		return err;
 
+	nr_cpus = libbpf_num_possible_cpus();
+	if (nr_cpus < 0) {
+		fprintf(stderr, "failed to get # of possible cpus: '%s'!\n",
+			strerror(-nr_cpus));
+		return 1;
+	}
+
 	memset(&env.comm, 0, sizeof(struct comm_item));
+	fp_rsw = fp_nsc = fp_irq = NULL;
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err)
 		return err;
 
-	libbpf_set_print(libbpf_print_fn);
+	/* check again for no any arguments, in that case, FILEs are NULL */
+	if (!fp_rsw || !fp_nsc || !fp_irq) {
+		fp_rsw = open_logfile(rswf, &fp_rsw);
+		fp_nsc = open_logfile(nscf, &fp_nsc);
+		fp_irq = open_logfile(irqf, &fp_irq);
+		if (!fp_rsw || !fp_nsc || !fp_irq) {
+			close_logfile(fp_rsw, fp_nsc, fp_irq);
+			return -EINVAL;
+		}
+	}
 	
-	bump_memlock_rlimit();
+	ksyms = NULL;
+	err = load_kallsyms(&ksyms);
+	if (err) {
+		fprintf(stderr, "Failed to load kallsyms\n");
+		return err;
+	}
+
+	sw_mlinks = calloc(nr_cpus, sizeof(*sw_mlinks));
+	if (!sw_mlinks) {
+		fprintf(stderr, "failed to alloc sw_mlinks or rlinks\n");
+		return -ENOMEM;
+	}
+	hw_mlinks = calloc(nr_cpus, sizeof(*hw_mlinks));
+	if (!hw_mlinks) {
+		fprintf(stderr, "failed to alloc hw_mlinks or rlinks\n");
+		free(ksyms);
+		free(sw_mlinks);
+		return -ENOMEM;
+	}
 	
 	obj = schedmoni_bpf__open();
 	if (!obj) {
@@ -280,21 +301,16 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = schedmoni_bpf__attach(obj);
-	if (err) {
-		fprintf(stderr, "failed to attach BPF programs\n");
-		goto cleanup;
-	}
-
 	i = 0;
 	arg_fd = bpf_map__fd(obj->maps.argmap);
-	ent_rslw_fd = bpf_map__fd(obj->maps.events_rnslw);
-	ent_nsch_fd = bpf_map__fd(obj->maps.events_nosch);
+	map_rslw_fd = bpf_map__fd(obj->maps.events_rnslw);
+	map_nsch_fd = bpf_map__fd(obj->maps.events_nosch);
+	map_irqf_fd = bpf_map__fd(obj->maps.events_irqof);
 	stk_fd = bpf_map__fd(obj->maps.stackmap);
 	args.comm_i = env.comm;
 	args.targ_tgid = env.pid;
 	args.targ_pid = env.tid;
-	args.min_us = env.min_us;
+	args.thresh = env.thresh;
 	args.flag = TIF_NEED_RESCHED;
 	args.ready = false;
 
@@ -304,40 +320,67 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	if (signal(SIGINT, sig_int) == SIG_ERR ||
-		signal(SIGALRM, sig_alarm) == SIG_ERR) {
+	if (signal(SIGINT, sig_exiting) == SIG_ERR ||
+		signal(SIGALRM, sig_exiting) == SIG_ERR) {
 		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
 		err = 1;
 		goto cleanup;
 	}
 
-	runslw.fd = ent_rslw_fd;
+	runslw.map_fd = map_rslw_fd;
 	runslw.ext_fd = arg_fd;
 	err = pthread_create(&pt_runslw, NULL, runslw_handler, &runslw);
 	if (err) {
 		fprintf(stderr, "can't pthread_create runslw: %s\n", strerror(errno));
 		goto cleanup;
 	}
-	runnsc.fd = stk_fd;
-	runnsc.ext_fd = ent_nsch_fd;
 
+	runnsc.map_fd = map_nsch_fd;
+	runnsc.ext_fd = stk_fd;
 	err = pthread_create(&pt_runnsc, NULL, runnsc_handler, &runnsc);
 	if (err) {
 		fprintf(stderr, "can't pthread_create runnsc: %s\n", strerror(errno));
 		goto cleanup;
 	}
 
-	if (env.span)
-		alarm(env.span);
-
-	err1 = pthread_join(pt_runslw, &res);
-	err2 = pthread_join(pt_runnsc, &res);
-	if (err1 || err2) {
+	irqoff.map_fd = map_irqf_fd;
+	irqoff.ext_fd = stk_fd;
+	err = pthread_create(&pt_irqoff, NULL, irqoff_handler, &irqoff);
+	if (err) {
+		fprintf(stderr, "can't pthread_create irqoff: %s\n", strerror(errno));
 		goto cleanup;
 	}
 
-cleanup:
-	schedmoni_bpf__destroy(obj);
+	if (env.span)
+		alarm(env.span);
+	err = attach_prog_to_perf(obj, sw_mlinks, hw_mlinks);
+	if (err) {
+		free(sw_mlinks);
+		free(hw_mlinks);
+		sw_mlinks = hw_mlinks = NULL;
+	}
 
+	err = schedmoni_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF programs\n");
+		goto cleanup;
+	}
+
+	pthread_join(pt_runslw, &res);
+	pthread_join(pt_runnsc, &res);
+	pthread_join(pt_irqoff, &res);
+
+cleanup:
+	for (i = 0; i < nr_cpus; i++) {
+		bpf_link__destroy(sw_mlinks[i]);
+		bpf_link__destroy(hw_mlinks[i]);
+	}
+	if (sw_mlinks)
+		free(sw_mlinks);
+	if (hw_mlinks)
+		free(hw_mlinks);
+	if (ksyms)
+		free(ksyms);
+	schedmoni_bpf__destroy(obj);
 	return err != 0;
 }

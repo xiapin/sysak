@@ -13,7 +13,7 @@ struct comm_item {
 };
 
 struct args {
-	__u64 min_us;
+	__u64 thresh;
 	pid_t targ_pid;
 	pid_t targ_tgid;
 	struct comm_item comm_i;
@@ -22,7 +22,7 @@ struct args {
 };
 
 struct tharg {
-	int fd;
+	int map_fd;
 	int ext_fd;
 };
 
@@ -38,11 +38,17 @@ struct env {
 	pid_t pid;
 	pid_t tid;
 	unsigned long span;
-	__u64 min_us;
+	__u64 thresh;
 	bool previous;
 	bool verbose;
 	void *fp;
+	__u64 sample_period;
 	struct comm_item comm;
+};
+
+struct ksym {
+	long addr;
+	char *name;
 };
 
 struct event {
@@ -53,7 +59,7 @@ struct event {
 	char task[TASK_COMM_LEN];
 	char prev_task[TASK_COMM_LEN];
 	
-	__u64 delta_us;
+	__u64 delay;
 	__u64 stamp;
 	pid_t pid;
 	pid_t prev_pid;

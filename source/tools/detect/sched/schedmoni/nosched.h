@@ -8,11 +8,6 @@
 #define TASK_COMM_LEN	16
 #define PERF_MAX_STACK_DEPTH	32
 
-struct ksym {
-	long addr;
-	char *name;
-};
-
 struct key_t {
 	__u32 ret;
 };

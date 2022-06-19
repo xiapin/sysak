@@ -7,122 +7,18 @@
 #include <errno.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
-#include "nosched.comm.h"
+#include "nosched.h"
 #include "schedmoni.h"
 
 #define MAX_SYMS 300000
 extern FILE *fp_nsc;
-//extern char filename[256] = {0};
 
 int stk_fd;
 extern volatile sig_atomic_t exiting;
-static struct ksym syms[MAX_SYMS];
-static int sym_cnt;
-
-static int ksym_cmp(const void *p1, const void *p2)
-{
-	return ((struct ksym *)p1)->addr - ((struct ksym *)p2)->addr;
-}
-
-int load_kallsyms(void)
-{
-	FILE *f = fopen("/proc/kallsyms", "r");
-	char func[256], buf[256];
-	char symbol;
-	void *addr;
-	int i = 0;
-
-	if (!f)
-		return -ENOENT;
-
-	while (!feof(f)) {
-		if (!fgets(buf, sizeof(buf), f))
-			break;
-		if (sscanf(buf, "%p %c %s", &addr, &symbol, func) != 3)
-			break;
-		if (!addr)
-			continue;
-		syms[i].addr = (long) addr;
-		syms[i].name = strdup(func);
-		i++;
-	}
-	fclose(f);
-	sym_cnt = i;
-	qsort(syms, sym_cnt, sizeof(struct ksym), ksym_cmp);
-	return 0;
-}
-
-struct ksym *ksym_search(long key)
-{
-	int start = 0, end = sym_cnt;
-	int result;
-
-	/* kallsyms not loaded. return NULL */
-	if (sym_cnt <= 0)
-		return NULL;
-
-	while (start < end) {
-		size_t mid = start + (end - start) / 2;
-
-		result = key - syms[mid].addr;
-		if (result < 0)
-			end = mid;
-		else if (result > 0)
-			start = mid + 1;
-		else
-			return &syms[mid];
-	}
-
-	if (start >= 1 && syms[start - 1].addr < key &&
-	    key < syms[start].addr)
-		/* valid ksym */
-		return &syms[start - 1];
-
-	/* out of range. return _stext */
-	return &syms[0];
-}
-
-static void print_ksym(__u64 addr)
-{
-	struct ksym *sym;
-
-	if (!addr)
-		return;
-
-	sym = ksym_search(addr);
-	fprintf(fp_nsc, "<0x%llx> %s\n", addr, sym->name);
-}
-
-static void print_stack(int fd, __u32 ret)
-{
-	int i;
-	__u64 ip[PERF_MAX_STACK_DEPTH] = {};
-
-	if (bpf_map_lookup_elem(fd, &ret, &ip) == 0) {
-		for (i = 7; i < PERF_MAX_STACK_DEPTH - 1; i++)
-			print_ksym(ip[i]);
-	} else {
-		if ((int)(ret) < 0)
-		fprintf(fp_nsc, "<0x0000000000000000>:error=%d\n", (int)(ret));
-	}
-}
-
-#define SEC_TO_NS	(1000*1000*1000)
-static void stamp_to_date(__u64 stamp, char dt[], int len)
-{
-	time_t t, diff, last;
-	struct tm *tm;
-	struct timespec ts;
-
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	time(&t);
-	diff = ts.tv_sec*SEC_TO_NS + ts.tv_nsec - stamp;
-	diff = diff/SEC_TO_NS;
-
-	last = t - diff;
-	tm = localtime(&last);
-	strftime(dt, len, "%F_%H:%M:%S", tm);
-}
+extern struct ksym *ksyms;
+void stamp_to_date(__u64 stamp, char dt[], int len);
+void print_stack(int fd, __u32 ret, struct ksym *syms, FILE *fp);
+static int stack_fd;
 
 void handle_event_nosch(void *ctx, int cpu, void *data, __u32 data_sz)
 {
@@ -131,8 +27,8 @@ void handle_event_nosch(void *ctx, int cpu, void *data, __u32 data_sz)
 
 	stamp_to_date(e->stamp, ts, sizeof(ts));
 	fprintf(fp_nsc, "%-21s %-5d %-15s %-8d %-10llu\n",
-		ts, e->cpuid, e->task, e->pid, e->delta_us);
-	print_stack(stk_fd, e->ret);
+		ts, e->cpuid, e->task, e->pid, e->delay/(1000*1000));
+	print_stack(stack_fd, e->ret, ksyms, fp_nsc);
 }
 
 void nosched_handler(int poll_fd)
@@ -142,7 +38,7 @@ void nosched_handler(int poll_fd)
 	struct perf_buffer_opts pb_opts = {};
 
 	fprintf(fp_nsc, "%-21s %-5s %-15s %-8s %-10s\n",
-		"TIME(nosched)", "CPU", "COMM", "TID", "LAT(us)");
+		"TIME(nosched)", "CPU", "COMM", "TID", "LAT(ms)");
 
 	pb_opts.sample_cb = handle_event_nosch;
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
@@ -168,16 +64,10 @@ clean_nosched:
 
 void *runnsc_handler(void *arg)
 {
-	int err;
 	struct tharg *runnsc = (struct tharg *)arg;
- 
-	err = load_kallsyms();
-	if (err) {
-		fprintf(stderr, "Failed to load kallsyms\n");
-		return NULL;
-	}
 
-	nosched_handler(runnsc->ext_fd);
+	stack_fd = runnsc->ext_fd;
+	nosched_handler(runnsc->map_fd);
 
 	return NULL;
 }

@@ -3,9 +3,10 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 #include "../schedmoni.h"
-#include "../nosched.comm.h"
+#include "../nosched.h"
+#include "../irqoff.h"
 
-#define MAX_THRESH	(10*1000)
+#define MAX_THRESH	(12*1000*1000)
 #define TASK_RUNNING	0
 #define _(P) ({typeof(P) val; __builtin_memset(&val, 0, sizeof(val)); bpf_probe_read(&val, sizeof(val), &P); val;})
 
@@ -35,6 +36,12 @@ struct {
 	__uint(value_size, sizeof(u32));
 } events_nosch SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(key_size, sizeof(u32));
+	__uint(value_size, sizeof(u32));
+} events_irqof SEC(".maps");
+
 struct bpf_map_def SEC("maps") stackmap = {
 	.type = BPF_MAP_TYPE_STACK_TRACE,
 	.key_size = sizeof(u32),
@@ -48,6 +55,13 @@ struct {
 	__type(key, u64);
 	__type(value, struct latinfo);
 } info_map SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct tm_info);
+} tm_map SEC(".maps");
 
 #define GETARG_FROM_ARRYMAP(map,argp,type,member)({	\
 	int i = 0;					\
@@ -96,6 +110,20 @@ struct {
 	}						\
 	ret;						\
 })
+
+static inline u64 get_thresh(void)
+{
+	u64 thresh, i = 0;
+	struct arg_info *argp;
+
+	argp = bpf_map_lookup_elem(&argmap, &i);
+	if (argp)
+		thresh = argp->thresh;
+	else
+		thresh = -1;
+
+	return thresh;
+}
 
 static bool program_ready(void)
 {
@@ -227,7 +255,7 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 	u32 pid, prev_pid;
 	long int prev_state;
 	struct event event = {};
-	u64 delta_us, min_us;
+	u64 delay, thresh;
 	struct args *argp;
 	struct latinfo *latp;
 	struct latinfo lati;
@@ -266,16 +294,16 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 	if (!enq)
 		return 0;   /* missed enqueue */
 
-	delta_us = (bpf_ktime_get_ns() - _(enq->ts)) / 1000;
-	min_us = GETARG_FROM_ARRYMAP(argmap, argp, u64, min_us);
-	if (min_us && delta_us <= min_us)
+	delay = (bpf_ktime_get_ns() - _(enq->ts));
+	thresh = GETARG_FROM_ARRYMAP(argmap, argp, u64, thresh);
+	if (thresh && delay <= thresh)
 		return 0;
 
 	__builtin_memset(&event, 0, sizeof(struct event));
 	event.cpuid = cpuid;
 	event.pid = pid;
 	event.prev_pid = prev_pid;
-	event.delta_us = delta_us;
+	event.delay = delay;
 	event.rqlen = _(enq->rqlen);
 	event.stamp = bpf_ktime_get_ns();
 	bpf_probe_read(event.task, sizeof(event.task), &(ctx->next_comm));
@@ -290,19 +318,19 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 	return 0;
 }
 
-static inline u64 adjust_thresh(u64 min_us)
+static inline u64 adjust_thresh(u64 thresh)
 {
-	if (min_us > MAX_THRESH)
-		min_us = MAX_THRESH;
+	if (thresh > MAX_THRESH)
+		thresh = MAX_THRESH;
 
-	return min_us;
+	return thresh;
 }
 
 SEC("kprobe/account_process_tick")
 int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 {
 	int args_key;
-	u64 cpuid, min_us;
+	u64 cpuid, thresh;
 	u64 resched_latency, now;
 	struct latinfo lati, *latp;
 	struct args args, *argsp;
@@ -328,13 +356,13 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 			latp->ticks_without_resched = 0;
 		} else {
 			latp->ticks_without_resched++;
-			resched_latency = (now - latp->last_seen_need_resched_ns)/1000;
-			min_us = adjust_thresh(_(argsp->min_us));
-			if (resched_latency > min_us) {
+			resched_latency = (now - latp->last_seen_need_resched_ns);
+			thresh = adjust_thresh(_(argsp->thresh));
+			if (resched_latency > thresh) {
 				struct event event = {};
 				event.stamp = now;
 				event.cpuid = cpuid;
-				event.delta_us = resched_latency;
+				event.delay = resched_latency;
 				event.pid = bpf_get_current_pid_tgid();
 				bpf_get_current_comm(&event.task, sizeof(event.task));
 				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);
@@ -352,4 +380,90 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 	return 0;
 }
 
+SEC("perf_event")
+int hw_irqoff_event(struct bpf_perf_event_data *ctx)
+{
+	int i = 0;
+	u64 now, delta, thresh, stamp;
+	struct tm_info *tmifp;
+	struct event event = {};
+	u32 cpu = bpf_get_smp_processor_id();
+
+	now = bpf_ktime_get_ns();
+	tmifp = bpf_map_lookup_elem(&tm_map, &i);
+
+	if (tmifp) {
+		stamp = tmifp->last_stamp;
+		thresh = get_thresh();
+		if (stamp && (thresh != -1)) {
+			delta = now - stamp;
+			if (delta > thresh) {
+				event.cpuid = cpu;
+				event.stamp = now;
+				event.delay = delta;
+				event.pid = bpf_get_current_pid_tgid();
+				bpf_get_current_comm(&event.task, sizeof(event.task));
+				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);
+				bpf_perf_event_output(ctx, &events_irqof, BPF_F_CURRENT_CPU,
+				      &event, sizeof(event));
+			}
+		}
+	}
+
+	return 0;
+}
+
+SEC("perf_event")
+int sw_irqoff_event1(struct bpf_perf_event_data *ctx)
+{
+	int ret, i = 0;
+	struct tm_info *tmifp, tm;
+
+	tmifp = bpf_map_lookup_elem(&tm_map, &i);
+	if (tmifp) {
+		tmifp->last_stamp = bpf_ktime_get_ns();
+	} else {
+		__builtin_memset(&tm, 0, sizeof(tm));
+		tm.last_stamp = bpf_ktime_get_ns();
+		bpf_map_update_elem(&tm_map, &i, &tm, 0);
+	}
+	return 0;
+}
+
+SEC("perf_event")
+int sw_irqoff_event2(struct bpf_perf_event_data *ctx)
+{
+	int i = 0;
+	u64 now, delta, thresh, stamp;
+	struct tm_info *tmifp, tm;
+	struct event event = {};
+	u32 cpu = bpf_get_smp_processor_id();
+
+	now = bpf_ktime_get_ns();
+	tmifp = bpf_map_lookup_elem(&tm_map, &i);
+
+	if (tmifp) {
+		stamp = tmifp->last_stamp;
+		tmifp->last_stamp = now;
+		thresh = get_thresh();
+		if (stamp && (thresh != -1)) {
+			delta = now - stamp;
+			if (delta > thresh) {
+				event.cpuid = cpu;
+				event.delay = delta;
+				event.pid = bpf_get_current_pid_tgid();
+				bpf_get_current_comm(&event.task, sizeof(event.task));
+				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);
+				bpf_perf_event_output(ctx, &events_irqof, BPF_F_CURRENT_CPU,
+				      &event, sizeof(event));
+			}
+		}
+	} else {
+		__builtin_memset(&tm, 0, sizeof(tm));
+		tm.last_stamp = now;
+		bpf_map_update_elem(&tm_map, &i, &tm, 0);
+	}
+
+	return 0;
+}
 char LICENSE[] SEC("license") = "GPL";
