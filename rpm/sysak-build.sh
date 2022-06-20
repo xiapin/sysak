@@ -39,6 +39,7 @@ fi
 mkdir -p \$RPM_BUILD_ROOT/usr/local/sbin
 /bin/cp -rf $BUILD_DIR/.sysak_compoents \$RPM_BUILD_ROOT/usr/local/sbin/.sysak_compoents
 /bin/cp -rf $BUILD_DIR/sysak \$RPM_BUILD_ROOT/usr/local/sbin/
+/bin/cp $SOURCE_DIR/rpm/sysak.service /usr/lib/systemd/system/
 
 %preun
 

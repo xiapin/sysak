@@ -1,0 +1,12 @@
+[Unit]
+Description=SysAK monitor service
+After=syslog.target
+
+[Service]
+Type=simple
+
+ExecStart=/usr/local/sbin/sysak mservice -S &
+ExecStop=/usr/bin/killall mservice
+
+[Install]
+WantedBy=multi-user.target
