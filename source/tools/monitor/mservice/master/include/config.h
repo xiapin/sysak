@@ -79,6 +79,8 @@ struct configure {
     char    output_file_path[LEN_128];
 
     /* service mode*/
+    char server_mode[LEN_128];
+    char agent_cmd[LEN_128];
     int cron_period;
 };
 

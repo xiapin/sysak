@@ -268,18 +268,35 @@ void *cron_thread(void *arg)
     }
 }
 
+void run_agent(void)
+{
+    system(conf.agent_cmd);
+}
+
 static void serivce_main(void)
 {
     pthread_t th;
     int res;
 
-    res = pthread_create(&th, NULL, cron_thread, NULL);
-    if (res) {
-       printf("create cron thread failed\n");
-       return;
+    printf("server mode %s\n", conf.server_mode);
+    if (strstr(conf.server_mode, "local")) {
+        printf("mservice start local server..\n");
+        res = pthread_create(&th, NULL, cron_thread, NULL);
+        if (res) {
+           printf("create cron thread failed\n");
+           return;
+        }
     }
 
-    http_server();
+    if (strstr(conf.server_mode, "http")) {
+        printf("mservice start http server..\n");
+        http_server();
+    }
+
+    if (strstr(conf.server_mode, "agent")){
+        printf("mservice start agent: %s\n", conf.agent_cmd);
+        run_agent();
+    }
 }
 
 int

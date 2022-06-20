@@ -248,6 +248,12 @@ parse_line(char *buff)
     } else if (!strcmp(token, "threshold")) {
         get_threshold();
 
+    } else if (!strcmp(token, "server_mode")) {
+        parse_string(conf.server_mode);
+
+    } else if (!strcmp(token, "agent_cmd")) {
+        parse_string(conf.agent_cmd);
+
     } else if (!strcmp(token, "cron_period")) {
         parse_int(&conf.cron_period);
 
