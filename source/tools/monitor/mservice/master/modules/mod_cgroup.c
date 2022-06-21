@@ -23,7 +23,7 @@
 
 char *cg_usage = "    --cg                Linux container stats";
 
-#define MAX_CGROUPS 64
+#define MAX_CGROUPS 128
 /*Todo,user configure ?*/
 #define CGROUP_INFO_AGING_TIME  7200
 #define NCONF_HW	2
@@ -144,7 +144,7 @@ struct cg_jitter_info {
 };
 
 struct cgroup_info {
-	char name[LEN_32];
+	char name[66];
 	int valid;
 	struct cg_load_info load;
 	struct cg_cpu_info cpu;
@@ -241,24 +241,10 @@ static struct mod_info cg_info[] = {
 
 #define NR_CGROUP_INFO sizeof(cg_info)/sizeof(struct mod_info)
 
-char *get_cgroup_path(const char *name, const char *child, char *path)
+static inline char *get_cgroup_path(const char *name, const char *child, char *path)
 {
-	FILE *result;
-	char cmd[LEN_256];
-
-	snprintf(cmd, LEN_256, "find /sys/fs/cgroup/%s/ -name %s*", child, name);
-	result = popen(cmd, "r");
-	if (!result)
-		return NULL;
-
-	if (fgets(buffer, sizeof(buffer), result)) {
-		sscanf(buffer, "%s", path);
-		pclose(result);
-		return path;
-	}
-
-	pclose(result);
-	return NULL;
+	snprintf(path, LEN_1024, "/sys/fs/cgroup/%s/docker/%s/", child, name);
+	return path;
 }
 
 static unsigned long cgroup_init_time;
@@ -331,8 +317,6 @@ static int perf_event_init(struct cgroup_info *cgroup)
 			if (fds[cpu][i] < 0) {
 				if (errno == ENODEV)
 					continue;
-				fprintf(stderr, "perf_event_open %s:%d: %s\n",
-					cgroup->name, cpu, strerror(errno));
 				continue;
 			}
 			if (i == 0)
@@ -419,12 +403,12 @@ int enum_containers(void)
 	int i, perf_fail = 0;
 	FILE *result;
 
-	result = popen("docker ps -q", "r");
+	result = popen("docker ps -q --no-trunc", "r");
 	memset(buffer, 0, sizeof(buffer));
 	for (i = 0; i < MAX_CGROUPS && !feof(result); i++) {
 		if (feof(result) || !fgets(buffer, sizeof(buffer), result))
 			break;
-		sscanf(buffer, "%31s", cgroups[n_cgs].name);
+		sscanf(buffer, "%65s", cgroups[n_cgs].name);
 		if (perf_event_init(&cgroups[n_cgs]) < 0) {
 			perf_fail++;
 			fprintf(stderr, "%s:Perf init failed\n", cgroups[n_cgs].name);
@@ -486,12 +470,14 @@ int enum_containers_ext(char *parent)
 			continue;
 		}
 		if (S_ISDIR(stats.st_mode) && is_docker_path(entp->d_name)) {
-			sscanf(entp->d_name, "%12s", cgroups[n_cgs].name);
+			sscanf(entp->d_name, "%65s", cgroups[n_cgs].name);
 			if (perf_event_init(&cgroups[n_cgs]) < 0) {
 				perf_fail++;
 				fprintf(stderr, "%s:Perf init failed\n", cgroups[n_cgs].name);
 			}
 			n_cgs++;
+			if (n_cgs >= MAX_CGROUPS)
+				break;
 		}
 		if (!perf_fail) {
 			int i;
@@ -1103,6 +1089,8 @@ void get_cgroup_stats(void)
 	struct sum_jitter_infos sums;
 
 	get_jitter_summary(&sums);
+
+	n_cgs = (n_cgs>MAX_CGROUPS)?MAX_CGROUPS:n_cgs;
 	for (i = 0; i < n_cgs; i++) {
 		items = 0;
 		items += get_load_and_enhanced_cpu_stats(i);
@@ -1173,7 +1161,7 @@ static int print_cgroup_blkio(char *buf, int len, struct cg_blkio_info *info)
 			info->rd_wait, info->wr_wait,
 			info->rd_time, info->wr_time,
 			info->rd_qios, info->wr_qios,
-			info->rd_qbytes, info->wr_qbytes,0,0);
+			info->rd_qbytes, info->wr_qbytes,0ULL,0ULL);
 }
 
 static int print_cgroup_hwres(char *buf, int len, struct cg_hwres_info *info)
@@ -1205,14 +1193,16 @@ void
 print_cgroup_stats(struct module *mod)
 {
 	int pos = 0, i;
-	char buf[LEN_1M];
+	char buf[LEN_1M], name[13] = {0};
 
 	memset(buf, 0, LEN_1M);
 
+	n_cgs = (n_cgs>MAX_CGROUPS)?MAX_CGROUPS:n_cgs;
 	for (i = 0; i < n_cgs; i++) {
 		if (!cgroups[i].valid)
 			continue;
-		pos += snprintf(buf + pos, LEN_1M - pos, "%s=",	cgroups[i].name);
+		strncpy(name,cgroups[i].name, 12);
+		pos += snprintf(buf + pos, LEN_1M - pos, "%s=", name);
 		pos += print_cgroup_load(buf + pos, LEN_1M - pos, &cgroups[i].load);
 		pos += print_cgroup_cpu(buf + pos, LEN_1M - pos, &cgroups[i].cpu);
 		pos += print_cgroup_memory(buf + pos, LEN_1M - pos, &cgroups[i].mem);
