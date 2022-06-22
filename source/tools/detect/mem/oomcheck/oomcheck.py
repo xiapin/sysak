@@ -274,9 +274,10 @@ def oom_get_meminfo(oom_result, lines, index, num):
     if key >= len(lines) -5:
         return True
 
+    index = key
     for pattern in meminfo_pattern:
-        index += 1
         line = lines[index]
+        index += 1
         gp = pattern.search(line)
         if gp:
             for i in range(1,len(gp.groups()),2):
@@ -286,7 +287,6 @@ def oom_get_meminfo(oom_result, lines, index, num):
                     oom['meminfo']['slabr'] = int(gp.group(i+1))*4
                 else:
                     oom['meminfo'][gp.group(i)] = int(gp.group(i+1))*4
-    #print oom['meminfo']
     return True
 
 def oom_get_total_mem(oom_result, line, num):
@@ -691,7 +691,8 @@ def oom_reason_analyze(num, oom_result, summary):
         summary = oom_output_msg(oom_result, num, summary)
         oom_result['sub_msg'][num]['summary'] = summary
         if oom_result['json'] == 1:
-            print(json.dumps(oom_result['sub_msg'][num]['json'], encoding='utf-8', ensure_ascii=False))
+            #print(json.dumps(oom_result['sub_msg'][num]['json'], encoding='utf-8', ensure_ascii=False))
+            print(json.dumps(oom_result['sub_msg'][num]['json'], ensure_ascii=False))
         else:
             print(summary)
         return summary
@@ -725,6 +726,8 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_result['sub_msg'][oom_result['oom_total_num']]['meminfo'] = {}
                 oom_result['sub_msg'][oom_result['oom_total_num']]['type'] = 'unknow'
                 oom_result['sub_msg'][oom_result['oom_total_num']]['root'] = 'unknow'
+                oom_result['sub_msg'][oom_result['oom_total_num']]['reason'] = ''
+                oom_result['sub_msg'][oom_result['oom_total_num']]['summary'] = ''
                 if line.find('[') != -1:
                     oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = oom_time_to_normal_time(line.split('[')[1].split(']')[0])
                 oom_result['time'].append(oom_result['sub_msg'][oom_result['oom_total_num']]['time'])
