@@ -1,11 +1,11 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#include <unistd.h>
 
 #define KVERSION 64
 #define MAX_SUBCMD_ARGS 512
@@ -62,15 +62,15 @@ bool post_module = false;
 bool btf_depend = false;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
-{"sysak tools for user self-help analysis", NULL},
-{"sysak tools for system detail info", NULL},
-{"sysak monitor service", NULL}
+    {"sysak tools for user self-help analysis", NULL},
+    {"sysak tools for system detail info", NULL},
+    {"sysak monitor service", NULL}
 };
 
 static void usage(void)
 {
-	fprintf(stdout,
-	            "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
+    fprintf(stdout,
+                "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
                 "       cmd:\n"
                 "              list [-a], show subcmds\n"
                 "              help, help information for specify subcmd\n"
@@ -81,7 +81,7 @@ static void kern_release(void)
 {
     struct utsname name;
 
-    if (uname (&name) == -1){
+    if (uname(&name) == -1) {
         printf("cannot get system version\n");
         return;
     }
@@ -100,13 +100,13 @@ static int mod_ctrl(bool enable)
         return ret;
 
     modlist_fp = fopen(system_modules, "r");
-    if (!modlist_fp){
+    if (!modlist_fp) {
         printf("open %s failed\n", system_modules);
         return ret;
     }
     while(fgets(modinfo, sizeof(modinfo), modlist_fp))
     {
-        if (strstr(modinfo, "sysak")){
+        if (strstr(modinfo, "sysak")) {
             has_ko = true;
             break;
         }
@@ -123,6 +123,8 @@ static int mod_ctrl(bool enable)
         snprintf(exec_mod, sizeof(exec_mod), "rmmod %s%s%s", module_path, kern_version, module);
         ret = system(exec_mod);
     }
+
+    return ret;
 }
 
 static int down_install(const char *compoent_name)
@@ -143,7 +145,7 @@ static int check_or_install_compoents(const char *name)
     else if (strcmp(name, "btf") == 0)
         sprintf(compents_path, "%s%s/vmlinux-%s", tools_path, kern_version, kern_version);
 
-    if (access(compents_path, 0) != 0){
+    if (access(compents_path, 0) != 0) {
         printf("%s %s", name, promt);
         scanf("%c", &user_input);
         if (user_input == 'y' || user_input == 'Y')
@@ -172,32 +174,32 @@ static int do_prev_depend(void)
 
 static void add_python_depend(char *depend,char *cmd)
 {
-    if (!strcmp(depend, "all")){
+    if (!strcmp(depend, "all")) {
         snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
-    }else if (!strcmp(depend, "python3")){
+    } else if (!strcmp(depend, "python3")) {
         snprintf(tools_exec, sizeof(tools_exec), "python3 %s", cmd);
-    }else if(!strcmp(depend, "python2")){
+    } else if(!strcmp(depend, "python2")) {
         snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
     }
 }
 
 static int exectue(int argc, char *argv[])
 {
-    int i;
-    int ret = 0;
     char subcmd_name[MAX_NAME_LEN+MAX_SUBCMD_ARGS];
     char subcmd_args[MAX_SUBCMD_ARGS];
     char subcmd_exec_final[MAX_NAME_LEN+MAX_SUBCMD_ARGS];
+    int ret = 0;
+    int i = 0;
 
     if (do_prev_depend() < 0)
         return -1;
 
     snprintf(subcmd_name, sizeof(subcmd_name), "%s%s", tools_path, argv[1]);
 
-    if (access(subcmd_name,0) != 0)
+    if (access(subcmd_name, 0) != 0)
         snprintf(subcmd_name, sizeof(subcmd_name), "%s%s%s", tools_path, kern_version, argv[1]);
 
-    for(i = 2; i <= (argc-1); i++){
+    for (i = 2; i <= (argc - 1); i++) {
         snprintf(subcmd_args, sizeof(subcmd_args), " \"%s\"", argv[i]);
         strcat(subcmd_name,subcmd_args);
     }
@@ -205,13 +207,14 @@ static int exectue(int argc, char *argv[])
     if (run_depend[0])
         add_python_depend(run_depend, subcmd_name);
     else
-        strncpy(tools_exec,subcmd_name,strlen(subcmd_name));
+        strncpy(tools_exec, subcmd_name, strlen(subcmd_name));
 
     snprintf(subcmd_exec_final, sizeof(subcmd_exec_final), "%s;%s", sysak_work_path, tools_exec);
     ret = system(subcmd_exec_final);
-    
+
     if (post_module)
         mod_ctrl(false);
+
     return ret;
 }
 
@@ -254,10 +257,11 @@ static int build_subcmd_info_from_file(FILE *fp, bool all)
     while(fgets(buf, sizeof(buf), fp))
     {
         sscanf(buf,"%[^:]:%[^:]",tools_class_module, tools_name);
-	if (!all) {
-	    if (strcmp(tools_class_module, "combine"))
+        if (!all) {
+            if (strcmp(tools_class_module, "combine"))
                 continue;
-	}
+        }
+
         node = malloc(sizeof(struct tool_list_node));
         if (!node) {
             fclose(fp);
@@ -265,7 +269,7 @@ static int build_subcmd_info_from_file(FILE *fp, bool all)
         }
 
         memset(node, 0, sizeof(struct tool_list_node));
-	if (strcmp(tools_class_module, "combine") == 0) {
+        if (strcmp(tools_class_module, "combine") == 0) {
             list = &tool_lists[USER_TOOL];
         } else if (strncmp(tools_class_module, "detect", 6) == 0) {
             list = &tool_lists[EXPERT_TOOL];
@@ -319,25 +323,26 @@ static void subcmd_list(bool show_all)
 
 static bool tool_lookup(char *path, char *tool)
 {
-    FILE *fp;
+    char *pstr = NULL;
+    FILE *fp = NULL;
     char buf[MAX_NAME_LEN + MAX_SUBCMD_ARGS];
-    char *pstr;
 
     if (access(path,0) != 0)
         return false;
 
     fp = fopen(path, "r");
-    if (!fp){
+    if (!fp) {
         printf("open %s failed\n", path);
-		return false;
+        return false;
     }
+
     while(fgets(buf, sizeof(buf), fp))
     {
         char tools_name[MAX_NAME_LEN];
 
         pstr = buf;
         sscanf(buf,"%*[^:]:%[^:]",tools_name);
-        if (strcmp(tools_name, tool)){
+        if (strcmp(tools_name, tool)) {
             continue;
         }
         pstr = strstr(buf, ":prev{");
@@ -347,8 +352,10 @@ static bool tool_lookup(char *path, char *tool)
         if (pstr)
             sscanf(pstr, ":python-dep{%[^}]}", run_depend);
 
+        fclose(fp);
         return true;
     }
+
     fclose(fp);
     return false;
 }
@@ -358,7 +365,7 @@ static int subcmd_parse(int argc, char *argv[])
     int i;
     
     if (!tool_lookup(sysak_other_rule, argv[1]) && 
-            !tool_lookup(sysak_rule, argv[1])){
+            !tool_lookup(sysak_rule, argv[1])) {
         printf("no components, you should get first\n");
         return -ERR_NOSUBTOOL;
     }
@@ -368,19 +375,19 @@ static int subcmd_parse(int argc, char *argv[])
         goto exec;
     }
 
-    if (strstr(prev_dep, "default") != NULL|| strstr(post_dep, "default") != NULL){
+    if (strstr(prev_dep, "default") != NULL|| strstr(post_dep, "default") != NULL) {
         pre_module = true;
         post_module = true;
         goto exec;
     }
 
-    for(i = 2; i <= (argc-1); i++)
+    for (i = 2; i <= (argc-1); i++)
     {
-        if (strstr(prev_dep, argv[i])){
+        if (strstr(prev_dep, argv[i])) {
             pre_module = true;
             break;
         }
-        else if (strstr(post_dep, argv[i])){
+        else if (strstr(post_dep, argv[i])) {
             post_module = true;
             break;
         }
@@ -393,37 +400,37 @@ static int parse_arg(int argc, char *argv[])
 {
     bool show_all = false;
 
-    if (argc < 2){
+    if (argc < 2) {
         usage();
         return -ERR_MISSARG;
     }
 
-    if (!strcmp(argv[1],"list")){
-        if (argc == 3 && !strcmp(argv[2],"-a"))
+    if (!strcmp(argv[1], "list")) {
+        if (argc == 3 && !strcmp(argv[2], "-a"))
             show_all = true;
 
         subcmd_list(show_all);
         return 0;
     }
 
-    if (!strcmp(argv[1],"help")){
+    if (!strcmp(argv[1], "help")) {
         usage();
         return 0;
     }
     return subcmd_parse(argc, argv);
 }
+
 char *dirpath(char *fullpath)
 {
-    char* substr = strrchr(fullpath,'/');
+    char* substr = strrchr(fullpath, '/');
     char *ptr = fullpath;
 
-    while(strcmp(substr,ptr))
+    while(strcmp(substr, ptr))
         ptr++;
 
     *(ptr)='\0';
     return fullpath;
 }
-
 
 static void set_path(char *argv[])
 {
@@ -435,22 +442,22 @@ static void set_path(char *argv[])
     current_path = dirpath(tmp);
 
     snprintf(compoents_path, sizeof(compoents_path), "%s%s", 
-            current_path, "/.sysak_compoents");
+             current_path, "/.sysak_compoents");
 
     if (access(compoents_path,0) != 0)
         snprintf(compoents_path, sizeof(tools_path), "%s%s", 
             bin_path, "/.sysak_compoents");
 
     snprintf(tools_path, sizeof(tools_path), "%s%s", 
-            compoents_path, "/tools/");
+             compoents_path, "/tools/");
     snprintf(module_path, sizeof(module_path), "%s%s", 
-            compoents_path, "/lib/");
+             compoents_path, "/lib/");
     snprintf(sysak_rule, sizeof(sysak_rule), "%s%s", 
-            compoents_path, "/tools/.sysak.rules");
+             compoents_path, "/tools/.sysak.rules");
     snprintf(sysak_other_rule, sizeof(sysak_other_rule), "%s%s%s%s", 
-            compoents_path, "/tools/",kern_version,"/.sysak.rules");
+             compoents_path, "/tools/",kern_version,"/.sysak.rules");
     snprintf(sysak_work_path, sizeof(sysak_work_path), "%s%s", 
-            "export SYSAK_WORK_PATH=", compoents_path);
+             "export SYSAK_WORK_PATH=", compoents_path);
 }
 
 int main(int argc, char *argv[])
@@ -462,6 +469,7 @@ int main(int argc, char *argv[])
 
     kern_release();
     set_path(argv);
+
     ret = parse_arg(argc, argv);
     return ret;
 }
