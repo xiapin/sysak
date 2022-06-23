@@ -157,6 +157,8 @@ static int trace_output_init(char *path)
 	trace_para.root = cJSON_CreateObject();
 	if (!trace_para.root) {
 		printf("create json root failed\n");
+		fclose(trace_para.file);
+		trace_para.file = NULL;
 		return -1;
 	}
 
