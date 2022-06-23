@@ -21,9 +21,9 @@ int kprobe_cpuacct_calc_load(struct pt_regs *ctx)
 	unsigned int avenrun_n = 0;
 
 	if (bpf_core_read(&cgrp, sizeof(struct cgroup___MEMCG *), &acct->css.cgroup))
-			return 0;
+		return 0;
 	if (bpf_core_read(&key, sizeof(int), &cgrp->id))
-			return 0;
+		return 0;
 
 	load_up = bpf_map_lookup_elem(&cpuacct_load_hash_map, &key);
 	if (load_up != NULL) {
