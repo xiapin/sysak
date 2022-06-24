@@ -86,7 +86,6 @@ static void get_dtask_stack(long tid)
 		return;
 
 	while (fgets(line, sizeof(line), fp)) {
-
 		fwrite(line, strlen(line), 1, g_dtask_fp);
 	}
 

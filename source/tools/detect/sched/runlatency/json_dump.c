@@ -63,21 +63,23 @@ int parse_dump(char *file)
 			ret = errno;
 			fprintf(stderr, "%s :fopen %s\n",
 				strerror(errno), file);
-			goto failed;
+			goto out;
 		}
 	} else {
-		goto failed;
+		fprintf(stderr, "invalid file name\n");
+		goto out;
 	}
 	ret = read_file(IRQOFF_FILE, s);
 	if (ret < 0) {
-		goto failed;
+		goto out;
 	}
 	s[ret] = '\0';
 	parser_irqoff(s, ret, outf);
+	clear_file(IRQOFF_FILE);
 	
 	ret = read_file(NOSCH_FILE, s);
 	if (ret < 0) {
-		goto failed;
+		goto out;
 	}
 	s[ret] = '\0';
 	parser_nosch(s, ret, outf);
@@ -85,18 +87,14 @@ int parse_dump(char *file)
 	
 	ret = read_file(RUNQ_FILE, s);
 	if (ret < 0) {
-		goto failed;
+		goto out;
 	}
 	s[ret] = '\0';
 	parser_runq(s, ret, outf);
 	clear_file(RUNQ_FILE);
-	
-	free(s);
-	if (outf)
-		fclose(outf);
-	return 0;
-	
-failed:
+	ret = 0;
+
+out:
 	free(s);
 	if (outf)
 		fclose(outf);
