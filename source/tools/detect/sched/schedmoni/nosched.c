@@ -17,7 +17,7 @@ int stk_fd;
 extern volatile sig_atomic_t exiting;
 extern struct ksym *ksyms;
 void stamp_to_date(__u64 stamp, char dt[], int len);
-void print_stack(int fd, __u32 ret, struct ksym *syms, FILE *fp);
+void print_stack(int fd, __u32 ret, int skip, struct ksym *syms, FILE *fp);
 static int stack_fd;
 
 void handle_event_nosch(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -26,9 +26,17 @@ void handle_event_nosch(void *ctx, int cpu, void *data, __u32 data_sz)
 	char ts[64];
 
 	stamp_to_date(e->stamp, ts, sizeof(ts));
-	fprintf(fp_nsc, "%-21s %-5d %-15s %-8d %-10llu\n",
-		ts, e->cpuid, e->task, e->pid, e->delay/(1000*1000));
-	print_stack(stack_fd, e->ret, ksyms, fp_nsc);
+	fprintf(fp_nsc, "%-21llu %-5d %-15s %-8d %-10llu %s\n",
+		e->stamp, e->cpuid, e->task, e->pid, e->delay/(1000*1000),
+		(e->exit==e->stamp)?"(EOF)":"");
+	if (!e->exit)
+		print_stack(stack_fd, e->ret, 7, ksyms, fp_nsc);
+	fflush(fp_nsc);
+}
+
+void handle_lost_nosch_events(void *ctx, int cpu, __u64 lost_cnt)
+{
+	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
 }
 
 void nosched_handler(int poll_fd)
@@ -41,6 +49,7 @@ void nosched_handler(int poll_fd)
 		"TIME(nosched)", "CPU", "COMM", "TID", "LAT(ms)");
 
 	pb_opts.sample_cb = handle_event_nosch;
+	pb_opts.lost_cb = handle_lost_nosch_events;
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
 	if (!pb) {
 		err = -errno;

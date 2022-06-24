@@ -104,13 +104,13 @@ static void print_ksym(__u64 addr, struct ksym *psym, FILE *filep)
 	fprintf(filep, "<0x%llx> %s\n", addr, sym->name);
 }
 
-void print_stack(int fd, __u32 ret, struct ksym *syms, FILE *filep)
+void print_stack(int fd, __u32 ret, int skip, struct ksym *syms, FILE *filep)
 {
 	int i;
 	__u64 ip[PERF_MAX_STACK_DEPTH] = {};
 
 	if (bpf_map_lookup_elem(fd, &ret, &ip) == 0) {
-		for (i = 0; i < PERF_MAX_STACK_DEPTH - 1; i++)
+		for (i = skip; i < PERF_MAX_STACK_DEPTH - 1; i++)
 			print_ksym(ip[i], syms, filep);
 	} else {
 		if ((int)(ret) < 0)

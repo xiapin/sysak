@@ -24,7 +24,7 @@ extern volatile sig_atomic_t exiting;
 static int stackmap_fd;
 struct ksym *ksyms;
 
-void print_stack(int fd, __u32 ret, struct ksym *syms, FILE *fp);
+void print_stack(int fd, __u32 ret, int sikp, struct ksym *syms, FILE *fp);
 void stamp_to_date(__u64 stamp, char dt[], int len);
 
 static int
@@ -96,7 +96,7 @@ void irqoff_handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e->delay = e->delay/(1000*1000);
 	fprintf(fp_irq, "%-21s %-5d %-15s %-8d %-10llu\n",
 		ts, e->cpuid, e->task, e->pid, e->delay);
-	print_stack(stackmap_fd, e->ret, ksyms, fp_irq);
+	print_stack(stackmap_fd, e->ret, 0, ksyms, fp_irq);
 }
 
 void irqoff_handler(void *args)

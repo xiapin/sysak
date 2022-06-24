@@ -294,7 +294,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
-
+	/* Here we are, providing selection for users */
+#if 0
+	bpf_program__set_autoload(obj->progs.raw_tracepoint__sched_wakeup, false);
+	bpf_program__set_autoload(obj->progs.raw_tracepoint__sched_wakeup_new, false);
+	bpf_program__set_autoload(obj->progs.hw_irqoff_event, false);
+	bpf_program__set_autoload(obj->progs.sw_irqoff_event1, false);
+	bpf_program__set_autoload(obj->progs.sw_irqoff_event2, false);
+#endif
 	err = schedmoni_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);
@@ -353,6 +360,7 @@ int main(int argc, char **argv)
 
 	if (env.span)
 		alarm(env.span);
+
 	err = attach_prog_to_perf(obj, sw_mlinks, hw_mlinks);
 	if (err) {
 		free(sw_mlinks);
@@ -375,6 +383,7 @@ cleanup:
 		bpf_link__destroy(sw_mlinks[i]);
 		bpf_link__destroy(hw_mlinks[i]);
 	}
+
 	if (sw_mlinks)
 		free(sw_mlinks);
 	if (hw_mlinks)
