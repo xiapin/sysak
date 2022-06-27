@@ -28,6 +28,8 @@ extern void scan_slabs(char *slabs);
 extern void scan_zero_subpages(struct buddy_info *buddy_info);
 extern void scan_zero_subpages_in_base(uint64_t raw_pfn, int idx, int end);
 extern void scan_exec_vma(struct procmap *procmap, int procmap_num);
+extern void scan_consd_vma(struct procmap *procmap, int procmap_num);
+
 
 struct options {
 	pid_t *pids;
@@ -36,6 +38,7 @@ struct options {
 	bool movability;
 	bool zero_subpages;
 	bool exec_vma;
+	bool consd_vma;
 	char *slabs;
 } opt = { 0 };
 
@@ -753,6 +756,9 @@ static struct buddy_info *scan_pids(pid_t *pids, int pid_num)
 		if (opt.exec_vma)
 			scan_exec_vma(procmap, procmap_num);
 
+		if (opt.consd_vma)
+			scan_consd_vma(procmap, procmap_num);
+
 		for (procmap_idx = 0; procmap_idx < procmap_num; procmap_idx++) {
 			/* Skip vsyscall */
 			if (strstr(procmap[procmap_idx].fname, "[vsyscall]"))
@@ -783,6 +789,7 @@ static void show_usage(const char *name)
 		 "  -m, --movability     scan page's movability to estimate compaction function\n"
 		 "  -z, --zero_subpages  scan zero subpages wrt base pages and THP to estimate memory bloating\n"
 		 "  -s, --slab           scan fine-grained slab external fragments\n"
+		 "  -c, --consd_vma      scan virtual memory area's information to estimate detailed memory consumption\n"
 		 "\n"
 		 , name);
 	scan_movability_help();
@@ -793,7 +800,7 @@ int main(int argc, char *argv[])
 	struct buddy_info *buddy_info = NULL;
 	int ch, ret;
 
-	const char *sopt = "hp:fmzs:e";
+	const char *sopt = "hp:fmzs:ec";
 	const struct option lopt[] = {
 		{"help", 0, NULL, 'h'},
 		{"pid", 1, NULL, 'p'},
@@ -802,6 +809,7 @@ int main(int argc, char *argv[])
 		{"zero_subpages", 0, NULL, 'z'},
 		{"slab", 0, NULL, 's'},
 		{"exec_vma", 0, NULL, 'e'},
+		{"consd_vma", 0, NULL, 'c'},
 		{ NULL, 0, NULL, 0 }
 	};
 
@@ -826,6 +834,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'e':
 			opt.exec_vma = true;
+			break;
+		case 'c':
+			opt.consd_vma = true;
 			break;
 		case 'h':
 			show_usage(argv[0]);

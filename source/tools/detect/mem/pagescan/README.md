@@ -171,3 +171,26 @@ In the current implementation, PMD mappings are counted according to the sum
 of AnonHugepages, ShmemPMDMapped, and FilepMDMapped (if any) in the
 /proc/pid/smaps file. The PTE mappings are obtained using RSS - PMD mappings
 as a temporary schema.
+
+Comsumed VMA
+==============
+Like executable VMA feature, this feature also scans the memory maps of code
+segments of specified process. It count the total memory mappings by types.
+
+In current version, only transparent huge pages (THP) related memory consumption
+information are collected. The statisics are calculated in the following way:
+rss=count(Rss), anon_thp=count(AnonHugepages), shmem_thp=count(ShmemPmdMapped),
+file_thp=count(FilepMDMapped), total_thp=anon_thp+shmem_thp+file_thp.
+
+The sample is as follows.
+
+$./sysak pagescan -p 1 -c
+pid	cmdline
+1	/usr/lib/systemd/systemd
+<Vma>
+type               size (kb)  ratio (%)
+rss                14136      -
+anon_thp           2048       14.49
+shmem_thp          0          0.00
+file_thp           0          0.00
+total_thp          2048       14.49
