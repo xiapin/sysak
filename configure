@@ -172,8 +172,7 @@ target_path=$(dirname $file)
 target_paths="$target_path $target_paths"
 grep -nrw modin $file > /dev/null
 if [ $? = 0 ]; then
-	enable_lkm="YES"
-	echo "$target_path need lkm"
+	echo "$target_path need lkm, you may set --enable-lkm"
 fi
 
 grep -nr "bpf.mk" $file > /dev/null

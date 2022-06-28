@@ -14,6 +14,7 @@
 #define MAX_WORK_PATH_LEN 512
 #define ERR_NOSUBTOOL 2
 #define ERR_MISSARG 3
+#define LINE_BUFF_LEN 1024
 
 #define bool int
 #define true 1
@@ -48,6 +49,7 @@ char *system_modules = "/proc/modules";
 char *bin_path = "/usr/local/sbin";
 
 char kern_version[KVERSION];
+char machine[KVERSION];
 char prev_dep[MAX_DEPEND_LEN];
 char post_dep[MAX_DEPEND_LEN];
 char run_depend[MAX_DEPEND_LEN]= {0};
@@ -55,8 +57,11 @@ char tools_path[MAX_WORK_PATH_LEN];
 char tools_exec[MAX_WORK_PATH_LEN] = {0};
 char sysak_rule[MAX_WORK_PATH_LEN];
 char module_path[MAX_WORK_PATH_LEN];
+char module_tag[MAX_NAME_LEN];
 char sysak_work_path[MAX_WORK_PATH_LEN];
 char sysak_other_rule[MAX_WORK_PATH_LEN];
+char sysak_compoents_server[MAX_WORK_PATH_LEN];
+char download_cmd[MAX_WORK_PATH_LEN];
 bool pre_module = false;
 bool post_module = false;
 bool btf_depend = false;
@@ -77,6 +82,26 @@ static void usage(void)
                 "       subcmd: see the result of list\n");
 }
 
+static void strim(char *str)
+{
+    char *pstr = str, *start = NULL;
+    bool has_space = false;
+
+    while (pstr && *pstr) {
+       if (isspace(*pstr)) {
+           *pstr = 0;
+           has_space = true;
+       }
+       else if (!start) {
+           start = pstr;
+       }
+       pstr++;
+    }
+
+    if (start && start != str)
+       strcpy(str, start);
+}
+
 static void kern_release(void)
 {
     struct utsname name;
@@ -86,6 +111,7 @@ static void kern_release(void)
         return;
     }
     strncpy(kern_version, name.release, sizeof(name.release));
+    strncpy(machine, name.machine, sizeof(name.machine));
 }
 
 static int mod_ctrl(bool enable)
@@ -127,10 +153,140 @@ static int mod_ctrl(bool enable)
     return ret;
 }
 
+static bool get_server_addr(void)
+{
+    char filename[MAX_WORK_PATH_LEN];
+    FILE *fp;
+
+    sprintf(filename, "%s/sysak_server.conf", tools_path);
+    fp = fopen(filename, "r");
+    if (!fp) {
+        fprintf(stderr, "no sysak server config file\n");
+        return false;
+    }
+
+    fgets(sysak_compoents_server, sizeof(sysak_compoents_server), fp);
+    fclose(fp);
+
+    strim(sysak_compoents_server);
+    if (strlen(sysak_compoents_server) == 0) {
+        fprintf(stderr, "no sysak server setting\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool get_module_tag(void)
+{
+    FILE *fp;
+    char filename[MAX_WORK_PATH_LEN];
+    char buf[LINE_BUFF_LEN];
+    char *pstr;
+
+    sprintf(filename, "%s%s/.sysak.rules", module_path, kern_version);
+    fp = fopen(filename, "r");
+    if (!fp) {
+        printf("open %s failed\n", filename);
+        return false;
+    }
+
+    while(fgets(buf, sizeof(buf), fp)) {
+        pstr = strstr(buf, "sysak_module_tag=");
+        if (pstr) {
+            pstr += strlen("sysak_module_tag=");
+            strcpy(module_tag, pstr);
+            strim(module_tag);
+            if (strlen(module_tag) == 0)
+               return false;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static int down_install_ext_tools(const char *tool)
+{
+    int ret;
+    FILE *fp;
+    char filename[MAX_WORK_PATH_LEN];
+    char buf[LINE_BUFF_LEN];
+    char rule[LINE_BUFF_LEN];
+    char *pstr;
+
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s",
+           sysak_compoents_server, machine, tool, tools_path);
+    printf("%s ... \n", download_cmd);
+    ret = system(download_cmd);
+    if (ret < 0)
+        return ret;
+
+    sprintf(filename, "%s/rule", tools_path);
+    fp = fopen(filename, "r");
+    if (!fp)
+        return -1;
+
+    while(fgets(buf, sizeof(buf), fp)) {
+        pstr = strstr(buf, "target=");
+        if (pstr) {
+            strcpy(filename, pstr + strlen("target="));
+            continue;
+        }
+
+        pstr = strstr(buf, "info=");
+        if (pstr) {
+            strcpy(rule, pstr + strlen("info="));
+            continue;
+        }
+    }
+    fclose(fp);
+
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s",
+            sysak_compoents_server, machine, tool, filename, tools_path);
+    printf("%s ... \n", download_cmd);
+    ret = system(download_cmd);
+    if (ret < 0)
+        return ret;
+
+    /* extract files, only for zip now*/
+    if (strstr(filename, ".zip")) {
+        sprintf(buf, "unzip %s/%s -d %s\n", tools_path, filename, tools_path);
+        printf("%s ... \n", buf);
+        ret = system(buf);
+        if (ret < 0)
+            return ret;
+    }
+
+    fp = fopen(sysak_rule, "a");
+    if (!fp)
+        return -1;
+
+    fputs(rule, fp);
+    fclose(fp);
+    return 0;
+}
+
 static int down_install(const char *compoent_name)
 {
-    /* TBD*/
-    return -1;
+    if (!get_server_addr())
+        return -1;
+
+    if (strcmp(compoent_name, "sysak_modules") == 0) {
+        if (!get_module_tag())
+            return -1;
+        sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s",
+                sysak_compoents_server, machine, module_tag, module_path, kern_version);
+        printf("%s ... \n", download_cmd);
+        return system(download_cmd);
+    } else if (strcmp(compoent_name, "btf") == 0) {
+        sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s/%s",
+                sysak_compoents_server, kern_version, tools_path, kern_version);
+        printf("%s ... \n", download_cmd);
+        return system(download_cmd);
+    } else {
+        return down_install_ext_tools(compoent_name);
+    }
 }
 
 static int check_or_install_compoents(const char *name)
@@ -148,10 +304,13 @@ static int check_or_install_compoents(const char *name)
     if (access(compents_path, 0) != 0) {
         printf("%s %s", name, promt);
         scanf("%c", &user_input);
-        if (user_input == 'y' || user_input == 'Y')
+        if (user_input == 'y' || user_input == 'Y') {
             ret = down_install(name);
-        else
+            if (ret < 0 || access(compents_path, 0) != 0)
+               ret = -EEXIST;
+        } else {
             ret = -EEXIST;
+        }
     }
 
     return ret;
@@ -321,7 +480,7 @@ static void subcmd_list(bool show_all)
     print_each_tool(show_all);
 }
 
-static bool tool_lookup(char *path, char *tool)
+static bool tool_rule_parse(char *path, char *tool)
 {
     char *pstr = NULL;
     FILE *fp = NULL;
@@ -360,12 +519,34 @@ static bool tool_lookup(char *path, char *tool)
     return false;
 }
 
+static bool tool_lookup(char *tool)
+{
+    char tool_exec_file[MAX_WORK_PATH_LEN];
+
+    snprintf(tool_exec_file, sizeof(tool_exec_file), "%s%s%s", tools_path, kern_version, tool);
+    if (access(tool_exec_file, 0) != 0)
+        snprintf(tool_exec_file, sizeof(tool_exec_file), "%s%s", tools_path, tool);
+
+    if (access(tool_exec_file, 0) != 0) {
+        if (down_install(tool) < 0)
+            return false;
+    }
+
+    if (access(tool_exec_file, 0) != 0)
+        return false;
+
+    if (!tool_rule_parse(sysak_other_rule, tool) &&
+            !tool_rule_parse(sysak_rule, tool))
+        return false;
+
+    return true;
+}
+
 static int subcmd_parse(int argc, char *argv[])
 {
     int i;
-    
-    if (!tool_lookup(sysak_other_rule, argv[1]) && 
-            !tool_lookup(sysak_rule, argv[1])) {
+
+    if (!tool_lookup(argv[1])) {
         printf("no components, you should get first\n");
         return -ERR_NOSUBTOOL;
     }
