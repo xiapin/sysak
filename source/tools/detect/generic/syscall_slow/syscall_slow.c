@@ -95,7 +95,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 			return -1;
 		}
-			
+
 		if (env.filter.size > TASK_COMM_LEN - 1)
 			env.filter.size = TASK_COMM_LEN - 1;
 
@@ -122,7 +122,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'f':
 		if (strlen(arg) < 2)
 			strncpy(filename, defaultfile, sizeof(filename));
-		else 
+		else
 			strncpy(filename, arg, sizeof(filename));
 		filep = fopen(filename, "w+");
 		if (!filep) {

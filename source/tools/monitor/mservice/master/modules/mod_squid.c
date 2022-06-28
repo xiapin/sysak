@@ -568,7 +568,7 @@ read_squid_stat(struct module *mod, char *parameter)
     count_squid_nr();
     if (squid_nr == 0) {
         if (atoi(parameter) != 0) {
-            port_list[0] = atoi(parameter);  
+            port_list[0] = atoi(parameter);
             squid_nr = 1;
         } else {
             port_list[0] = 3128;

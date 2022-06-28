@@ -118,7 +118,7 @@ struct data image = {0};
 #define DATA_MIN(path)	data_min.path = data_min.path < image.path ? data_min.path : image.path;
 #define DATA_MAX(path)	data_max.path = data_max.path > image.path ? data_max.path : image.path;
 #define DATA_AVG(path)	data_avg.path = data_avg.path + image.path;
-#define DELTA(path, to, from)  image.path = (time[nr].times[to] - time[nr].times[from]) / 1000; 
+#define DELTA(path, to, from)  image.path = (time[nr].times[to] - time[nr].times[from]) / 1000;
 
 //static char path[5] = {'v', '>', '^', 'v', '<'};
 
@@ -221,7 +221,7 @@ static void image_show(int nr)
 	DATA_AVG(r_dev)
 	DATA_AVG(r_ip)
 	DATA_AVG(delta)
-	
+
 	printf("+-------------------tcp-trace---------------------+\n");
 	printf("| seq:%5d                       unit:usec       |\n", nr);
 	printf("|      +-------+      %5u  +---------------+    |\n", image.delta);
@@ -280,7 +280,7 @@ static int probe(int nr, __u32 src_ip, __u32 dst_ip, __u16 src_port,
 	*/
 	strncpy((char *)payload, "test", sizeof(payload)-1); /* 构造负载的内容 */
 	payload_s = strlen((char *)payload); /* 计算负载内容的长度 */
-	packet_size = LIBNET_IPV4_H + LIBNET_TCP_H + payload_s;	
+	packet_size = LIBNET_IPV4_H + LIBNET_TCP_H + payload_s;
 	for (i = 0; i < nr; i++) {
 		//payload_s = 0;
 		//data_tag = libnet_build_data(payload, payload_s, handle, 0);

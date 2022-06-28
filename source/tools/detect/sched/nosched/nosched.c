@@ -356,7 +356,7 @@ int main(int argc, char **argv)
 			case 'f':
 				if (strlen(optarg) < 2)
 					strncpy(filename, defaultfile, sizeof(filename));
-				else 
+				else
 					strncpy(filename, optarg, sizeof(filename));
 				filep = fopen(filename, "w+");
 				if (!filep) {

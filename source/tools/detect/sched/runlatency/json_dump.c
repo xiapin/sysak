@@ -18,13 +18,13 @@ int read_file(char* path, char* s)
 {
 	int fd = open(path, O_RDONLY);
 	int size;
-	
+
 	if (fd < 0) {
 		fprintf(stderr, "%s :open %s\n",
 			strerror(errno), path);
 		return fd;
 	}
-	
+
 	size = read(fd, s, STREAM_SIZE - 1);
 	close(fd);
 	return size;
@@ -34,13 +34,13 @@ int clear_file(char *path)
 {
 	int fd = open(path, O_WRONLY);
 	int size;
-	
+
 	if (fd < 0) {
 		fprintf(stderr, "%s :open %s\n",
 			strerror(errno), path);
 		return fd;
 	}
-	
+
 	size = write(fd, "0", 1);
 	close(fd);
 	return size;
@@ -51,7 +51,7 @@ int parse_dump(char *file)
 	char *s;
 	int ret;
 	FILE *outf = NULL;
-	
+
 	s = malloc(STREAM_SIZE);
 	if (s == NULL) {
 		return -ENOMEM;
@@ -76,7 +76,7 @@ int parse_dump(char *file)
 	s[ret] = '\0';
 	parser_irqoff(s, ret, outf);
 	clear_file(IRQOFF_FILE);
-	
+
 	ret = read_file(NOSCH_FILE, s);
 	if (ret < 0) {
 		goto out;
@@ -84,7 +84,7 @@ int parse_dump(char *file)
 	s[ret] = '\0';
 	parser_nosch(s, ret, outf);
 	clear_file(NOSCH_FILE);
-	
+
 	ret = read_file(RUNQ_FILE, s);
 	if (ret < 0) {
 		goto out;

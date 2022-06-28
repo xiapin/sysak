@@ -138,7 +138,7 @@ static int mod_ctrl(bool enable)
         }
 
     }
-    fclose(modlist_fp); 
+    fclose(modlist_fp);
 
     if (enable && !has_ko) {
         snprintf(exec_mod, sizeof(exec_mod), "insmod %s%s%s", module_path, kern_version, module);
@@ -622,22 +622,22 @@ static void set_path(char *argv[])
     realpath(argv[0],tmp);
     current_path = dirpath(tmp);
 
-    snprintf(compoents_path, sizeof(compoents_path), "%s%s", 
+    snprintf(compoents_path, sizeof(compoents_path), "%s%s",
              current_path, "/.sysak_compoents");
 
     if (access(compoents_path,0) != 0)
-        snprintf(compoents_path, sizeof(tools_path), "%s%s", 
+        snprintf(compoents_path, sizeof(tools_path), "%s%s",
             bin_path, "/.sysak_compoents");
 
-    snprintf(tools_path, sizeof(tools_path), "%s%s", 
+    snprintf(tools_path, sizeof(tools_path), "%s%s",
              compoents_path, "/tools/");
-    snprintf(module_path, sizeof(module_path), "%s%s", 
+    snprintf(module_path, sizeof(module_path), "%s%s",
              compoents_path, "/lib/");
-    snprintf(sysak_rule, sizeof(sysak_rule), "%s%s", 
+    snprintf(sysak_rule, sizeof(sysak_rule), "%s%s",
              compoents_path, "/tools/.sysak.rules");
-    snprintf(sysak_other_rule, sizeof(sysak_other_rule), "%s%s%s%s", 
+    snprintf(sysak_other_rule, sizeof(sysak_other_rule), "%s%s%s%s",
              compoents_path, "/tools/",kern_version,"/.sysak.rules");
-    snprintf(sysak_work_path, sizeof(sysak_work_path), "%s%s", 
+    snprintf(sysak_work_path, sizeof(sysak_work_path), "%s%s",
              "export SYSAK_WORK_PATH=", compoents_path);
 }
 

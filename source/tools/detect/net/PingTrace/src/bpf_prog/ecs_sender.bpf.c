@@ -95,7 +95,7 @@ int netif_rx_hook(struct netif_receive_skb_args *args)
         u32 cpu;
         u64 softirq_ts = -1;
         u64 *ts_ptr;
-        
+
         cpu = bpf_get_smp_processor_id();
         ts_ptr = bpf_map_lookup_elem(&irq_map, &cpu);
         if (ts_ptr)

@@ -25,9 +25,9 @@ struct {
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
-/* 
+/*
  * the return value type can only be assigned to 0,
- * so it can be int ,long , long long and the unsinged version 
+ * so it can be int ,long , long long and the unsinged version
  * */
 #define GETARG_FROM_ARRYMAP(map,argp,type,member)({	\
 	type retval = 0;			\

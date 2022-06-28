@@ -137,7 +137,7 @@ static bool program_ready(void)
 }
 
 static inline int test_bit(int nr, const volatile unsigned long *addr)
-{               
+{
         return 1UL & (addr[BIT_WORD(nr)] >> (nr & (BITS_PER_LONG-1)));
 }
 
@@ -197,7 +197,7 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 			comm_eqaul = strequal(comm,  comm_i);
 			if (!comm_eqaul)
 				return 0;
-		} else { 
+		} else {
 			use_comm = false;
 		}
 	}
@@ -275,9 +275,9 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 
 		now = bpf_ktime_get_ns();
 		event.enter = latp->last_seen_need_resched_ns;
-		if (event.enter && latp->thresh && 
+		if (event.enter && latp->thresh &&
 			(now - event.enter > latp->thresh)) {
-			
+
 			event.stamp = now;
 			event.exit = now;
 			event.cpuid = cpuid;

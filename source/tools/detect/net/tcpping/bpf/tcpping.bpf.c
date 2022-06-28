@@ -100,7 +100,7 @@ int tcp_v4_rcv_hook(struct pt_regs *ctx)
 	tuple = get_tuple_info(&tuple_map, PORT_VARS);
 	if (!tuple) {
 		return 0;
-	} 
+	}
 
 	struct sk_buff *skb = (void *)PT_REGS_PARM1(ctx);
 	tag_timestamp(&pt_map, skb, PT_KERN_TCP_V4_RCV, TCPTRACE_DIRECTION_IN, tuple,
@@ -121,7 +121,7 @@ int ip_rcv_hook(struct pt_regs *ctx)
 	struct sk_buff *skb = (void *)PT_REGS_PARM1(ctx);
 	tag_timestamp(&pt_map, skb, PT_KERN_IP_RCV, TCPTRACE_DIRECTION_IN, tuple,
 				false, ctx, &perf_map);
-	
+
 	return 0;
 }
 

@@ -84,7 +84,7 @@ int rtrace_filter_map_fd(struct rtrace *r)
     return bpf_map__fd(r->obj->maps.filter_map);
 }
 
-static void rtrace_free(struct rtrace *r) 
+static void rtrace_free(struct rtrace *r)
 {
     rtrace_bpf__destroy(r->obj);
 
@@ -93,7 +93,7 @@ static void rtrace_free(struct rtrace *r)
 
     free(r->btf_custom_path);
     r->btf_custom_path = NULL;
-    
+
     free(r->pin_path);
     r->pin_path = NULL;
 

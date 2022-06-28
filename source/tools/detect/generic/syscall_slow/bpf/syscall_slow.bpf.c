@@ -26,9 +26,9 @@
 	ret;						\
 })
 
-/* 
+/*
  * struct trace_event_raw_sys_enter/exit may not defined in
- * some old versions, so we do a work-around 
+ * some old versions, so we do a work-around
  * */
 struct raw_sys_enter_arg {
         struct trace_entry ent;
@@ -145,7 +145,7 @@ int handle_raw_sys_enter(struct raw_sys_enter_arg *ctx)
 	argp = bpf_map_lookup_elem(&arg_map, &i);
 	if (argp)
 		filter = _(argp->filter);
-	else 
+	else
 		return 0;
 
 	if (filter.size && filter.size != -1) {
@@ -197,7 +197,7 @@ int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 	pid = bpf_get_current_pid_tgid();
 	if (argp)
 		filter = _(argp->filter);
-	else 
+	else
 		return 0;
 
 	if (filter.size && filter.size != -1) {

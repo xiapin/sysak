@@ -352,7 +352,7 @@ static int cg_jitter_inited(void)
 		if (jitter_symbol)
 			jit_inited = *jitter_symbol + cg_jitter_init;
 		else
-			jit_inited = cg_jitter_init; 
+			jit_inited = cg_jitter_init;
 	} else {
 		fprintf(stderr, "cgroup:dlopen NULL fail\n");
 		jit_inited = -1;
@@ -1001,11 +1001,11 @@ static unsigned long jitter_cgroup_matched(int cg_idx, struct sum_jitter_info *s
 			tmp = tmp | ((1 << (vals[1]+1)) - 1);
 			tmp = tmp & ~((1 << vals[0]) -1);
 		}
-		cpusets = cpusets | tmp;	
+		cpusets = cpusets | tmp;
 	}
 	mask = 0;
 	num = sum->num - sum->lastnum;
-	num = num > 4?4:num; 
+	num = num > 4?4:num;
 	for (i = 0; i < num; i++) {
 		cpu = sum->lastcpu[i];
 		if ((1 << cpu) & cpusets)
@@ -1028,8 +1028,8 @@ static int get_jitter_stats(int cg_idx, struct sum_jitter_infos *sums)
 		struct sum_jitter_info *sum;
 
 		jit = &jits->info[j];
-		sum = &sums->sum[j];	
-		if (!(mask = jitter_cgroup_matched(cg_idx, sum))) 
+		sum = &sums->sum[j];
+		if (!(mask = jitter_cgroup_matched(cg_idx, sum)))
 			continue;
 		while(i < JITITEM) {
 			if (mask & (1 << i)) {

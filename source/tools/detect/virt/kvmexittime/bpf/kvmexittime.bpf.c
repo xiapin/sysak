@@ -64,7 +64,7 @@ bool filter(u32 tgid, u32 pid)
 	return false;
 }
 
-SEC("tp/kvm/kvm_exit") 
+SEC("tp/kvm/kvm_exit")
 int handle__kvm_exit(struct trace_event_raw_kvm_exit *ctx) {
     u64 current;
     u32 pid, tgid;

@@ -8,7 +8,7 @@
 #include "parser.h"
 
 #define OPT_MASK 0x7
-#define	OPT_IRQ	0x1	
+#define	OPT_IRQ	0x1
 #define	OPT_SCH	0x2
 #define	OPT_LAT	0x4
 #define MAX_CMD 3
@@ -57,7 +57,7 @@ int switch_func(int opt, int enable, int pid)
 		param[2] = (enable != 0) ? pid:-1;
 
 	param[0] = param[1] = enable;
-	while (index < MAX_CMD) {	
+	while (index < MAX_CMD) {
 		if (optalign & (1 << index)) {
 			snprintf(cmd, MAX_CMD_LEN, "echo %d > %s",param[index], enable_files[index]);
 			/* fprintf(stderr, "debug_cmd:%s\n", cmd); */
@@ -102,7 +102,7 @@ static int all_ready(bool ready[], int retno[])
 			ready_cnt++;
 		} else {
 			fprintf(stderr, "%s: access() %s\n",
-				strerror(retno[i]), enable_files[i]);	
+				strerror(retno[i]), enable_files[i]);
 		}
 	}
 
@@ -174,7 +174,7 @@ int main(int argc, char *argv[])
 					opt_mask = atoi(optarg);
 				else
 					opt_mask = OPT_MASK & (~OPT_LAT);
-					
+
 				will_switch = 1;
 				enable = 1;
 				break;

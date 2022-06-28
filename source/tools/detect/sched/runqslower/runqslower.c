@@ -325,9 +325,9 @@ int main(int argc, char **argv)
 	}
 
 	libbpf_set_print(libbpf_print_fn);
-	
+
 	bump_memlock_rlimit();
-	
+
 	obj = runqslower_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open BPF object\n");

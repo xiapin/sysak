@@ -132,9 +132,9 @@ int main(int argc, char **argv)
 		return err;
 
 	libbpf_set_print(libbpf_print_fn);
-	
+
 	bump_memlock_rlimit();
-	
+
 	obj = kvmexittime_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open BPF object\n");
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
 		if (err < 0) {
 			fprintf(stderr, "failed to lookup exec: %d\n", err);
 			return -1;
-		
+
 		}
 		lookup_key = next_key;
 		total_cnt += tm.count;

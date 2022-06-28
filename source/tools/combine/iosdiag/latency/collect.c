@@ -158,7 +158,7 @@ static unsigned int get_devt_by_devname(char *devname)
 	sprintf(sys_file, "/sys/block/%s/dev", devname);
 	if (access(sys_file, F_OK))
 		sprintf(sys_file, "/sys/block/*/%s/../dev", devname);
-	
+
 	sprintf(cmd, "cat %s 2>/dev/null", sys_file);
 	if ((fp = popen(cmd, "r")) == NULL) {
 		fprintf(stderr, "exec \'%s\' fail\n", cmd);

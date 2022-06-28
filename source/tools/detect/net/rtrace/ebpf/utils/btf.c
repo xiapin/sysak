@@ -89,7 +89,7 @@ const struct btf_member *btf_find_member(struct btf *btf, int typeid,
     const struct btf_member *m, *tmpm;
     const char *name;
     int i;
-    
+
     t = btf__type_by_id(btf, typeid);
     while(btf_type_is_modifier(t) || btf_is_ptr(t)) {
         t = btf_type_skip_modifiers(btf, typeid, (uint32_t *)&typeid);

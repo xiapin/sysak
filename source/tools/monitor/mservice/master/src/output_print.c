@@ -535,7 +535,7 @@ check_time(const char *line)
             return 0;
         }
         pre_time = now_time;
-	
+
         return 1;
 
     } else {

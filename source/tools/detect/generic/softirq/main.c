@@ -89,7 +89,7 @@ int calc_softirq(void)
 			ret = -1;
 			break;
 		}
-		
+
 		sum = 0;
 		while (str = strtok(NULL,  " \n")) {
 			sum += atoll(str);
@@ -168,7 +168,7 @@ int calc_softirq_speed(void)
 
 		start_sum = atoll(str);
 		diff = end_sum - start_sum;
-		
+
 		snprintf(res_line, sizeof(res_line), "%lld counts/s\n", diff);
 		if (fwrite(res_line, strlen(res_line), 1, g_res_fp) != 1) {
 			ret = -1;
@@ -209,5 +209,5 @@ int main(int argc, char *argv[])
 	}
 
 	fclose(g_softirq_fp);
-	return 0;	
+	return 0;
 }

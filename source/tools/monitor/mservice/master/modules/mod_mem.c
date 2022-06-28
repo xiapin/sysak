@@ -98,7 +98,7 @@ set_mem_record(struct module *mod, double st_array[],
 {
     int i;
     if ((cur_array[4] - cur_array[0] -cur_array[2] -cur_array[3]) < 0) {
-        for (i = 0; i < 6; i++) 
+        for (i = 0; i < 6; i++)
             st_array[i] = -1;
         return;
     }

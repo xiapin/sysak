@@ -12,7 +12,7 @@
  *  char dockerid[CONID_LEN] = {0};
  *  int pid = getpid();
  *  get_container(dockerid, 1118);
- * RETURN VALUE: 0 success, or this "pid" is not in a container or other fail. 
+ * RETURN VALUE: 0 success, or this "pid" is not in a container or other fail.
  * */
 int get_container(char *dockerid, int pid)
 {
@@ -56,7 +56,7 @@ int get_container(char *dockerid, int pid)
 		}
 	}
 out1:
-	free(buf);	
+	free(buf);
 out2:
 	fclose(fp);
 	return ret;

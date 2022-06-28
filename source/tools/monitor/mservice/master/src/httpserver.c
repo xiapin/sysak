@@ -95,7 +95,7 @@ int output_http(int sk, int req, const char*sub_req)
 						continue;
 
 					if (req > REQUEST_METRIC_CGROUP_ALL && req < REQUEST_MAX)
-                                        	n = snprintf(detail, LEN_1M, "%s%s} %6llu\n", 
+                                        	n = snprintf(detail, LEN_1M, "%s%s} %6llu\n",
 							opt_line, trim(mod->info[k].hdr, LEN_128), raw_array[k]);
 					else
                                         	n = snprintf(detail, LEN_1M, "%s%s} %6.2f\n",

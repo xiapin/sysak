@@ -92,7 +92,7 @@ static inline FILE* open_logfile(char *filename, FILE **fporig)
 
 	/* if original FILE is opened, just skip... */
 	if (fp)
-		return fp; 
+		return fp;
 	fp = fopen(filename, "w+");
 	if (!fp)
 		fprintf(stderr, "%s :fopen %s\n",
@@ -154,7 +154,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 			return -1;
 		}
-			
+
 		if (env.comm.size > TASK_COMM_LEN - 1)
 			env.comm.size = TASK_COMM_LEN - 1;
 
@@ -268,7 +268,7 @@ int main(int argc, char **argv)
 			return -EINVAL;
 		}
 	}
-	
+
 	ksyms = NULL;
 	err = load_kallsyms(&ksyms);
 	if (err) {
@@ -288,7 +288,7 @@ int main(int argc, char **argv)
 		free(sw_mlinks);
 		return -ENOMEM;
 	}
-	
+
 	obj = schedmoni_bpf__open();
 	if (!obj) {
 		fprintf(stderr, "failed to open BPF object\n");

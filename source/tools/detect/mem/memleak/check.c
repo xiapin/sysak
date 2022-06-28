@@ -14,7 +14,7 @@ static int read_hugepage1G(void)
 {
     FILE *fp;
     char line[LEN_128];
-    unsigned long nr =0; 
+    unsigned long nr =0;
 
     fp = fopen(hugepath, "r");
     if (fp == NULL)
@@ -23,7 +23,7 @@ static int read_hugepage1G(void)
     if (fgets(line, 128,fp) == NULL) {
         fclose(fp);
         return 0;
-    }   
+    }
 
     sscanf(line, "%lu", &nr);
     fclose(fp);
@@ -109,5 +109,5 @@ int test_main(void)
     struct meminfo mem;
     read_meminfo(&mem);
     printf(" kernel used %dM\n", mem.kernel/1024);
-    return 0; 
+    return 0;
 }

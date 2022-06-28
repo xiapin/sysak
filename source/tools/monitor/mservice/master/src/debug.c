@@ -35,7 +35,7 @@ _do_debug(log_level_t level, const char *file, int line, const char *fmt, ...)
         local = localtime(&timep);
         timestr = asctime(local);
 
-        fprintf(stderr, "[%.*s] %s:%d ", 
+        fprintf(stderr, "[%.*s] %s:%d ",
                 (int)(strlen(timestr) - 1), timestr, file, line);
 
         va_start(argp, fmt);

@@ -98,7 +98,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 	case 'f':
 		if (strlen(arg) < 2)
 			strncpy(filename, defaultfile, sizeof(filename));
-		else 
+		else
 			strncpy(filename, arg, sizeof(filename));
 		filep = fopen(filename, "w+");
 		if (!filep) {

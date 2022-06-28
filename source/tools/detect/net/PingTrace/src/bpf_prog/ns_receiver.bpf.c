@@ -35,7 +35,7 @@ int netif_rx_hook(struct netif_rx_args *args)
 {
         int ret;
         ret = tag_timestamp_bidirect(args->skb, ICMP_ECHO, P_M_RX_DEVECHO, &rx_map, ICMP_ECHOREPLY, P_M_RX_DEVREPLY, &tx_map);
-        return 0; 
+        return 0;
 }
 
 char _license[] SEC("license") = "GPL";

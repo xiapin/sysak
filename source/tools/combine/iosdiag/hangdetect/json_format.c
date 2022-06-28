@@ -259,7 +259,7 @@ static void detail_convert_to_json(char *dest, struct rq_hang_info *rq_hi)
 	char *diskname = get_bdi_diskname();
 
 	sprintf(dest, "{\"diskname\":\"%s\","
-				"\"time\":\"%s\",", 
+				"\"time\":\"%s\",",
 				rq_hi->diskname,
 				get_base_info_check_time_date());
 	rqinfo_convert_to_json(dest + strlen(dest), rq_hi);
