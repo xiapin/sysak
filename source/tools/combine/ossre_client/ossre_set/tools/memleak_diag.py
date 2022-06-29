@@ -23,7 +23,7 @@ import collect_data
 import crash
 import utils
 
-trace_event = True 
+trace_event = True
 functions = []
 
 
@@ -124,7 +124,7 @@ def get_kallsyms():
 		func_dict[int(base,16)] = function_name
 		functions.append(func_dict)
 
-	functions.sort(key=lambda x: list(x.keys()))	
+	functions.sort(key=lambda x: list(x.keys()))
 	fd.close()
 
 def address_to_sym(address):
@@ -162,7 +162,7 @@ def free_alloc(alloc,ptr,ts):
 	if ts >= alloc[ptr][-1]:
 		alloc.pop(ptr)
 		return True
-	return None	
+	return None
 
 def get_unfree_count(alloc):
 	unfree = {}
@@ -200,7 +200,7 @@ def get_unfree_alloc(perf_file):
 			continue
 		line_list = line.strip().split(' ')
 		line_list = list(filter(is_null,line_list))
-		
+
 		ts = None
 		call_ip = None
 		ptr = None
@@ -227,15 +227,15 @@ def get_unfree_alloc(perf_file):
 			start_ts = ts
 		end_ts = ts
 		info = []
-		info.append(ptr)	
-		info.append(call_ip)	
-		info.append(line_list[0])	
-		info.append(ts)	
+		info.append(ptr)
+		info.append(call_ip)
+		info.append(line_list[0])
+		info.append(ts)
 		if free == 1:
 			alloc[ptr] = info
 			continue
 		if free == 2 :
-			free_alloc(alloc,ptr,ts)	
+			free_alloc(alloc,ptr,ts)
 	delta = end_ts - start_ts
 	delta = delta * 0.1
 	end_ts = end_ts - delta
@@ -273,7 +273,7 @@ def kmem_write_enable(bytes_alloc):
 		filter_args = "ptr != 0"
 		kmem_write_sys(filters, filter_args)
 		kmem_write_sys(enable, "1")
-	
+
 	for event in allocs:
 		slab_event = debug_path + os.sep + event
 		enable = slab_event + os.sep + "enable"
@@ -286,12 +286,12 @@ def kmem_write_disable():
 	free = ["kfree", "kmem_cache_free"]
 	allocs = ["kmalloc", "kmalloc_node", "kmem_cache_alloc", "kmem_cache_alloc_node"]
 	debug_path = "/sys/kernel/debug/tracing/events/kmem"
-	
+
 	for event in allocs:
 		slab_event = debug_path + os.sep + event
 		enable = slab_event + os.sep + "enable"
 		kmem_write_sys(enable, "0")
-	
+
 	for event in free:
 		slab_event = debug_path + os.sep + event
 		enable = slab_event + os.sep + "enable"
@@ -300,7 +300,7 @@ def kmem_write_disable():
 def kmem_trace_clear():
 	filename = "/sys/kernel/debug/tracing/trace"
 	kmem_write_sys(filename, "clear")
-		
+
 def kmem_trace_enable(bytes_alloc, delay):
 	global trace_event
 	kmem_write_enable(bytes_alloc)
@@ -333,7 +333,7 @@ def slab_is_unreclaim(name):
 	slabname = name + os.sep + "reclaim_account"
 	ret = get_slab_elem(slabname)
 	return (int(ret) == 0)
-	
+
 def slab_get_objects(name):
 	ret = 0
 	slabname = name + os.sep + "objects"
@@ -372,15 +372,15 @@ def slab_number_memleak(number, force):
 			slab_path.append(name)
 			slab_link[linkname] = slab_path
 
-			
+
 	if max_objects > number or force:
 		max_dict[max_slab] = slab_link[max_slab]
 
 	return max_dict
-			
+
 def slab_total_memleak(rate):
-	mem_total =	None 
-	slab_unreclaim = None 
+	mem_total =	None
+	slab_unreclaim = None
 
 	fd = open("/proc/meminfo", 'r')
 	while 1:
@@ -400,7 +400,7 @@ def slab_total_memleak(rate):
 	if (slab_unreclaim * 100) > (mem_total * rate):
 		return True
 	else:
-		return None	
+		return None
 
 def check_memleak(rate, number, size, timeout):
         ret = slab_total_memleak(rate)

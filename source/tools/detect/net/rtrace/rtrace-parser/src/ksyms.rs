@@ -73,7 +73,7 @@ impl Ksyms {
     }
 }
 
-/// 
+///
 static GLOBAL_KSYMS: Lazy<Mutex<Ksyms>> = Lazy::new(|| {
     let ksyms = Ksyms::new();
     Mutex::new(ksyms)

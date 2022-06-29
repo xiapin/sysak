@@ -125,7 +125,7 @@ def print_request(crash_inst, request, data):
         bio = struct_get_member(crash_inst.cmd("struct bio.bi_next %s" % bio))
 
     print();print()
-    
+
     if threshold and (data['current_time'] - int(start_time_ns)) > threshold:
         data['timeouts'] += 1
 
@@ -172,8 +172,8 @@ def process_one_hw_ctx(crash_inst, tagmap, index, data):
             elif 'word =' in line:
                 word = int(struct_get_member(line))
                 tags += [bit+base+nr_reserved_tags for bit in get_all_set_bit(word) if bit+base < nr_tags]
-                
-    
+
+
     print("[Hardware Queue %d]" % index)
     rqs = struct_get_member(crash_inst.cmd("struct blk_mq_tags.rqs %s" % tagmap))
     for tag in tags:
@@ -204,7 +204,7 @@ def process_one_queue(crash_inst, queue_info, data):
 
     if data['threshold']:
         print("[%s] %d hang requests." % (queue_info['name'], data['timeouts']))
- 
+
 
 def main():
     sn = ''

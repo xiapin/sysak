@@ -280,7 +280,7 @@ class hangAnalysis():
 			summaryDicts['summary'][diskIdx]['hung ios'].append(sDict)
 		else:
 			detailDicts['summary'][diskIdx]['hung ios'].append(sDict)
-		
+
 	def hangStatCalculate(self):
 		statDicts = self.statDicts
 		totalIosDicts = self.totalIosDicts

@@ -12,7 +12,7 @@ alinux3_etc_sysctl = "/etc/sysctl.d/50-aliyun.conf"
 dict_paraments = {'kernel.unprivileged_bpf_disabled': 1}
 
 file_max = "/proc/sys/fs/file-max"
-nr_open = "/proc/sys/fs/nr_open" 
+nr_open = "/proc/sys/fs/nr_open"
 etc_security_limit = "/etc/security/limits.conf"
 
 pagecache_dirty_bytes = "/proc/sys/vm/dirty_bytes"
@@ -70,7 +70,7 @@ def check_pagecache_config():
         if dirty_bytes_val <= pagecache_watermask:
             print("vm.dirty_bytes=%s 低于20%Mem，可能造成pagecache频繁回写，io拥塞" %(dirty_bytes_val))
     meminfo_fd.close()
- 
+
     pagecache_bk_watermask = int(mem_total_val)*1024*10/100
 
     if bk_dirty_bytes_val:
@@ -87,7 +87,7 @@ def check_etc_config():
         alinux3_etc_fd = open(alinux3_etc_sysctl,"r")
         for line in alinux3_etc_fd.readlines():
             match_parament= re.search( r'kernel.unprivileged_bpf_disabled = (\d+)', line, re.I)
-            if match_parament:           
+            if match_parament:
                 for parament in dict_paraments.keys():
                     if dict_paraments[parament] == match_parament.group(1):
                         print("kernel.unprivileged_bpf_disabled应该配置成1")
@@ -134,10 +134,10 @@ def overcommit_check():
             Committed_AS = line
 
     if overcommit_memory == "0":
-        print("vm.overcommit_memory = %s" %(overcommit_memory)) 
+        print("vm.overcommit_memory = %s" %(overcommit_memory))
         print("vm.overcommit_kbytes和vm.overcommit_ratio设置的值不会生效，只要当前系统还有可用内存，即可继续分配虚拟地址区间。")
     elif overcommit_memory == "1":
-        print("vm.overcommit_memory = %s" %(overcommit_memory)) 
+        print("vm.overcommit_memory = %s" %(overcommit_memory))
         print("vm.overcommit_kbytes和vm.overcommit_ratio设置的值不会生效，不会受CommitLimit限制，始终可分配虚拟地址。")
     else:
         print("vm.overcommit_kbytes = %s," %(overcommit_kbytes))

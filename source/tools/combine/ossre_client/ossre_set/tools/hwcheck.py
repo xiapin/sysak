@@ -157,8 +157,8 @@ def check_nmi(ret,data):
                 if gp != None:
                     cpu = int(gp.group(1))
                     backtrace_cpu.append(cpu)
-        
-            result_cpu = [] 
+
+            result_cpu = []
             for i in range(0,cpunum):
                 if i == exclude_cpu:
                     continue

@@ -75,7 +75,7 @@ if __name__ == '__main__':
             process = Popen(comm,stdout=PIPE, stderr=PIPE, shell=True)
 
             stdout, stderr = process.communicate()
-            
+
             if stderr:
                 continue
 

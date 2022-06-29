@@ -38,12 +38,12 @@ def exectue_cmd(command):
     command_fd.close()
     return ret
 
-def show_result(trace_reslut): 
+def show_result(trace_reslut):
     trace_fd = open(trace_reslut,"r")
     pid_fd = open(monitor_pid,"r")
     pid_v = 0
 
-    for line_1 in pid_fd.readlines():       
+    for line_1 in pid_fd.readlines():
         pagetype_1 = re.search( r'pid:(\d+),*', line_1, re.I)
         if pagetype_1:
             pid_v = pagetype_1.group(1)
@@ -61,7 +61,7 @@ def show_result(trace_reslut):
             analysed_fd.writelines(utrace)
         else:
             analysed_fd.writelines(line_2)
-    
+
     log_fd.writelines("------------------------------")
     analysed_fd.writelines("-------------------------")
     trace_fd.close()
@@ -86,7 +86,7 @@ def monitor_status():
         else:
             command_pid = 'systemctl status ' + app_name + '| grep "Main PID" |awk -F " " \'{print $3}\''
             pid = exectue_cmd(command_pid)
-        
+
         if not pid:
             continue
 
@@ -119,7 +119,7 @@ def monitor_status():
                     continue
             else:
                 print("%s:cpu使用率%s,超过50%%" %(app_name, cpu.replace("\n", "")))
-        
+
         mem_use_t2 = exectue_cmd(command_mem)
         vmem_use_t2 = exectue_cmd(command_vmem)
         mem_inc = int(mem_use_t2) - int(mem_use_t1)
@@ -204,7 +204,7 @@ def main():
                 enable_kernelmod(1)
                 set_parameter(monitor_pid, pid)
             else:
-                usage()               
+                usage()
                 sys.exit()
         if opt_name in ('-s'):
             show_result(trace_reslut)
@@ -214,7 +214,7 @@ def main():
                 size = int(opt_value)
                 set_parameter(monitor_size, size)
             else:
-                usage() 
+                usage()
             sys.exit()
         if opt_name in ('-d'):
             enable_kernelmod(0)

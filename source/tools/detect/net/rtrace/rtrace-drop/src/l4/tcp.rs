@@ -129,7 +129,7 @@ exprs = ["sk.sk_backlog.len", "sk.sk_backlog.rmem_alloc", "sk.sk_rcvbuf", "sk.sk
         if vals[0] + vals[1] > vals[2] + vals[3] + self.headroom {
             return RtraceDropAction::Consume(format!(
                 "Backlog queue overflow:
-                    Judge Expression: sk_backlog.len + sk_backlog.rmem_alloc > sk_rcvbuf + sk_sndbuf + HEADROOM 
+                    Judge Expression: sk_backlog.len + sk_backlog.rmem_alloc > sk_rcvbuf + sk_sndbuf + HEADROOM
                     Actual Expression: {} + {} > {} + {} + {}
                 ",
                 vals[0], vals[1], vals[2], vals[3], self.headroom

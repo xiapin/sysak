@@ -21,7 +21,7 @@ impl Dynamic {
         if let Some(xs) = &function.exprs {
             exprs = xs.clone();
         }
-        
+
         Ok(Dynamic {
             func: CString::new(function.name.clone())?,
             exprs,

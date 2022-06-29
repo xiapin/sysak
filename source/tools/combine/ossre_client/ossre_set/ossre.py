@@ -332,7 +332,7 @@ def check_cpu_indicator(ret):
             softirq_num = 0
             index = 2
             sys_sum = ""
-    
+
             for line in tsar:
                 line = line.strip()
                 if (line.startswith('Time') or len(line) == 0 or line.startswith('MAX') or
@@ -393,7 +393,7 @@ def check_cpu_indicator(ret):
                     "当前系统近一天softirq占比超过%.2f%%的时间超过%s分钟"%(
                     ossre_config['highsoftirq_thresh'],ossre_config['highsoftirq_thresh'],softirq_num))
                 ret['fields']['SLI']['SCHED']['highsoftirq_num']['solution'] = DEFAULT_SOLUTION
-    
+
             if len(sys_sum) > 0:
                 summary += "CPU利用率高异常:\n%s"%(sys_sum)
 
@@ -585,7 +585,7 @@ def check_mem_indicator(ret):
                 ret['fields']['cust']['SLI']['memleak']['solution'] = cust_const.memleak['solution']
                 ret['fields']['cust']['SLI']['memleak']['summary'] = (
                     cust_const.memleak['summary_format']%(memleak_ret['solution']['summary']))
- 
+
         dentry_num = get_fs_value(cache_data, "/sys/kernel/slab/dentry/objects").strip().split()[0]
         dentry_num = int(dentry_num)
         ret['fields']['SLI']['MEM']['dentry_num'] = {}
@@ -710,7 +710,7 @@ def check_io_indicator(ret):
                                         i += 1
                                     if await_index > 0:
                                         break
-    
+
                             for line in io_stats:
                                line = line.strip()
                                if len(line) <= 0:
@@ -812,10 +812,10 @@ def check_net_indicator(ret):
                     ret['fields']['SLI']['NET']['highretran_num']['solution'] = DEFAULT_SOLUTION
                 if len(net_sum) > 0:
                     summary += "网络存在高重传(重传率>30%%):\n%s"%(net_sum)
-    
+
             if highretran_num > 0:
                 ret['status'] = -1
-    
+
             if len(summary) <= 0:
                 summary = "None\n"
             else:
@@ -831,7 +831,7 @@ def check_net_indicator(ret):
                 ret['fields']['cust']['SLI']['highretran']['summary'] = summary
 
             ret['fields']['SLI']['summary'] += summary
-    
+
     except Exception as e:
         print( 'check_net_indicator exception:',e)
         traceback.print_exc()
@@ -1777,7 +1777,7 @@ def main():
         'vmlinux' not in cache_data)):
         parser.print_help()
         exit()
-        
+
     args,left = parser.parse_known_args()
     sys.argv = sys.argv[:1]+left
 

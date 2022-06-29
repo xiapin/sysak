@@ -84,7 +84,7 @@ def query(sn, data):
                        'util-linux-2.23.2-61.1.alios7 or newer version.'
                        ' "systemctl restart getty@tty1" as workaround.'),
                        commitid=('https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/commit/term-utils/agetty.c?id=d23597a88cdbdbc7f2a1c84cd6fe0b2ad9f7e87b'))
-               break 
+               break
 
     utils.cache_script_result(sn,data,ret)
     print( __name__,':',ret)

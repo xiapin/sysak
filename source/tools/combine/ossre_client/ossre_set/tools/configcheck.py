@@ -48,7 +48,7 @@ def main():
         ossre.check_net_params(ret)
         ossre.check_misc_params(ret)
 
-        print ret['fields']['CONFIG']['summary'] 
+        print ret['fields']['CONFIG']['summary']
 
         f = open("/tmp/configcheck.log", "w+")
         f.write(json.dumps(ret,ensure_ascii=False))
@@ -71,4 +71,4 @@ if __name__ == "__main__":
     else:
         print "/tmp/configcheck.log not exist"
     main()
-            
+

@@ -112,7 +112,7 @@ def getCacheStat(filename, comm):
 			_munmap(addr, size)
 			f.close()
 			return 0
-		
+
 		cached = list(vec).count(1)
 		_munmap(addr, size)
 		f.close()

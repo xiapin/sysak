@@ -169,7 +169,7 @@ impl Rtrace {
         if let Some(x) = self.progs.remove(name) {
             return Ok(x);
         }
-        
+
         let cname = CString::new(name.clone())?;
         let prog = unsafe {
             rtrace_trace_program(self.ptr, cname.as_ptr(), skv, skbv)

@@ -105,7 +105,7 @@ def query(sn, data):
                         if mod.get_description() not in mods:
                             mods[mod.get_description()] = []
                         mods[mod.get_description()].append(mod)
-                    
+
                 except Exception as e:
                     print( '%s Exception!'%(mod),e)
                     pass

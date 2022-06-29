@@ -5,7 +5,7 @@ use rtrace_parser::func::Func;
 use std::boxed::Box;
 use uname::uname;
 
-/// 
+///
 pub enum RtraceDropAction {
     Continue,
     Consume(String),

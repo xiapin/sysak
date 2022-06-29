@@ -37,7 +37,7 @@ def get_procfs_value(sn, data, proc_path, updated=0):
             print( 'get_procfs_value(path %s) exception!'%proc_path)
             data['proc'][proc_path] = ''
 
-    return data['proc'][proc_path] 
+    return data['proc'][proc_path]
 
 def get_sysfs_value(sn, data, sysfs_path, updated=0):
     if 'sysfs' not in data:

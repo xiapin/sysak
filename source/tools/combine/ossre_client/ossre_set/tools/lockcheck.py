@@ -140,4 +140,4 @@ if __name__ == "__main__":
     else:
         print "/tmp/lockcheck.log not exist"
     main()
-            
+

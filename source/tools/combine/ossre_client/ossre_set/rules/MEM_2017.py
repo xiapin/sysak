@@ -91,7 +91,7 @@ def need_long_time():
 
 # Return whether need crash to attach /proc/kcore
 def need_attach_crash():
-    return False 
+    return False
 
 # We define a fast mode which has suspected diagnosis to help fast scanning in ossre fast mode.
 # You can have a accurate diagnosis by run this script directly.
@@ -128,7 +128,7 @@ def query(sn, data):
         if (dentry_state < 0):
             return build_ret_value(sn, data, ret)
         else:
-            return build_ret_none(sn, data, ret) 
+            return build_ret_none(sn, data, ret)
     except Exception as e:
         traceback.print_exc()
         pass

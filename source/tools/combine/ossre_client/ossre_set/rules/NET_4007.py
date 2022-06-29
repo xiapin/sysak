@@ -143,7 +143,7 @@ def query(sn, data):
         cmd = "cat /proc/sys/net/ipv4/tcp_mem"
         tcp_mem = collect_data.get_cmddata(sn,data,cmd).strip()
         tcp_mem_max = tcp_mem.split()[2]
-        
+
         cmd = "cat /proc/net/sockstat"
         socketstat = collect_data.get_cmddata(sn,data,cmd).strip()
         tcp_mem_now = 0

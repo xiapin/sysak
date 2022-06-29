@@ -20,7 +20,7 @@ impl RtraceDrop for L2 {
     fn get_name(&self) -> &str {
         "l2"
     }
-    
+
     fn get_subpoints(&self) -> Option<&Vec<Box<dyn RtraceDrop>>> {
         Some(&self.points)
     }

@@ -199,7 +199,7 @@ def analysis_log(outfile, pid):
 	next_pid = "next_pid="+str(pid)
 	wkup_pid = "pid="+str(pid)
 	fr = open(outfile, "r")
-	
+
 	for lines in fr.readlines():
 		if (sched_swc not in lines and sched_wkp not in lines):
 			continue
@@ -323,14 +323,14 @@ def usage(app):
 	print '  -a/--analy <logfile>      analysis trace logfile'
 	print '            logfile: the source file for json'
 	print '  -e/--enable <l|m|h>       enable sched trace with -p/--pid'
-	print '            l: enable low-level trace' 
-	print '            m: enable middle-level trace' 
-	print '            h: enable high-level trace' 
+	print '            l: enable low-level trace'
+	print '            m: enable middle-level trace'
+	print '            h: enable high-level trace'
 	print '  -d/--disable <l|m|h>       disable sched trace with'
-	print '            l: disable low-level trace' 
-	print '            m: disable middle-level trace' 
-	print '            h: disable high-level trace' 
-	print '            p: disable trace target_pid' 
+	print '            l: disable low-level trace'
+	print '            m: disable middle-level trace'
+	print '            h: disable high-level trace'
+	print '            p: disable trace target_pid'
 	print '=============='
 	return
 

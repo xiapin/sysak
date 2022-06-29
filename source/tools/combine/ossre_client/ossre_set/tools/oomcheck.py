@@ -255,7 +255,7 @@ def oom_msg_analyze(dmesgs, oom_figure):
                         oom_figure['task'][task_name] = 1
                     else:
                         oom_figure['task'][task_name] += 1
-                    
+
                 if OOM_CGROUP_KEYWORD in line:
                     cgroup_name = line.split('Task in')[1].split()[0]
                     oom_figure['sub_msg'][oom_figure['oom_total_num']]['cgroup_name'] = cgroup_name

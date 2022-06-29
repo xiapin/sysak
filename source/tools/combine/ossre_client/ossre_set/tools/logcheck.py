@@ -188,7 +188,7 @@ def extract_panic_calltrace(dmesgs,panic_list):
 def match_sim_issues(column,conn):
     # TBD
     return None
- 
+
 
 def extract_softlock_calltrace(dmesgs,softlock_list,conn):
     column = {"func_name":"","calltrace":[]}

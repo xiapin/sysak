@@ -113,7 +113,7 @@ impl Prog {
 
     /// Merge the instructions of the ebpf program with the newly
     /// generated instructions.
-    ///  
+    ///
     ///  1. copy insns.
     ///  1. Calculate the instruction split point based on the previous buried
     ///  point position.

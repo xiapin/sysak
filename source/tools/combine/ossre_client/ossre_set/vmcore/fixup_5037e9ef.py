@@ -25,7 +25,7 @@ def fixup_issue_status(column, ret=None):
 
     if (column['dmesg'].find('] dst_destroy+') > 0 and
           column['dmesg'].find('WARNING: at lib/list_debug.c') > 0 and
-          column['vertype'] == 310):       
+          column['vertype'] == 310):
         prev_warning = 0
         prev_calltrace = 0
         lines = column['dmesg'].split('\n')

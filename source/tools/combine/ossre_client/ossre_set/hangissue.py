@@ -55,7 +55,7 @@ def query(sn, data):
                             if desc not in desc_mods:
                                 desc_mods[desc] = []
                             desc_mods[desc].append(mod)
-                    
+
                 except Exception as e:
                     print( '%s Exception!'%(mod),e)
                     pass

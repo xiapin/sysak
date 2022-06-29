@@ -80,7 +80,7 @@ def query(sn, data):
         utils.cache_script_result(sn,data,ret)
         print( __name__,':',ret)
         return ret
-    
+
     crash_inst = collect_data.get_live_crash(sn, data)
     list_addr = ''
     net_namespace_list = crash_inst.cmd('p net_namespace_list').strip()

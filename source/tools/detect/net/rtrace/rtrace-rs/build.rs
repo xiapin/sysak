@@ -9,4 +9,4 @@ fn main() {
     println!("cargo:rustc-link-search={}", libpath.display());
     println!("cargo:rustc-link-lib=static=rtrace");
 }
- 
+

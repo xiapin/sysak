@@ -79,7 +79,7 @@ def query(sn, data):
     try:
         dmesg = collect_data.get_dmesg(sn, data)
         version = collect_data.get_kernel_version(sn, data)
-        if (dmesg.find("BUG: soft lockup") > 0 and 
+        if (dmesg.find("BUG: soft lockup") > 0 and
             dmesg.find("] __fsnotify_parent+0x") >= 0 and
             dmesg.find("] fsnotify+0x") >= 0):
             ret['return'] = True

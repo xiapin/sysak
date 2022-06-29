@@ -20,7 +20,7 @@ def extract_kernel_ptr(addr):
         return m.group(1)
     else:
         return ''
-        
+
 def struct_get_size(string):
     return string.splitlines()[-1].split()[-1]
 
@@ -102,7 +102,7 @@ class Crash:
             self.__crash_inst = Popen('crash'.split(), shell=False, stdin=PIPE, stdout=PIPE, stderr=PIPE)
         except OSError as err:
             raise Exception("Can't execute crash, please yum install crash.<" + repr(err) +">")
-        
+
         while True:
             line =  self.__crash_inst.stdout.readline()
             line = line.decode('ascii')
@@ -149,7 +149,7 @@ class Crash:
         self.__crash_inst.stdin.write(cmd)
         while True:
             line =  self.__crash_inst.stdout.readline()
-            line = line.decode('ascii') 
+            line = line.decode('ascii')
             if(line.startswith("<<Crash buffer end>>")):
                 break;
             output += line

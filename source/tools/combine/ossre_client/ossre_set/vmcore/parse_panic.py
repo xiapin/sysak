@@ -5,7 +5,7 @@ import os
 import sys
 import time
 import subprocess
-import re 
+import re
 import sqlite3
 import json
 import traceback
@@ -251,7 +251,7 @@ def check_panic(column,conn):
         column['crashkey'] = '%d$%s$%s'%(column['vertype'],column['bugon_file'],column['calltrace'])
 
     clarify_panic_type(column)
-    
+
     cursor = conn.cursor()
     issue_id = ''
     if column['panic_type'] == vmcore_const.PANIC_BUGON:
@@ -287,7 +287,7 @@ def check_panic(column,conn):
         for row in rows:
             if row[1] == column['vertype'] or len(issue_id) <= 0:
                 issue_id = row[0]
- 
+
     sql = 'select commitid,solution from issue where issue_id=?'
     value = (issue_id,)
     cursor.execute(sql, value)
@@ -428,14 +428,14 @@ def query(sn, data, log_file="", crashonly=0):
                 ret['return'] = True
                 result["cause"] = "该宕机为硬件错误导致宕机!"
             ret['solution'].append(result)
-        else:    
+        else:
             for subdir, dirs, files in os.walk(get_crash_path()):
                 for file in files:
                     result = {}
                     filepath = subdir + os.sep + file
                     if os.path.isfile(filepath) and filepath.endswith('-dmesg.txt'):
                         init_column(column)
-                        column['filename'] = filepath 
+                        column['filename'] = filepath
                         column['ver'] = ''
                         result['dmesg_file'] = filepath
                         matched = check_panic(column,conn)

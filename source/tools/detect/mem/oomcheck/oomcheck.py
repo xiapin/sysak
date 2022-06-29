@@ -717,7 +717,7 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_getting = 1
                 oom_result['sub_msg'][oom_result['oom_total_num']] = {}
                 oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = []
-                oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = 0 
+                oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = 0
                 oom_result['sub_msg'][oom_result['oom_total_num']]['cg_name'] = 'unknow'
                 oom_result['sub_msg'][oom_result['oom_total_num']]['task_name'] = task_name
                 oom_result['sub_msg'][oom_result['oom_total_num']]['pid'] = "0"
@@ -745,7 +745,7 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                         oom_result['task'][task_name] = 1
                     else:
                         oom_result['task'][task_name] += 1
-                    
+
                 if OOM_CGROUP_KEYWORD in line:
                     cgroup_name = line.split('Task in')[1].split()[0]
                     oom_result['sub_msg'][oom_result['oom_total_num']]['cgroup_name'] = cgroup_name
@@ -834,8 +834,8 @@ def usage():
             -j --output json
            for example:
            python oomcheck.py
-           python oomcheck.py -t "2021-09-13 15:32:22" 
-           python oomcheck.py -t 970665.476522 
+           python oomcheck.py -t "2021-09-13 15:32:22"
+           python oomcheck.py -t 970665.476522
            python oomcheck.py -f oom_file.txt
            python oomcheck.py -f oom_file.txt -t 970665.476522
         """

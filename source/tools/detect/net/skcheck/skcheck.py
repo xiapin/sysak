@@ -271,7 +271,7 @@ def get_args(argv):
             print("tcp memory and socket leak check")
             print("default enable for tcp memmory check")
             print("-s:enable socket leak check")
-            print("-t:threshold value for open socket ,default is 2000") 
+            print("-t:threshold value for open socket ,default is 2000")
             print("-l:leak threshold for shutdown socket ,default is 500")
             sys.exit()
         elif opt in ("-m"):
@@ -291,4 +291,4 @@ if __name__ == "__main__":
     tcp_mem_check()
     leak = socket_leak_check()
     for taskInfo in leak:
-        print("{}:{} socketNum {} socketLeakNum {}".format(taskInfo["task"], taskInfo["pid"], taskInfo["num"], taskInfo["numleak"])) 
+        print("{}:{} socketNum {} socketLeakNum {}".format(taskInfo["task"], taskInfo["pid"], taskInfo["num"], taskInfo["numleak"]))

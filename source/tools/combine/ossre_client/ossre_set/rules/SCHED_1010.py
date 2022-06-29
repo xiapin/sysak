@@ -80,7 +80,7 @@ def query(sn, data):
         maxcg = 0
         for subsys in CGROUP_SUB:
             path = "/sys/fs/cgroup/%s"%subsys
-            
+
             if os.path.exists(path):
                 path = "%s/system.slice"%path
                 if os.path.exists(path):
@@ -94,7 +94,7 @@ def query(sn, data):
             ret['return'] = True
             ret['solution'] = utils.format_result(desc=('systemd has too many cgroups in systemd.slice'),
                 commitid=('https://github.com/poettering/systemd/commit/e1e98911a818ad3b46c6a1c26d759df590bef476'))
- 
+
     except Exception as e:
         print( __name__,e)
         pass

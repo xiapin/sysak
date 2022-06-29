@@ -66,7 +66,7 @@ def get_input_hints():
 def get_category():
     return ['HANG','SOFTLOCKUP']
 
-#Reference: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=a90e90b7d55e789c71d85b946ffb5c1ab2f137ca 
+#Reference: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/?id=a90e90b7d55e789c71d85b946ffb5c1ab2f137ca
 
 def query(sn, data):
     ret = utils.get_script_result(sn,data)

@@ -73,4 +73,4 @@ if __name__ == "__main__":
     else:
         print "/tmp/systemdcheck.log not exist"
     main()
-            
+
