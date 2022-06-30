@@ -14,7 +14,7 @@
 #include <getopt.h>
 #include "pidComm.h"
 #include "bpf/nosched.skel.h"
-#include "nosched.comm.h"
+#include "nosched.h"
 
 #define MAX_SYMS 300000
 unsigned int nr_cpus;
@@ -181,7 +181,7 @@ static void update_summary(struct summary* summary, const struct event *e)
 	summary->num++;
 	idx = summary->num % CPU_ARRY_LEN;
 	summary->total += e->delay;
-	summary->cpus[idx] = e->cpu;
+	summary->cpus[idx] = e->cpuid;
 	summary->jitter[idx] = e->delay;
 	if (get_container(buf, e->pid))
 		strncpy(summary->container[idx], "000000000000", sizeof(summary->container[idx]));
@@ -190,7 +190,7 @@ static void update_summary(struct summary* summary, const struct event *e)
 
 	if (summary->max.value < e->delay) {
 		summary->max.value = e->delay;
-		summary->max.cpu = e->cpu;
+		summary->max.cpu = e->cpuid;
 		summary->max.pid = e->pid;
 		summary->max.stamp = e->stamp;
 		strncpy(summary->max.comm, e->comm, 16);
@@ -259,23 +259,31 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	if (env.summary) {
 		struct summary *sumi;
 
-		if (e->cpu > nr_cpus - 1)
+		if (e->cpuid > nr_cpus - 1)
 			return;
 
-		sumi = &percpu_summary[e->cpu];
+		sumi = &percpu_summary[e->cpuid];
 		update_summary(&summary, e);
 		update_summary(sumi, e);
 		if(record_summary(&summary, 0, true))
 			return;
-		record_summary(sumi, e->cpu, false);
+		record_summary(sumi, e->cpuid, false);
 	} else {
-		fprintf(filep, "%-21s %-5d %-15s %-8d %-10llu\n",
-			ts, e->cpu, e->comm, e->pid, e->delay);
-		print_stack(stackmp_fd, e->ret);
+		fprintf(filep, "%-21llu %-5d %-15s %-8d %-10llu %s\n",
+			e->stamp, e->cpuid, e->comm, e->pid,
+			e->delay, (e->exit==e->stamp)?"(EOF)":"");
+		if (e->exit == 0)
+			print_stack(stackmp_fd, e->ret);
+		fflush(filep);
 	}
 }
 
-void nosched_handler(int poll_fd)
+void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
+{
+	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+}
+
+int nosched_handler(int poll_fd, struct nosched_bpf *skel)
 {
 	int err = 0;
 	struct perf_buffer *pb = NULL;
@@ -283,7 +291,7 @@ void nosched_handler(int poll_fd)
 
 	if (!env.summary) {
 		fprintf(filep, "%-21s %-5s %-15s %-8s %-10s\n",
-			"TIME(nosched)", "CPU", "COMM", "TID", "LAT(us)");
+			"TIME(nosched)", "CPU", "COMM", "TID", "LAT(ms)");
 	} else {
 		int i;
 		char buf[128] = {' '};
@@ -295,6 +303,7 @@ void nosched_handler(int poll_fd)
 			strncpy(summary.container[i], "000000000000", sizeof(summary.container[i]));
 	}
 	pb_opts.sample_cb = handle_event;
+	pb_opts.lost_cb = handle_lost_events;
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
 	if (!pb) {
 		err = -errno;
@@ -302,6 +311,12 @@ void nosched_handler(int poll_fd)
 		goto clean_nosched;
 	}
 
+	/* Attach tracepoint handler */
+	err = nosched_bpf__attach(skel);
+	if (err) {
+		fprintf(stderr, "Failed to attach BPF skeleton\n");
+		return err;
+	}
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
 		if (err < 0 && err != -EINTR) {
@@ -311,9 +326,9 @@ void nosched_handler(int poll_fd)
 		/* reset err to return 0 if exiting */
 		err = 0;
 	}
-
 clean_nosched:
 	perf_buffer__free(pb);
+	return err;
 }
 
 static void sig_int(int signo)
@@ -422,12 +437,6 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to load BPF skeleton\n");
 		return 1;
 	}
-	/* Attach tracepoint handler */
-	err = nosched_bpf__attach(skel);
-	if (err) {
-		fprintf(stderr, "Failed to attach BPF skeleton\n");
-		goto cleanup;
-	}
 
 	map_fd0 = bpf_map__fd(skel->maps.args_map);
 	map_fd1 = bpf_map__fd(skel->maps.events);
@@ -451,7 +460,7 @@ int main(int argc, char **argv)
 	if (span)
 		alarm(span);
 
-	nosched_handler(map_fd1);
+	err = nosched_handler(map_fd1, skel);
 
 cleanup:
 	nosched_bpf__destroy(skel);

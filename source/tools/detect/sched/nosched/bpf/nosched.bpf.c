@@ -2,7 +2,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
-#include "../nosched.comm.h"
+#include "../nosched.h"
 
 #define BPF_F_FAST_STACK_CMP	(1ULL << 9)
 #define KERN_STACKID_FLAGS	(0 | BPF_F_FAST_STACK_CMP)
@@ -59,7 +59,14 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int nr)
 static inline int test_tsk_thread_flag(struct task_struct *tsk, int flag)
 {
 	struct thread_info tf, *tfp;
-	tfp = (struct thread_info *)(BPF_CORE_READ(tsk, stack));
+
+#ifdef VER310_LATER
+		tfp = &(tsk->thread_info);
+		bpf_probe_read(&tf, sizeof(tf), &(tsk->thread_info));
+		tfp = &tf;
+#else
+		tfp = (struct thread_info *)(BPF_CORE_READ(tsk, stack));
+#endif
 	return test_ti_thread_flag(tfp, flag);
 }
 
@@ -82,6 +89,9 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 	if (!argsp)
 		return 0;
 
+	if (_(p->pid) == 0)
+		return 0;
+
 	if(!test_tsk_need_resched(p, _(argsp->flag)))
 		return 0;
 
@@ -93,17 +103,19 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 		if (!latp->last_seen_need_resched_ns) {
 			latp->last_seen_need_resched_ns = now;
 			latp->ticks_without_resched = 0;
+			latp->last_perf_event = now;
 		} else {
 			latp->ticks_without_resched++;
-			resched_latency = now - latp->last_seen_need_resched_ns;
+			resched_latency = now - latp->last_perf_event;
 			if (resched_latency > _(argsp->thresh)) {
-				struct event event = {};
-				event.stamp = now;
-				event.cpu = cpuid;
-				event.delay = resched_latency;
+				struct event event = {0};
+				event.stamp = latp->last_seen_need_resched_ns;
+				event.cpuid = cpuid;
+				event.delay = now - latp->last_seen_need_resched_ns;
 				event.pid = bpf_get_current_pid_tgid();
 				bpf_get_current_comm(&event.comm, sizeof(event.comm));
 				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);
+				latp->last_perf_event = now;
 				bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
 							&event, sizeof(event));
 			}
@@ -111,7 +123,7 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 	} else {
 		__builtin_memset(&lati, 0, sizeof(struct latinfo));
 		lati.last_seen_need_resched_ns = now;
-		lati.ticks_without_resched = 0;
+		lati.last_perf_event = now;
 		bpf_map_update_elem(&info_map, &cpuid, &lati, BPF_ANY);
 	}
 
@@ -140,12 +152,26 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 	cpuid = bpf_get_smp_processor_id();
 	latp = bpf_map_lookup_elem(&info_map, &cpuid);
 	if (latp) {
+		u64 now;
+		struct event event = {0};
+
+		now = bpf_ktime_get_ns();
+		event.enter = latp->last_seen_need_resched_ns;
+		if (event.enter && latp->thresh && 
+			(now - event.enter > latp->thresh)) {
+			
+			event.stamp = now;
+			event.exit = now;
+			event.cpuid = cpuid;
+			event.delay = now - latp->last_seen_need_resched_ns;
+			latp->last_perf_event = now;
+			event.pid = bpf_get_current_pid_tgid();
+			bpf_get_current_comm(&event.comm, sizeof(event.comm));
+			event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);
+			bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
+					&event, sizeof(event));
+		}
 		latp->last_seen_need_resched_ns = 0;
-	} else {
-		__builtin_memset(&lati, 0, sizeof(struct latinfo));
-		lati.last_seen_need_resched_ns = 0;
-		lati.ticks_without_resched = 0;
-		bpf_map_update_elem(&info_map, &cpuid, &lati, BPF_ANY);
 	}
 
 	return 0;

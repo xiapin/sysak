@@ -33,12 +33,14 @@ struct key_t {
 
 struct latinfo {
 	__u64 last_seen_need_resched_ns;
+	__u64 last_perf_event;
+	__u64 thresh;
 	int ticks_without_resched;
 };
 
 struct event {
-	__u32 ret, pid, cpu;
-	__u64 delay, stamp;
+	__u32 ret, pid, cpuid;
+	__u64 delay, stamp, enter, exit;
 	char comm[TASK_COMM_LEN];
 };
 
