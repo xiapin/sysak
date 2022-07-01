@@ -40,8 +40,8 @@ usage()
             "    -check         display last record for alert\n"
             /*end*/
 #endif
-            "    --check/-C     display last record for alert.example:tsar --check / tsar --check --cpu --io\n"
-            "    --watch/-w     display last records in N mimutes. example:tsar --watch 30 / tsar --watch 30 --cpu --io\n"
+            "    --check/-C     display last record for alert.example:sysak mservice --check / tsar --check --cpu --io\n"
+            "    --watch/-w     display last records in N mimutes. example:sysak mservice --watch 30 / tsar --watch 30 --cpu --io\n"
             "    --cron/-c      run in cron mode, output data to file\n"
             "    --interval/-i  specify intervals numbers, in minutes if with --live, it is in seconds\n"
             "    --list/-L      list enabled modules\n"
@@ -51,8 +51,8 @@ usage()
             "    --date/-d      show the value for the specify day(n or YYYYMMDD)\n"
             "    --merge/-m     merge multiply item to one\n"
             "    --detail/-D    do not conver data to K/M/G\n"
-            "    --spec/-s      show spec field data, tsar --cpu -s sys,util\n"
-            "    --item/-I      show spec item data, tsar --io -I sda\n"
+            "    --spec/-s      show spec field data, sysak mservice --cpu -s sys,util\n"
+            "    --item/-I      show spec item data, sysak mservice --io -I sda\n"
             "    --serv/-S      run as service \n"
             "    --help/-h      help\n");
 
