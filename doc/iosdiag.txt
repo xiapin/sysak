@@ -1,7 +1,7 @@
 1. iosdiag
 iosdiag (IO storage diagnostics tools), IO存储诊断工具，目前包括已实现的IO延迟诊断功能以及IO夯诊断功能
 
-2. 代码目录结构(source/tools/detect/iosdiag目录下)
+2. 代码目录结构(source/tools/combine/iosdiag目录下)
 entry          IO诊断功能入口代码
 latency        IO延迟诊断代码
 hangdetect     IO夯诊断代码
