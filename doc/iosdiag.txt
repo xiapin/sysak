@@ -99,19 +99,34 @@ options:
 
 5.1.2 sysak iosdiag latency -h
 
-Usage:  latency [OPTION] disk_devname
-
-options:
-	-t threshold, 指定超时IO的时间阈值(单位ms)，IO时延诊断将过滤完成耗时超过此阈值的IO(默认1000ms)
-	-T time, 指定诊断运行时长(单位秒)后自动退出(默认10秒)
+Usage: 
+    latency [OPTION] disk_devname       检测诊断IO延迟事件
+    latency -t ms disk_devname          指定超时IO的时间阈值(单位ms)，IO时延诊断将过滤完成耗时超过此阈值的IO(默认1000ms)
+    latency -T sec disk_devname         指定诊断运行时长(单位秒)后自动退出(默认10秒)
+    latency -f log disk_devname         指定日志文件目录
 
 e.g.
-	latency vda			诊断访问磁盘vda上耗时1000ms的IO，诊断10s后自动退出
-	latency -t 10 vda		诊断访问磁盘vda上耗时10ms的IO，诊断10s后自动退出
-	latency -t 10 -T 30 vda		诊断访问磁盘vda上耗时10ms的IO，诊断30s后自动退出
+    latency vda                         诊断访问磁盘vda上耗时1000ms的IO，诊断10s后自动退出
+    latency -t 10 vda                   诊断磁盘"vda"上的io延迟超过10ms的事件
+    latency -t 10 -T 30 vda             诊断访问磁盘vda上耗时10ms的IO，诊断30s后自动退出
+
+5.1.3 sysak iosdiag hangdetect -h
+
+Usage: 
+    hangdetect [OPTION] disk_devname       检测诊断IO夯事件
+    hangdetect -t ms disk_devname          指定io夯的时间阈值，超过次时间的未完成的io将被认为是io夯被抓取出来(默认5000ms)
+    hangdetect -T sec disk_devname         指定诊断运行时长(单位秒)后自动退出(默认10秒)
+    hangdetect -f log disk_devname         指定日志文件目录
+    hangdetect -o disk_devname             一旦捕获到io夯程序自动退出
+
+e.g.
+    hangdetect vda                         诊断磁盘"vda"上的io夯事件
+    hangdetect -t 1000 vda                 诊断磁盘"vda"上的io夯住1000ms的事件
+    hangdetect -t 1000 -o vda              诊断磁盘"vda"上的io夯住1000ms的事件，一经捕获立即退出
+    hangdetect -T 10 vda                   诊断磁盘"vda"上的io夯住事件，诊断10秒后退出
 
 5.2 输出说明
-5.2.1 控制台输出
+5.2.1 控制台输出---iolatency
 运行命令：
 sysak iosdiag latency -t 1 -T 20 vda
 运行过程日志：
@@ -151,6 +166,7 @@ abnormal(delay:totaldelay):此IO异常点（此IO在此异常点的耗时：此I
 日志文件中的数据均以磁盘为单位以json数组的方式呈现
 /var/log/sysak/iosdiag/latency/result.log
 该日志文件描述的是每一个延迟IO的事件信息
+```
 {
 	"summary":[			//以磁盘为一个单位的数组
 	{
@@ -178,7 +194,7 @@ abnormal(delay:totaldelay):此IO异常点（此IO在此异常点的耗时：此I
 ```
 /var/log/sysak/iosdiag/latency/result.log.seq
 该日志文件描述的是每一个延迟IO在各组建的延迟分布
-
+```
 {
 	"summary":[						//以磁盘为一个单位的数组
 		{
@@ -217,7 +233,7 @@ abnormal(delay:totaldelay):此IO异常点（此IO在此异常点的耗时：此I
 ```
 /var/log/sysak/iosdiag/latency/result.log.stat
 该日志文件描述的是在磁盘角度，所有IO的延迟分布统计信息
-
+```
 {
 	"summary":[			//以磁盘为一个单位的数组
 		{
@@ -239,4 +255,110 @@ abnormal(delay:totaldelay):此IO异常点（此IO在此异常点的耗时：此I
 		...
 	]
 }
+```
 
+5.2.3 控制台输出---iohang
+运行命令：
+sysak iosdiag hangdetect -t 1 -T 10 vda(此处假设检测io夯住1ms的io)
+hang detect stop!
+控制台输出结果：
+两个维度，整体IO夯分布情况(以百分比展示)+输出io夯住时长最大的前TOPn个IO
+OS  ：指IO在OS内核夯住事件数的占比
+Disk：指IO在磁盘夯住事件数的占比
+os(complete)：指IO在OS内核中，IO消亡流程的耗时占比
+
+```
+402 IOs hung of disk vda2, IO hung distribution:
+Disk         delay: 100.0%
+OS           delay: 0.0%
+The first 10 IOs with the largest delay, more details:
+time                      comm                pid       iotype      sector      datalen     abnormal                                          file
+2022-7-4 17:54:52.133     -                   -         WRITE       27663632    4096        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27663664    4096        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27664088    4096        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27664192    8192        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27664240    4096        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27663688    8192        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27663752    4096        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27663832    4096        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27663848    4096        Disk(Waitting for disk handle) hang 0.005 s       -
+2022-7-4 17:54:52.133     -                   -         WRITE       27663904    8192        Disk(Waitting for disk handle) hang 0.005 s       -
+more details see /var/log/sysak/iosdiag/hangdetect/result.log*
+```
+time:检测到IO夯的时间，往前推io夯住的时长，可以得到IO的发起时间
+comm/pid:进程信息，需要跟-e参数才能展示，默认不展示
+iotype:此IO类型
+sector:IO起始扇区
+datalen:IO大小
+abnormal:此IO夯住点（夯住的原因）已夯住时长
+file:夯住的io关联的文件，需要跟-e参数才能展示，如下所示，默认不展示
+```
+time                      comm                pid       iotype      sector      datalen     abnormal                                          file
+2022-7-4 18:1:49.925      syslog-ng           37270     WRITE       27663216    4096        Disk(Waitting for disk handle) hang 0.005 s       //var/log/journal/da4b86843a464cc18ac897729463ef74/system.journal
+...
+```
+
+5.2.4 日志文件说明---iohang
+日志文件中的数据均以磁盘为单位以json数组的方式呈现
+/var/log/sysak/iosdiag/hangdetect/result.log
+该日志文件描述的是每一个IO夯的事件信息
+```
+{
+	"summary":[			//以磁盘为一个单位的数组
+	{
+			"diskname":"vda",	//磁盘盘符
+			"hung ios":[	//每一个该磁盘下的io为一个单位的数组
+				{
+					"time":"2022-7-4 18:1:49.921",		//检测到此IO夯的时间
+					"abnormal":"Disk(Waitting for disk handle) hang 0.001 s",	//此IO夯住点（夯住的原因）已夯住时长
+					"iotype":"WRITEW",				//此IO类型
+					"sector":27658296,				//此IO访问磁盘的具体偏移位置
+					"datalen":4096,				//次IO访问磁盘的数据量
+                    "iostate": "in_flight",       //此io状态，in_flight表示未完成
+                    "cpu": 1,                     //发起此IO的cpu
+					"comm": "syslog-ng",			//发起此IO的进程，这一项可能因为获取不到为'-'
+					"pid": 37270,				//进程ID，这一项可能因为获取不到为'-'
+					"file": "//var/log/journal/da4b86843a464cc18ac897729463ef74/system.journal"	 //此IO关联文件，这一项可能因为获取不到为'-'
+				},
+				{第二个IO事件信息},
+				...
+			]
+	},
+	{第二个磁盘},
+	...
+	]
+}
+```
+/var/log/sysak/iosdiag/hangdetect/result.log.stat
+该日志文件描述的是OS和磁盘夯住IO分布占比
+```
+{
+	"summary":[						//以磁盘为一个单位的数组
+		{
+			"diskname":"vda",	//磁盘盘符
+			"hung ios":[			//每一个该磁盘下的io夯信息为一个单位的数组
+				{
+					"component": "OS",		//统计夯在OS的io数
+					"count": 0,		        //此IO总耗时
+                    "percent": "0.0%",
+                    "max": 0,
+                    "min": 0,
+                    "avg": 0
+				},
+				{
+					"component": "Disk", //统计夯在磁盘的io数
+					"count": 437,		 //夯住的io数
+                    "percent": "100.0%", //夯住的io占比
+                    "max": 5412,        //io夯住的最大时长us
+                    "min": 1070,        //io夯住的最小时长us
+                    "avg": 3713         //io夯住的平均时长us
+				}
+			]
+		},
+		{第二个磁盘},
+		...
+	]
+}
+```
+/var/log/sysak/iosdiag/hangdetect/result.log.seq
+该日志文件描述的是每一个夯住IO的请求信息，展示的都是内核层面的信息，此处不在详细展开，有兴趣者可以参照具体的代码查阅
