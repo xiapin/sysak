@@ -47,16 +47,20 @@ def set_to_list(setstr):
     setstr = setstr.split(',')
     resset = []
     for line in setstr:
-        line = line.strip()
-        if line[0] == '(' and line[-1] == ')':
-            line = line[1:-1]
-        if line.find('null') >= 0:
-            resset.append(-1)
-            break
-        if line.find('-') >= 0:
-            resset.extend([i for i in range(int(line.split('-')[0]), int(line.split('-')[1])+1)])
-        else:
-            resset.append(int(line))
+        try:
+            line = line.strip()
+            if line[0] == '(' and line[-1] == ')':
+                line = line[1:-1]
+            if line.find('null') >= 0:
+                resset.append(-1)
+                break
+            if line.find('-') >= 0:
+                resset.extend([i for i in range(int(line.split('-')[0]), int(line.split('-')[1])+1)])
+            else:
+                resset.append(int(line))
+        except Exception as err:
+            print ("set_to_list loop err {} lines {}\n".format(err, traceback.print_exc()))
+            continue
     return resset
 
 def bignum_to_num(ori_num):
@@ -559,6 +563,10 @@ def oom_output_msg(oom_result,num, summary):
 
     oom_init_json(oom_result, num)
     res = oom['json']
+    res['total_oom'] = oom_result['oom_total_num']
+    res['cg_name'] = oom['cg_name']
+    res['host_free'] = oom.get('host_free',0)
+    res['host_low'] = oom.get('host_low',0)
     reason = ''
     #print("oom time = {} spectime = {}".format(oom['time'], oom_result['spectime']))
     task = oom['task_name']
@@ -610,47 +618,51 @@ def oom_get_max_task(num, oom_result):
     state['msg'] = []
     state['total_rss'] = 0
     for line in oom['oom_msg']:
-        if 'rss' in line and 'oom_score_adj' in line and 'name' in line:
-            dump_task = True
+        try:
+            if 'rss' in line and 'oom_score_adj' in line and 'name' in line:
+                dump_task = True
+                state['msg'].append(line)
+                continue
+            if not dump_task:
+                continue
+            if 'Out of memory' in line:
+                break
+            if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
+                break
+            if line.count('[') !=2 or line.count(']') !=2:
+                break
+            pid_idx = line.rfind('[')
+            last_idx = line.rfind(']')
+            if pid_idx == -1 or last_idx == -1:
+                continue
+            pid = int(line[pid_idx+1:last_idx].strip())
+            last_str = line[last_idx+1:].strip()
+            last = last_str.split()
+            if len(last) < 3:
+                continue
+            if last[-1] not in rss_all:
+                rss_all[last[-1]] = {}
+                rss_all[last[-1]]['rss'] = int(last[3])
+                rss_all[last[-1]]['cnt'] = 1
+            else:
+                rss_all[last[-1]]['rss'] += int(last[3])
+                rss_all[last[-1]]['cnt'] += 1
             state['msg'].append(line)
+            state[str(pid)] = int(last[3]) *4
+            state['total_rss'] += int(last[3]) *4
+            if int(last[3]) >  res['rss']:
+                res['rss'] = int(last[3])
+                res['score'] = int(last[-2])
+                res['task'] = last[-1]
+                res['pid'] = pid
+            if rss_all[last[-1]]['rss'] >  res_total['rss']:
+                res_total['rss'] = int(rss_all[last[-1]]['rss'])
+                res_total['cnt'] = int(rss_all[last[-1]]['cnt'])
+                res_total['score'] = int(last[-2])
+                res_total['task'] = last[-1]
+        except Exception as err:
+            print ("oom_get_max_task loop err {} lines {}\n".format(err, traceback.print_exc()))
             continue
-        if not dump_task:
-            continue
-        if 'Out of memory' in line:
-            break
-        if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
-            break
-        if line.count('[') !=2 or line.count(']') !=2:
-            break
-        pid_idx = line.rfind('[')
-        last_idx = line.rfind(']')
-        if pid_idx == -1 or last_idx == -1:
-            continue
-        pid = int(line[pid_idx+1:last_idx].strip())
-        last_str = line[last_idx+1:].strip()
-        last = last_str.split()
-        if len(last) < 3:
-            continue
-        if last[-1] not in rss_all:
-            rss_all[last[-1]] = {}
-            rss_all[last[-1]]['rss'] = int(last[3])
-            rss_all[last[-1]]['cnt'] = 1
-        else:
-            rss_all[last[-1]]['rss'] += int(last[3])
-            rss_all[last[-1]]['cnt'] += 1
-        state['msg'].append(line)
-        state[str(pid)] = int(last[3]) *4
-        state['total_rss'] += int(last[3]) *4
-        if int(last[3]) >  res['rss']:
-            res['rss'] = int(last[3])
-            res['score'] = int(last[-2])
-            res['task'] = last[-1]
-            res['pid'] = pid
-        if rss_all[last[-1]]['rss'] >  res_total['rss']:
-            res_total['rss'] = int(rss_all[last[-1]]['rss'])
-            res_total['cnt'] = int(rss_all[last[-1]]['cnt'])
-            res_total['score'] = int(last[-2])
-            res_total['task'] = last[-1]
     return res
 
 def oom_reason_analyze(num, oom_result, summary):
@@ -659,34 +671,38 @@ def oom_reason_analyze(num, oom_result, summary):
         lines = oom_result['sub_msg'][num]['oom_msg']
         line_len = len(lines)
         for key in range(line_len):
-            line = lines[key]
-            if "invoked oom-killer" in line:
-                oom_get_order(oom_result, line, num)
-                if 'nodemask' in line:
-                    oom_get_nodemask(oom_result, line, num)
-            elif "mems_allowed=" in line:
-                oom_get_mem_allowed(oom_result, line, num)
-            elif "Task in" in line:
-                oom_get_cgroup_name(oom_result, line, num)
-            elif "memory: usage" in line:
-                oom_get_cgroup_mem(oom_result, line, num)
-            elif "Memory cgroup stats for" in line:
-                oom_get_cgroup_shmem(oom_result, line, num)
-            elif "Normal free:" in line:
-                oom_get_host_mem(oom_result, line, num)
-            elif "Mem-Info:" in line:
-                oom_get_meminfo(oom_result, lines, key,num)
-            elif "pages RAM" in line:
-                oom_get_total_mem(oom_result, line, num)
-            elif "pages reserved" in line:
-                oom_get_rmem(oom_result, line, num)
-            elif line.find('hugepages_total')!=-1:
-                if oom_is_node_num(line):
-                    node_num += 1
-                oom_get_hugepage(oom_result, line, num)
-            elif OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
-                oom_get_task_mem(oom_result, line, num)
-                oom_get_pid(oom_result, line, num)
+            try:
+                line = lines[key]
+                if "invoked oom-killer" in line:
+                    oom_get_order(oom_result, line, num)
+                    if 'nodemask' in line:
+                        oom_get_nodemask(oom_result, line, num)
+                elif "mems_allowed=" in line:
+                    oom_get_mem_allowed(oom_result, line, num)
+                elif "Task in" in line:
+                    oom_get_cgroup_name(oom_result, line, num)
+                elif "memory: usage" in line:
+                    oom_get_cgroup_mem(oom_result, line, num)
+                elif "Memory cgroup stats for" in line:
+                    oom_get_cgroup_shmem(oom_result, line, num)
+                elif "Normal free:" in line:
+                    oom_get_host_mem(oom_result, line, num)
+                elif "Mem-Info:" in line:
+                    oom_get_meminfo(oom_result, lines, key,num)
+                elif "pages RAM" in line:
+                    oom_get_total_mem(oom_result, line, num)
+                elif "pages reserved" in line:
+                    oom_get_rmem(oom_result, line, num)
+                elif line.find('hugepages_total')!=-1:
+                    if oom_is_node_num(line):
+                        node_num += 1
+                    oom_get_hugepage(oom_result, line, num)
+                elif OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
+                    oom_get_task_mem(oom_result, line, num)
+                    oom_get_pid(oom_result, line, num)
+            except Exception as err: 
+                print ("oom_reason_analyze loop err {} lines {}\n".format(err, traceback.print_exc()))
+                continue
         oom_result['node_num'] = node_num
         summary = oom_output_msg(oom_result, num, summary)
         oom_result['sub_msg'][num]['summary'] = summary
