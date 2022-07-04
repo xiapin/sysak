@@ -57,9 +57,13 @@ $(bpfskel): %.skel.h : %.bpf.o $(target_bpfobjs)
 
 $(target_bpfobjs): $(bpfobjs)
 
+NEWVER := $(shell echo $(KERNEL_VERSION)|awk -F. '{if($$1>3) print 1; else print 0}')
+ifeq ($(NEWVER),1)
+	KERN_VER := -DVER310_LATER
+endif
 $(bpfobjs) : %.o : %.c dirs
 	$(call msg,BPF,$@)
-	$(Q)$(CLANG) -g -O2 -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDES) -c $< -o $(OBJPATH)/$@
+	$(CLANG) -g -O2 $(KERN_VER) -target bpf -D__TARGET_ARCH_$(ARCH) $(INCLUDES) -c $< -o $(OBJPATH)/$@
 	$(Q)$(LLVM_STRIP) -g $(OBJPATH)/$@ # strip useless DWARF info
 
 dirs:
