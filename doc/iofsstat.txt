@@ -2,6 +2,7 @@
 iofsstat实现从进程和文件级别统计IO信息，传统的IO统计工具在如下场景下会略有不足：
 > 在磁盘io被打满的情况下，希望观察是哪个进程贡献了比较多的IO，传统的工具只能从整个磁盘角度去统计io信息，如统计整盘的iops、bps，但不能统计单个进程所贡献的iops、bps
 > 系统上统计到某个进程贡献了大量的IO，希望观察到这些IO最终是被哪个磁盘给消费，或者这些IO是在访问哪个文件，如果这个进程是来自某个容器，希望依然可以获取访问的文件以及此进程所在的容器
+代码位置：source/tools/detect/io/iofsstat
 
 2.sysak打包
 在编译sysak的之前，需要在执行configure配置的时候加上--enable-target-iofsstat才能打包进sysak
