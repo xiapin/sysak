@@ -265,7 +265,6 @@ hang detect stop!
 两个维度，整体IO夯分布情况(以百分比展示)+输出io夯住时长最大的前TOPn个IO
 OS  ：指IO在OS内核夯住事件数的占比
 Disk：指IO在磁盘夯住事件数的占比
-os(complete)：指IO在OS内核中，IO消亡流程的耗时占比
 
 ```
 402 IOs hung of disk vda2, IO hung distribution:
