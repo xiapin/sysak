@@ -252,8 +252,8 @@ parse_line(char *buff)
         parse_string(conf.server_mode);
 
     } else if (!strcmp(token, "agent_cmd")) {
-        strncpy(conf.agent_cmd, token + strlen(token) + 1, LEN_128 - 1);
-        conf.agent_cmd[LEN_128 - 1] = 0;
+        strncpy(conf.agent_cmd, token + strlen(token) + 1, LEN_512 - 1);
+        conf.agent_cmd[LEN_512 - 1] = 0;
 
     } else if (!strcmp(token, "cron_period")) {
         parse_int(&conf.cron_period);

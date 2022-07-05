@@ -80,7 +80,7 @@ struct configure {
 
     /* service mode*/
     char server_mode[LEN_128];
-    char agent_cmd[LEN_128];
+    char agent_cmd[LEN_512];
     int cron_period;
 };
 
