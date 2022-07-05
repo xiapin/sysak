@@ -37,9 +37,12 @@ fi
 
 %install
 mkdir -p \$RPM_BUILD_ROOT/usr/local/sbin
+mkdir -p \$RPM_BUILD_ROOT/etc/sysak/
+mkdir -p \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 /bin/cp -rf $BUILD_DIR/.sysak_compoents \$RPM_BUILD_ROOT/usr/local/sbin/.sysak_compoents
 /bin/cp -rf $BUILD_DIR/sysak \$RPM_BUILD_ROOT/usr/local/sbin/
-/bin/cp $SOURCE_DIR/rpm/sysak.service /usr/lib/systemd/system/
+/bin/cp $SOURCE_DIR/rpm/sysak.service \$RPM_BUILD_ROOT/usr/lib/systemd/system/
+/bin/cp -f $BUILD_DIR/.sysak_compoents/tools/monitor/sysakmon.conf \$RPM_BUILD_ROOT/etc/sysak/
 
 %preun
 
@@ -52,6 +55,8 @@ fi
 %files
 /usr/local/sbin/.sysak_compoents
 /usr/local/sbin/sysak
+/etc/sysak/sysakmon.conf
+/usr/lib/systemd/system/sysak.service
 
 %changelog
 EOF
