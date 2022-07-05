@@ -184,7 +184,7 @@ static bool get_module_tag(void)
     char buf[LINE_BUFF_LEN];
     char *pstr;
 
-    sprintf(filename, "%s%s/.sysak.rules", module_path, kern_version);
+    sprintf(filename, "%s/.sysak.rules", module_path);
     fp = fopen(filename, "r");
     if (!fp) {
         printf("open %s failed\n", filename);
@@ -242,6 +242,13 @@ static int down_install_ext_tools(const char *tool)
     }
     fclose(fp);
 
+    strim(filename);
+
+    if (strlen(filename) == 0) {
+        printf("invalid ext tool\n");
+        return -1;
+    }
+
     sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s",
             sysak_compoents_server, machine, tool, filename, tools_path);
     printf("%s ... \n", download_cmd);
@@ -281,7 +288,7 @@ static int down_install(const char *compoent_name)
         return system(download_cmd);
     } else if (strcmp(compoent_name, "btf") == 0) {
         sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s/%s",
-                sysak_compoents_server, kern_version, tools_path, kern_version);
+                sysak_compoents_server, machine, kern_version, tools_path, kern_version);
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else {
