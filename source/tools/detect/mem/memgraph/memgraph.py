@@ -220,7 +220,7 @@ def memgraph_graph(meminfo):
     res["userUsed"] = meminfo["userUsed"]
     res["kernelUsed"] = meminfo["kernelUsed"]
     res["available"] = meminfo["MemAvailable"]
-    res["used"] = memgraph_free(meminfo)
+    res["used"] = memgraph_free(meminfo) + meminfo['Shmem']
     user = {}
     user["anon"] = meminfo["Active(anon)"] + meminfo["Inactive(anon)"]
     user["cache"] = meminfo["Cached"]
