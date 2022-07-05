@@ -65,6 +65,7 @@ char download_cmd[MAX_WORK_PATH_LEN];
 bool pre_module = false;
 bool post_module = false;
 bool btf_depend = false;
+bool auto_get_compoents = false;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
     {"sysak tools for user self-help analysis", NULL},
@@ -300,18 +301,32 @@ static int check_or_install_compoents(const char *name)
 {
     char compents_path[MAX_WORK_PATH_LEN];
     const char *promt = "has not been installed, do you want to auto download and install ? Enter Y/N:";
-    char user_input;
+    char user_input = ' ';
     int ret = 0;
+    bool download = false;
 
     if (strcmp(name, "sysak_modules") == 0)
         sprintf(compents_path, "%s%s%s", module_path, kern_version, module);
     else if (strcmp(name, "btf") == 0)
         sprintf(compents_path, "%s%s/vmlinux-%s", tools_path, kern_version, kern_version);
+    else
+        sprintf(compents_path, "%s%s", tools_path, name);
 
     if (access(compents_path, 0) != 0) {
-        printf("%s %s", name, promt);
-        scanf("%c", &user_input);
-        if (user_input == 'y' || user_input == 'Y') {
+        if (auto_get_compoents) {
+            printf("auto_get_compoents is %d", auto_get_compoents);
+            download = true;
+        } else {
+            while (user_input != 'y' && user_input != 'Y' && user_input != 'n' && user_input != 'N') {
+                printf("%s %s", name, promt);
+                scanf("%c", &user_input);
+            }
+
+            if (user_input == 'y' || user_input == 'Y')
+                download = true;
+        }
+
+        if (download) {
             ret = down_install(name);
             if (ret < 0 || access(compents_path, 0) != 0)
                ret = -EEXIST;
@@ -360,12 +375,12 @@ static int exectue(int argc, char *argv[])
     if (do_prev_depend() < 0)
         return -1;
 
-    snprintf(subcmd_name, sizeof(subcmd_name), "%s%s", tools_path, argv[1]);
+    snprintf(subcmd_name, sizeof(subcmd_name), "%s%s", tools_path, argv[0]);
 
     if (access(subcmd_name, 0) != 0)
-        snprintf(subcmd_name, sizeof(subcmd_name), "%s%s%s", tools_path, kern_version, argv[1]);
+        snprintf(subcmd_name, sizeof(subcmd_name), "%s%s%s", tools_path, kern_version, argv[0]);
 
-    for (i = 2; i <= (argc - 1); i++) {
+    for (i = 1; i <= (argc - 1); i++) {
         snprintf(subcmd_args, sizeof(subcmd_args), " \"%s\"", argv[i]);
         strcat(subcmd_name,subcmd_args);
     }
@@ -535,12 +550,9 @@ static bool tool_lookup(char *tool)
         snprintf(tool_exec_file, sizeof(tool_exec_file), "%s%s", tools_path, tool);
 
     if (access(tool_exec_file, 0) != 0) {
-        if (down_install(tool) < 0)
+        if (check_or_install_compoents(tool) < 0)
             return false;
     }
-
-    if (access(tool_exec_file, 0) != 0)
-        return false;
 
     if (!tool_rule_parse(sysak_other_rule, tool) &&
             !tool_rule_parse(sysak_rule, tool))
@@ -553,7 +565,7 @@ static int subcmd_parse(int argc, char *argv[])
 {
     int i;
 
-    if (!tool_lookup(argv[1])) {
+    if (!tool_lookup(argv[0])) {
         printf("no components, you should get first\n");
         return -ERR_NOSUBTOOL;
     }
@@ -569,7 +581,7 @@ static int subcmd_parse(int argc, char *argv[])
         goto exec;
     }
 
-    for (i = 2; i <= (argc-1); i++)
+    for (i = 1; i <= (argc-1); i++)
     {
         if (strstr(prev_dep, argv[i])) {
             pre_module = true;
@@ -605,6 +617,21 @@ static int parse_arg(int argc, char *argv[])
         usage();
         return 0;
     }
+
+    if (!strcmp(argv[1], "-g")) {
+        if (argc < 3) {
+            usage();
+            return -ERR_MISSARG;
+        }
+
+        auto_get_compoents = true;
+        argc = argc - 2;
+        argv = &argv[2];
+    } else {
+        argc = argc - 1;
+        argv = &argv[1];
+    }
+
     return subcmd_parse(argc, argv);
 }
 
