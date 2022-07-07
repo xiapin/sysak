@@ -1,4 +1,5 @@
 *.mod
+!go.mod
 *.mod.c
 *.o
 *.o.cmd

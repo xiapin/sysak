@@ -1,11 +1,11 @@
 package main
 
 import (
-	"mypkg"
 	"fmt"
+	"mygo/mypkg"
 )
 
 func main() {
 	fmt.Println("hello world")
-	mypkg.test()
+	mypkg.Test()
 }

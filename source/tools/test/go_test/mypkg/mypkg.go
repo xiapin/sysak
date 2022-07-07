@@ -2,6 +2,6 @@ package mypkg
 
 import "fmt"
 
-func test() {
+func Test() {
 	fmt.Println("invoke test func")
 }
