@@ -93,28 +93,38 @@ struct ksym *ksym_search(long key, struct ksym *syms)
 	return &syms[0];
 }
 
-static void print_ksym(__u64 addr, struct ksym *psym, FILE *filep)
+static int print_ksym(__u64 addr, struct ksym *psym, void *filep, int mod, int pos)
 {
+	int cnt = 0;
 	struct ksym *sym;
 
 	if (!addr)
-		return;
+		return 0;
 
 	sym = ksym_search(addr, psym);
-	fprintf(filep, "<0x%llx> %s\n", addr, sym->name);
+	if (mod == MOD_FILE)
+		fprintf((FILE *)filep, "<0x%llx> %s\n", addr, sym->name);
+	else if (mod == MOD_STRING)
+		cnt = sprintf((char*)filep + pos, "<0x%llx> %s,", addr, sym->name);
+
+	return cnt;
 }
 
-void print_stack(int fd, __u32 ret, int skip, struct ksym *syms, FILE *filep)
+int print_stack(int fd, __u32 ret, int skip, struct ksym *syms, void *filep, int mod)
 {
-	int i;
+	int i, cnt = 0;
 	__u64 ip[PERF_MAX_STACK_DEPTH] = {};
 
 	if (bpf_map_lookup_elem(fd, &ret, &ip) == 0) {
 		for (i = skip; i < PERF_MAX_STACK_DEPTH - 1; i++)
-			print_ksym(ip[i], syms, filep);
+			cnt += print_ksym(ip[i], syms, filep, mod, cnt);
+		if ((cnt > 0) && *((char*)(filep+cnt-1)) == ',')
+			*((char*)(filep+cnt-1)) = ' ';
 	} else {
 		if ((int)(ret) < 0)
-		fprintf(filep, "<0x0000000000000000>:error=%d\n", (int)(ret));
+			fprintf(filep, "<0x0000000000000000>:error=%d\n", (int)(ret));
 	}
+
+	return cnt;
 }
 

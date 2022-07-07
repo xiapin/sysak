@@ -21,11 +21,8 @@ extern int nr_cpus;
 extern FILE *fp_irq;
 extern volatile sig_atomic_t exiting;
 
-static int stackmap_fd;
+static int stack_fd;
 struct ksym *ksyms;
-
-void print_stack(int fd, __u32 ret, int sikp, struct ksym *syms, FILE *fp);
-void stamp_to_date(__u64 stamp, char dt[], int len);
 
 static int
 open_and_attach_perf_event(struct perf_event_attr *attr,
@@ -84,6 +81,7 @@ int attach_prog_to_perf(struct schedmoni_bpf *obj, struct bpf_link **sw_mlinks, 
 	return !ret;
 }
 
+char stack[512];
 void irqoff_handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event ev, *e;
@@ -94,9 +92,37 @@ void irqoff_handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e = &ev;
 	stamp_to_date(e->stamp, ts, sizeof(ts));
 	e->delay = e->delay/(1000*1000);
-	fprintf(fp_irq, "%-21s %-5d %-15s %-8d %-10llu\n",
-		ts, e->cpuid, e->task, e->pid, e->delay);
-	print_stack(stackmap_fd, e->ret, 0, ksyms, fp_irq);
+	if (env.mod_json) {
+		int cnt;
+		struct summary *sum;
+		cJSON *arryItem;
+		char current[32] = {0};
+
+		sum = &env.summary[IRQOF];
+		arryItem = cJSON_CreateObject();
+		cJSON_AddStringToObject(arryItem, "date", ts);
+		cJSON_AddStringToObject(arryItem, "class", "irq延迟");
+		cJSON_AddNumberToObject(arryItem, "latency", e->delay);
+		cJSON_AddNumberToObject(arryItem, "cpu", e->cpuid);
+		snprintf(current, sizeof(current), "%s (%d)", e->task, e->pid);
+		cJSON_AddStringToObject(arryItem, "current", current);
+		cJSON_AddNumberToObject(arryItem, "stamp", e->stamp);
+
+		if (!e->exit) {
+			cnt = print_stack(stack_fd, e->ret, 7, ksyms, stack, MOD_STRING);
+			*(stack+cnt) = '\0';
+		}
+		cJSON_AddStringToObject(arryItem, "extern", stack);
+		cJSON_AddItemToArray(env.json.tbl_data, arryItem);
+		sum->delay += e->delay;
+		sum->cnt++;
+		if (e->delay > sum->max)
+			sum->max = e->delay;
+	} else {
+		fprintf(fp_irq, "%-21s %-5d %-15s %-8d %-10llu\n",
+			ts, e->cpuid, e->task, e->pid, e->delay);
+		print_stack(stack_fd, e->ret, 0, ksyms, fp_irq, MOD_FILE);
+	}
 }
 
 void irqoff_handler(void *args)
@@ -106,7 +132,7 @@ void irqoff_handler(void *args)
 	struct perf_buffer *pb = NULL;
 	struct perf_buffer_opts pb_opts = {};
 
-	stackmap_fd = runirq->ext_fd;
+	stack_fd = runirq->ext_fd;
 	poll_fd = runirq->map_fd;
 	fprintf(fp_irq, "%-21s %-5s %-15s %-8s %-10s\n",
 		"TIME(irqoff)", "CPU", "COMM", "TID", "LAT(us)");

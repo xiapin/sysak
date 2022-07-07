@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <linux/types.h>
 #include <time.h>
 
@@ -9,11 +10,12 @@ void stamp_to_date(__u64 stamp, char dt[], int len)
 	struct timespec ts;
 
 	clock_gettime(CLOCK_MONOTONIC, &ts);
-	time(&t);
-	diff = ts.tv_sec*SEC_TO_NS + ts.tv_nsec - stamp;
-	diff = diff/SEC_TO_NS;
-
-	last = t - diff;
+	last = time(&t);
+	if (stamp) {
+		diff = ts.tv_sec*SEC_TO_NS + ts.tv_nsec - stamp;
+		diff = diff/SEC_TO_NS;
+		last = t - diff;
+	}
 	tm = localtime(&last);
-	strftime(dt, len, "%F_%H:%M:%S", tm);
+	strftime(dt, len, "%F %H:%M:%S", tm);
 }

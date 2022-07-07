@@ -16,6 +16,7 @@
 
 extern int stk_fd;
 extern struct ksym *ksyms;
+extern struct epool events_pool;
 
 int nr_cpus;
 char filename[256] = {0};
@@ -25,18 +26,21 @@ char log_dir[] = "/var/log/sysak/schedmoni";
 char rswf[] = "/var/log/sysak/schedmoni/runslow.log";
 char nscf[] = "/var/log/sysak/schedmoni/nosched.log";
 char irqf[] = "/var/log/sysak/schedmoni/irqoff.log";
+char *mode_name[] = {"调度延迟", "sys延迟", "irq延迟"};
+char *mode_cnt_str[] = {"调度延迟次数", "sys延迟次数", "irq延迟次数"};
 
 struct env env = {
 	.span = 0,
-	.thresh = 20*1000*1000,
+	.thresh = 50*1000*1000,
 	.fp = NULL,
+	.mod_json = false,
 };
 
 const char *argp_program_version = "schedmoni 0.1";
 const char argp_program_doc[] =
 "Trace schedule latency.\n"
 "\n"
-"USAGE: schedmoni [--help] [-s SPAN] [-t TID] [-c COMM] [-P] [threshold] [-f LOGFILE]\n"
+"USAGE: schedmoni [--help] [-s SPAN] [-t TID] [-c COMM] [-P] [-j|-f LOGFILE] [threshold]\n"
 "\n"
 "EXAMPLES:\n"
 "    schedmoni          # trace latency higher than 10000 us (default)\n"
@@ -46,7 +50,8 @@ const char argp_program_doc[] =
 "    schedmoni -t 123   # trace tid 123 (use for threads only)\n"
 "    schedmoni -c bash  # trace aplication who's name is bash\n"
 "    schedmoni -s 10    # monitor for 10 seconds\n"
-"    schedmoni -P       # also show previous task name and TID\n";
+"    schedmoni -P       # also show previous task name and TID\n"
+"    schedmoni -j       # record result as json,exclusive with -f\n";
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace"},
@@ -56,7 +61,7 @@ static const struct argp_option opts[] = {
 	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ "previous", 'P', NULL, 0, "also show previous task name and TID" },
-	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
+	{ "json", 'j', NULL, 0, "record the result with JSON mode" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
 };
@@ -126,6 +131,20 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'P':
 		env.previous = true;
+		break;
+	case 'j':
+		env.mod_json = true;
+		env.json.root = cJSON_CreateObject();
+		env.json.datasources = cJSON_CreateObject();
+		env.json.tbl = cJSON_CreateObject();
+		env.json.tbl_data = cJSON_CreateArray();
+		cJSON_AddItemToObject(env.json.tbl, "data", env.json.tbl_data);
+		env.json.tms = cJSON_CreateObject();
+		env.json.tms_data= cJSON_CreateArray();
+		cJSON_AddItemToObject(env.json.tms, "data", env.json.tms_data);
+		cJSON_AddItemToObject(env.json.datasources, "jitterTable", env.json.tbl);
+		cJSON_AddItemToObject(env.json.datasources, "jitterTimeSeries", env.json.tms);
+		cJSON_AddItemToObject(env.json.root, "datasources", env.json.datasources);
 		break;
 	case 'p':
 		errno = 0;
@@ -228,6 +247,7 @@ int main(int argc, char **argv)
 	int i, err;
 	int arg_fd, map_rslw_fd, map_nsch_fd, map_irqf_fd;
 	pthread_t pt_runslw, pt_runnsc, pt_irqoff;
+	struct summary prev[3], next[3], delta[3];
 	struct schedmoni_bpf *obj;
 	struct args args = {};
 	struct tharg runslw = {}, runnsc = {}, irqoff ={};
@@ -374,10 +394,46 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
+	memset(prev, 0, sizeof(prev));
+	memset(next, 0, sizeof(next));
+	memset(delta, 0, sizeof(delta));
+	while(!exiting) {
+		char date[32];
+		bool addjson = false;
+		cJSON *arryItem;
+
+		stamp_to_date(0, date, sizeof(date));
+		arryItem = cJSON_CreateObject();
+		for (i = 0; i < MAX_MOD; i++) {
+			next[i] = env.summary[i];
+			delta[i].delay = next[i].delay - prev[i].delay;
+			delta[i].cnt = next[i].cnt - prev[i].cnt;
+			delta[i].max = next[i].max;
+			if (delta[i].delay || delta[i].cnt) {
+				if (!addjson) {
+					cJSON_AddStringToObject(arryItem, "time", date);
+					addjson = true;
+				}
+				cJSON_AddNumberToObject(arryItem, mode_name[i], delta->delay/(1000*1000));
+				cJSON_AddNumberToObject(arryItem, mode_cnt_str[i], delta->cnt);
+			}
+			prev[i] = next[i];
+		}
+		if (addjson)
+			cJSON_AddItemToArray(env.json.tms_data, arryItem);
+		sleep(1);
+	}
 	pthread_join(pt_runslw, &res);
 	pthread_join(pt_runnsc, &res);
 	pthread_join(pt_irqoff, &res);
 
+	if (env.mod_json) {
+		char *out;
+		out = cJSON_Print(env.json.root);
+		printf("%s", out);
+		free(out);
+		cJSON_Delete(env.json.root);
+	}
 cleanup:
 	for (i = 0; i < nr_cpus; i++) {
 		bpf_link__destroy(sw_mlinks[i]);

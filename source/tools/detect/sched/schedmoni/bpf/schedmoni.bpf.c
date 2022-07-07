@@ -4,7 +4,6 @@
 #include <bpf/bpf_core_read.h>
 #include "../schedmoni.h"
 #include "../nosched.h"
-#include "../irqoff.h"
 
 #define TASK_RUNNING	0
 #define _(P) ({typeof(P) val; __builtin_memset(&val, 0, sizeof(val)); bpf_probe_read(&val, sizeof(val), &P); val;})
@@ -113,7 +112,7 @@ struct {
 static inline u64 get_thresh(void)
 {
 	u64 thresh, i = 0;
-	struct arg_info *argp;
+	struct args *argp;
 
 	argp = bpf_map_lookup_elem(&argmap, &i);
 	if (argp)
