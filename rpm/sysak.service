@@ -5,7 +5,7 @@ After=syslog.target
 [Service]
 Type=simple
 
-ExecStart=/usr/local/sbin/sysak mservice -S &
+ExecStart=/usr/bin/sysak mservice -S &
 ExecStop=/usr/bin/killall mservice
 
 [Install]

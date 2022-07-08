@@ -46,7 +46,7 @@ struct tool_list {
 char *module = "/sysak.ko";
 char *log_path="/var/log/sysak";
 char *system_modules = "/proc/modules";
-char *bin_path = "/usr/local/sbin";
+char *sysak_root_path = "/usr/local/sysak";
 
 char kern_version[KVERSION];
 char machine[KVERSION];
@@ -159,7 +159,7 @@ static bool get_server_addr(void)
     char filename[MAX_WORK_PATH_LEN];
     FILE *fp;
 
-    sprintf(filename, "%s/sysak_server.conf", tools_path);
+    sprintf(filename, "%s/sysak_server.conf", sysak_root_path);
     fp = fopen(filename, "r");
     if (!fp) {
         fprintf(stderr, "no sysak server config file\n");
@@ -661,7 +661,7 @@ static void set_path(char *argv[])
 
     if (access(compoents_path,0) != 0)
         snprintf(compoents_path, sizeof(tools_path), "%s%s",
-            bin_path, "/.sysak_compoents");
+            sysak_root_path, "/.sysak_compoents");
 
     snprintf(tools_path, sizeof(tools_path), "%s%s",
              compoents_path, "/tools/");

@@ -58,9 +58,9 @@
 
 #define MOD_INFO_SIZE       sizeof(strcut mod_info)
 
-#define DEFAULT_MODULE_PATH         "/usr/local/tsar/modules"
-#define DEFAULT_CONF_FILE_PATH      "/etc/sysak/sysakmon.conf"
-#define DEFAULT_OUTPUT_FILE_PATH    "/var/log/sysak/tsar.data"
+#define DEFAULT_CONF_FILE_PATH      "/usr/local/sysak/sysakmon.conf"
+#define DEFAULT_OUTPUT_FILE_PATH    "/usr/local/sysak/log/tsar.data"
+
 #define MIN_STRING "MIN:        "
 #define MEAN_STRING "MEAN:       "
 #define MAX_STRING "MAX:        "

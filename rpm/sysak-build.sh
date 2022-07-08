@@ -28,6 +28,7 @@ commit: $COMMIT_ID
 echo source_dir=%{source_dir}
 if [ %{source_dir} ]; then
 	echo linux_version=%{linux_version}
+	cd %{source_dir} && make dist_clean
 	for version in %{linux_version}; do
 		cd %{source_dir} && ./configure %{target} --kernel=\$version
 		make clean_middle
@@ -36,13 +37,13 @@ if [ %{source_dir} ]; then
 fi
 
 %install
-mkdir -p \$RPM_BUILD_ROOT/usr/local/sbin
-mkdir -p \$RPM_BUILD_ROOT/etc/sysak/
+mkdir -p \$RPM_BUILD_ROOT/usr/bin
+mkdir -p \$RPM_BUILD_ROOT/usr/local/sysak/log
 mkdir -p \$RPM_BUILD_ROOT/usr/lib/systemd/system/
-/bin/cp -rf $BUILD_DIR/.sysak_compoents \$RPM_BUILD_ROOT/usr/local/sbin/.sysak_compoents
-/bin/cp -rf $BUILD_DIR/sysak \$RPM_BUILD_ROOT/usr/local/sbin/
+/bin/cp -rf $BUILD_DIR/.sysak_compoents \$RPM_BUILD_ROOT/usr/local/sysak/.sysak_compoents
+/bin/cp -rf $BUILD_DIR/sysak \$RPM_BUILD_ROOT/usr/bin/
 /bin/cp $SOURCE_DIR/rpm/sysak.service \$RPM_BUILD_ROOT/usr/lib/systemd/system/
-/bin/cp -f $BUILD_DIR/.sysak_compoents/tools/monitor/sysakmon.conf \$RPM_BUILD_ROOT/etc/sysak/
+/bin/cp -f $BUILD_DIR/.sysak_compoents/tools/monitor/sysakmon.conf \$RPM_BUILD_ROOT/usr/local/sysak/
 
 %preun
 
@@ -52,10 +53,12 @@ if [ $? -eq 0 ]; then
 	exit 0
 fi
 
+%postun
+rm -rf /usr/local/sysak
+
 %files
-/usr/local/sbin/.sysak_compoents
-/usr/local/sbin/sysak
-/etc/sysak/sysakmon.conf
+/usr/local/sysak
+/usr/bin/sysak
 /usr/lib/systemd/system/sysak.service
 
 %changelog
