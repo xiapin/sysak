@@ -257,9 +257,15 @@ static int down_install_ext_tools(const char *tool)
     if (ret < 0)
         return ret;
 
-    /* extract files, only for zip now*/
+    /* extract files, only for zip and tar now*/
     if (strstr(filename, ".zip")) {
         sprintf(buf, "unzip %s/%s -d %s\n", tools_path, filename, tools_path);
+        printf("%s ... \n", buf);
+        ret = system(buf);
+        if (ret < 0)
+            return ret;
+    } else if (strstr(filename, ".tar")) {
+        sprintf(buf, "tar xf %s/%s -C %s\n", tools_path, filename, tools_path);
         printf("%s ... \n", buf);
         ret = system(buf);
         if (ret < 0)
