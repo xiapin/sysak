@@ -35,8 +35,9 @@ def get_local_ip(line):
     return "unkonw"
 
 def get_task(line):
+    local_ip = get_local_ip(line)
     if line.find("users") == -1:
-        return get_local_ip(line)
+        return local_ip
 
     start = line.find("(")
     if start == -1:
@@ -46,17 +47,14 @@ def get_task(line):
     if end == -1:
         return "unknow"
 
-    task = line[start+3:end].strip()
+    task = line[start+3:end].strip().replace('\"','')
     if len(task) < 2:
         return "unknow"
 
-    task = task.split(",")
-    comm = task[0][:-1]
-    pid = task[1].split("=")[1]
-    return comm + ":" + pid
+    return task + " ip:" + local_ip
 
 def tcp_mem_check():
-    ret = os_cmd("ss -tnapm")
+    ret = os_cmd("ss -tunapm")
     tcp_mem = get_tcp_mem()
     memTask = {}
     tx_mem = 0
@@ -85,12 +83,9 @@ def tcp_mem_check():
 
     total = (rx_mem + tx_mem) / 1024
     print("tx_queue {}K rx_queue {}K queue_total {}K tcp_mem {}K".format(tx_mem/1024, rx_mem/1024, total, tcp_mem))
-    if tcp_mem > memThres and tcp_mem > total*1.5:
-        print("tcp memleak tcp_mem:{}K tx_rx queue:{}K".format(tcp_mem, total))
-        print("\n")
-        print("task hold memory:")
+    if total > 0:
         for task, value in memTask.items():
-            print("task {} mem {}K".format(task, value/1024))
+            print("task {}  mem {}K".format(task, value/1024))
     print("\n")
     return total, tcp_mem
 
@@ -144,23 +139,6 @@ def socket_inode_get(inodes):
     socket_inode_4(inodes)
     socket_inode_8(inodes)
 
-
-def is_number(s):
-    try:
-        float(s)
-        return True
-    except ValueError:
-        pass
-    try:
-        import unicodedata
-        unicodedata.numeric(s)
-        return True
-    except (TypeError, ValueError):
-        import traceback
-        traceback.print_exc()
-        pass
-    return False
-
 def get_comm(proc):
     cmd = "cat " + proc + "/comm"
     ret = os.popen(cmd).read().strip()
@@ -174,11 +152,8 @@ def scan_all_proc(inodes):
 
     try:
         for proc in os.listdir(root):
-            if not os.path.exists(root + proc):
+            if not os.path.exists(root + proc + "/comm"):
                 continue
-            if not is_number(proc):
-                continue
-
             procName = root + proc + "/fd/"
             taskInfo = {}
             taskInfo["task"] = ""
@@ -264,7 +239,7 @@ def get_args(argv):
     try:
         opts, args = getopt.getopt(argv, "hm:t:sl:")
     except getopt.GetoptError:
-        print 'tcp memory and socket leak check, GetoptError, try again :)'
+        print('tcp memory and socket leak check, GetoptError, try again ')
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
@@ -290,5 +265,7 @@ if __name__ == "__main__":
     get_args(sys.argv[1:])
     tcp_mem_check()
     leak = socket_leak_check()
+    if len(leak) !=0:
+        print("socket hold info:")
     for taskInfo in leak:
         print("{}:{} socketNum {} socketLeakNum {}".format(taskInfo["task"], taskInfo["pid"], taskInfo["num"], taskInfo["numleak"]))
