@@ -61,8 +61,9 @@ $(OBJ_TOOLS_PATH):
 	mkdir -p $(OBJ_TOOLS_PATH)
 
 install:
-	cp $(OBJPATH)/sysak /usr/local/sbin/
-	cp $(OBJPATH)/.sysak_components /usr/local/sbin/ -rf
+	mkdir -p /usr/local/sysak/
+	cp $(OBJPATH)/sysak /usr/local/sysak/
+	cp $(OBJPATH)/.sysak_components /usr/local/sysak/ -rf
 	mkdir -p /etc/sysak
 	mkdir -p /var/log/sysak
 ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf),)
@@ -72,5 +73,5 @@ endif
 
 uninstall:
 	rm -rf /etc/sysak
-	rm -rf /usr/local/sbin/sysak
-	rm -rf /usr/local/sbin/.sysak_components
+	rm -rf /usr/local/sysak
+	rm -rf /usr/local/.sysak_components
