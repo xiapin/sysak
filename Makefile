@@ -62,7 +62,8 @@ $(OBJ_TOOLS_PATH):
 
 install:
 	mkdir -p /usr/local/sysak/
-	cp $(OBJPATH)/sysak /usr/local/sysak/
+	mkdir -p /usr/bin/
+	cp $(OBJPATH)/sysak /usr/bin/sysak
 	cp $(OBJPATH)/.sysak_components /usr/local/sysak/ -rf
 	mkdir -p /etc/sysak
 	mkdir -p /var/log/sysak
@@ -73,5 +74,5 @@ endif
 
 uninstall:
 	rm -rf /etc/sysak
+	rm -rf /usr/bin/sysak
 	rm -rf /usr/local/sysak
-	rm -rf /usr/local/.sysak_components
