@@ -194,3 +194,5 @@ anon_thp           2048       14.49
 shmem_thp          0          0.00
 file_thp           0          0.00
 total_thp          2048       14.49
+# 功能说明
+评估THP内存浪费率和内存碎片化
