@@ -26,6 +26,7 @@ char log_dir[] = "/var/log/sysak/schedmoni";
 char rswf[] = "/var/log/sysak/schedmoni/runslow.log";
 char nscf[] = "/var/log/sysak/schedmoni/nosched.log";
 char irqf[] = "/var/log/sysak/schedmoni/irqoff.log";
+char json_log[] = "/var/log/sysak/schedmoni/schedmoni.json";
 char *mode_name[] = {"调度延迟", "sys延迟", "irq延迟"};
 char *mode_cnt_str[] = {"调度延迟次数", "sys延迟次数", "irq延迟次数"};
 
@@ -43,15 +44,15 @@ const char argp_program_doc[] =
 "USAGE: schedmoni [--help] [-s SPAN] [-t TID] [-c COMM] [-P] [-j|-f LOGFILE] [threshold]\n"
 "\n"
 "EXAMPLES:\n"
-"    schedmoni          # trace latency higher than 10000 us (default)\n"
-"    schedmoni -f a.log # record result to a.log (default to ~sysak/schedmoni/schedmoni.log)\n"
-"    schedmoni 1000     # trace latency higher than 1000 us\n"
-"    schedmoni -p 123   # trace pid 123\n"
-"    schedmoni -t 123   # trace tid 123 (use for threads only)\n"
-"    schedmoni -c bash  # trace aplication who's name is bash\n"
-"    schedmoni -s 10    # monitor for 10 seconds\n"
-"    schedmoni -P       # also show previous task name and TID\n"
-"    schedmoni -j       # record result as json,exclusive with -f\n";
+"  schedmoni          # trace latency higher than 10000 us (default)\n"
+"  schedmoni -f a.log # result to a.log (default ~sysak/schedmoni/schedmoni.log)\n"
+"  schedmoni 1000     # trace latency higher than 1000 us\n"
+"  schedmoni -p 123   # trace pid 123\n"
+"  schedmoni -t 123   # trace tid 123 (use for threads only)\n"
+"  schedmoni -c bash  # trace aplication who's name is bash\n"
+"  schedmoni -s 10    # monitor for 10 seconds\n"
+"  schedmoni -P       # also show previous task name and TID\n"
+"  schedmoni -j       # record result as json,exclusive with -f\n";
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace"},
@@ -227,7 +228,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 {
 	if (level == LIBBPF_DEBUG && !env.verbose)
 		return 0;
-	return vfprintf(stderr, format, args);
+	return vfprintf(stdout, format, args);
 }
 
 static void sig_exiting(int signo)
@@ -258,7 +259,6 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 
-	libbpf_set_print(libbpf_print_fn);
 	bump_memlock_rlimit();
 
 	err = prepare_dictory(log_dir);
@@ -278,6 +278,7 @@ int main(int argc, char **argv)
 	if (err)
 		return err;
 
+	libbpf_set_print(libbpf_print_fn);
 	/* check again for no any arguments, in that case, FILEs are NULL */
 	if (!fp_rsw || !fp_nsc || !fp_irq) {
 		fp_rsw = open_logfile(rswf, &fp_rsw);
@@ -428,9 +429,17 @@ int main(int argc, char **argv)
 	pthread_join(pt_irqoff, &res);
 
 	if (env.mod_json) {
+		FILE *fp;
 		char *out;
+
+		fp = fopen(json_log, "w+");
+		if (!fp) {
+			fprintf(stdout, "%s :fopen %s\n",
+				strerror(errno), json_log);
+			fp = stderr;
+		}
 		out = cJSON_Print(env.json.root);
-		printf("%s", out);
+		fprintf(fp, "%s", out);
 		free(out);
 		cJSON_Delete(env.json.root);
 	}

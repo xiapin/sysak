@@ -83,14 +83,14 @@ void nosched_handler(int poll_fd)
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
 	if (!pb) {
 		err = -errno;
-		fprintf(stderr, "failed to open perf buffer: %d\n", err);
+		fprintf(stdout, "failed to open perf buffer: %d\n", err);
 		goto clean_nosched;
 	}
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
 		if (err < 0 && err != -EINTR) {
-			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			fprintf(stdout, "error polling perf buffer: %s\n", strerror(-err));
 			goto clean_nosched;
 		}
 		/* reset err to return 0 if exiting */

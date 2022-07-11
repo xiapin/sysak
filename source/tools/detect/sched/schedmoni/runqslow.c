@@ -84,7 +84,7 @@ void *runslw_handler(void *arg)
 	pb = perf_buffer__new(data->map_fd, 128, &pb_opts);
 	if (!pb) {
 		err = -errno;
-		fprintf(stderr, "failed to open perf buffer: %d\n", err);
+		fprintf(stdout, "failed to open perf buffer: %d\n", err);
 		goto clean_runslw;
 	}
 
@@ -93,14 +93,14 @@ void *runslw_handler(void *arg)
 	bpf_args.ready = true;
 	err = bpf_map_update_elem(data->ext_fd, &i, &bpf_args, 0);
 	if (err) {
-		fprintf(stderr, "Failed to update flag map\n");
+		fprintf(stdout, "Failed to update flag map\n");
 		goto clean_runslw;
 	}
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
 		if (err < 0 && err != -EINTR) {
-			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			fprintf(stdout, "error polling perf buffer: %s\n", strerror(-err));
 			goto clean_runslw;
 		}
 		/* reset err to return 0 if exiting */
