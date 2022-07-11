@@ -8,9 +8,9 @@ endif
 
 SRC := $(shell pwd)/source
 
-OBJ_LIB_PATH := $(OBJPATH)/.sysak_compoents/lib/$(KERNEL_VERSION)
-OBJ_TOOLS_ROOT := $(OBJPATH)/.sysak_compoents/tools
-OBJ_TOOLS_PATH := $(OBJPATH)/.sysak_compoents/tools/$(KERNEL_VERSION)
+OBJ_LIB_PATH := $(OBJPATH)/.sysak_components/lib/$(KERNEL_VERSION)
+OBJ_TOOLS_ROOT := $(OBJPATH)/.sysak_components/tools
+OBJ_TOOLS_PATH := $(OBJPATH)/.sysak_components/tools/$(KERNEL_VERSION)
 SYSAK_RULES := .sysak.rules
 
 export KERNEL_VERSION
@@ -40,7 +40,7 @@ binary:
 	$(CC) -o $(SRC)/sysak $(SRC)/sysak.c
 	cp $(SRC)/sysak $(OBJPATH)/
 	chmod +x $(OBJPATH)/sysak
-	chmod +x $(OBJPATH)/.sysak_compoents/tools/* -R
+	chmod +x $(OBJPATH)/.sysak_components/tools/* -R
 
 .PHONY: clean clean_middle dist_clean
 clean:
@@ -62,15 +62,15 @@ $(OBJ_TOOLS_PATH):
 
 install:
 	cp $(OBJPATH)/sysak /usr/local/sbin/
-	cp $(OBJPATH)/.sysak_compoents /usr/local/sbin/ -rf
+	cp $(OBJPATH)/.sysak_components /usr/local/sbin/ -rf
 	mkdir -p /etc/sysak
 	mkdir -p /var/log/sysak
-ifneq ($(wildcard $(OBJPATH)/.sysak_compoents/tools/monitor/sysakmon.conf),)
-		cp $(OBJPATH)/.sysak_compoents/tools/monitor/sysakmon.conf /etc/sysak/
+ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf),)
+		cp $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf /etc/sysak/
 		cp $(SRC)/../rpm/sysak.service /usr/lib/systemd/system/
 endif
 
 uninstall:
 	rm -rf /etc/sysak
 	rm -rf /usr/local/sbin/sysak
-	rm -rf /usr/local/sbin/.sysak_compoents
+	rm -rf /usr/local/sbin/.sysak_components

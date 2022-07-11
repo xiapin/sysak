@@ -40,10 +40,10 @@ fi
 mkdir -p \$RPM_BUILD_ROOT/usr/bin
 mkdir -p \$RPM_BUILD_ROOT/usr/local/sysak/log
 mkdir -p \$RPM_BUILD_ROOT/usr/lib/systemd/system/
-/bin/cp -rf $BUILD_DIR/.sysak_compoents \$RPM_BUILD_ROOT/usr/local/sysak/.sysak_compoents
+/bin/cp -rf $BUILD_DIR/.sysak_components \$RPM_BUILD_ROOT/usr/local/sysak/.sysak_components
 /bin/cp -rf $BUILD_DIR/sysak \$RPM_BUILD_ROOT/usr/bin/
 /bin/cp $SOURCE_DIR/rpm/sysak.service \$RPM_BUILD_ROOT/usr/lib/systemd/system/
-/bin/cp -f $BUILD_DIR/.sysak_compoents/tools/monitor/sysakmon.conf \$RPM_BUILD_ROOT/usr/local/sysak/
+/bin/cp -f $BUILD_DIR/.sysak_components/tools/monitor/sysakmon.conf \$RPM_BUILD_ROOT/usr/local/sysak/
 
 %preun
 

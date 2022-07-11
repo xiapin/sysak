@@ -22,8 +22,8 @@ usage() {
 	echo "  --disable-libbpf           disable all bpf tools"
 	echo "  --enable-static            static link for c/cpp tools"
 	echo "  --enable-target-xxx        xxx is the actual tool, like memleak, you may use --show-target to list all"
-	echo "  --enable-target-all        enable all compoents"
-	echo "  --disable-default          disable default compoents to built-in"
+	echo "  --enable-target-all        enable all components"
+	echo "  --disable-default          disable default components to built-in"
 	echo "  --disable-target-xxx       xxx is the actual tool, like memleak, you may use --show-target to list all"
 	echo "  --show-target              list all support tools"
 }

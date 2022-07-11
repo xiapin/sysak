@@ -10,7 +10,7 @@
 if [ "$SYSAK_WORK_PATH" != "" ]; then
 WORK_PATH=$SYSAK_WORK_PATH
 else
-WORK_PATH=/usr/local/sbin/.sysak_compoents
+WORK_PATH=/usr/local/sbin/.sysak_components
 fi
 TOOLS_PATH=$WORK_PATH/tools/`uname -r`
 LIB_PATH=$WORK_PATH/lib/`uname -r`

@@ -70,7 +70,7 @@ lkm_base_check() {
 		exit 1
 	fi
 	local SYSAK_PATH=$(dirname $SYSAK)
-	local LIB_PATH=$SYSAK_PATH/.sysak_compoents/lib/`uname -r`
+	local LIB_PATH=$SYSAK_PATH/.sysak_components/lib/`uname -r`
 	local SYSAK_MOD=$LIB_PATH/sysak.ko
 	echo "doing sysak module base check"
 	save_sys_info
@@ -111,7 +111,7 @@ tool_running_check() {
 mkdir -p $selfcheck_dir
 
 usage() {
-	echo "selfcheck, do the base test for sysak compoents"
+	echo "selfcheck, do the base test for sysak components"
 	echo "Usage: selfcheck [-m] | [[-a] -C subcmd]"
 	echo "       -m, check linux kernel module"
 	echo "       -C subcmd, check the subcmd, like memleak etc"

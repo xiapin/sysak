@@ -2,9 +2,9 @@ ifndef KERNEL_VERSION
 KERNEL_VERSION = $(shell uname -r)
 SRC := /work/gitee/sysak/source
 OBJPATH = /work/gitee/sysak/out
-OBJ_LIB_PATH := $(OBJPATH)/.sysak_compoents/lib/$(KERNEL_VERSION)
-OBJ_TOOLS_ROOT := $(OBJPATH)/.sysak_compoents/tools
-OBJ_TOOLS_PATH := $(OBJPATH)/.sysak_compoents/tools/$(KERNEL_VERSION)
+OBJ_LIB_PATH := $(OBJPATH)/.sysak_components/lib/$(KERNEL_VERSION)
+OBJ_TOOLS_ROOT := $(OBJPATH)/.sysak_components/tools
+OBJ_TOOLS_PATH := $(OBJPATH)/.sysak_components/tools/$(KERNEL_VERSION)
 SYSAK_RULES := .sysak.rules
 
 export SRC

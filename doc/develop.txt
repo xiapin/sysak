@@ -21,8 +21,8 @@ options:
 --enable-libbpf ,enable libbpf
 --enable-static ,static link for c/cpp tools
 --enable-target-xxx ,xxx is the actual tool, like memleak
---enable-target-all ,enable all compoents
---disable-default ,disable default compoents to built-in
+--enable-target-all ,enable all components
+--disable-default ,disable default components to built-in
 
 2) ./make
 

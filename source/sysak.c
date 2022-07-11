@@ -60,12 +60,12 @@ char module_path[MAX_WORK_PATH_LEN];
 char module_tag[MAX_NAME_LEN];
 char sysak_work_path[MAX_WORK_PATH_LEN];
 char sysak_other_rule[MAX_WORK_PATH_LEN];
-char sysak_compoents_server[MAX_WORK_PATH_LEN];
+char sysak_components_server[MAX_WORK_PATH_LEN];
 char download_cmd[MAX_WORK_PATH_LEN];
 bool pre_module = false;
 bool post_module = false;
 bool btf_depend = false;
-bool auto_get_compoents = false;
+bool auto_get_components = false;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
     {"sysak tools for user self-help analysis", NULL},
@@ -166,11 +166,11 @@ static bool get_server_addr(void)
         return false;
     }
 
-    fgets(sysak_compoents_server, sizeof(sysak_compoents_server), fp);
+    fgets(sysak_components_server, sizeof(sysak_components_server), fp);
     fclose(fp);
 
-    strim(sysak_compoents_server);
-    if (strlen(sysak_compoents_server) == 0) {
+    strim(sysak_components_server);
+    if (strlen(sysak_components_server) == 0) {
         fprintf(stderr, "no sysak server setting\n");
         return false;
     }
@@ -217,7 +217,7 @@ static int down_install_ext_tools(const char *tool)
     char *pstr;
 
     sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s",
-           sysak_compoents_server, machine, tool, tools_path);
+           sysak_components_server, machine, tool, tools_path);
     printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
     if (ret < 0)
@@ -251,7 +251,7 @@ static int down_install_ext_tools(const char *tool)
     }
 
     sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s",
-            sysak_compoents_server, machine, tool, filename, tools_path);
+            sysak_components_server, machine, tool, filename, tools_path);
     printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
     if (ret < 0)
@@ -281,29 +281,29 @@ static int down_install_ext_tools(const char *tool)
     return 0;
 }
 
-static int down_install(const char *compoent_name)
+static int down_install(const char *component_name)
 {
     if (!get_server_addr())
         return -1;
 
-    if (strcmp(compoent_name, "sysak_modules") == 0) {
+    if (strcmp(component_name, "sysak_modules") == 0) {
         if (!get_module_tag())
             return -1;
         sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s",
-                sysak_compoents_server, machine, module_tag, module_path, kern_version);
+                sysak_components_server, machine, module_tag, module_path, kern_version);
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
-    } else if (strcmp(compoent_name, "btf") == 0) {
+    } else if (strcmp(component_name, "btf") == 0) {
         sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s/%s",
-                sysak_compoents_server, machine, kern_version, tools_path, kern_version);
+                sysak_components_server, machine, kern_version, tools_path, kern_version);
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else {
-        return down_install_ext_tools(compoent_name);
+        return down_install_ext_tools(component_name);
     }
 }
 
-static int check_or_install_compoents(const char *name)
+static int check_or_install_components(const char *name)
 {
     char compents_path[MAX_WORK_PATH_LEN];
     const char *promt = "has not been installed, do you want to auto download and install ? Enter Y/N:";
@@ -319,8 +319,8 @@ static int check_or_install_compoents(const char *name)
         sprintf(compents_path, "%s%s", tools_path, name);
 
     if (access(compents_path, 0) != 0) {
-        if (auto_get_compoents) {
-            printf("auto_get_compoents is %d", auto_get_compoents);
+        if (auto_get_components) {
+            printf("auto_get_components is %d", auto_get_components);
             download = true;
         } else {
             while (user_input != 'y' && user_input != 'Y' && user_input != 'n' && user_input != 'N') {
@@ -347,14 +347,14 @@ static int check_or_install_compoents(const char *name)
 static int do_prev_depend(void)
 {
     if (pre_module) {
-        if (!check_or_install_compoents("sysak_modules"))
+        if (!check_or_install_components("sysak_modules"))
             return mod_ctrl(true);
         printf("sysak_modules not installed, exit ...\n");
         return -1;
     }
 
     if (btf_depend)
-        return check_or_install_compoents("btf");
+        return check_or_install_components("btf");
 
     return 0;
 }
@@ -556,7 +556,7 @@ static bool tool_lookup(char *tool)
         snprintf(tool_exec_file, sizeof(tool_exec_file), "%s%s", tools_path, tool);
 
     if (access(tool_exec_file, 0) != 0) {
-        if (check_or_install_compoents(tool) < 0)
+        if (check_or_install_components(tool) < 0)
             return false;
     }
 
@@ -630,7 +630,7 @@ static int parse_arg(int argc, char *argv[])
             return -ERR_MISSARG;
         }
 
-        auto_get_compoents = true;
+        auto_get_components = true;
         argc = argc - 2;
         argv = &argv[2];
     } else {
@@ -655,30 +655,30 @@ char *dirpath(char *fullpath)
 
 static void set_path(char *argv[])
 {
-    char compoents_path[MAX_WORK_PATH_LEN];
+    char components_path[MAX_WORK_PATH_LEN];
     char tmp[MAX_WORK_PATH_LEN];
     char *current_path;
 
     realpath(argv[0],tmp);
     current_path = dirpath(tmp);
 
-    snprintf(compoents_path, sizeof(compoents_path), "%s%s",
-             current_path, "/.sysak_compoents");
+    snprintf(components_path, sizeof(components_path), "%s%s",
+             current_path, "/.sysak_components");
 
-    if (access(compoents_path,0) != 0)
-        snprintf(compoents_path, sizeof(tools_path), "%s%s",
-            sysak_root_path, "/.sysak_compoents");
+    if (access(components_path,0) != 0)
+        snprintf(components_path, sizeof(tools_path), "%s%s",
+            sysak_root_path, "/.sysak_components");
 
     snprintf(tools_path, sizeof(tools_path), "%s%s",
-             compoents_path, "/tools/");
+             components_path, "/tools/");
     snprintf(module_path, sizeof(module_path), "%s%s",
-             compoents_path, "/lib/");
+             components_path, "/lib/");
     snprintf(sysak_rule, sizeof(sysak_rule), "%s%s",
-             compoents_path, "/tools/.sysak.rules");
+             components_path, "/tools/.sysak.rules");
     snprintf(sysak_other_rule, sizeof(sysak_other_rule), "%s%s%s%s",
-             compoents_path, "/tools/",kern_version,"/.sysak.rules");
+             components_path, "/tools/",kern_version,"/.sysak.rules");
     snprintf(sysak_work_path, sizeof(sysak_work_path), "%s%s",
-             "export SYSAK_WORK_PATH=", compoents_path);
+             "export SYSAK_WORK_PATH=", components_path);
 }
 
 int main(int argc, char *argv[])

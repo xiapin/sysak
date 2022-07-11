@@ -25,7 +25,7 @@ for version in $LINUX_VERSION; do
 	make -C $SOURCE_DIR KERNEL_VERSION=$version -j
 done
 
-/bin/cp -rf $BUILD_DIR/.sysak_compoents $ZIP_BUILD_ROOT/
+/bin/cp -rf $BUILD_DIR/.sysak_components $ZIP_BUILD_ROOT/
 /bin/cp -rf $BUILD_DIR/sysak $ZIP_BUILD_ROOT/
 cd $ZIP_BUILD_ROOT/
 zip -r -q -o sysak-$ZIP_VERSION.zip .[!.]* *

@@ -8,7 +8,7 @@
 if [ "$SYSAK_WORK_PATH" != "" ]; then
 WORK_PATH=$SYSAK_WORK_PATH
 else
-WORK_PATH=/usr/local/sbin/.sysak_compoents
+WORK_PATH=/usr/local/sbin/.sysak_components
 fi
 
 MEMCGUSAGE_BIN=$WORK_PATH/tools/memcg_usage
