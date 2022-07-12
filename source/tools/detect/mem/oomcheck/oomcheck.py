@@ -708,7 +708,8 @@ def oom_reason_analyze(num, oom_result, summary):
         oom_result['sub_msg'][num]['summary'] = summary
         if oom_result['json'] == 1:
             #print(json.dumps(oom_result['sub_msg'][num]['json'], encoding='utf-8', ensure_ascii=False))
-            print(json.dumps(oom_result['sub_msg'][num]['json'], ensure_ascii=False))
+            #print(json.dumps(oom_result['sub_msg'][num]['json'], ensure_ascii=False))
+            pass
         else:
             print(summary)
         return summary
@@ -812,8 +813,17 @@ def oom_diagnose(sn, data, mode):
             num = oomcheck_get_spectime(oom_result['spectime'], oom_result)
             if num < 0 or num > last_oom:
                 num = last_oom
-            res = oom_get_max_task(num, oom_result)
-            submsg = oom_reason_analyze(num, oom_result, oom_result['summary'])
+            last_num = num-data['num']+1
+            if last_num <= 0 :
+                last_num = 1
+            output_json = {}
+            for i in range(last_num,num+1):
+                oom_get_max_task(i, oom_result)
+                submsg = oom_reason_analyze(i, oom_result, oom_result['summary'])
+                output_json[str(oom_result['sub_msg'][i]['time'])] = oom_result['sub_msg'][i]['json']
+            print(json.dumps(output_json, ensure_ascii=False))
+            #res = oom_get_max_task(num, oom_result)
+            #submsg = oom_reason_analyze(num, oom_result, oom_result['summary'])
             oom_result['summary'] = submsg
         data['oom_result'] = oom_result
         return oom_result['summary']
@@ -833,6 +843,7 @@ def main():
     data = {}
     data['mode'] = 1
     data['json'] = 0
+    data['num'] = 1
     data['filename'] = ''
     data['spectime'] = int(time.time())
     get_opts(data)
@@ -848,6 +859,7 @@ def usage():
             -l --live mode
             -t --time mode
             -j --output json
+            -n --# of output results
            for example:
            python oomcheck.py
            python oomcheck.py -t "2021-09-13 15:32:22"
@@ -858,7 +870,7 @@ def usage():
     )
 
 def get_opts(data):
-    options,args = getopt.getopt(sys.argv[1:],"jhlf:t:",["json","help","file=","live=","time="])
+    options,args = getopt.getopt(sys.argv[1:],"jhlf:t:n:",["json","help","file=","live=","time="])
     for name,value in options:
         if name in ("-h","--help"):
             usage()
@@ -870,6 +882,8 @@ def get_opts(data):
             data['mode'] = 1
         elif name in ("-j","--json"):
             data['json'] = 1
+        elif name in ("-n","--num"):
+            data['num'] = int(value)
         elif name in ("-t","--time"):
             if '-' in value:
                 value = normal_time2ts(value)
