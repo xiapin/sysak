@@ -821,7 +821,8 @@ def oom_diagnose(sn, data, mode):
                 oom_get_max_task(i, oom_result)
                 submsg = oom_reason_analyze(i, oom_result, oom_result['summary'])
                 output_json[str(oom_result['sub_msg'][i]['time'])] = oom_result['sub_msg'][i]['json']
-            print(json.dumps(output_json, ensure_ascii=False))
+            if oom_result['json'] == 1:
+                print(json.dumps(output_json, ensure_ascii=False))
             #res = oom_get_max_task(num, oom_result)
             #submsg = oom_reason_analyze(num, oom_result, oom_result['summary'])
             oom_result['summary'] = submsg
