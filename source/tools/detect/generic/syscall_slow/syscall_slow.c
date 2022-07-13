@@ -33,12 +33,15 @@ FILE *filep = NULL;
 static int stackmp_fd;
 static struct ksym *ksyms;
 char filename[256] = {0};
+char *sys_array[MAX_NR];
 char log_dir[] = "/var/log/sysak/syscall_slow";
 char defaultfile[] = "/var/log/sysak/syscall_slow/syscall_slow.log";
 volatile sig_atomic_t exiting = 0;
 
 void print_stack(int fd, __u32 ret, struct ksym *syms);
 int load_kallsyms(struct ksym **pksyms);
+int nr_to_syscall(int argc, char *arry[]);
+
 const char *argp_program_version = "syscall_slow 0.1";
 const char argp_program_doc[] =
 "Catch the delay of a syscall more than threshold.\n"
@@ -189,10 +192,17 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	if (0) {
 		;
 	} else {
-		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6ld\n",
+		char *syscall, tmp[32];
+		if ((e->sysid < MAX_NR) && (sys_array[e->sysid])) {
+			syscall = sys_array[e->sysid];
+		} else {
+			snprintf(tmp, sizeof(tmp), "%ld", e->sysid);
+			syscall = tmp;
+		}
+		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6s\n",
 			ts, e->delay/(1000*1000), e->realtime/(1000*1000),
 			e->itime/(1000*1000), e->vtime/(1000*1000),
-			e->stime/(1000*1000), e->nvcsw, e->nivcsw, e->sysid);
+			e->stime/(1000*1000), e->nvcsw, e->nivcsw, syscall);
 		fflush(filep);
 		print_stack(stackmp_fd, e->ret, ksyms);
 	}
@@ -207,7 +217,7 @@ void syscall_slow_handler(int poll_fd, int map_fd)
 
 	fprintf(filep, "%-21s %-8s %-6s %-6s %-6s %-6s %-6s %-6s %-6s\n",
 		"TIME(syscall)", "DELAY", "REAL", "WAIT", "SLEEP",
-		"SYS", "vcsw", "ivcsw", "sysid");
+		"SYS", "vcsw", "ivcsw", "syscall");
 
 	pb_opts.sample_cb = handle_event;
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
@@ -302,12 +312,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = syscall_slow_bpf__attach(obj);
-	if (err) {
-		fprintf(stderr, "failed to attach BPF programs\n");
-		goto cleanup;
-	}
-
 	arg_fd = bpf_map__fd(obj->maps.arg_map);
 	ent_fd = bpf_map__fd(obj->maps.events);
 	stackmp_fd = bpf_map__fd(obj->maps.stackmap);
@@ -322,6 +326,13 @@ int main(int argc, char **argv)
 	if (env.duration)
 		alarm(env.duration);
 
+	err = syscall_slow_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF programs\n");
+		goto cleanup;
+	}
+	memset(sys_array, 0, sizeof(sys_array));
+	err = nr_to_syscall(0, sys_array);
 	syscall_slow_handler(ent_fd, arg_fd);
 
 cleanup:
