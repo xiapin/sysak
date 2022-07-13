@@ -37,13 +37,13 @@ open_and_attach_perf_event(struct perf_event_attr *attr,
 			/* Ignore CPU that is offline */
 			if (errno == ENODEV)
 				continue;
-			fprintf(stderr, "failed to init perf sampling: %s\n",
+			fprintf(stdout, "failed to init perf sampling: %s\n",
 				strerror(errno));
 			return -1;
 		}
 		links[i] = bpf_program__attach_perf_event(prog, fd);
 		if (!links[i]) {
-			fprintf(stderr, "failed to attach perf event on cpu: %d\n", i);
+			fprintf(stdout, "failed to attach perf event on cpu: %d\n", i);
 			close(fd);
 			return -1;
 		}
@@ -141,14 +141,14 @@ void irqoff_handler(void *args)
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
 	if (!pb) {
 		err = -errno;
-		fprintf(stderr, "failed to open perf buffer: %d\n", err);
+		fprintf(stdout, "failed to open perf buffer: %d\n", err);
 		goto clean_irqoff;
 	}
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
 		if (err < 0 && err != -EINTR) {
-			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			fprintf(stdout, "error polling perf buffer: %s\n", strerror(-err));
 			goto clean_irqoff;
 		}
 		/* reset err to return 0 if exiting */
