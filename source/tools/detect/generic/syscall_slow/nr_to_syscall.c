@@ -52,7 +52,7 @@ static int parse(char *p, char *arry[])
 
 int nr_to_syscall(int argc, char *arry[])
 {
-	int idx;
+	int idx = 0;
 	FILE *fp;
 	char *p, buff[128];
 
