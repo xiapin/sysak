@@ -19,7 +19,7 @@ extern volatile sig_atomic_t exiting;
 extern struct ksym *ksyms;
 static int stack_fd;
 
-char stack[512];
+static char stack[512];
 void handle_event_nosch(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	const struct event *e = data;

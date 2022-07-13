@@ -81,7 +81,7 @@ int attach_prog_to_perf(struct schedmoni_bpf *obj, struct bpf_link **sw_mlinks, 
 	return !ret;
 }
 
-char stack[512];
+static char stack[512];
 void irqoff_handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event ev, *e;
