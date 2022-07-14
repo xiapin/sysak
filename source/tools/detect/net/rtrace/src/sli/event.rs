@@ -1,7 +1,6 @@
 use crate::sli_bindings::*;
 use anyhow::{bail, Result};
 
-#[derive(Default)]
 pub struct LatencyHist {
     overflow: u32,
     latency: [u32; MAX_LATENCY_SLOTS as usize],
@@ -9,15 +8,17 @@ pub struct LatencyHist {
 
 impl LatencyHist {
     pub fn new(ptr: *const latency_hist) -> LatencyHist {
-        let mut lh = LatencyHist::default();
         unsafe {
+            let mut latency = [0; MAX_LATENCY_SLOTS as usize];
             for (i, j) in (*ptr).latency.into_iter().enumerate() {
-                lh.latency[i] = j;
+                latency[i] = j;
             }
 
-            lh.overflow = (*ptr).overflow;
+            LatencyHist {
+                overflow: (*ptr).overflow,
+                latency,
+            }
         }
-        lh
     }
 }
 
@@ -38,11 +39,11 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn from_event(ptr: *const event) -> Result<Event> {
+    pub fn new(ptr: *const event) -> Result<Event> {
         let et = unsafe { (*ptr).event_type } as u32;
         match et {
-            LATENCY_EVENT => Ok(Event::LatencyEvent(LatencyEvent::New(unsafe {
-                (*ptr).__bindgen_anon_1.le
+            LATENCY_EVENT => Ok(Event::LatencyEvent(LatencyEvent::new(unsafe {
+                &(*ptr).__bindgen_anon_1.le
             }))),
             _ => {
                 bail!("Can't recognize event type: {}", et)
