@@ -10,6 +10,7 @@ use std::thread;
 use structopt::StructOpt;
 use tcp::Tcp;
 use std::time;
+use gettid::gettid;
 
 pub struct AbnortmalOutput {}
 
@@ -41,7 +42,7 @@ fn get_events(opts: &AbnormalCommand) -> Result<Vec<Event>> {
     let (ts, tr) = crossbeam_channel::unbounded();
     let (ms, mr) = (ts.clone(), tr.clone());
     thread::spawn(move || {
-        let pid = unsafe { libc::gettid() };
+        let pid = unsafe { gettid() };
         ts.send(ChannelMsgType::Pid(pid as u32)).unwrap();
         thread::sleep(time::Duration::from_millis(10));
         match tr.recv().unwrap() {
@@ -60,7 +61,7 @@ fn get_events(opts: &AbnormalCommand) -> Result<Vec<Event>> {
         ChannelMsgType::Pid(pid) => {
             log::debug!(
                 "main thread tid: {}, pstree thread tid: {}",
-                unsafe { libc::gettid() },
+                unsafe { gettid() },
                 pid
             );
             pstree_thread_pid = pid;
