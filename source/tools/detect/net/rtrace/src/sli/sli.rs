@@ -70,7 +70,7 @@ impl<'a> Sli<'a> {
             let data_warp = rx.recv_timeout(timeout);
             match data_warp {
                 Ok(data) => {
-                    let event = Event::new(data.1);
+                    let event = Event::new(&data.1[0] as *const u8 as *const event)?;
                     return Ok(Some(event));
                 }
                 _ => {
@@ -104,7 +104,9 @@ impl<'a> Sli<'a> {
             MapFlags::ANY,
         )?;
         if let Some(r) = res {
-            return Ok(Some(LatencyHist::new(&r as *const latency_hist)));
+            return Ok(Some(LatencyHist::new(
+                &r[0] as *const u8 as *const latency_hist,
+            )));
         }
         Ok(None)
     }
