@@ -92,18 +92,28 @@ impl<'a> Sli<'a> {
         Ok(None)
     }
 
-    pub fn lookup_and_delte_latency_map(&mut self) -> Result<Option<LatencyHist>> {
+    /// update with zero map value.
+    pub fn lookup_and_update_latency_map(&mut self) -> Result<Option<LatencyHist>> {
         let key: u32 = 0;
-        let res = self.skel.maps_mut().latency_map().lookup(
-            unsafe {
-                std::slice::from_raw_parts(
-                    &key as *const u32 as *const u8,
-                    std::mem::size_of::<u32>(),
-                )
-            },
-            MapFlags::ANY,
-        )?;
+        let map_key = unsafe {
+            std::slice::from_raw_parts(&key as *const u32 as *const u8, std::mem::size_of::<u32>())
+        };
+        let map_value = unsafe {
+            std::slice::from_raw_parts(
+                &self.zero_latency_hist as *const latency_hist as *const u8,
+                std::mem::size_of::<latency_hist>(),
+            )
+        };
+        let res = self
+            .skel
+            .maps_mut()
+            .latency_map()
+            .lookup(map_key, MapFlags::ANY)?;
         if let Some(r) = res {
+            self.skel
+                .maps_mut()
+                .latency_map()
+                .update(map_key, map_value, MapFlags::ANY)?;
             return Ok(Some(LatencyHist::new(
                 &r[0] as *const u8 as *const latency_hist,
             )));
