@@ -141,10 +141,14 @@ static int mod_ctrl(bool enable)
     }
     fclose(modlist_fp);
 
-    if (enable && !has_ko) {
-        snprintf(exec_mod, sizeof(exec_mod), "insmod %s%s%s", module_path, kern_version, module);
-        ret = system(exec_mod);
-
+    if (enable) {
+        if(has_ko) {
+            ret = 0;
+        }
+        else {
+            snprintf(exec_mod, sizeof(exec_mod), "insmod %s%s%s", module_path, kern_version, module);
+            ret = system(exec_mod);
+        }
     }
     else if (!enable && has_ko) {
         snprintf(exec_mod, sizeof(exec_mod), "rmmod %s%s%s", module_path, kern_version, module);
