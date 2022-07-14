@@ -91,19 +91,12 @@ static int sort_call_site(struct user_result *res)
 	return 0;
 }
 
-int page_main(struct memleak_settings *set)
+int page_main(struct memleak_settings *set, int fd)
 {
-	int fd = 0;
 	int ret = 0;
 	struct user_result res;
-
+    int try = 10;
 	struct user_alloc_desc *desc;
-
-	fd = open("/dev/sysak", O_RDWR);
-	if (fd < 0) {
-		printf("open memleak check error\n");
-		return -1;
-	}
 
 	if (!set->monitor_time)
 		set->monitor_time = detect_time;
@@ -134,12 +127,12 @@ int page_main(struct memleak_settings *set)
 
 _retry:
 	ret = ioctl(fd, MEMLEAK_RESULT, &res);
-	if (ret) {
+	if (ret && try--) {
 		printf("ret %d,errn %d, num = %d\n", ret, errno, res.num);
 		sleep(10);
 		goto _retry;
 	}
-
+    ret = 0;
 	desc = res.desc;
 	printf("未释放内存详细列表:\n");
 	for (ret = 0; ret < res.num; ret++) {
@@ -159,10 +152,9 @@ _retry:
 _out:
 
 	free(res.desc);
+    if(!ret)
+	    ioctl(fd, MEMLEAK_OFF);
 
-	ret = ioctl(fd, MEMLEAK_OFF);
-
-	close(fd);
 	if (call)
 		free(call);
 	return 0;
