@@ -64,3 +64,5 @@ int BPF_KPROBE(kprobe__tcp_ack, struct sock *sk, const struct sk_buff *skb, int 
 
     return 0;
 }
+
+char _license[] SEC("license") = "GPL";
