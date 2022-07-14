@@ -48,6 +48,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		cJSON_AddItemToArray(env.json.tbl_data, arryItem);
 		sum->delay += e->delay;
 		sum->cnt++;
+		sum->real_cnt++;
 		if (e->delay > sum->max)
 			sum->max = e->delay;
 	} else {

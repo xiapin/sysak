@@ -143,8 +143,12 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.json.tms = cJSON_CreateObject();
 		env.json.tms_data= cJSON_CreateArray();
 		cJSON_AddItemToObject(env.json.tms, "data", env.json.tms_data);
-		cJSON_AddItemToObject(env.json.datasources, "jitterTable", env.json.tbl);
+		env.json.evt = cJSON_CreateObject();
+		env.json.evt_data= cJSON_CreateArray();
+		cJSON_AddItemToObject(env.json.evt, "data", env.json.evt_data);
+		cJSON_AddItemToObject(env.json.datasources, "jitterEventSummary", env.json.evt);
 		cJSON_AddItemToObject(env.json.datasources, "jitterTimeSeries", env.json.tms);
+		cJSON_AddItemToObject(env.json.datasources, "jitterTable", env.json.tbl);
 		cJSON_AddItemToObject(env.json.root, "datasources", env.json.datasources);
 		break;
 	case 'p':
@@ -246,9 +250,9 @@ int main(int argc, char **argv)
 {
 	void *res;
 	int i, err;
+	__u64 loops = 0;
 	int arg_fd, map_rslw_fd, map_nsch_fd, map_irqf_fd;
 	pthread_t pt_runslw, pt_runnsc, pt_irqoff;
-	struct summary prev[3], next[3], delta[3];
 	struct schedmoni_bpf *obj;
 	struct args args = {};
 	struct tharg runslw = {}, runnsc = {}, irqoff ={};
@@ -394,35 +398,39 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to attach BPF programs\n");
 		goto cleanup;
 	}
+	if (env.mod_json) {
+		struct summary prev[3], next[3], delta[3];
+		memset(prev, 0, sizeof(prev));
+		memset(next, 0, sizeof(next));
+		memset(delta, 0, sizeof(delta));
+		while(!exiting) {
+			char date[32];
+			bool addjson = false;
+			cJSON *arryItem;
 
-	memset(prev, 0, sizeof(prev));
-	memset(next, 0, sizeof(next));
-	memset(delta, 0, sizeof(delta));
-	while(!exiting) {
-		char date[32];
-		bool addjson = false;
-		cJSON *arryItem;
-
-		stamp_to_date(0, date, sizeof(date));
-		arryItem = cJSON_CreateObject();
-		for (i = 0; i < MAX_MOD; i++) {
-			next[i] = env.summary[i];
-			delta[i].delay = next[i].delay - prev[i].delay;
-			delta[i].cnt = next[i].cnt - prev[i].cnt;
-			delta[i].max = next[i].max;
-			if (delta[i].delay || delta[i].cnt) {
-				if (!addjson) {
-					cJSON_AddStringToObject(arryItem, "time", date);
-					addjson = true;
+			stamp_to_date(0, date, sizeof(date));
+			arryItem = cJSON_CreateObject();
+			for (i = 0; i < MAX_MOD; i++) {
+				next[i] = env.summary[i];
+				delta[i].delay = next[i].delay - prev[i].delay;
+				delta[i].cnt = next[i].cnt - prev[i].cnt;
+				delta[i].max = next[i].max;
+				/* This is for time-series table */
+				if (delta[i].delay || delta[i].cnt) {
+					if (!addjson) {
+						cJSON_AddStringToObject(arryItem, "time", date);
+						addjson = true;
+					}
+					cJSON_AddNumberToObject(arryItem, mode_name[i], delta->delay/(1000*1000));
+					cJSON_AddNumberToObject(arryItem, mode_cnt_str[i], delta->cnt);
 				}
-				cJSON_AddNumberToObject(arryItem, mode_name[i], delta->delay/(1000*1000));
-				cJSON_AddNumberToObject(arryItem, mode_cnt_str[i], delta->cnt);
+				prev[i] = next[i];
 			}
-			prev[i] = next[i];
+			if (addjson)
+				cJSON_AddItemToArray(env.json.tms_data, arryItem);
+			sleep(1);
+			loops++;
 		}
-		if (addjson)
-			cJSON_AddItemToArray(env.json.tms_data, arryItem);
-		sleep(1);
 	}
 	pthread_join(pt_runslw, &res);
 	pthread_join(pt_runnsc, &res);
@@ -431,6 +439,37 @@ int main(int argc, char **argv)
 	if (env.mod_json) {
 		FILE *fp;
 		char *out;
+		struct summary sum[3];
+		int color, max_cnt, thresh_rate;
+		enum {RED = 0, BLUE, GREEN};
+		char *colors[] = {"red", "blue", "green"};
+		char *ev[] = {"异常", "告警", "正常"};
+		cJSON *arryItem;
+
+		for (i = 0; i < MAX_MOD; i++) {
+			arryItem = cJSON_CreateObject();
+			sum[i] = env.summary[i];
+			max_cnt = (loops*SEC_TO_NS)/env.thresh;
+			if (max_cnt == 0)
+				thresh_rate = 0;
+			else
+				thresh_rate = sum[i].real_cnt*100/max_cnt;
+			
+			if (sum[i].max > 500*1000*1000 && sum[i].max > env.thresh*2)
+				color = RED;
+			else if (sum[i].max > env.thresh*2)
+				color = BLUE;
+			else if (thresh_rate > 20)
+				color = RED;
+			else if (thresh_rate > 5)
+				color = BLUE;
+			else
+				color = GREEN;
+			cJSON_AddStringToObject(arryItem, "key", mode_name[i]);
+			cJSON_AddStringToObject(arryItem, "value", ev[color]);
+			cJSON_AddStringToObject(arryItem, "color", colors[color]);
+			cJSON_AddItemToArray(env.json.evt_data, arryItem);
+		}
 
 		fp = fopen(json_log, "w+");
 		if (!fp) {

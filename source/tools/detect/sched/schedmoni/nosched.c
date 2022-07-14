@@ -45,9 +45,11 @@ void handle_event_nosch(void *ctx, int cpu, void *data, __u32 data_sz)
 		if (!e->exit) {
 			cnt = print_stack(stack_fd, e->ret, 7, ksyms, stack, MOD_STRING);
 			*(stack+cnt) = '\0';
+			sum->real_cnt++;
 		} else {
 			sum->delay += e->delay;
 			sum->cnt++;
+			sum->real_cnt++;
 			if (e->delay > sum->max)
 				sum->max = e->delay;
 			snprintf(stack, sizeof(stack), "%s", "(EOF)");

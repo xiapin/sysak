@@ -108,14 +108,13 @@ void irqoff_handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		cJSON_AddStringToObject(arryItem, "current", current);
 		cJSON_AddNumberToObject(arryItem, "stamp", e->stamp);
 
-		if (!e->exit) {
-			cnt = print_stack(stack_fd, e->ret, 7, ksyms, stack, MOD_STRING);
-			*(stack+cnt) = '\0';
-		}
+		cnt = print_stack(stack_fd, e->ret, 7, ksyms, stack, MOD_STRING);
+		*(stack+cnt) = '\0';
 		cJSON_AddStringToObject(arryItem, "extern", stack);
 		cJSON_AddItemToArray(env.json.tbl_data, arryItem);
 		sum->delay += e->delay;
 		sum->cnt++;
+		sum->real_cnt++;
 		if (e->delay > sum->max)
 			sum->max = e->delay;
 	} else {
