@@ -14,6 +14,38 @@ const DROP_HDR: &str = "./src/drop/bpf/drop.h";
 const ABNORMAL_TCP_BPF_SRC: &str = "./src/abnormal/bpf/tcp.bpf.c";
 const ABNORMAL_HDR: &str = "./src/abnormal/bpf/abnormal.h";
 
+const SLI_BPF_SRC: &str = "./src/sli/bpf/sli.bpf.c";
+const SLI_HDR: &str = "./src/sli/bpf/sli.h";
+
+fn compile_sli_ebpf() {
+    create_dir_all("./src/sli/bpf/.output").unwrap();
+
+    let sli_skel = Path::new("./src/sli/bpf/.output/sli.skel.rs");
+    match SkeletonBuilder::new(SLI_BPF_SRC).generate(&sli_skel) {
+        Ok(()) => {}
+        Err(e) => {
+            println!("{}", e);
+            panic!()
+        }
+    }
+
+    let bindings = bindgen::Builder::default()
+        // The input header we would like to generate
+        // bindings for.
+        .header(SLI_HDR)
+        // Tell cargo to invalidate the built crate whenever any of the
+        // included header files changed.
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        // Finish the builder and generate the bindings.
+        .generate()
+        // Unwrap the Result and panic on failure.
+        .expect("Unable to generate bindings");
+    let bind = Path::new("./src/sli/bpf/.output/bindings.rs");
+    bindings
+        .write_to_file(bind)
+        .expect("Couldn't write bindings!");
+}
+
 fn compile_abnormal_ebpf() {
     create_dir_all("./src/abnormal/bpf/.output").unwrap();
 
@@ -130,7 +162,11 @@ fn main() {
     println!("cargo:rerun-if-changed={}", ABNORMAL_TCP_BPF_SRC);
     println!("cargo:rerun-if-changed={}", ABNORMAL_HDR);
 
+    println!("cargo:rerun-if-changed={}", SLI_BPF_SRC);
+    println!("cargo:rerun-if-changed={}", SLI_HDR);
+
     compile_latency_ebpf();
     compile_drop_ebpf();
     compile_abnormal_ebpf();
+    compile_sli_ebpf();
 }
