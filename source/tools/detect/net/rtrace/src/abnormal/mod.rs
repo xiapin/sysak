@@ -9,6 +9,7 @@ use pstree::Pstree;
 use std::thread;
 use structopt::StructOpt;
 use tcp::Tcp;
+use std::time;
 
 pub struct AbnortmalOutput {}
 
@@ -42,6 +43,7 @@ fn get_events(opts: &AbnormalCommand) -> Result<Vec<Event>> {
     thread::spawn(move || {
         let pid = unsafe { libc::gettid() };
         ts.send(ChannelMsgType::Pid(pid as u32)).unwrap();
+        thread::sleep(time::Duration::from_millis(10));
         match tr.recv().unwrap() {
             ChannelMsgType::Start => {
                 let mut pstree = Pstree::new();
