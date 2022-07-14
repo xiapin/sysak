@@ -1,3 +1,5 @@
+mod event;
+
 use eutils_rs::proc::Snmp;
 mod sli;
 use anyhow::{bail, Result};
@@ -8,6 +10,8 @@ use structopt::StructOpt;
 pub struct SliCommand {
     #[structopt(long, help = "Collect retransmission metrics")]
     retran: bool,
+    #[structopt(long, help = "Collect latency metrics")]
+    latency: bool,
     #[structopt(long, default_value = "3", help = "Data collection cycle, in seconds")]
     period: u64,
 }
