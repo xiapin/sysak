@@ -17,6 +17,8 @@ pub struct SliCommand {
     latency: bool,
     #[structopt(long, default_value = "3", help = "Data collection cycle, in seconds")]
     period: u64,
+    #[structopt(long, help = "Output every sli to shell")]
+    shell: bool,
 }
 
 pub struct SliOutput {
@@ -80,19 +82,34 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
             sli_output.outsegs = snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "OutSegs"))?;
             sli_output.retran = snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "RetransSegs"))?;
 
-            println!(
-                "OutSegs: {}, Retran: {}",
-                snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "OutSegs"))?,
-                snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "RetransSegs"))?,
-            );
+            if opts.shell {
+                println!(
+                    "OutSegs: {}, Retran: {}, %Retran: {}",
+                    sli_output.outsegs,
+                    sli_output.retran,
+                    sli_output.retran as f64 / sli_output.outsegs as f64
+                );
+            }
         }
 
         if opts.latency {
             if let Some(x) = sli.lookup_and_update_latency_map()? {
                 sli_output.latencyhist = x;
             }
+
+            if opts.shell {
+                println!("{}", sli_output.latencyhist);
+                for event in &sli_output.events {
+                    match event {
+                        Event::LatencyEvent(le) => {
+                            println!("{}", le);
+                        }
+                    }
+                }
+            }
         }
 
         old_snmp = new_snmp;
+        println!("\n\n");
     }
 }
