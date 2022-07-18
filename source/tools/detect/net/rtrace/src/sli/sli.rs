@@ -5,6 +5,7 @@ use crate::sliskel::*;
 use anyhow::{bail, Result};
 use crossbeam_channel;
 use crossbeam_channel::Receiver;
+use eutils_rs::proc::Kallsyms;
 use libbpf_rs::MapFlags;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
@@ -122,7 +123,18 @@ impl<'a> Sli<'a> {
     }
 
     pub fn attach_latency(&mut self) -> Result<()> {
-        self.skel.links.kprobe__tcp_ack = Some(self.skel.progs_mut().kprobe__tcp_ack().attach()?);
+        let ksyms = Kallsyms::try_from("/proc/kallsyms")?;
+        if ksyms.has_sym("tcp_rtt_estimator") {
+            self.skel.links.kprobe__tcp_rtt_estimator = Some(
+                self.skel
+                    .progs_mut()
+                    .kprobe__tcp_rtt_estimator()
+                    .attach()?,
+            );
+        } else {
+            self.skel.links.kprobe__tcp_ack =
+                Some(self.skel.progs_mut().kprobe__tcp_ack().attach()?);
+        }
         Ok(())
     }
 }
