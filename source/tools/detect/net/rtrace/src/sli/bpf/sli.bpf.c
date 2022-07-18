@@ -33,35 +33,51 @@ void __always_inline set_addr_pair_by_sock(struct sock *sk, struct addr_pair *ap
     ap->dport = bpf_ntohs(ap->dport);
 }
 
-SEC("kprobe/tcp_ack")
-int BPF_KPROBE(kprobe__tcp_ack, struct sock *sk, const struct sk_buff *skb, int flag)
+__always_inline void handle_rtt(void *ctx, struct sock *sk, u32 rtt)
 {
-    u32 srtt;
     u32 key = 0;
-    struct tcp_sock *tp;
     struct latency_hist *lhp;
-
-    tp = (struct tcp_sock *)sk;
-    bpf_probe_read(&srtt, sizeof(srtt), &tp->srtt_us);
-    srtt >>= 3;
-    srtt /= 1000;
-    srtt >>= 3;
 
     lhp = bpf_map_lookup_elem(&latency_map, &key);
     if (lhp)
     {
-        if (srtt < MAX_LATENCY_SLOTS)
-            lhp->latency[srtt]++;
-        else
+        rtt /= 8000;
+        asm volatile("%0 = %1"
+                     : "=r"(rtt)
+                     : "r"(rtt));
+        if (rtt >= MAX_LATENCY_SLOTS)
         {
             lhp->overflow++;
             struct event e = {};
             set_addr_pair_by_sock(sk, &e.le.ap);
-            e.le.latency = srtt;
+            e.le.latency = rtt;
             bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &e, sizeof(e));
         }
+        else
+            lhp->latency[rtt]++;
     }
+}
 
+SEC("kprobe/tcp_ack")
+int BPF_KPROBE(kprobe__tcp_ack, struct sock *sk, const struct sk_buff *skb, int flag)
+{
+    u32 srtt;
+    struct tcp_sock *tp;
+
+    tp = (struct tcp_sock *)sk;
+    bpf_probe_read(&srtt, sizeof(srtt), &tp->srtt_us);
+
+    srtt >>= 3;
+    handle_rtt(ctx, sk, srtt);
+
+    return 0;
+}
+
+SEC("kprobe/tcp_rtt_estimator")
+int BPF_KPROBE(kprobe__tcp_rtt_estimator, struct sock *sk, long mrtt_us)
+{
+    if (mrtt_us > 0)
+        handle_rtt(ctx, sk, (u32)mrtt_us);
     return 0;
 }
 
