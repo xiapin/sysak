@@ -4,6 +4,7 @@ use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 
 pub struct LatencyHist {
+    threshold: u32,
     overflow: u32,
     latency: [u32; MAX_LATENCY_SLOTS as usize],
 }
@@ -17,6 +18,7 @@ impl LatencyHist {
             }
 
             LatencyHist {
+                threshold: (*ptr).threshold,
                 overflow: (*ptr).overflow,
                 latency,
             }
@@ -27,11 +29,15 @@ impl LatencyHist {
 impl fmt::Display for LatencyHist {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut cnt = 0;
-        let mut new_latency = [0; MAX_LATENCY_SLOTS as usize / 8]; // 16
+        let mut interval = ((self.threshold + 15) / 16) as usize; // Up to 16 lines
+        let mut new_latency = [0; 16]; // Up to 16 lines
 
         for (i, j) in self.latency.into_iter().enumerate() {
+            if i >= self.threshold as usize {
+                break;
+            }
             cnt += j;
-            new_latency[i / 8] += j;
+            new_latency[i / interval] += j;
         }
 
         if cnt == 0 {
@@ -40,16 +46,21 @@ impl fmt::Display for LatencyHist {
 
         for (i, j) in new_latency.into_iter().enumerate() {
             let probablity = j * 100 / cnt;
+            let start = i * interval;
+            if start >= self.threshold as usize {
+                break;
+            }
+            let end = std::cmp::min(self.threshold as usize, (i + 1) * interval);
             write!(
                 f,
-                "{:<4}-{:<4} | {:<100} {}\n",
-                i * 64,
-                (i + 1) * 64,
+                "{:>4}-{:<4} | {:<100} {}\n",
+                start,
+                end,
                 "*".repeat(probablity as usize),
                 j
             )?;
         }
-        write!(f, "execced {} ms times: {}", MAX_LATENCY_MS, self.overflow)
+        write!(f, "execced {} ms times: {}", self.threshold, self.overflow)
     }
 }
 
