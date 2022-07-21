@@ -167,6 +167,7 @@ show_result() {
 
 collect_global_framegraph() {
 	if [ -f  $TOOLS_ROOT/cpu_flamegraph ]; then
+		global_cpuflamegraph=${loadtask_dir}global_cpuflamegraph-`date "+%Y-%m-%d-%H-%M-%S"`.svg
 		$TOOLS_ROOT/cpu_flamegraph -d 5 | xargs -I {} sudo cp {} $global_cpuflamegraph
 		if [ -e $global_cpuflamegraph ];then
 			sudo cp $global_cpuflamegraph $tmp_cpuflamegraph
@@ -306,8 +307,10 @@ current_analyse() {
 
 	echo >> $tmpfile
 	echo "####################################################################################" >> $tmpfile
-	cat ${tmp_cpuflamegraph} >> $tmpfile
-	rm ${tmp_cpuflamegraph}
+	if [ "$is_cpuflamegraph" == "true" ];then
+		cat ${tmp_cpuflamegraph} >> $tmpfile
+		rm ${tmp_cpuflamegraph}
+	fi
 }
 
 history_analyse() {
@@ -339,6 +342,7 @@ monitor() {
 				show_result $tmpfile
 			fi
 
+			datafile=${loadtask_dir}loadtask-`date "+%Y-%m-%d-%H-%M-%S"`.log
 			cat ${tmpfile} >> ${datafile}
 
 			if [ "$deamon" != "true" ];then
