@@ -14,30 +14,44 @@
 #include <getopt.h>
 #define _GNU_SOURCE
 
-#define NUM_ENV	PERF_COUNT_HW_MAX
+#define NUM_ENV	(PERF_COUNT_HW_MAX+2)
 #define ARGS_FMT(i, j)				\
 	events_str[i], events_str[j],		\
 	hw_events_cnt[i], hw_events_cnt[j],	\
 	hw_events_cnt[j]==0?0:((double)hw_events_cnt[i]/hw_events_cnt[j])
-
+#define EVENT_RATE(i, j)	\
+	hw_events_cnt[j]==0?0:((double)hw_events_cnt[i]/hw_events_cnt[j])
 char *path;
 char fixpath[128];
 char cmd[128], buffer[128];
-int hwconfigs[] = {
+
+__u64 hwconfigs[] = {
 	PERF_COUNT_HW_CPU_CYCLES,
 	PERF_COUNT_HW_INSTRUCTIONS,
-	PERF_COUNT_HW_CACHE_REFERENCES,
-	PERF_COUNT_HW_CACHE_MISSES,
+	-1, //PERF_COUNT_HW_CACHE_REFERENCES,
+	-1, //PERF_COUNT_HW_CACHE_MISSES,
 	-1, /*PERF_COUNT_HW_BRANCH_INSTRUCTIONS*/
 	-1, /*PERF_COUNT_HW_BRANCH_MISSES*/
 	-1, /*PERF_COUNT_HW_BUS_CYCLES*/
 	PERF_COUNT_HW_STALLED_CYCLES_FRONTEND,
 	-1, /*PERF_COUNT_HW_STALLED_CYCLES_BACKEND*/
-	-1, /* PERF_COUNT_HW_REF_CPU_CYCLES */};
+	-1, /* PERF_COUNT_HW_REF_CPU_CYCLES */
+	PERF_COUNT_HW_CACHE_LL			<<  0  |
+	(PERF_COUNT_HW_CACHE_OP_READ		<<  8) |
+	(PERF_COUNT_HW_CACHE_RESULT_ACCESS	<< 16),
+	PERF_COUNT_HW_CACHE_LL			<<  0  |
+	(PERF_COUNT_HW_CACHE_OP_READ		<<  8) |
+	(PERF_COUNT_HW_CACHE_RESULT_MISS	<< 16),
+};
+
+enum {
+	PERF_COUNT_HW_CACHE_LL_R_ACCE = PERF_COUNT_HW_MAX,
+	PERF_COUNT_HW_CACHE_LL_R_MISS,
+};
 
 char *events_str[] = {"cpu_cycles", "instructions", "cache_reference", "cache_miss",
 			"branch_ins", "branch_miss", "bus_cycles", "stalled_cycles_frontend", 
-			"stalled_cycles_backend", "ref_cpu_cycles"};
+			"stalled_cycles_backend", "ref_cpu_cycles", "llc_cache_ref", "llc_cache_miss"};
 char origpath[]="/sys/fs/cgroup/perf_event/docker/";
 
 static void usage(char *prog)
@@ -71,7 +85,9 @@ int main(int argc, char *argv[])
 	int c, option_index,span = 5;
 	int cpu = 0, pid = -1, cgrp_id = -1;
 	int i, fd[NUM_ENV], cgrp_fd = -1;
+	double cache_miss_rate, cpi, ins_stall_rate;
 	unsigned long long hw_events_cnt[PERF_COUNT_HW_MAX];
+	struct perf_event_attr attr1;
 	struct perf_event_attr attr = {
 		.type = PERF_TYPE_HARDWARE,
 		.freq = 0,
@@ -117,18 +133,21 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	cgrp_id = open(path, O_RDONLY);
+	if (cgrp_id < 0) {
+		fprintf(stderr, "%s :open %s\n", strerror(errno), path);
+		return cgrp_id;
+	}
+
 	for (i = 0; i < NUM_ENV; i++) {
-		if (hwconfigs[i] < 0)
+		if ((long long)(hwconfigs[i]) < 0)
 			continue;
+		/* let's begin hw-cache events */
+		if (i == PERF_COUNT_HW_MAX)
+			attr.type = PERF_TYPE_HW_CACHE;
 		attr.config = hwconfigs[i];
-		pid  = -1;
 
 		flags = PERF_FLAG_PID_CGROUP;
-		cgrp_id = open(path, O_RDONLY);
-		if (cgrp_id < 0) {
-			fprintf(stderr, "%s :open %s\n", strerror(errno), path);
-			return cgrp_id;
-		}
 		pid = cgrp_id;
 
 		fd[i] = perf_event_open(&attr, pid, cpu, cgrp_fd, flags);
@@ -146,16 +165,28 @@ int main(int argc, char *argv[])
 	ioctl(cgrp_fd, PERF_EVENT_IOC_ENABLE, PERF_IOC_FLAG_GROUP);
 	sleep(span);
 
+	memset(hw_events_cnt, 0, sizeof(hw_events_cnt));
 	for (i = 0; i < NUM_ENV; i++) {
-		if (fd[i] < 0 || hwconfigs[i] < 0)
+		if (fd[i] < 0 || (long long)(hwconfigs[i]) < 0)
 			continue;
 		read(fd[i], &hw_events_cnt[i], sizeof(hw_events_cnt[i]));
+#ifdef DEBUG
+		printf("%s:%llu\n", events_str[i], hw_events_cnt[i]);
+#endif
 	}
+	cache_miss_rate = EVENT_RATE(PERF_COUNT_HW_CACHE_MISSES, PERF_COUNT_HW_CACHE_REFERENCES);
+	cpi = EVENT_RATE(PERF_COUNT_HW_CPU_CYCLES, PERF_COUNT_HW_INSTRUCTIONS);
+	ins_stall_rate = EVENT_RATE(PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, PERF_COUNT_HW_INSTRUCTIONS);
 	printf("%s/%s : %llu/%llu  (%.6f)\n",
-		ARGS_FMT(PERF_COUNT_HW_CACHE_MISSES, PERF_COUNT_HW_CACHE_REFERENCES)); 
-	printf("%s/%s (CPI): %llu/%llu  (%.6f)\n", 
-		ARGS_FMT(PERF_COUNT_HW_CPU_CYCLES, PERF_COUNT_HW_INSTRUCTIONS)); 
-	printf("%s/%s : %llu/%llu  (%.6f)\n", 
-		ARGS_FMT(PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, PERF_COUNT_HW_INSTRUCTIONS)); 
+		ARGS_FMT(PERF_COUNT_HW_CACHE_LL_R_MISS, PERF_COUNT_HW_CACHE_LL_R_ACCE));
+	printf("%s/%s (CPI): %llu/%llu  (%.6f)\n",
+		ARGS_FMT(PERF_COUNT_HW_CPU_CYCLES, PERF_COUNT_HW_INSTRUCTIONS));
+	printf("%s/%s : %llu/%llu  (%.6f)\n",
+		ARGS_FMT(PERF_COUNT_HW_STALLED_CYCLES_FRONTEND, PERF_COUNT_HW_INSTRUCTIONS));
+
+	if (cpi > 1)
+		printf("CPI > 1,Memory may hit a bottleneck\n");
+	else
+		printf("CPI is ok %f\n", cpi);
 }	
 
