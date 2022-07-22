@@ -21,7 +21,10 @@ fn compile_sli_ebpf() {
     create_dir_all("./src/sli/bpf/.output").unwrap();
 
     let sli_skel = Path::new("./src/sli/bpf/.output/sli.skel.rs");
-    match SkeletonBuilder::new(SLI_BPF_SRC).generate(&sli_skel) {
+    match SkeletonBuilder::new()
+        .source(SLI_BPF_SRC)
+        .build_and_generate(&sli_skel)
+    {
         Ok(()) => {}
         Err(e) => {
             println!("{}", e);
@@ -50,7 +53,10 @@ fn compile_abnormal_ebpf() {
     create_dir_all("./src/abnormal/bpf/.output").unwrap();
 
     let tcp_skel = Path::new("./src/abnormal/bpf/.output/tcp.skel.rs");
-    match SkeletonBuilder::new(ABNORMAL_TCP_BPF_SRC).generate(&tcp_skel) {
+    match SkeletonBuilder::new()
+        .source(ABNORMAL_TCP_BPF_SRC)
+        .build_and_generate(&tcp_skel)
+    {
         Ok(()) => {}
         Err(e) => {
             println!("{}", e);
@@ -79,8 +85,9 @@ fn compile_drop_ebpf() {
     create_dir_all("./src/drop/bpf/.output").unwrap();
 
     let drop_skel = Path::new("./src/drop/bpf/.output/drop.skel.rs");
-    SkeletonBuilder::new(DROP_BPF_SRC)
-        .generate(&drop_skel)
+    SkeletonBuilder::new()
+        .source(DROP_BPF_SRC)
+        .build_and_generate(&drop_skel)
         .unwrap();
 
     let bindings = bindgen::Builder::default()
@@ -103,7 +110,10 @@ fn compile_drop_ebpf() {
 fn compile_latency_ebpf() {
     create_dir_all("./src/latency/bpf/.output").unwrap();
     let tcp_skel = Path::new("./src/latency/bpf/.output/tcp.skel.rs");
-    match SkeletonBuilder::new(LATENCY_TCP_SRC).generate(&tcp_skel) {
+    match SkeletonBuilder::new()
+        .source(LATENCY_TCP_SRC)
+        .build_and_generate(&tcp_skel)
+    {
         Ok(()) => {}
         Err(e) => {
             println!("{}", e);
@@ -112,7 +122,10 @@ fn compile_latency_ebpf() {
     }
 
     let icmp_skel = Path::new("./src/latency/bpf/.output/icmp.skel.rs");
-    match SkeletonBuilder::new(LATENCY_ICMP_SRC).generate(&icmp_skel) {
+    match SkeletonBuilder::new()
+        .source(LATENCY_ICMP_SRC)
+        .build_and_generate(&icmp_skel)
+    {
         Ok(()) => {}
         Err(e) => {
             println!("{}", e);

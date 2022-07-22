@@ -9,6 +9,8 @@ use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use std::time::Duration;
 use libbpf_rs::MapFlags;
+use std::ffi::CString;
+
 
 static GLOBAL_TX: Lazy<Mutex<Option<crossbeam_channel::Sender<(usize, Vec<u8>)>>>> =
     Lazy::new(|| Mutex::new(None));
@@ -41,11 +43,20 @@ fn bump_memlock_rlimit() -> Result<()> {
     Ok(())
 }
 
-fn open_load_skel<'a>(debug: bool) -> Result<DropSkel<'a>> {
+fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<DropSkel<'a>> {
+    let btf_cstring;
+    let mut btf_cstring_ptr = std::ptr::null();
+    if let Some(btf) = btf {
+        btf_cstring = CString::new(btf.clone())?;
+        btf_cstring_ptr = btf_cstring.as_ptr();
+    }
+
     bump_memlock_rlimit()?;
     let mut skel_builder = DropSkelBuilder::default();
     skel_builder.obj_builder.debug(debug);
-    let mut open_skel = skel_builder.open()?;
+    let mut open_opts = skel_builder.obj_builder.opts(std::ptr::null());
+    open_opts.btf_custom_path = btf_cstring_ptr;
+    let mut open_skel = skel_builder.open_opts(open_opts)?;
     Ok(open_skel.load()?)
 }
 
@@ -55,8 +66,8 @@ pub struct Drop<'a> {
 }
 
 impl<'a> Drop<'a> {
-    pub fn new(debug: bool) -> Result<Drop<'a>> {
-        let skel = open_load_skel(debug)?;
+    pub fn new(debug: bool, btf: &Option<String>) -> Result<Drop<'a>> {
+        let skel = open_load_skel(debug, btf)?;
         Ok(Drop { skel, rx: None })
     }
 

@@ -19,6 +19,8 @@ use structopt::StructOpt;
 pub struct DropCommand {
     #[structopt(long, default_value = "tcp", help = "Network protocol type")]
     proto: String,
+    #[structopt(long, help = "Custom btf path")]
+    btf: Option<String>,
 }
 
 pub struct DropParams {
@@ -81,7 +83,7 @@ fn get_stack_string(kallsyms: &Kallsyms, stack: Vec<u8>) -> Result<Vec<String>> 
 }
 
 pub fn build_drop(opts: &DropCommand) -> Result<()> {
-    let mut drop = Drop::new(log::log_enabled!(log::Level::Debug))?;
+    let mut drop = Drop::new(log::log_enabled!(log::Level::Debug), &opts.btf)?;
     let kallsyms = Kallsyms::try_from("/proc/kallsyms")?;
     let mut drop_params = DropParams::new()?;
     let mut drop_reasons = build_drop_reasons();
