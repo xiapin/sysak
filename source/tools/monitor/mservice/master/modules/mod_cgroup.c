@@ -26,7 +26,7 @@ char *cg_usage = "    --cg                Linux container stats";
 #define MAX_CGROUPS 128
 /*Todo,user configure ?*/
 #define CGROUP_INFO_AGING_TIME  7200
-#define NCONF_HW	2
+#define NCONF_HW	4
 #define JITITEM		4
 #define	CONID_LEN	13
 
@@ -46,9 +46,23 @@ enum jitter_types {
 	JITTER_NTYPE,
 };
 
-int hwconfigs[] = {
-	PERF_COUNT_HW_CACHE_MISSES,
-	PERF_COUNT_HW_CACHE_REFERENCES};
+__u32 hwtypes[] = {
+	PERF_TYPE_HARDWARE,
+	PERF_TYPE_HARDWARE,
+	PERF_TYPE_HW_CACHE,
+	PERF_TYPE_HW_CACHE,
+};
+
+__u64 hwconfigs[] = {
+	PERF_COUNT_HW_CPU_CYCLES,
+	PERF_COUNT_HW_INSTRUCTIONS,
+	PERF_COUNT_HW_CACHE_LL			<<  0  |
+	(PERF_COUNT_HW_CACHE_OP_READ		<<  8) |
+	(PERF_COUNT_HW_CACHE_RESULT_ACCESS	<< 16),
+	PERF_COUNT_HW_CACHE_LL			<<  0  |
+	(PERF_COUNT_HW_CACHE_OP_READ		<<  8) |
+	(PERF_COUNT_HW_CACHE_RESULT_MISS	<< 16),
+};
 
 struct cg_load_info {
 	int load_avg_1;
@@ -116,6 +130,12 @@ struct cg_blkio_info {
 struct cg_hwres_info {
 	int **hw_fds;
 	long long **hw_counters;
+	/*
+ 	 * PERF_COUNT_HW_CPU_CYCLES,
+	 * PERF_COUNT_HW_INSTRUCTIONS,
+	 * PERF_COUNT_LLC_R_CACHE_REF,
+	 * PERF_COUNT_LLC_R_CACHE_MISS,
+	*/
 	long long hw_sum[NCONF_HW];
 };
 
@@ -227,10 +247,14 @@ static struct mod_info cg_info[] = {
 	{"wioqsz", HIDE_BIT,  MERGE_AVG,  STATS_NULL},
 	{"rarqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	{"warqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
-	/* hw_events info 65-68 */
-	{"cahmis", HIDE_BIT,  0,  STATS_NULL},
-	{"cahref", HIDE_BIT,  0,  STATS_NULL},
-	/* jitter info 67-72 */
+	/* hw_events info 65-70 */
+	{"cycle", HIDE_BIT,  0,  STATS_NULL},
+	{"instr", HIDE_BIT,  0,  STATS_NULL},
+	{"llcref", HIDE_BIT,  0,  STATS_NULL},
+	{"llcmis", HIDE_BIT,  0,  STATS_NULL},
+	{"CPI", HIDE_BIT,  0,  STATS_NULL},
+	{"dltCPI", HIDE_BIT,  0,  STATS_NULL},
+	/* jitter info 71-76 */
 	{"numrsw", HIDE_BIT,  0,  STATS_NULL},	/* total numbers of runqslow jitter */
 	{" tmrsw", HIDE_BIT,  0,  STATS_NULL},	/* the sum-time of runqslow delay */
 	{"numnsc", HIDE_BIT,  0,  STATS_NULL},	/* total numbers of nosched jitter */
@@ -305,12 +329,12 @@ static int perf_event_init(struct cgroup_info *cgroup)
 		}
 		counts[cpu] = cnts;
 		struct perf_event_attr attr = {
-			.type = PERF_TYPE_HARDWARE,
 			.freq = 0,
 			.disabled = 1,
 			.sample_period = 5*1000*1000-1,
 		};
 		for (i = 0; i < NCONF_HW; i++) {
+			attr.type = hwtypes[i];
 			attr.config = hwconfigs[i];
 			fds[cpu][i] = syscall(__NR_perf_event_open, &attr, cgrp_id,
 						cpu, gleader_fd, PERF_FLAG_PID_CGROUP);
@@ -416,7 +440,7 @@ int enum_containers(void)
 		n_cgs++;
 	}
 	if (!perf_fail) {
-		for (i = 65; i < 67; i++)
+		for (i = 65; i < 71; i++)
 			cg_info[i].summary_bit = DETAIL_BIT;
 	}
 
@@ -481,7 +505,7 @@ int enum_containers_ext(char *parent)
 		}
 		if (!perf_fail) {
 			int i;
-			for (i = 65; i < 67; i++)
+			for (i = 65; i < 71; i++)
 				cg_info[i].summary_bit = DETAIL_BIT;
 		}
 	}
@@ -543,7 +567,7 @@ static void init_cgroups(void)
 
 	ret = cg_init_jitter();
 	if (!ret) {
-		for (i = 67; i < 73; i++)
+		for (i = 71; i < 76; i++)
 			cg_info[i].summary_bit = DETAIL_BIT;
 	}
 	cgroup_init_time = time(NULL);
@@ -1352,25 +1376,32 @@ static void
 set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 {
 	/*
- 	 * _cachms: delta(cache_miss)		65
- 	 * cachmis: cache_miss accumulated	66
- 	 * _cachrf: delta(cache_refer)		67
- 	 * cachref: cache_refer accumulated	68
+ 	 * cpu_cycles  :        65
+ 	 * instructions:        66
+ 	 * llc_R_acce  :        67
+ 	 * llc_R_miss  :        68
+ 	 * CPI         :        69
+ 	 * delta CPI   :        70
  	* */
-	st_array[0] = cur_array[0] - pre_array[0];
-	st_array[1] = cur_array[1] - pre_array[1];
+	st_array[0] = cur_array[0];
+	st_array[1] = cur_array[1];
+	st_array[2] = cur_array[2];
+	st_array[3] = cur_array[3];
+	st_array[4] = (cur_array[1]/pre_array[0])*100;
+	st_array[5] = ((cur_array[1]-pre_array[1])/
+			(pre_array[0]-pre_array[0]))*100;
 }
 
 static void
 set_cg_jit_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 {
 	/*
- 	 * numrqs: numbers of runqueue-slower jitter	67
- 	 * tmrqs:  time of runqeueue-slower jitter	68
- 	 * numnsc: numbers of system-delay jitter	69
- 	 * tmnsc:  time of system-delay jitter		70
- 	 * numirq: numbers of irqoff of jitter		71
- 	 * tmirq:  time of irqoff jitter		72
+ 	 * numrqs: numbers of runqueue-slower jitter	71
+ 	 * tmrqs:  time of runqeueue-slower jitter	72
+ 	 * numnsc: numbers of system-delay jitter	73
+ 	 * tmnsc:  time of system-delay jitter		74
+ 	 * numirq: numbers of irqoff of jitter		75
+ 	 * tmirq:  time of irqoff jitter		76
  	* */
 	st_array[0] = cur_array[0] - pre_array[0];
 	st_array[1] = cur_array[1] - pre_array[1];
@@ -1388,7 +1419,7 @@ set_cgroup_record(struct module *mod, double st_array[],
 	set_memory_record(&st_array[16], &pre_array[16], &cur_array[16]);
 	set_blkio_record(&st_array[51], &pre_array[51], &cur_array[51], inter);
 	set_hwres_record(&st_array[65], &pre_array[65], &cur_array[65]);
-	set_cg_jit_record(&st_array[67], &pre_array[67], &cur_array[67]);
+	set_cg_jit_record(&st_array[71], &pre_array[71], &cur_array[71]);
 }
 
 void
