@@ -27,7 +27,10 @@ export EXTRA_LDFLAGS
 export TARGET_LIST
 
 .PHONY: all lib tools binary install $(TARGET_LIST)
-all: config-host.mak $(OBJ_LIB_PATH) $(OBJ_TOOLS_PATH) lib tools binary
+all: config-host.mak $(OBJ_LIB_PATH) $(OBJ_TOOLS_PATH) clean_rules lib tools binary
+
+clean_rules:
+	find $(OBJPATH)/.sysak_components -name ".sysak.rules" |xargs rm -rf
 
 lib:
 	make -C $(SRC)/lib
@@ -67,6 +70,7 @@ install:
 	cp $(OBJPATH)/.sysak_components /usr/local/sysak/ -rf
 	mkdir -p /etc/sysak
 	mkdir -p /var/log/sysak
+	cp $(SRC)/../rpm/sysak_server.conf /usr/local/sysak/
 ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf),)
 		cp $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf /etc/sysak/
 		cp $(SRC)/../rpm/sysak.service /usr/lib/systemd/system/

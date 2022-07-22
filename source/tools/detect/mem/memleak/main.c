@@ -10,14 +10,14 @@
 #include <dirent.h>
 #include <sys/sysinfo.h>
 #include <pthread.h>
-
+#include <signal.h>
 #include "memleak.h"
 #include "user_api.h"
 
 extern int read_meminfo(struct meminfo *mem);
-extern int slab_main(struct memleak_settings *set);
+extern int slab_main(struct memleak_settings *set, int fd);
 extern int vmalloc_main(int argc, char **argv);
-extern int page_main(struct memleak_settings *set);
+extern int page_main(struct memleak_settings *set, int fd);
 static int error = 0;
 static int off = 0;
 static struct meminfo mem;
@@ -114,27 +114,37 @@ int get_arg(struct memleak_settings *set, int argc, char * argv[])
 }
 
 
+static int memleak_open(void)
+{
+    int fd = 0;
+    fd = open("/dev/sysak", O_RDWR);
+    if (fd < 0) {
+        printf("open memleak check error\n");
+    }
+   return fd; 
+}
+
+static int memleak_close(int fd)
+{
+    if (fd >0)
+        close(fd);
+}
+
 static int memleak_off(void)
 {
 	int fd = 0;
-
-	fd = open("/dev/sysak", O_RDWR);
-    if (fd < 0) {
-        printf("open memleak check error\n");
-        return -1;
-    }
+    
+    fd = memleak_open();
 	ioctl(fd, MEMLEAK_OFF);
-	close(fd);
-	return 0;
+    memleak_close(fd);	
+    return 0;
 }
-
-
 
 int main(int argc, char **argv)
 {
 	struct memleak_settings set;
 	int ret = 0;
-
+    int fd = 0;
 	memset(&set, 0, sizeof(set));
 
 	get_arg(&set, argc, argv);
@@ -147,7 +157,9 @@ int main(int argc, char **argv)
 		return 0;
 	}
 	printf("type %d\n", set.type);
-
+    fd = memleak_open();
+    if (fd < 0)
+        return 0;
 	switch (set.type) {
 
 		case MEMLEAK_TYPE_VMALLOC:
@@ -155,12 +167,13 @@ int main(int argc, char **argv)
 			break;
 
 		case MEMLEAK_TYPE_PAGE:
-			page_main(&set);
+			page_main(&set, fd);
 			break;
 
 		default:
-			slab_main(&set);
+			slab_main(&set, fd);
 			break;
 	};
+    memleak_close(fd);
 	return 0;
 }

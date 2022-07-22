@@ -11,6 +11,7 @@
 #elif defined (__aarch64__)
 #define TIF_NEED_RESCHED	1
 #endif
+#define SEC_TO_NS (1000*1000*1000)
 
 enum {
 	MOD_FILE = 0,
@@ -57,13 +58,13 @@ struct enq_info {
 
 struct jsons {
 	cJSON *root, *datasources;
-	cJSON *runqslw, *tms, *tms_data, *tbl, *tbl_data;
-	cJSON *nosched;
-	cJSON *irqoff;
+	cJSON *tms, *tms_data;
+	cJSON *tbl, *tbl_data;
+	cJSON *evt, *evt_data;
 };
 
 struct summary {
-	__u64 delay, cnt, max;
+	__u64 delay, cnt, real_cnt, max;
 };
 
 struct env {

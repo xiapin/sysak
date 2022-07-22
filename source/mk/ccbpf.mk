@@ -6,10 +6,13 @@ ARCH := $(shell uname -m | sed 's/x86_64/x86/')
 LIBBPF_OBJ := $(OBJ_LIB_PATH)/libbpf.a
 CXX ?= g++
 
+# source/mk/target.inc use $(TARGET_PATH)
 ifeq ($(KERNEL_DEPEND), Y)
 OUTPUT := $(OBJ_TOOLS_PATH)
+TARGET_PATH := $(OBJ_TOOLS_PATH)
 else
 OUTPUT := $(OBJ_TOOLS_ROOT)
+TARGET_PATH := $(OBJ_TOOLS_ROOT)
 endif
 
 DEPEND := "prev{btf}"

@@ -5,6 +5,7 @@ kern_ver=`uname -r`
 objdir=$(pwd)/out
 enable_lkm=NO
 enable_libbpf=NO
+enable_packages=NO
 disable_libbpf=NO
 static_link=no
 enable_all=no
@@ -19,6 +20,7 @@ usage() {
 	echo "  --buiddir=OBJDIR           the build dir"
 	echo "  --enable-lkm               enable linux kernel module"
 	echo "  --enable-libbpf            enable libbpf"
+	echo "  --enable-packages          auto install dependent packages for tools"
 	echo "  --disable-libbpf           disable all bpf tools"
 	echo "  --enable-static            static link for c/cpp tools"
 	echo "  --enable-target-xxx        xxx is the actual tool, like memleak, you may use --show-target to list all"
@@ -89,12 +91,48 @@ check_lkm_depend() {
 	fi
 }
 
+check_packages_depend() {
+	PWD=$(pwd)
+	PACKAGEBUILD_TMP="packagebuild_tmp"
+	BUILD_SH="package_build.sh"
+	SH_ABS_PATH=$(pwd)/$PACKAGEBUILD_TMP/$BUILD_SH
+
+	mkdir -p $(pwd)/$PACKAGEBUILD_TMP
+	if [ -f "$SH_ABS_PATH" ];then
+		rm -f $SH_ABS_PATH
+	fi
+	chmod +x $SH_ABS_PATH
+
+	echo "$(grep "DEP_PKG_INSTALL" $(pwd)/source/ -nr | awk -F ":=" '{print$2}'| tr -d "\"")"| while read line
+	do
+		echo $line
+		OLDIFS="$IFS"
+		IFS=@
+		echo "cd $(pwd)/$PACKAGEBUILD_TMP" >> $SH_ABS_PATH
+		for cmd in $line
+		do
+			echo $cmd >> $SH_ABS_PATH
+			if [[ $cmd =~ "git clone" ]];then
+				echo "WARNING:\"$cmd\" failed"
+			fi
+			#source $cmd
+		done
+		IFS="$OLDIFS"
+		echo "cd $PWD" >> $SH_ABS_PATH
+	done
+	exec ./$PACKAGEBUILD_TMP/$BUILD_SH
+	cd $PWD
+}
+
 check_depend() {
 	if [ $enable_lkm = "YES" ]; then
 		check_lkm_depend
 	fi
 	if [ $enable_libbpf = "YES" ]; then
 		check_bpf_depend
+	fi
+	if [ $enable_packages = "YES" ]; then
+		check_packages_depend
 	fi
 }
 
@@ -112,6 +150,9 @@ for opt; do
 			;;
 		--enable-libbpf)
 			enable_libbpf="YES"
+			;;
+		--enable-packages)
+			enable_packages="YES"
 			;;
 		--disable-libbpf)
 			disable_libbpf="YES"

@@ -3,6 +3,7 @@
 
 #define TASK_COMM_LEN	16
 #define CPU_ARRY_LEN	4
+#define MAX_NR 1024
 
 struct info {
 	__u64 prev_counter;
