@@ -68,7 +68,6 @@ struct
 void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 {
 	struct event event = {};
-	struct sock *sk = NULL;
 	struct net *net = NULL;
 	struct iphdr ih = {};
 	struct tcphdr th = {};
@@ -160,6 +159,7 @@ int BPF_KPROBE(tcp_drop, struct sock *sk, struct sk_buff *skb)
 SEC("kprobe/kfree_skb")
 int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
 {
+	struct sock *sk;
 	bpf_probe_read(&sk, sizeof(sk), &skb->sk);
 	handle(ctx, sk, skb);
 	return 0;
