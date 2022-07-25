@@ -65,6 +65,8 @@ impl fmt::Display for LatencyHist {
 }
 
 pub struct LatencyEvent {
+    pid: u32,
+    comm: String,
     src: SocketAddr,
     dst: SocketAddr,
     latency: u32,
@@ -72,6 +74,8 @@ pub struct LatencyEvent {
 
 impl LatencyEvent {
     pub fn new(ptr: *const latency_event) -> LatencyEvent {
+        let pid = unsafe { (*ptr).pid };
+        let comm = unsafe { String::from_utf8_unchecked((*ptr).comm.to_vec()) };
         let daddr = unsafe { (*ptr).ap.daddr };
         let dport = unsafe { (*ptr).ap.dport };
         let saddr = unsafe { (*ptr).ap.saddr };
@@ -79,6 +83,8 @@ impl LatencyEvent {
         let src = SocketAddr::new(IpAddr::V4(Ipv4Addr::from(u32::from_be(saddr))), sport);
         let dst = SocketAddr::new(IpAddr::V4(Ipv4Addr::from(u32::from_be(daddr))), dport);
         LatencyEvent {
+            pid,
+            comm,
             latency: unsafe { (*ptr).latency },
             src,
             dst,
@@ -88,6 +94,9 @@ impl LatencyEvent {
 
 impl fmt::Display for LatencyEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.pid != 0 {
+            write!(f, "{}/{}", self.pid, self.comm)?;
+        }
         write!(
             f,
             "{} -> {}, latency: {}ms",
@@ -98,6 +107,7 @@ impl fmt::Display for LatencyEvent {
 
 pub enum Event {
     LatencyEvent(LatencyEvent),
+    AppLatencyEvent(LatencyEvent),
 }
 
 impl Event {
@@ -105,6 +115,9 @@ impl Event {
         let et = unsafe { (*ptr).event_type } as u32;
         match et {
             LATENCY_EVENT => Ok(Event::LatencyEvent(LatencyEvent::new(unsafe {
+                &(*ptr).__bindgen_anon_1.le
+            }))),
+            APP_LATENCY_EVENT => Ok(Event::AppLatencyEvent(LatencyEvent::new(unsafe {
                 &(*ptr).__bindgen_anon_1.le
             }))),
             _ => {

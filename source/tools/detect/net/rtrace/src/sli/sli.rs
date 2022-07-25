@@ -97,8 +97,7 @@ impl<'a> Sli<'a> {
     }
 
     /// update with zero map value.
-    pub fn lookup_and_update_latency_map(&mut self) -> Result<Option<LatencyHist>> {
-        let key: u32 = 0;
+    pub fn lookup_and_update_latency_map(&mut self, key: u32) -> Result<Option<LatencyHist>> {
         let map_key = unsafe {
             std::slice::from_raw_parts(&key as *const u32 as *const u8, std::mem::size_of::<u32>())
         };
@@ -134,6 +133,13 @@ impl<'a> Sli<'a> {
             self.skel.links.kprobe__tcp_ack =
                 Some(self.skel.progs_mut().kprobe__tcp_ack().attach()?);
         }
+        Ok(())
+    }
+
+    pub fn attach_applatency(&mut self) -> Result<()> {
+        self.skel.links.tp__tcp_probe = Some(self.skel.progs_mut().tp__tcp_probe().attach()?);
+        self.skel.links.tp__tcp_rcv_space_adjust =
+            Some(self.skel.progs_mut().tp__tcp_rcv_space_adjust().attach()?);
         Ok(())
     }
 }

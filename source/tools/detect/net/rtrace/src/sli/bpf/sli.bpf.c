@@ -12,14 +12,14 @@
 struct
 {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
+    __uint(max_entries, 2);
     __type(key, u32);
     __type(value, struct latency_hist);
 } latency_map SEC(".maps");
 
 struct
 {
-    __uint(tyoe, BPF_MAP_TYPE_HASH);
+    __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 102400);
     __type(key, u64);
     __type(value, u64);
@@ -92,43 +92,36 @@ int BPF_KPROBE(kprobe__tcp_rtt_estimator, struct sock *sk, long mrtt_us)
     return 0;
 }
 
-struct tracepoint_args
-{
-    u32 pad[2];
-    struct sock *skaddr;
-};
-
 SEC("tracepoint/tcp/tcp_rcv_space_adjust")
-int tp__tcp_rcv_space_adjust(struct trace_event_raw_tcp_event_sk *args)
+int tp__tcp_rcv_space_adjust(struct trace_event_raw_tcp_event_sk *ctx)
 {
+    struct trace_event_raw_tcp_event_sk args = {};
+    struct event e = {};
+    struct latency_hist *lhp;
+    struct sock *sk;
+    u64 cur_ts, delta;
     u32 key = 1;
     u64 *pre_ts;
-    pre_ts = bpf_map_lookup_elem(&sockmap, &args->sock_cookie);
 
+    bpf_probe_read(&args, sizeof(args), ctx);
+    pre_ts = bpf_map_lookup_elem(&sockmap, &args.sock_cookie);
     if (pre_ts)
     {
-        u64 cur_ts = bpf_ktime_get_ns();
-        u64 delta = (cur_ts - *pre_ts)/1000000;
+        cur_ts = bpf_ktime_get_ns();
+        delta = (cur_ts - *pre_ts) / 1000000;
 
-        struct latency_hist *lhp;
         lhp = bpf_map_lookup_elem(&latency_map, &key);
-
         if (lhp)
         {
-            if (delta < MAX_LATENCY_SLOTS)
-                lhp->latency[delta]++;
-
             if (delta >= lhp->threshold)
             {
-                struct event e = {};
-                e.event_type = USR_LATENCY_EVENT;
-                e.le.ap.saddr = args->saddr;
-                e.le.ap.daddr = args->daddr;
-                e.le.ap.sport = args->sport;
-                e.le.ap.dport = args->dport;
+                sk = (struct sock *)args.skaddr;
+                e.le.pid = args.ent.pid;
+                bpf_get_current_comm(e.le.comm, sizeof(e.le.comm));
+                e.event_type = APP_LATENCY_EVENT;
                 e.le.latency = delta;
-
-                bpf_perf_event_output(args, &events, BPF_F_CURRENT_CPU, &e, sizeof(e));
+                set_addr_pair_by_sock(sk, &e.le.ap);
+                bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &e, sizeof(e));
             }
         }
     }
@@ -136,10 +129,12 @@ int tp__tcp_rcv_space_adjust(struct trace_event_raw_tcp_event_sk *args)
 }
 
 SEC("tracepoint/tcp/tcp_probe")
-int tp__tcp_probe(struct trace_event_raw_tcp_probe *args)
+int tp__tcp_probe(struct trace_event_raw_tcp_probe *ctx)
 {
     u64 ts = bpf_ktime_get_ns();
-    bpf_map_update_elem(&sockmap, &args->sock_cookie, &ts, 0);
+    struct trace_event_raw_tcp_probe args = {};
+    bpf_probe_read(&args, sizeof(args), ctx);
+    bpf_map_update_elem(&sockmap, &args.sock_cookie, &ts, BPF_ANY);
     return 0;
 }
 

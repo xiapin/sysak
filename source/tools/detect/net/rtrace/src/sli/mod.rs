@@ -18,6 +18,11 @@ pub struct SliCommand {
     latency: bool,
     #[structopt(
         long,
+        help = "Collect latency between kernel and application in receiving side"
+    )]
+    applatency: bool,
+    #[structopt(
+        long,
         default_value = "1000",
         help = "Max latency to trace, default is 1000ms"
     )]
@@ -70,7 +75,12 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
 
     if opts.latency {
         sli.attach_latency()?;
-        sli.lookup_and_update_latency_map()?;
+        sli.lookup_and_update_latency_map(0)?;
+    }
+
+    if opts.applatency {
+        sli.attach_applatency()?;
+        sli.lookup_and_update_latency_map(1)?;
     }
 
     loop {
@@ -103,17 +113,33 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
         }
 
         if opts.latency {
-            if let Some(x) = sli.lookup_and_update_latency_map()? {
+            if let Some(x) = sli.lookup_and_update_latency_map(0)? {
                 sli_output.latencyhist = x;
             }
 
             if opts.shell {
+                println!("rtt histogram");
                 println!("{}", sli_output.latencyhist);
                 for event in &sli_output.events {
                     match event {
                         Event::LatencyEvent(le) => {
                             println!("{}", le);
                         }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        if opts.applatency {
+            if opts.shell {
+                println!("application latency event:");
+                for event in &sli_output.events {
+                    match event {
+                        Event::AppLatencyEvent(le) => {
+                            println!("{}", le);
+                        }
+                        _ => {}
                     }
                 }
             }

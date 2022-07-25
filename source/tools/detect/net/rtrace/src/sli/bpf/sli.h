@@ -23,7 +23,7 @@ typedef long long unsigned int u64;
 
 enum {
     LATENCY_EVENT = 0,
-    USR_LATENCY_EVENT,
+    APP_LATENCY_EVENT,
 };
 
 struct addr_pair
@@ -44,8 +44,10 @@ struct latency_hist
 
 struct latency_event
 {
-    struct addr_pair ap;
+    u32 pid;
     u32 latency;
+    u8 comm[16];
+    struct addr_pair ap;
 };
 
 struct event
