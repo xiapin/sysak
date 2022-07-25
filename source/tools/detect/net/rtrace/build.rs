@@ -85,10 +85,16 @@ fn compile_drop_ebpf() {
     create_dir_all("./src/drop/bpf/.output").unwrap();
 
     let drop_skel = Path::new("./src/drop/bpf/.output/drop.skel.rs");
-    SkeletonBuilder::new()
+    match SkeletonBuilder::new()
         .source(DROP_BPF_SRC)
         .build_and_generate(&drop_skel)
-        .unwrap();
+    {
+        Ok(()) => {}
+        Err(e) => {
+            println!("{}", e);
+            panic!()
+        }
+    }
 
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
