@@ -23,6 +23,7 @@ typedef long long unsigned int u64;
 
 enum {
     LATENCY_EVENT = 0,
+    USR_LATENCY_EVENT,
 };
 
 struct addr_pair
