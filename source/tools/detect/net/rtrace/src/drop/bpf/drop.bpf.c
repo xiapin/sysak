@@ -64,8 +64,8 @@ struct
 // 	return 0;
 // }
 
-SEC("kprobe/kfree_skb")
-int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
+
+void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 {
 	struct event event = {};
 	struct sock *sk = NULL;
@@ -79,9 +79,6 @@ int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
 	char *head;
 
 	event.stackid = bpf_get_stackid(ctx, &stackmap, 0);
-
-	bpf_probe_read(&sk, sizeof(sk), &skb->sk);
-
 	if (sk)
 	{
 		// address pair
@@ -150,6 +147,21 @@ int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
 
 out:
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+}
+
+
+SEC("kprobe/tcp_drop")
+int BPF_KPROBE(tcp_drop, struct sock *sk, struct sk_buff *skb)
+{
+	handle(ctx, sk, skb);
+	return 0;
+}
+
+SEC("kprobe/kfree_skb")
+int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
+{
+	bpf_probe_read(&sk, sizeof(sk), &skb->sk);
+	handle(ctx, sk, skb);
 	return 0;
 }
 
