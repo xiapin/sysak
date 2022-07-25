@@ -41,11 +41,15 @@ __always_inline void handle_rtt(void *ctx, struct sock *sk, u32 rtt)
     lhp = bpf_map_lookup_elem(&latency_map, &key);
     if (lhp)
     {
-        rtt /= 8000;
+        rtt /= 1000;
         asm volatile("%0 = %1"
                      : "=r"(rtt)
                      : "r"(rtt));
-        if (rtt >= MAX_LATENCY_SLOTS)
+        
+        if (rtt < MAX_LATENCY_SLOTS)
+            lhp->latency[rtt]++;
+        
+        if (rtt >= lhp->threshold)
         {
             lhp->overflow++;
             struct event e = {};
@@ -53,8 +57,6 @@ __always_inline void handle_rtt(void *ctx, struct sock *sk, u32 rtt)
             e.le.latency = rtt;
             bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &e, sizeof(e));
         }
-        else
-            lhp->latency[rtt]++;
     }
 }
 

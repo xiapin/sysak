@@ -18,8 +18,8 @@ typedef unsigned int u32;
 typedef long long unsigned int u64;
 #endif
 
-#define MAX_LATENCY_MS 1024
-#define MAX_LATENCY_SLOTS (MAX_LATENCY_MS >> 3)
+#define MAX_LATENCY_MS 1000
+#define MAX_LATENCY_SLOTS (MAX_LATENCY_MS)
 
 enum {
     LATENCY_EVENT = 0,
@@ -36,6 +36,8 @@ struct addr_pair
 struct latency_hist
 {
     u32 overflow;
+    //max latency slot by user setting
+    u32 threshold;
     u32 latency[MAX_LATENCY_SLOTS];
 };
 

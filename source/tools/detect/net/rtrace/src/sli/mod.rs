@@ -13,10 +13,19 @@ use structopt::StructOpt;
 pub struct SliCommand {
     #[structopt(long, help = "Collect retransmission metrics")]
     retran: bool,
+
     #[structopt(long, help = "Collect latency metrics")]
     latency: bool,
+    #[structopt(
+        long,
+        default_value = "1000",
+        help = "Max latency to trace, default is 1000ms"
+    )]
+    threshold: u32,
+
     #[structopt(long, default_value = "3", help = "Data collection cycle, in seconds")]
     period: u64,
+
     #[structopt(long, help = "Output every sli to shell")]
     shell: bool,
 }
@@ -55,12 +64,13 @@ fn latency_sli(sli: &mut Sli) -> Result<()> {
 pub fn build_sli(opts: &SliCommand) -> Result<()> {
     let mut old_snmp = Snmp::from_file("/proc/net/snmp")?;
     let delta_ns = opts.period * 1_000_000_000;
-    let mut sli = Sli::new(log::log_enabled!(log::Level::Debug))?;
+    let mut sli = Sli::new(log::log_enabled!(log::Level::Debug), opts.threshold)?;
     let mut sli_output: SliOutput = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
     let mut pre_ts = 0;
 
     if opts.latency {
         sli.attach_latency()?;
+        sli.lookup_and_update_latency_map()?;
     }
 
     loop {
@@ -110,6 +120,8 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
         }
 
         old_snmp = new_snmp;
+        // clear
+        sli_output = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
         println!("\n\n");
     }
 }

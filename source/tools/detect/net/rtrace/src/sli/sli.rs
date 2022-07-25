@@ -57,12 +57,15 @@ pub struct Sli<'a> {
 }
 
 impl<'a> Sli<'a> {
-    pub fn new(debug: bool) -> Result<Sli<'a>> {
+    pub fn new(debug: bool, threshold: u32) -> Result<Sli<'a>> {
         let skel = open_load_skel(debug)?;
+        let mut zero_latency_hist: latency_hist =
+            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        zero_latency_hist.threshold = threshold;
         Ok(Sli {
             skel,
             rx: None,
-            zero_latency_hist: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
+            zero_latency_hist,
         })
     }
 
@@ -125,12 +128,8 @@ impl<'a> Sli<'a> {
     pub fn attach_latency(&mut self) -> Result<()> {
         let ksyms = Kallsyms::try_from("/proc/kallsyms")?;
         if ksyms.has_sym("tcp_rtt_estimator") {
-            self.skel.links.kprobe__tcp_rtt_estimator = Some(
-                self.skel
-                    .progs_mut()
-                    .kprobe__tcp_rtt_estimator()
-                    .attach()?,
-            );
+            self.skel.links.kprobe__tcp_rtt_estimator =
+                Some(self.skel.progs_mut().kprobe__tcp_rtt_estimator().attach()?);
         } else {
             self.skel.links.kprobe__tcp_ack =
                 Some(self.skel.progs_mut().kprobe__tcp_ack().attach()?);
