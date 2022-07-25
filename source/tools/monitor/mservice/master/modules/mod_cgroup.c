@@ -1388,8 +1388,11 @@ set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 	st_array[2] = cur_array[2];
 	st_array[3] = cur_array[3];
 	st_array[4] = (cur_array[1]/pre_array[0])*100;
-	st_array[5] = ((cur_array[1]-pre_array[1])/
-			(pre_array[0]-pre_array[0]))*100;
+	if (cur_array[0]-pre_array[0] == 0)
+		st_array[5] = 0;
+	else
+		st_array[5] = ((cur_array[1]-pre_array[1])/
+			(cur_array[0]-pre_array[0]))*100;
 }
 
 static void
