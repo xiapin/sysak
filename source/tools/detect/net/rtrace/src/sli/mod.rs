@@ -72,6 +72,7 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
     let mut sli = Sli::new(log::log_enabled!(log::Level::Debug), opts.threshold)?;
     let mut sli_output: SliOutput = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
     let mut pre_ts = 0;
+    let mut has_output = false;
 
     if opts.latency {
         sli.attach_latency()?;
@@ -98,6 +99,8 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
 
         let new_snmp = Snmp::from_file("/proc/net/snmp")?;
 
+        has_output = false;
+
         if opts.retran {
             sli_output.outsegs = snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "OutSegs"))?;
             sli_output.retran = snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "RetransSegs"))?;
@@ -109,6 +112,7 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
                     sli_output.retran,
                     sli_output.retran as f64 / sli_output.outsegs as f64
                 );
+                has_output = true;
             }
         }
 
@@ -128,15 +132,21 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
                         _ => {}
                     }
                 }
+                has_output = true;
             }
         }
 
         if opts.applatency {
             if opts.shell {
-                println!("application latency event:");
+                let mut first = true;
                 for event in &sli_output.events {
                     match event {
                         Event::AppLatencyEvent(le) => {
+                            if first {
+                                has_output = true;
+                                first = false;
+                                println!("application latency event:");
+                            }
                             println!("{}", le);
                         }
                         _ => {}
@@ -148,6 +158,8 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
         old_snmp = new_snmp;
         // clear
         sli_output = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-        println!("\n\n");
+        if has_output {
+            println!("\n\n");
+        }
     }
 }
