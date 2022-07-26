@@ -21,7 +21,7 @@ pub struct SliCommand {
         long,
         help = "Collect latency between kernel and application in receiving side"
     )]
-    applatency: bool,
+    applat: bool,
     #[structopt(
         long,
         default_value = "1000",
