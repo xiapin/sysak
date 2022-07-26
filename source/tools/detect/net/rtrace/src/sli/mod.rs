@@ -17,6 +17,7 @@ pub struct SliCommand {
     #[structopt(long, help = "Collect latency metrics")]
     latency: bool,
     #[structopt(
+        short,
         long,
         help = "Collect latency between kernel and application in receiving side"
     )]
