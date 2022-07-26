@@ -137,6 +137,7 @@ struct cg_hwres_info {
 	 * PERF_COUNT_LLC_R_CACHE_MISS,
 	*/
 	long long hw_sum[NCONF_HW];
+	long long CPI, deltaCPI;
 };
 
 struct sum_jitter_info {
@@ -954,7 +955,7 @@ static int get_blkinfo_stats(int cg_idx)
 
 static int get_hwres_stats(int cg_idx)
 {
-	long long count;
+	long long count, pre_cycle, pre_ins;
 	int i, j, nr;
 	struct cg_hwres_info *hwres;
 
@@ -962,6 +963,8 @@ static int get_hwres_stats(int cg_idx)
 	if (!hwres->hw_fds || !hwres->hw_counters)
 		return 0;	//todo
 
+	pre_cycle = hwres->hw_sum[0];
+	pre_ins = hwres->hw_sum[1];
 	for (i = 0; i < nr_cpus; i++) {
 		if (!hwres->hw_fds[i] || !hwres->hw_counters[i])
 			continue;
@@ -976,6 +979,15 @@ static int get_hwres_stats(int cg_idx)
 			hwres->hw_sum[j] += count;
 		}
 	}
+	if (hwres->hw_sum[1])
+		hwres->CPI = (100*hwres->hw_sum[0])/hwres->hw_sum[1];
+	else
+		hwres->CPI = 0;
+	if (hwres->hw_sum[1]-pre_ins)
+		hwres->deltaCPI = (100*(hwres->hw_sum[0]-pre_cycle))/
+				(hwres->hw_sum[1]-pre_ins);
+	else
+		hwres->deltaCPI = 0;
 	return nr_cpus*sizeof(long long);
 }
 
@@ -1194,6 +1206,8 @@ static int print_cgroup_hwres(char *buf, int len, struct cg_hwres_info *info)
 
 	for (i = 0; i < NCONF_HW; i++)
 		pos += snprintf(buf + pos, len - pos, "%lld,", info->hw_sum[i]);
+	pos += snprintf(buf + pos, len - pos, "%lld,", info->CPI);
+	pos += snprintf(buf + pos, len - pos, "%lld,", info->deltaCPI);
 	return pos;
 }
 
@@ -1387,12 +1401,17 @@ set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 	st_array[1] = cur_array[1];
 	st_array[2] = cur_array[2];
 	st_array[3] = cur_array[3];
-	st_array[4] = (cur_array[1]/pre_array[0])*100;
+	if (pre_array[0])
+		st_array[4] = (100*cur_array[0])/cur_array[1];
+	else
+		st_array[4] = 0;
 	if (cur_array[0]-pre_array[0] == 0)
 		st_array[5] = 0;
 	else
-		st_array[5] = ((cur_array[1]-pre_array[1])/
-			(cur_array[0]-pre_array[0]))*100;
+		st_array[5] = (100*(cur_array[0]-pre_array[0]))/
+			(cur_array[1]-pre_array[1]);
+	pre_array[0] = cur_array[0];
+	pre_array[1] = cur_array[1];
 }
 
 static void
