@@ -95,7 +95,7 @@ impl LatencyEvent {
 impl fmt::Display for LatencyEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.pid != 0 {
-            write!(f, "{}/{}", self.pid, self.comm)?;
+            write!(f, "{}/{} ", self.pid, self.comm)?;
         }
         write!(
             f,
