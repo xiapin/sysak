@@ -381,13 +381,13 @@ for key,value in d.iteritems():
 	#	continue
 
 if (enable_arg == 0 or disable_arg == 0) and list_arg == 0:
-	useage()
+	usage()
 	exit(0)
 if enable_arg == 1:
 	if eventpid == 0:
 		usage(sys.argv[0])
 		sys.exit("  ::target pid must be set first, use -p")
-	if disable_level:
+	if disable_arg == 1:
 		sys.exit("  ::enable can't use with disable together, only -d or -e")
 	check_essential_files(stack_trace)
 	i = 0
