@@ -80,7 +80,7 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
         sli.lookup_and_update_latency_map(0)?;
     }
 
-    if opts.applatency {
+    if opts.applat {
         sli.attach_applatency()?;
         sli.lookup_and_update_latency_map(1)?;
     }
@@ -137,7 +137,7 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
             }
         }
 
-        if opts.applatency {
+        if opts.applat {
             if opts.shell {
                 let mut first = true;
                 for event in &sli_output.events {
