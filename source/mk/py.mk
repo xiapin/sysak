@@ -6,10 +6,10 @@ endif
 
 all: $(target) target_rule
 
-$(target): $(mods)
+$(target): $(pymods)
 	cp $@.py $(TARGET_PATH)/$@
 
-$(mods): %: %.py
-	cp $< $(TARGET_PATH)/$@
+$(pymods): %: %.py
+	cp $< $(TARGET_PATH)/$@.py
 
 include $(SRC)/mk/target.inc
