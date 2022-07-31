@@ -286,7 +286,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e = &ev;
 	time(&t);
 	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%F_%H:%M:%S", tm);
+	strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
 	e->delay = e->delay/(1000*1000);
 	if (env.summary) {
 		struct summary *sumi;
@@ -301,13 +301,14 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			return;
 		record_summary(sumi, e->cpu, false);
 	} else {
-		fprintf(filep, "%-21s %-5d %-15s %-8d %-10llu\n",
-			ts, e->cpu, e->comm, e->pid, e->delay);
+		fprintf(filep, "%-21s %-5d %-15s %-8d %-10llu %-18.6f\n",
+			ts, e->cpu, e->comm, e->pid, e->delay, ((double)e->stamp/1000000000));
 		print_stack(stackmp_fd, e->ret, ksyms);
 	}
 }
 
-void irqoff_handler(int poll_fd, int map_fd)
+void irqoff_handler(int poll_fd, int map_fd, struct irqoff_bpf *obj,
+		struct bpf_link **sw_mlinks, struct bpf_link **hw_mlinks)
 {
 	int arg_key = 0, err = 0;
 	struct arg_info arg_info = {};
@@ -315,8 +316,8 @@ void irqoff_handler(int poll_fd, int map_fd)
 	struct perf_buffer_opts pb_opts = {};
 
 	if (!env.summary) {
-		fprintf(filep, "%-21s %-5s %-15s %-8s %-10s\n",
-			"TIME(irqoff)", "CPU", "COMM", "TID", "LAT(us)");
+		fprintf(filep, "%-21s %-5s %-15s %-8s %-10s %-18s\n",
+			"TIME(irqoff)", "CPU", "COMM", "TID", "LAT(ms)", "STAMP");
 	} else {
 		int i;
 		char buf[128] = {' '};
@@ -342,6 +343,9 @@ void irqoff_handler(int poll_fd, int map_fd)
 		fprintf(stderr, "Failed to update arg_map\n");
 		goto clean_irqoff;
 	}
+
+	if (!attach_prog_to_perf(obj, sw_mlinks, hw_mlinks))
+		goto clean_irqoff;
 
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
@@ -451,9 +455,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	if (!attach_prog_to_perf(obj, sw_mlinks, hw_mlinks))
-		goto cleanup;
-
 	arg_fd = bpf_map__fd(obj->maps.arg_map);
 	ent_fd = bpf_map__fd(obj->maps.events);
 	stackmp_fd = bpf_map__fd(obj->maps.stackmap);
@@ -468,7 +469,7 @@ int main(int argc, char **argv)
 	if (env.duration)
 		alarm(env.duration);
 
-	irqoff_handler(ent_fd, arg_fd);
+	irqoff_handler(ent_fd, arg_fd, obj, sw_mlinks, hw_mlinks);
 
 cleanup:
 	for (i = 0; i < nr_cpus; i++) {

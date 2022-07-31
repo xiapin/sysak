@@ -254,7 +254,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e = &tmpe;
 	time(&t);
 	tm = localtime(&t);
-	strftime(ts, sizeof(ts), "%F_%H:%M:%S", tm);
+	strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
 	e->delay = e->delay/(1000*1000);
 	if (env.summary) {
 		struct summary *sumi;
@@ -269,9 +269,9 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			return;
 		record_summary(sumi, e->cpuid, false);
 	} else {
-		fprintf(filep, "%-21llu %-5d %-15s %-8d %-10llu %s\n",
-			e->stamp, e->cpuid, e->comm, e->pid,
-			e->delay, (e->exit==e->stamp)?"(EOF)":"");
+		fprintf(filep, "%-18.6f %-5d %-15s %-8d %-10llu %-21s\n",
+			((double)e->stamp/1000000000), e->cpuid, e->comm,
+			e->pid, e->delay, (e->exit==e->stamp)?"(EOF)":ts);
 		if (e->exit == 0)
 			print_stack(stackmp_fd, e->ret);
 		fflush(filep);
@@ -290,8 +290,8 @@ int nosched_handler(int poll_fd, struct nosched_bpf *skel)
 	struct perf_buffer_opts pb_opts = {};
 
 	if (!env.summary) {
-		fprintf(filep, "%-21s %-5s %-15s %-8s %-10s\n",
-			"TIME(nosched)", "CPU", "COMM", "TID", "LAT(ms)");
+		fprintf(filep, "%-18s %-5s %-15s %-8s %-10s %-21s\n",
+			"TIME(nosched)", "CPU", "COMM", "TID", "LAT(ms)", "DATE");
 	} else {
 		int i;
 		char buf[128] = {' '};

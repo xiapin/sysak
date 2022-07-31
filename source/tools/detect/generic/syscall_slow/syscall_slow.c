@@ -208,7 +208,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	}
 }
 
-void syscall_slow_handler(int poll_fd, int map_fd)
+void syscall_slow_handler(int poll_fd, int map_fd, struct syscall_slow_bpf *obj)
 {
 	int arg_key = 0, err = 0;
 	struct arg_info arg_info = {};
@@ -234,6 +234,12 @@ void syscall_slow_handler(int poll_fd, int map_fd)
 	err = bpf_map_update_elem(map_fd, &arg_key, &arg_info, 0);
 	if (err) {
 		fprintf(stderr, "Failed to update arg_map\n");
+		goto clean_syscall_slow;
+	}
+
+	err = syscall_slow_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF programs\n");
 		goto clean_syscall_slow;
 	}
 
@@ -326,14 +332,9 @@ int main(int argc, char **argv)
 	if (env.duration)
 		alarm(env.duration);
 
-	err = syscall_slow_bpf__attach(obj);
-	if (err) {
-		fprintf(stderr, "failed to attach BPF programs\n");
-		goto cleanup;
-	}
 	memset(sys_array, 0, sizeof(sys_array));
 	err = nr_to_syscall(0, sys_array);
-	syscall_slow_handler(ent_fd, arg_fd);
+	syscall_slow_handler(ent_fd, arg_fd, obj);
 
 cleanup:
 	syscall_slow_bpf__destroy(obj);

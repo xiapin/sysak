@@ -340,12 +340,6 @@ int main(int argc, char **argv)
 		goto cleanup;
 	}
 
-	err = runqslower_bpf__attach(obj);
-	if (err) {
-		fprintf(stderr, "failed to attach BPF programs\n");
-		goto cleanup;
-	}
-
 	i = 0;
 	map_fd = bpf_map__fd(obj->maps.argmap);
 	args.targ_tgid = env.pid;
@@ -393,6 +387,13 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Failed to update flag map\n");
 		goto cleanup;
 	}
+
+	err = runqslower_bpf__attach(obj);
+	if (err) {
+		fprintf(stderr, "failed to attach BPF programs\n");
+		goto cleanup;
+	}
+
 	while (!exiting) {
 		err = perf_buffer__poll(pb, 100);
 		if (err < 0 && err != -EINTR) {
