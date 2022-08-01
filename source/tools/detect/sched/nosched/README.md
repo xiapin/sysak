@@ -4,9 +4,9 @@ nosched是一款基于ebpf的用于监控cpu长时间运行在系统态，使得
 # 使用说明
 ```
 sysak nosched [--help] [-t THRESH(ms)]   [-f LOGFILE] [-s duration(s)]  
-    -t  门限：    当内核超过门限时间不调度就记录，单位ms； ｜可选，默认10ms
-    -f log文件：  将log记录到指定文件。                    ｜可选，默认在/var/log/nosched/nosched.log
-    -s durations：设置该程序运行多长时间，单位秒；         ｜ 可选，默认永远运行
+    -t  门限：    当内核超过门限时间不调度就记录，单位ms; 可选，默认10ms
+    -f log文件：  将log记录到指定文件;可选，默认在/var/log/sysak/nosched/nosched.log
+    -s durations：设置该程序运行多长时间，单位秒; 可选，默认永远运行
 ```
 # 使用举例
 ## 运行说明
@@ -17,10 +17,10 @@ $sudo sysak nosched  -f a.log -s 30
 ## 日志输出说明
 上面结果a.log输出说明如下：
 ```
-时间戳             发生CPU      任务名字         线程ID       内核延时    
-    ｜                 \           ｜              ｜            ｜               
-TIME(nosched)          CPU        COMM            TID          LAT(ms)   
-2022-05-26_17:50:58     0         test            535832         10        
+  时间戳     发生CPU   任务名字    线程ID   内核延时   时间
+    ｜           \        ｜         ｜        ｜       |          
+TIME(nosched)    CPU     COMM       TID      LAT(ms)   DATE
+1645141.062124   0       test       535832   10        2022-07-31 18:14:50
 <0xffffffff86a01b0f> apic_timer_interrupt
 <0xffffffff868744a7> clear_page_erms
 <0xffffffff861e6add> prep_new_page

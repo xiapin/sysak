@@ -3,11 +3,12 @@
 runqslower监控的是已经就绪(处于运行状态)的任务，但是由于各种原因(如就绪队列上排队任务太多等因素)导致被监控任务长时间无法得到CPU资源运行的情况。
 # 使用说明
 ```
-sysak  runqslower [-s SPAN] [-t TID]  [-f ./runqslow.log] [threshold]
-  threshold 门限：触发任务被抢占记录的门限值，单位ms  ｜可选，默认20ms
-  -f log文件：    将log记录到指定文件。               ｜可选，默认在/var/log/runqslow/runqslow.log
-  -s durations：设置该程序运行多长时间，单位秒；      ｜ 可选，默认永远运行
-  -t  tid:       过滤选项，指定被监控的现场ID。       ｜ 可选，默认监控所有的线程
+sysak  runqslower [-s SPAN] [-t TID]  [-f ./runqslow.log] [-P]  [threshold]
+  threshold 门限：触发任务被抢占记录的门限值，单位ms; 可选，默认50ms
+  -f log文件：    将log记录到指定文件; 可选，默认在/var/log/sysak/runqslow/runqslow.log
+  -s durations：设置该程序运行多长时间，单位秒; 可选，默认永远运行
+  -t  tid:       过滤选项，指定被监控的现场ID; 可选，默认监控所有的线程
+  -P   : 日志中记录上次抢占的任务信息; 可选。
 ```
 # 使用举例
 ## 运行说明

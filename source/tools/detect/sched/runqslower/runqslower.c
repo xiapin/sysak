@@ -32,7 +32,7 @@ struct env {
 	bool summary;
 } env = {
 	.span = 0,
-	.threshold = 10*1000*1000,
+	.threshold = 50*1000*1000,
 };
 
 const char *argp_program_version = "runqslower 0.1";
@@ -42,7 +42,7 @@ const char argp_program_doc[] =
 "USAGE: runqslower [--help] [-s SPAN] [-t TID] [-P] [threshold] [-f ./runslow.log]\n"
 "\n"
 "EXAMPLES:\n"
-"    runqslower          # trace latency higher than 10ms (default)\n"
+"    runqslower          # trace latency higher than 50ms (default)\n"
 "    runqslower -f a.log # trace latency and record result to a.log (default to /var/log/sysak/runqslow/runqslow.log)\n"
 "    runqslower 12     # trace latency higher than 12 ms\n"
 "    runqslower -p 123   # trace pid 123\n"

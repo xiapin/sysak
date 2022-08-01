@@ -5,9 +5,9 @@ irqoff使用eBPF结合perf采样的方式，根据内核支持hw perf事件的�
 ```
 sysak irqoff  [--help] [-t THRESH(ms)] [-f LOGFILE] [duration(s)]
 参数说明：
-   -t  门限：   当关中断超过门限值就记录，单位ms；  ｜可选，默认10ms
-   -f log文件： 将log记录到指定文件。               ｜可选，默认记录在/var/log/irqoff/irqoff.log
-   durations：  设置该程序运行多长时间，单位秒；    ｜ 可选，默认永远运行
+   -t  门限：   当关中断超过门限值就记录，单位ms; 可选，默认10ms
+   -f log文件： 将log记录到指定文件;可选，默认记录在/var/log/sysak/rqoff/irqoff.log
+   durations：  设置该程序运行多长时间，单位秒; 可选，默认永远运行
 ```
 # 使用举例
 ## 运行说明
@@ -19,10 +19,10 @@ $sudo sysak irqoff  -f a.log -t 10 30
 上面结果a.log输出说明如下：
 ```
 $cat a.log  #输出如下（时间单位：毫秒）
-时间戳             发生CP      任务名字         线程ID       中断延时     
-  ｜                   \          ｜              ｜            ｜               
-TIME(irqoff)           CPU       COMM            TID          LAT(ms)   
-2022-05-26_17:50:58     3        kworker/3:0     379531       11 
+ 日期             发生CP      任务名字         线程ID       中断延时    时间戳 
+  ｜                   \          ｜              ｜            ｜        |
+TIME(irqoff)           CPU       COMM            TID          LAT(ms)   STAMP
+2022-05-26_17:50:58     3        kworker/3:0     379531       11        1645130.077595
 <0xffffffffc04e2072> owner_func
 <0xffffffff890b1c5b> process_one_work
 <0xffffffff890b1eb9> worker_thread
