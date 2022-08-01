@@ -30,6 +30,8 @@ pub struct AbnormalCommand {
     dst: Option<String>,
     #[structopt(long, default_value = "10", help = "Show top N connections")]
     top: usize,
+    #[structopt(long, help = "Custom btf path")]
+    btf: Option<String>,
 }
 
 enum ChannelMsgType {
@@ -75,7 +77,7 @@ fn get_events(opts: &AbnormalCommand) -> Result<Vec<Event>> {
 
     match opts.proto.as_str() {
         "tcp" => {
-            let mut tcp = Tcp::new(log::log_enabled!(log::Level::Debug))?;
+            let mut tcp = Tcp::new(log::log_enabled!(log::Level::Debug), &opts.btf)?;
             tcp.set_filter_pid(pstree_thread_pid);
             tcp.set_filter_protocol(libc::IPPROTO_TCP as u16);
             tcp.set_filter_ts(eutils_rs::timestamp::current_monotime());

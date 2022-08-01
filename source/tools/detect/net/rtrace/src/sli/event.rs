@@ -105,9 +105,46 @@ impl fmt::Display for LatencyEvent {
     }
 }
 
+pub struct DropEvent {
+    pid: u32,
+    comm: String,
+    src: SocketAddr,
+    dst: SocketAddr,
+}
+
+impl DropEvent {
+    pub fn new(ptr: *const drop_event) -> DropEvent {
+        let pid = unsafe { (*ptr).pid };
+        let comm = unsafe { String::from_utf8_unchecked((*ptr).comm.to_vec()) };
+        let daddr = unsafe { (*ptr).ap.daddr };
+        let dport = unsafe { (*ptr).ap.dport };
+        let saddr = unsafe { (*ptr).ap.saddr };
+        let sport = unsafe { (*ptr).ap.sport };
+        let src = SocketAddr::new(IpAddr::V4(Ipv4Addr::from(u32::from_be(saddr))), sport);
+        let dst = SocketAddr::new(IpAddr::V4(Ipv4Addr::from(u32::from_be(daddr))), dport);
+
+        DropEvent {
+            pid,
+            comm,
+            src,
+            dst,
+        }
+    }
+}
+
+impl fmt::Display for DropEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.pid != 0 {
+            write!(f, "{}/{} ", self.pid, self.comm)?;
+        }
+        write!(f, "{} -> {}", self.src, self.dst)
+    }
+}
+
 pub enum Event {
     LatencyEvent(LatencyEvent),
     AppLatencyEvent(LatencyEvent),
+    DropEvent(DropEvent),
 }
 
 impl Event {
@@ -119,6 +156,9 @@ impl Event {
             }))),
             APP_LATENCY_EVENT => Ok(Event::AppLatencyEvent(LatencyEvent::new(unsafe {
                 &(*ptr).__bindgen_anon_1.le
+            }))),
+            DROP_EVENT => Ok(Event::DropEvent(DropEvent::new(unsafe {
+                &(*ptr).__bindgen_anon_1.de
             }))),
             _ => {
                 bail!("Can't recognize event type: {}", et)

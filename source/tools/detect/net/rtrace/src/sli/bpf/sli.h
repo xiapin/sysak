@@ -24,6 +24,7 @@ typedef long long unsigned int u64;
 enum {
     LATENCY_EVENT = 0,
     APP_LATENCY_EVENT,
+    DROP_EVENT,
 };
 
 struct addr_pair
@@ -50,12 +51,22 @@ struct latency_event
     struct addr_pair ap;
 };
 
+struct drop_event
+{
+    u32 pid;
+    u8 comm[16];
+    int stackid;
+    u16 protocol;
+    struct addr_pair ap;
+};
+
 struct event
 {
     u8 event_type;
     union
     {
         struct latency_event le;
+        struct drop_event de;
     };
 };
 

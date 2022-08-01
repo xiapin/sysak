@@ -11,6 +11,9 @@ use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct SliCommand {
+    #[structopt(long, help = "Collect drop metrics")]
+    drop: bool,
+
     #[structopt(long, help = "Collect retransmission metrics")]
     retran: bool,
 
@@ -85,6 +88,10 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
         sli.lookup_and_update_latency_map(1)?;
     }
 
+    if opts.drop {
+        sli.attach_drop()?;
+    }
+
     loop {
         if let Some(event) = sli.poll(std::time::Duration::from_millis(100))? {
             // log::debug!("{}", event);
@@ -149,6 +156,25 @@ pub fn build_sli(opts: &SliCommand) -> Result<()> {
                                 println!("application latency event:");
                             }
                             println!("{}", le);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        if opts.drop {
+            if opts.shell {
+                let mut first = true;
+                for event in &sli_output.events {
+                    match event {
+                        Event::DropEvent(de) => {
+                            if first {
+                                has_output = true;
+                                first = false;
+                                println!("packet drop event:");
+                            }
+                            println!("{}", de);
                         }
                         _ => {}
                     }

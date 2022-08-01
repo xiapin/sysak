@@ -32,6 +32,14 @@ struct
     __uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
+struct
+{
+    __uint(type, BPF_MAP_TYPE_STACK_TRACE);
+    __uint(max_entries, 1024);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(uint64_t) * 20);
+} stackmap SEC(".maps");
+
 void __always_inline set_addr_pair_by_sock(struct sock *sk, struct addr_pair *ap)
 {
     bpf_probe_read(&ap->daddr, sizeof(ap->daddr), &sk->__sk_common.skc_daddr);
@@ -131,9 +139,77 @@ int tp__tcp_probe(struct trace_event_raw_tcp_probe *ctx)
 {
     u64 ts = bpf_ktime_get_ns();
     u64 sock_cookie;
-    
+
     sock_cookie = ctx->sock_cookie;
     bpf_map_update_elem(&sockmap, &sock_cookie, &ts, BPF_ANY);
+    return 0;
+}
+
+__always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
+{
+    struct event event = {};
+    struct net *net = NULL;
+    struct iphdr ih = {};
+    struct tcphdr th = {};
+    struct udphdr uh = {};
+    u16 protocol = 0;
+    bool has_netheader = false;
+    u16 network_header, transport_header;
+    char *head;
+
+    event.event_type = DROP_EVENT;
+    event.de.stackid = bpf_get_stackid(ctx, &stackmap, 0);
+    if (sk)
+    {
+        protocol = bpf_core_sock_sk_protocol(sk);
+        if (protocol != IPPROTO_TCP)
+            return;
+    }
+
+    // pid info
+    event.de.pid = bpf_get_current_pid_tgid() >> 32;
+    bpf_get_current_comm(event.de.comm, sizeof(event.de.comm));
+
+    bpf_probe_read(&head, sizeof(head), &skb->head);
+    bpf_probe_read(&network_header, sizeof(network_header), &skb->network_header);
+    if (network_header != 0)
+    {
+        bpf_probe_read(&ih, sizeof(ih), head + network_header);
+        has_netheader = true;
+        event.de.ap.saddr = ih.saddr;
+        event.de.ap.daddr = ih.daddr;
+        event.de.protocol = ih.protocol;
+        transport_header = network_header + (ih.ihl << 2);
+        if (event.de.protocol != IPPROTO_TCP)
+            return;
+    }
+    else
+    {
+        bpf_probe_read(&transport_header, sizeof(transport_header), &skb->transport_header);
+    }
+
+    if (transport_header != 0 && transport_header != ~0)
+    {
+        bpf_probe_read(&th, sizeof(th), head + transport_header);
+        event.de.ap.sport = bpf_ntohl(th.source);
+        event.de.ap.dport = bpf_ntohl(th.dest);
+        bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+    }
+}
+
+SEC("kprobe/tcp_drop")
+int BPF_KPROBE(tcp_drop, struct sock *sk, struct sk_buff *skb)
+{
+    handle(ctx, sk, skb);
+    return 0;
+}
+
+SEC("kprobe/kfree_skb")
+int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
+{
+    struct sock *sk;
+    bpf_probe_read(&sk, sizeof(sk), &skb->sk);
+    handle(ctx, sk, skb);
     return 0;
 }
 

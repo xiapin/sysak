@@ -142,4 +142,19 @@ impl<'a> Sli<'a> {
             Some(self.skel.progs_mut().tp__tcp_rcv_space_adjust().attach()?);
         Ok(())
     }
+
+    pub fn attach_drop(&mut self) -> Result<()> {
+        if eutils_rs::KernelVersion::current()? >= eutils_rs::KernelVersion::try_from("5.10.0")? {
+            self.skel.links.kfree_skb = Some(
+                self.skel
+                    .progs_mut()
+                    .kfree_skb()
+                    .attach_kprobe(false, "kfree_skb_reason")?,
+            );
+        } else {
+            self.skel.links.kfree_skb = Some(self.skel.progs_mut().kfree_skb().attach()?);
+            self.skel.links.tcp_drop = Some(self.skel.progs_mut().tcp_drop().attach()?);
+        }
+        Ok(())
+    }
 }
