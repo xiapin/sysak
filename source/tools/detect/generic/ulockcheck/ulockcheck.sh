@@ -63,9 +63,10 @@ parase_calltrace(){
 
     if [[ ! -f $1 ]]; then
         echo "$1 dose not exist, use bbox print log"
-        if [[ -f $SYSAK_BBOX ]]
+        if [[ -f $SYSAK_BBOX ]];then
             cat $SYSAK_BBOX >> $LOG_DIR/$RAW_CALLTRACE_LOG
             CALLTRACE=$LOG_DIR/$RAW_CALLTRACE_LOG
+        fi
     else
         CALLTRACE=$1
     fi
