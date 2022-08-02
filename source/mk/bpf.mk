@@ -14,7 +14,7 @@ endif
 
 DEPEND := "prev{btf}"
 
-CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall -static
+CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall
 LDFLAGS += $(EXTRA_LDFLAGS)
 INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(TARGET_PATH) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi -I$(SRC)/lib/uapi/include
 
