@@ -11,18 +11,22 @@ pub struct Event {
     state: TcpState,
     inum: u32,
 
-    accept_queue: u32,
+    pub accept_queue: u32,
     percent_accept_queue: f64,
-    syn_queue: u32,
+    pub syn_queue: u32,
     percent_syn_queue: f64,
     max_queue: u32,
 
-    snd_mem: u32,
+    pub snd_mem: u32,
     max_snd_mem: u32,
     percent_snd_mem: f64,
-    rcv_mem: u32,
+    pub rcv_mem: u32,
     max_rcv_mem: u32,
     percent_rcv_mem: f64,
+
+    pub drop: u32,
+    pub retran: u32,
+    pub ooo: u32,
 
     score: f64,
 }
@@ -45,6 +49,10 @@ impl Default for Event {
             rcv_mem: 0,
             max_rcv_mem: 0,
             percent_rcv_mem: 0.0,
+
+            drop: 0,
+            retran: 0,
+            ooo: 0,
             score: 0.0,
         }
     }

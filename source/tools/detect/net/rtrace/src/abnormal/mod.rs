@@ -5,12 +5,12 @@ mod tcp;
 use anyhow::{bail, Result};
 use crossbeam_channel;
 use event::Event;
+use gettid::gettid;
 use pstree::Pstree;
 use std::thread;
+use std::time;
 use structopt::StructOpt;
 use tcp::Tcp;
-use std::time;
-use gettid::gettid;
 
 pub struct AbnortmalOutput {}
 
@@ -32,6 +32,11 @@ pub struct AbnormalCommand {
     top: usize,
     #[structopt(long, help = "Custom btf path")]
     btf: Option<String>,
+    #[structopt(
+        long,
+        help = "Sorting key, including: rcvq, sndq, rcvm, sndm, drop, retran, ooo"
+    )]
+    sort: Option<String>,
 }
 
 enum ChannelMsgType {
@@ -120,8 +125,14 @@ pub fn build_abnormal(opts: &AbnormalCommand) -> Result<()> {
     events.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
 
     println!(
-        "{:<25} {:<25} {:<15} {:<7} {:<7} {:<7} {:<7} {:<7}",
-        "Local", "Remote", "TCP-STATE", "%ACCQ", "%SYNQ", "%SNDMEM", "%RCVMEM", "%SCORE",
+        "{:<20} {:<25} {:<25} {:<15} {:<30} {:<30} {:<30}",
+        "Pid/Comm",
+        "Local",
+        "Remote",
+        "TCP-STATE",
+        "MEMORY(sndm, rcvm)",
+        "PACKET(drop, retran, ooo)",
+        "Queue(synq, rcvq)",
     );
 
     for event in events {
@@ -143,34 +154,32 @@ pub fn build_abnormal(opts: &AbnormalCommand) -> Result<()> {
         }
 
         let memory = format!(
-            "{:<.2}, {:<.2}",
-            event.percent_snd_mem(),
-            event.percent_rcv_mem()
+            "{}, {}",
+            event.snd_mem,
+            event.rcv_mem
         );
 
         let packet = format!(
-            "{:<.2}, {:<.2}, {:<.2}",
-            event.percent_drop(),
-            event.percent_retran(),
-            event.percent_ooo()
+            "{}, {}, {}",
+            event.drop,
+            event.retran,
+            event.ooo
         );
 
         let queue = format!(
-            "{:<.2}, {:<.2}",
-            event.percent_syn_queue(),
-            event.percent_accept_queue()
+            "{}, {}",
+            event.syn_queue,
+            event.accept_queue,
         );
         println!(
-            "{:<20} {:<25} {:<25} {:<15} {:<25} {:<25} {:<25} {:<7.2}",
+            "{:<20} {:<25} {:<25} {:<15} {:<30} {:<30} {:<30}",
             pidstring,
             event.src(),
             event.dst(),
             event.state(),
-            event.percent_accept_queue(),
-            event.percent_syn_queue(),
-            event.percent_snd_mem(),
-            event.percent_rcv_mem(),
-            event.score()
+            memory,
+            packet,
+            queue,
         )
         // println!("{:?}", event);
     }
