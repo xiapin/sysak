@@ -9,6 +9,7 @@ pub struct Event {
     src: SocketAddr,
     dst: SocketAddr,
     state: TcpState,
+    inum: u32,
 
     accept_queue: u32,
     percent_accept_queue: f64,
@@ -32,6 +33,7 @@ impl Default for Event {
             src: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0),
             dst: SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0),
             state: TcpState::Unknown,
+            inum: 0,
             accept_queue: 0,
             percent_accept_queue: 0.0,
             syn_queue: 0,
@@ -63,6 +65,8 @@ impl Event {
         let mut sk_rcvbuf = unsafe { (*ptr).__bindgen_anon_1.tp.sk_rcvbuf } as f64;
 
         event.state = TcpState::from(unsafe { (*ptr).__bindgen_anon_1.tp.state } as i32);
+        event.inum = unsafe { (*ptr).i_ino };
+
         event.accept_queue = sk_ack_backlog as u32;
         event.syn_queue = icsk_accept_queue as u32;
         event.snd_mem = sk_wmem_queued as u32;
@@ -96,6 +100,10 @@ impl Event {
         event.dst = SocketAddr::new(IpAddr::V4(Ipv4Addr::from(u32::from_be(daddr))), dport);
 
         event
+    }
+
+    pub fn inum(&self) -> u32 {
+        self.inum
     }
 
     pub fn score(&self) -> f64 {

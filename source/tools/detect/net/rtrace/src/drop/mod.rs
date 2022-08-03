@@ -1,5 +1,3 @@
-mod diagnosing;
-
 mod drop;
 mod event;
 pub use {self::drop::Drop, self::event::Event};
@@ -12,7 +10,6 @@ use eutils_rs::proc::Kallsyms;
 use eutils_rs::{net::ProtocolType, net::TcpState, proc::Snmp};
 use std::io::Cursor;
 
-use self::diagnosing::build_drop_reasons;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -21,31 +18,22 @@ pub struct DropCommand {
     proto: String,
     #[structopt(long, help = "Custom btf path")]
     btf: Option<String>,
-}
 
-pub struct DropParams {
-    pub event: Option<Event>,
-    pub snmp: Snmp,
-    pub stack: Vec<String>,
-}
+    #[structopt(long, help = "Enable iptables modules")]
+    iptables: bool,
+    #[structopt(long, help = "Enable conntrack modules")]
+    conntrack: bool,
+    #[structopt(long, help = "Network hardware drop packet")]
+    netdev: bool,
+    #[structopt(long, help = "Trace common drop point")]
+    drop: bool,
 
-impl DropParams {
-    pub fn new() -> Result<DropParams> {
-        Ok(DropParams {
-            event: None,
-            snmp: Snmp::from_file("/proc/net/snmp")?,
-            stack: Vec::new(),
-        })
-    }
-
-    pub fn update_snmp(&mut self) -> Result<()> {
-        // self.snmp -= Snmp::from_file("/proc/net/snmp")?;
-        Ok(())
-    }
-
-    pub fn set_stack(&mut self, stack: Vec<String>) {
-        self.stack = stack;
-    }
+    #[structopt(
+        long,
+        default_value = "3",
+        help = "Period of display in seconds. 0 mean display immediately when event triggers"
+    )]
+    period: u64,
 }
 
 fn show_basic(event: &Event) {
@@ -85,39 +73,49 @@ fn get_stack_string(kallsyms: &Kallsyms, stack: Vec<u8>) -> Result<Vec<String>> 
 pub fn build_drop(opts: &DropCommand) -> Result<()> {
     let mut drop = Drop::new(log::log_enabled!(log::Level::Debug), &opts.btf)?;
     let kallsyms = Kallsyms::try_from("/proc/kallsyms")?;
-    let mut drop_params = DropParams::new()?;
-    let mut drop_reasons = build_drop_reasons();
+    let mut events = Vec::new();
+    let mut pre_snmp = eutils_rs::proc::Snmp::from_file("/proc/net/snmp")?;
+    // let mut pre_netstat = eutils_rs::proc::Netstat:from_file("/proc/net/netstat")?;
+    // let mut pre_netstat;
 
     drop.attach()?;
 
+    let mut pre_ts = 0;
     loop {
         if let Some(event) = drop.poll(std::time::Duration::from_millis(100))? {
             log::debug!("{}", event);
-            // check event is we care
+            events.push(event);
+        }
 
-            // show basic
-            show_basic(&event);
+        let cur_ts = eutils_rs::timestamp::current_monotime();
+        if cur_ts - pre_ts > opts.period * 1_000_000_000 {
+            pre_ts = cur_ts;
 
-            // show stack
-            let stack_string = get_stack_string(&kallsyms, drop.get_stack(event.stackid())?)?;
-            for ss in &stack_string {
-                println!("\t{}", ss);
+            println!("Total {} packets drop", events.len());
+            for event in &events {
+                // show basic
+                show_basic(event);
+                // show stack
+                let stack_string = get_stack_string(&kallsyms, drop.get_stack(event.stackid())?)?;
+                for ss in &stack_string {
+                    println!("\t{}", ss);
+                }
             }
 
-            drop_params.set_stack(stack_string);
-
-            drop_params.update_snmp()?;
-
-            for dr in &drop_reasons {
-                dr.init(&drop_params);
+            if opts.period == 0 && events.len() == 0 {
+                continue;
             }
 
-            drop_reasons.sort_by(|a, b| b.probability().cmp(&a.probability()));
+            let cur_snmp = pre_snmp;
+            pre_snmp = Snmp::from_file("/proc/net/snmp")?;
+            let delta = pre_snmp.clone() - cur_snmp;
+            println!("Snmp Information");
+            delta.show_non_zero();
 
-            //  show
-            println!("诊断数据: {}", drop_reasons[0].display());
-            println!("丢包原因: {}", drop_reasons[0].reason());
-            println!("诊断建议: {}", drop_reasons[0].recommend());
+            // Netstat::from_file("/proc/net/netstat")?;
+            println!("Netstat Information");
+            // show_snmp();
+            // show_netstat();
         }
     }
 }

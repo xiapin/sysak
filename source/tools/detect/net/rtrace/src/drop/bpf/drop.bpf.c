@@ -6,6 +6,14 @@
 
 #include "drop.h"
 
+
+struct tid_map_value
+{
+	struct sk_buff *skb;
+	struct nf_hook_state *state;
+	struct xt_table *table;
+};
+
 struct
 {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -18,7 +26,7 @@ struct
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 512);
     __type(key, u32);
-    __type(value, struct sk_buff *);
+    __type(value, struct tid_map_value);
 } tid_map SEC(".maps");
 
 struct
@@ -165,4 +173,39 @@ int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
 	return 0;
 }
 
+#define NF_DROP 0
+
+SEC("kprobe/ipt_do_table")
+int BPF_KPROBE(ipt_do_table, void* priv, struct sk_buff *skb, struct nf_hook_state *state)
+{
+	u32 tid = bpf_get_current_pid_tgid();
+	struct tid_map_value value = {};
+	value.skb = skb;
+	value.state = state;
+	value.table = priv;
+	bpf_map_update_elem(&tid_map, &tid, &value, BPF_ANY);
+	return 0;
+}
+
+SEC("kretprobe/ipt_do_table")
+int BPF_KRETPROBE(ipt_do_table_ret, int ret)
+{
+	struct tid_map_value *value;
+	u32 tid = bpf_get_current_pid_tgid();
+
+	if (ret == NF_DROP)
+	{
+		value = bpf_map_lookup_elem(&tid_map, &tid);
+		if (value == NULL)
+			return 0;
+		
+		// struct nf_hook_state *state = value->state;
+
+		// state->net->ipv4.
+
+
+	}
+	bpf_map_delete_elem(&tid_map, &tid);
+	return 0;
+}
 char _license[] SEC("license") = "GPL";

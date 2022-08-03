@@ -40,7 +40,7 @@ enum ChannelMsgType {
     Pid(u32),
 }
 
-fn get_events(opts: &AbnormalCommand) -> Result<Vec<Event>> {
+fn get_events(opts: &AbnormalCommand) -> Result<(Pstree, Vec<Event>)> {
     let (ts, tr) = crossbeam_channel::unbounded();
     let (ms, mr) = (ts.clone(), tr.clone());
     thread::spawn(move || {
@@ -100,11 +100,22 @@ fn get_events(opts: &AbnormalCommand) -> Result<Vec<Event>> {
             bail!("not support, only support tcp now")
         }
     }
-    Ok(events)
+
+    let mut pstree;
+    match mr.recv()? {
+        ChannelMsgType::PstreeIns(ins) => {
+            log::debug!("receive pstree instance");
+            pstree = ins;
+        }
+        _ => {
+            bail!("failed to get pstree thread pid")
+        }
+    }
+    Ok((pstree, events))
 }
 
 pub fn build_abnormal(opts: &AbnormalCommand) -> Result<()> {
-    let mut events = get_events(opts)?;
+    let (mut pstree, mut events) = get_events(opts)?;
     let mut top = opts.top;
     events.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
 
@@ -118,9 +129,40 @@ pub fn build_abnormal(opts: &AbnormalCommand) -> Result<()> {
             break;
         }
         top -= 1;
-        // local remote state accq synq sndmem rcvmem score
+        // pid local remote state memory packet queue score
+
+        let mut pidstring = String::from("None/None");
+        match pstree.inum_pid(event.inum()) {
+            Ok(pid) => match pstree.pid_comm(pid) {
+                Ok(comm) => {
+                    pidstring = format!("{}/{}", pid, comm);
+                }
+                Err(e) => {}
+            },
+            Err(e) => {}
+        }
+
+        let memory = format!(
+            "{:<.2}, {:<.2}",
+            event.percent_snd_mem(),
+            event.percent_rcv_mem()
+        );
+
+        let packet = format!(
+            "{:<.2}, {:<.2}, {:<.2}",
+            event.percent_drop(),
+            event.percent_retran(),
+            event.percent_ooo()
+        );
+
+        let queue = format!(
+            "{:<.2}, {:<.2}",
+            event.percent_syn_queue(),
+            event.percent_accept_queue()
+        );
         println!(
-            "{:<25} {:<25} {:<15} {:<7.2} {:<7.2} {:<7.2} {:<7.2} {:<7.2}",
+            "{:<20} {:<25} {:<25} {:<15} {:<25} {:<25} {:<25} {:<7.2}",
+            pidstring,
             event.src(),
             event.dst(),
             event.state(),

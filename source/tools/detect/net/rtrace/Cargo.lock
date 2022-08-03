@@ -286,15 +286,16 @@ dependencies = [
 
 [[package]]
 name = "eutils-rs"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53bbb790ef13a552749c7fbbd8ac8386ce5b900a9802fea38cd7e49f3fdc6de6"
+checksum = "5bfd9401922f3b17895528c9529ab98688c20b29d40bb7cc17f848bf17307324"
 dependencies = [
  "anyhow",
  "chrono",
  "env_logger",
  "libc",
  "log",
+ "once_cell",
  "regex",
  "strum_macros 0.24.0",
 ]
