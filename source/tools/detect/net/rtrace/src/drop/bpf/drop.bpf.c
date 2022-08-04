@@ -42,37 +42,6 @@ struct
 #define NF_ACCEPT 1
 
 
-// __always_inline void fill_event(struct event *event, struct sk_buff *skb)
-// {
-
-// }
-
-// SEC("kprobe/__nf_conntrack_confirm")
-// int BPF_KPROBE(kprobe____nf_conntrack_confirm, struct sk_buff *skb)
-// {
-// 	u32 tid = bpf_get_current_pid_tgid();
-// 	bpf_map_update_elem(&tid_map, &tid, &skb, BPF_ANY);
-// 	return 0;
-// }
-
-// SEC("kretprobe/__nf_conntrack_confirm")
-// int BPF_KRETPROBE(kretprobe____nf_conntrack_confirm, int ret)
-// {
-// 	struct sk_buff **skbp;
-// 	u32 tid = bpf_get_current_pid_tgid();
-// 	if (ret == 0)
-// 	{
-// 		skbp = bpf_map_lookup_elem(&tid_map, &tid);
-// 		if (skbp == NULL)
-// 			return 0;
-		
-
-// 	}
-
-// 	bpf_map_delete_elem(&tid_map, &tid);
-// 	return 0;
-// }
-
 __always_inline void fill_stack(void *ctx, struct event *event)
 {
 	event->stackid = bpf_get_stackid(ctx, &stackmap, 0);
@@ -255,4 +224,41 @@ int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 	bpf_map_delete_elem(&tid_map, &tid);
 	return 0;
 }
+
+
+
+SEC("kprobe/__nf_conntrack_confirm")
+int BPF_KPROBE(__nf_conntrack_confirm, struct sk_buff *skb)
+{
+	ipt_do_table_entry(skb, NULL, NULL, 0);
+	return 0;
+}
+
+SEC("kretprobe/__nf_conntrack_confirm")
+int BPF_KRETPROBE(__nf_conntrack_confirm_ret, int ret)
+{
+	struct event event = {};
+	struct tid_map_value *value; 
+	struct sk_buff *skb;
+	struct sock *sk;
+	u32 tid = bpf_get_current_pid_tgid();
+	if (ret == NF_DROP)
+	{
+		value = bpf_map_lookup_elem(&tid_map, &tid);
+		if (value == NULL)
+			return 0;
+		
+		event.type = KFREE_SKB;
+		skb = value->skb;
+		bpf_probe_read(&sk, sizeof(sk), &skb->sk);
+		fill_stack(ctx, &event);
+		fill_pid(&event);
+		fill_sk_skb(&event, sk, skb);
+		bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+	}
+
+	bpf_map_delete_elem(&tid_map, &tid);
+	return 0;
+}
+
 char _license[] SEC("license") = "GPL";

@@ -129,4 +129,16 @@ impl<'a> Drop<'a> {
 
         Ok(())
     }
+
+    pub fn attach_conntrack(&mut self) -> Result<()> {
+        self.skel.links.__nf_conntrack_confirm =
+            Some(self.skel.progs_mut().__nf_conntrack_confirm().attach()?);
+        self.skel.links.__nf_conntrack_confirm_ret = Some(
+            self.skel
+                .progs_mut()
+                .__nf_conntrack_confirm_ret()
+                .attach()?,
+        );
+        Ok(())
+    }
 }

@@ -121,6 +121,10 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
         drop.attach_iptables()?;
     }
 
+    if opts.conntrack {
+        drop.attach_conntrack()?;
+    }
+
     let mut pre_ts = 0;
     loop {
         if let Some(event) = drop.poll(std::time::Duration::from_millis(100))? {
