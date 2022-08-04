@@ -5,13 +5,14 @@
 #include <bpf/bpf_endian.h>
 
 #include "drop.h"
-
+#include "bpf_core.h"
 
 struct tid_map_value
 {
 	struct sk_buff *skb;
 	struct nf_hook_state *state;
 	struct xt_table *table;
+	u32 hook;
 };
 
 struct
@@ -72,10 +73,20 @@ struct
 // 	return 0;
 // }
 
-
-void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
+__always_inline void fill_stack(void *ctx, struct event *event)
 {
-	struct event event = {};
+	event->stackid = bpf_get_stackid(ctx, &stackmap, 0);
+}
+
+__always_inline void fill_pid(struct event *event)
+{
+	// pid info
+	event->pi.pid = bpf_get_current_pid_tgid() >> 32;
+	bpf_get_current_comm(event->pi.comm, sizeof(event->pi.comm));
+}
+
+__always_inline void fill_sk_skb(struct event *event, struct sock *sk, struct sk_buff *skb)
+{
 	struct net *net = NULL;
 	struct iphdr ih = {};
 	struct tcphdr th = {};
@@ -84,25 +95,18 @@ void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 	bool has_netheader = false;
 	u16 network_header, transport_header;
 	char *head;
-
-	event.stackid = bpf_get_stackid(ctx, &stackmap, 0);
 	if (sk)
 	{
 		// address pair
-		bpf_probe_read(&event.skap.daddr, sizeof(event.skap.daddr), &sk->__sk_common.skc_daddr);
-		bpf_probe_read(&event.skap.dport, sizeof(event.skap.dport), &sk->__sk_common.skc_dport);
-		bpf_probe_read(&event.skap.saddr, sizeof(event.skap.saddr), &sk->__sk_common.skc_rcv_saddr);
-		bpf_probe_read(&event.skap.sport, sizeof(event.skap.sport), &sk->__sk_common.skc_num);
-		event.skap.dport = bpf_ntohs(event.skap.dport);
+		bpf_probe_read(&event->skap.daddr, sizeof(event->skap.daddr), &sk->__sk_common.skc_daddr);
+		bpf_probe_read(&event->skap.dport, sizeof(event->skap.dport), &sk->__sk_common.skc_dport);
+		bpf_probe_read(&event->skap.saddr, sizeof(event->skap.saddr), &sk->__sk_common.skc_rcv_saddr);
+		bpf_probe_read(&event->skap.sport, sizeof(event->skap.sport), &sk->__sk_common.skc_num);
+		event->skap.dport = bpf_ntohs(event->skap.dport);
 
-		bpf_probe_read(&event.sk_protocol, sizeof(event.sk_protocol), &sk->sk_protocol);
-		bpf_probe_read(&event.state, sizeof(event.state), &sk->__sk_common.skc_state);
-		protocol = event.sk_protocol;
+		bpf_probe_read(&event->sk_protocol, sizeof(event->sk_protocol), &sk->sk_protocol);
+		bpf_probe_read(&event->state, sizeof(event->state), &sk->__sk_common.skc_state);
 	}
-
-	// pid info
-	event.pi.pid = bpf_get_current_pid_tgid() >> 32;
-	bpf_get_current_comm(event.pi.comm, sizeof(event.pi.comm));
 
 	bpf_probe_read(&head, sizeof(head), &skb->head);
 	bpf_probe_read(&network_header, sizeof(network_header), &skb->network_header);
@@ -110,10 +114,10 @@ void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 	{
 		bpf_probe_read(&ih, sizeof(ih), head + network_header);
 		has_netheader = true;
-		event.ap.saddr = ih.saddr;
-		event.ap.daddr = ih.daddr;
-		event.protocol = ih.protocol;
-		protocol = protocol == 0 ? event.protocol : protocol;
+		event->ap.saddr = ih.saddr;
+		event->ap.daddr = ih.daddr;
+		event->protocol = ih.protocol;
+		protocol = protocol == 0 ? event->protocol : protocol;
 		transport_header = network_header + (ih.ihl << 2);
 	}
 	else
@@ -123,8 +127,8 @@ void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 
 	if (protocol == 0)
 	{
-		event.error = ERR_PROTOCOL_NOT_DETERMINED;
-		goto out;
+		event->error = ERR_PROTOCOL_NOT_DETERMINED;
+		return;
 	}
 
 	switch (protocol)
@@ -135,24 +139,34 @@ void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 		if (transport_header != 0 && transport_header != 0xffff)
 		{
 			bpf_probe_read(&uh, sizeof(uh), head + transport_header);
-			event.ap.sport = bpf_ntohl(uh.source);
-			event.ap.dport = bpf_ntohl(uh.dest);
+			event->ap.sport = bpf_ntohl(uh.source);
+			event->ap.dport = bpf_ntohl(uh.dest);
 		}
 		break;
 	case IPPROTO_TCP:
 		if (transport_header != 0 && transport_header != 0xffff)
 		{
 			bpf_probe_read(&th, sizeof(th), head + transport_header);
-			event.ap.sport = bpf_ntohl(th.source);
-			event.ap.dport = bpf_ntohl(th.dest);
+			event->ap.sport = bpf_ntohl(th.source);
+			event->ap.dport = bpf_ntohl(th.dest);
 		}
 		break;
 	default:
-		event.error = ERR_PROTOCOL_NOT_SUPPORT;
+		event->error = ERR_PROTOCOL_NOT_SUPPORT;
 		break;
 	}
 
-out:
+}
+
+
+__always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
+{
+	struct event event = {};
+	event.type = KFREE_SKB;
+	fill_stack(ctx, &event);
+	// pid info
+	fill_pid(&event);
+	fill_sk_skb(&event, sk, skb);
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 }
 
@@ -175,23 +189,46 @@ int BPF_KPROBE(kfree_skb, struct sk_buff *skb)
 
 #define NF_DROP 0
 
-SEC("kprobe/ipt_do_table")
-int BPF_KPROBE(ipt_do_table, void* priv, struct sk_buff *skb, struct nf_hook_state *state)
+__always_inline void ipt_do_table_entry(struct sk_buff *skb, struct nf_hook_state *state, struct xt_table *table, u32 hook)
 {
 	u32 tid = bpf_get_current_pid_tgid();
 	struct tid_map_value value = {};
 	value.skb = skb;
 	value.state = state;
-	value.table = priv;
+	value.table = table;
+	value.hook = hook;
 	bpf_map_update_elem(&tid_map, &tid, &value, BPF_ANY);
+}
+
+// for kernel 4.19 and 5.10
+// unsigned int
+// ipt_do_table(struct sk_buff *skb,
+// 	     const struct nf_hook_state *state,
+// 	     struct xt_table *table)
+SEC("kprobe/ipt_do_table")
+int BPF_KPROBE(ipt_do_table, void* priv, struct sk_buff *skb, struct nf_hook_state *state)
+{
+	u32 hook;
+	bpf_probe_read(&hook, sizeof(hook), &state->hook);
+	ipt_do_table_entry(skb, state, priv, hook);
+	return 0;
+}
+
+SEC("kprobe/ipt_do_table")
+int BPF_KPROBE(ipt_do_table310, struct sk_buff *skb, u32 hook, struct nf_hook_state *state)
+{
+	ipt_do_table_entry(skb, state, PT_REGS_PARM4(ctx), hook);
 	return 0;
 }
 
 SEC("kretprobe/ipt_do_table")
 int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 {
+	struct sock *sk;
 	struct tid_map_value *value;
+	struct event event = {};
 	u32 tid = bpf_get_current_pid_tgid();
+	u64 addr;
 
 	if (ret == NF_DROP)
 	{
@@ -199,11 +236,21 @@ int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 		if (value == NULL)
 			return 0;
 		
-		// struct nf_hook_state *state = value->state;
+		struct nf_hook_state *state = value->state;
+		struct xt_table *table = value->table;
+		struct sk_buff *skb = value->skb;
 
-		// state->net->ipv4.
-
-
+		event.type = IPTABLES;
+		addr = bpf_core_xt_table_name(table);
+		if (addr)
+			bpf_probe_read(event.ip.name, sizeof(event.ip.name), (void *)addr);
+		
+		event.ip.hook = value->hook;
+		bpf_probe_read(&sk, sizeof(sk), &skb->sk);
+		fill_stack(ctx, &event);
+		fill_pid(&event);
+		fill_sk_skb(&event, sk, skb);
+		bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 	}
 	bpf_map_delete_elem(&tid_map, &tid);
 	return 0;

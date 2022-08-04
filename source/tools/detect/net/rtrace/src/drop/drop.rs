@@ -5,12 +5,11 @@ use crate::perf::PerfBufferBuilder;
 use anyhow::{bail, Result};
 use crossbeam_channel;
 use crossbeam_channel::Receiver;
+use libbpf_rs::MapFlags;
 use once_cell::sync::Lazy;
+use std::ffi::CString;
 use std::sync::Mutex;
 use std::time::Duration;
-use libbpf_rs::MapFlags;
-use std::ffi::CString;
-
 
 static GLOBAL_TX: Lazy<Mutex<Option<crossbeam_channel::Sender<(usize, Vec<u8>)>>>> =
     Lazy::new(|| Mutex::new(None));
@@ -110,8 +109,24 @@ impl<'a> Drop<'a> {
         }
     }
 
-    pub fn attach(&mut self) -> Result<()> {
-        self.skel.attach()?;
+    pub fn attach_drop(&mut self) -> Result<()> {
+        if eutils_rs::KernelVersion::current()? >= eutils_rs::KernelVersion::try_from("5.10.0")? {
+            self.skel.links.kfree_skb = Some(self.skel.progs_mut().kfree_skb().attach()?);
+        } else {
+            self.skel.links.kfree_skb = Some(self.skel.progs_mut().kfree_skb().attach()?);
+            self.skel.links.tcp_drop = Some(self.skel.progs_mut().tcp_drop().attach()?);
+        }
+        Ok(())
+    }
+
+    pub fn attach_iptables(&mut self) -> Result<()> {
+        if eutils_rs::KernelVersion::current()? >= eutils_rs::KernelVersion::try_from("4.10.0")? {
+            self.skel.links.ipt_do_table = Some(self.skel.progs_mut().ipt_do_table().attach()?);
+        } else {
+            self.skel.links.ipt_do_table310 = Some(self.skel.progs_mut().ipt_do_table().attach()?);
+        }
+        self.skel.links.ipt_do_table_ret = Some(self.skel.progs_mut().ipt_do_table_ret().attach()?);
+
         Ok(())
     }
 }

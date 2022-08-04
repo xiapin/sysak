@@ -1,6 +1,12 @@
-use crate::drop_bindings::event;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use crate::drop_bindings::{event, KFREE_SKB};
 use std::fmt;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+
+pub enum EventType {
+    KfreeSkb,
+    Iptables,
+    Unknown,
+}
 
 pub struct Event {
     data: Vec<u8>,
@@ -16,7 +22,7 @@ impl Event {
     }
 
     pub fn stackid(&self) -> i32 {
-        unsafe {(*self.ptr).stackid}
+        unsafe { (*self.ptr).stackid }
     }
 
     pub fn pid(&self) -> u32 {
@@ -47,6 +53,31 @@ impl Event {
         (src, dst)
     }
 
+    pub fn type_(&self) -> EventType {
+        match unsafe { (*self.ptr).type_ } as u32 {
+            KFREE_SKB => EventType::KfreeSkb,
+            IPTABLES => EventType::Iptables,
+            _ => EventType::Unknown,
+        }
+    }
+
+    pub fn iptables_params(&self) -> IptablesParams {
+        let hooknum = unsafe { (*self.ptr).__bindgen_anon_1.ip.hook };
+        IptablesParams {
+            name: unsafe {
+                String::from_utf8_unchecked((*self.ptr).__bindgen_anon_1.ip.name.to_vec())
+            },
+            hook: match hooknum {
+                0 => "PREROUTING".to_owned(),
+                1 => "LOCAL_IN".to_owned(),
+                2 => "FORWARD".to_owned(),
+                3 => "LOCAL_OUT".to_owned(),
+                4 => "POSTROUTING".to_owned(),
+                _ => "unknown".to_owned(),
+            },
+        }
+    }
+
     pub fn state(&self) -> u8 {
         unsafe { (*self.ptr).state }
     }
@@ -60,25 +91,37 @@ impl Event {
     }
 
     pub fn syn_qlen(&self) -> u32 {
-        unsafe {(*self.ptr).__bindgen_anon_1.tp.syn_qlen}
+        unsafe { (*self.ptr).__bindgen_anon_1.tp.syn_qlen }
     }
 
     pub fn max_len(&self) -> u32 {
-        unsafe {(*self.ptr).__bindgen_anon_1.tp.max_len}
+        unsafe { (*self.ptr).__bindgen_anon_1.tp.max_len }
     }
 
     pub fn syncookies(&self) -> u8 {
-        unsafe {(*self.ptr).__bindgen_anon_1.tp.syncookies}
+        unsafe { (*self.ptr).__bindgen_anon_1.tp.syncookies }
     }
 
     pub fn acc_qlen(&self) -> u32 {
-        unsafe {(*self.ptr).__bindgen_anon_1.tp.acc_qlen}
+        unsafe { (*self.ptr).__bindgen_anon_1.tp.acc_qlen }
     }
-
 }
 
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "")
+    }
+}
+
+pub struct IptablesParams {
+    // table name
+    name: String,
+    // chain name
+    hook: String,
+}
+
+impl fmt::Display for IptablesParams {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "table: {}, chain: {}", self.name, self.hook)
     }
 }

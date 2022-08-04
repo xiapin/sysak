@@ -2,14 +2,16 @@ mod drop;
 mod event;
 pub use {self::drop::Drop, self::event::Event};
 
+use crate::drop::event::EventType;
 use crate::Command;
 use anyhow::Result;
 use byteorder::{NativeEndian, ReadBytesExt};
 use chrono::prelude::*;
 use eutils_rs::proc::Kallsyms;
 use eutils_rs::{net::ProtocolType, net::TcpState, proc::Snmp};
+use procfs::net::DeviceStatus;
+use std::collections::HashMap;
 use std::io::Cursor;
-
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -23,10 +25,6 @@ pub struct DropCommand {
     iptables: bool,
     #[structopt(long, help = "Enable conntrack modules")]
     conntrack: bool,
-    #[structopt(long, help = "Network hardware drop packet")]
-    netdev: bool,
-    #[structopt(long, help = "Trace common drop point")]
-    drop: bool,
 
     #[structopt(
         long,
@@ -70,6 +68,45 @@ fn get_stack_string(kallsyms: &Kallsyms, stack: Vec<u8>) -> Result<Vec<String>> 
     Ok(stackstring)
 }
 
+pub fn show_dev_delta(dev1: &HashMap<String, DeviceStatus>, dev2: &HashMap<String, DeviceStatus>) {
+    let mut stat1: Vec<_> = dev1.values().collect();
+
+    stat1.sort_by_key(|s| &s.name);
+
+    println!(
+        "{:<10} {:<10} {:<10} {:<10} {:<10} {:<10}",
+        "Interface", "SendErrs", "SendDrop", "SendFifo", "SendColls", "SendCarrier"
+    );
+
+    for stat in &stat1 {
+        println!(
+            "{:<10} {:<10} {:<10} {:<10} {:<10} {:<10}",
+            stat.name,
+            dev2.get(&stat.name).unwrap().sent_errs - stat.sent_errs,
+            dev2.get(&stat.name).unwrap().sent_drop - stat.sent_drop,
+            dev2.get(&stat.name).unwrap().sent_fifo - stat.sent_fifo,
+            dev2.get(&stat.name).unwrap().sent_colls - stat.sent_colls,
+            dev2.get(&stat.name).unwrap().sent_carrier - stat.sent_carrier,
+        );
+    }
+
+    println!(
+        "{:<10} {:<10} {:<10} {:<10} {:<10}",
+        "Interface", "RecvErrs", "RecvDrop", "RecvFifo", "RecvFrameErr"
+    );
+
+    for stat in &stat1 {
+        println!(
+            "{:<10} {:<10} {:<10} {:<10} {:<10}",
+            stat.name,
+            dev2.get(&stat.name).unwrap().recv_errs - stat.recv_errs,
+            dev2.get(&stat.name).unwrap().recv_drop - stat.recv_drop,
+            dev2.get(&stat.name).unwrap().recv_fifo - stat.recv_fifo,
+            dev2.get(&stat.name).unwrap().recv_frame - stat.recv_frame,
+        );
+    }
+}
+
 pub fn build_drop(opts: &DropCommand) -> Result<()> {
     let mut drop = Drop::new(log::log_enabled!(log::Level::Debug), &opts.btf)?;
     let kallsyms = Kallsyms::try_from("/proc/kallsyms")?;
@@ -77,8 +114,12 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
     let mut pre_snmp = eutils_rs::proc::Snmp::from_file("/proc/net/snmp")?;
     // let mut pre_netstat = eutils_rs::proc::Netstat:from_file("/proc/net/netstat")?;
     // let mut pre_netstat;
+    let mut pre_dev = procfs::net::dev_status()?;
 
-    drop.attach()?;
+    drop.attach_drop()?;
+    if opts.iptables {
+        drop.attach_iptables()?;
+    }
 
     let mut pre_ts = 0;
     loop {
@@ -100,22 +141,36 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
                 for ss in &stack_string {
                     println!("\t{}", ss);
                 }
+
+                match event.type_() {
+                    EventType::Iptables => {
+                        println!("{}", event.iptables_params());
+                    }
+                    _ => {}
+                }
             }
 
             if opts.period == 0 && events.len() == 0 {
                 continue;
             }
+            events.clear();
 
+            println!("DELTA_SNMP");
             let cur_snmp = pre_snmp;
             pre_snmp = Snmp::from_file("/proc/net/snmp")?;
             let delta = pre_snmp.clone() - cur_snmp;
-            println!("Snmp Information");
             delta.show_non_zero();
 
             // Netstat::from_file("/proc/net/netstat")?;
-            println!("Netstat Information");
-            // show_snmp();
-            // show_netstat();
+            println!("DELTA_NETSTAT");
+
+            // netdev
+            println!("DELTA_DEV");
+            let cur_dev = procfs::net::dev_status()?;
+            show_dev_delta(&pre_dev, &cur_dev);
+            pre_dev = cur_dev;
+
+            println!("");
         }
     }
 }

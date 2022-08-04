@@ -23,6 +23,11 @@ enum{
     ERR_PROTOCOL_NOT_SUPPORT,
 };
 
+enum {
+    KFREE_SKB = 0,
+    TCP_DROP,
+    IPTABLES,
+};
 /**
  * struct addr_pair -
  * @saddr: be
@@ -52,10 +57,17 @@ struct tcp_params
     u32 acc_qlen; // accept queue
 };
 
+struct iptables_params
+{
+    u8 name[32];
+    u32 hook;
+};
+
 struct event
 {
     int stackid;
     u8 error;
+    u8 type;
     struct pid_info pi;
 
     struct addr_pair ap;
@@ -69,6 +81,14 @@ struct event
     union
     {
         struct tcp_params tp;
+#define IPTABLE_FILTER 1
+#define IPTABLE_MANGLE 2
+#define IPTABLE_RAW 3
+#define ARPTABLE_FILTER 4
+#define IPTABLE_SECURITY 5
+#define IPTABLE_NAT 6
+        struct iptables_params ip;
+        
     };
 };
 

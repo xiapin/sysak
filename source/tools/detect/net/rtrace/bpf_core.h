@@ -56,6 +56,89 @@ static __always_inline u16 bpf_core_sock_sk_protocol(struct sock *sk)
     return (u16)BPF_CORE_READ_BITFIELD_PROBED(sk, sk_protocol);
 }
 
+struct netns_ipv4___310_419
+{
+    struct xt_table		*iptable_filter;
+	struct xt_table		*iptable_mangle;
+	struct xt_table		*iptable_raw;
+	struct xt_table		*arptable_filter;
+	struct xt_table		*iptable_security;
+	struct xt_table		*nat_table;
+};
+
+static __always_inline u64 bpf_core_netns_ipv4_iptable_filter(void *ptr)
+{
+    struct netns_ipv4___310_419 *ns = ptr;
+    u64 addr = 0;
+    if (bpf_core_field_exists(ns->iptable_filter))
+        bpf_probe_read(&addr, sizeof(addr), &ns->iptable_filter);
+
+    return addr;
+}
+
+static __always_inline u64 bpf_core_netns_ipv4_iptable_mangle(void *ptr)
+{
+    struct netns_ipv4___310_419 *ns = ptr;
+    u64 addr = 0;
+    if (bpf_core_field_exists(ns->iptable_mangle))
+        bpf_probe_read(&addr, sizeof(addr), &ns->iptable_mangle);
+
+    return addr;
+}
+
+static __always_inline u64 bpf_core_netns_ipv4_iptable_raw(void *ptr)
+{
+    struct netns_ipv4___310_419 *ns = ptr;
+    u64 addr = 0;
+    if (bpf_core_field_exists(ns->iptable_raw))
+        bpf_probe_read(&addr, sizeof(addr), &ns->iptable_raw);
+
+    return addr;
+}
+
+static __always_inline u64 bpf_core_netns_ipv4_arptable_filter(void *ptr)
+{
+    struct netns_ipv4___310_419 *ns = ptr;
+    u64 addr = 0;
+    if (bpf_core_field_exists(ns->arptable_filter))
+        bpf_probe_read(&addr, sizeof(addr), &ns->arptable_filter);
+
+    return addr;
+}
+
+static __always_inline u64 bpf_core_netns_ipv4_iptable_security(void *ptr)
+{
+    struct netns_ipv4___310_419 *ns = ptr;
+    u64 addr = 0;
+    if (bpf_core_field_exists(ns->iptable_security))
+        bpf_probe_read(&addr, sizeof(addr), &ns->iptable_security);
+
+    return addr;
+}
+
+static __always_inline u64 bpf_core_netns_ipv4_nat_table(void *ptr)
+{
+    struct netns_ipv4___310_419 *ns = ptr;
+    u64 addr = 0;
+    if (bpf_core_field_exists(ns->nat_table))
+        bpf_probe_read(&addr, sizeof(addr), &ns->nat_table);
+
+    return addr;
+}
+
+#define XT_TABLE_MAXNAMELEN 32
+struct xt_table___419
+{
+    char name[XT_TABLE_MAXNAMELEN];
+};
+
+static __always_inline u64 bpf_core_xt_table_name(void *ptr)
+{
+    struct xt_table___419 *table = ptr;
+    if (bpf_core_field_exists(table->name))
+        return (u64)(&table->name[0]);
+    return 0;
+}
 #endif
 
 #endif

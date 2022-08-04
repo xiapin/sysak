@@ -24,6 +24,7 @@ chrono = "0.4.19"
 byteorder = "1.4.3"
 eutils-rs = "0.1.5"
 gettid = "0.1.2"
+procfs = "0.14.0"
 
 [build-dependencies]
 libbpf-cargo = "0.12.0"
