@@ -6,9 +6,9 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 
 #[derive(Debug)]
 pub struct Event {
-    src: SocketAddr,
-    dst: SocketAddr,
-    state: TcpState,
+    pub src: SocketAddr,
+    pub dst: SocketAddr,
+    pub state: TcpState,
     inum: u32,
 
     pub accept_queue: u32,
@@ -71,6 +71,10 @@ impl Event {
         let mut sndbuf = unsafe { (*ptr).__bindgen_anon_1.tp.sndbuf } as f64;
         let mut rmem_alloc = unsafe { (*ptr).__bindgen_anon_1.tp.rmem_alloc } as f64;
         let mut sk_rcvbuf = unsafe { (*ptr).__bindgen_anon_1.tp.sk_rcvbuf } as f64;
+        // packet
+        let mut drop = unsafe { (*ptr).__bindgen_anon_1.tp.drop } as f64;
+        let mut retran = unsafe { (*ptr).__bindgen_anon_1.tp.retran } as f64;
+        let mut ooo = unsafe { (*ptr).__bindgen_anon_1.tp.ooo } as f64;
 
         event.state = TcpState::from(unsafe { (*ptr).__bindgen_anon_1.tp.state } as i32);
         event.inum = unsafe { (*ptr).i_ino };
@@ -82,6 +86,9 @@ impl Event {
         event.max_queue = sk_max_ack_backlog as u32;
         event.max_snd_mem = sndbuf as u32;
         event.max_rcv_mem = sk_rcvbuf as u32;
+        event.drop = drop as u32;
+        event.retran = retran as u32;
+        event.ooo = ooo as u32;
 
         match event.state {
             TcpState::Listen => {

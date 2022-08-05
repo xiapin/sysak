@@ -34,9 +34,10 @@ pub struct AbnormalCommand {
     btf: Option<String>,
     #[structopt(
         long,
-        help = "Sorting key, including: rcvq, sndq, rcvm, sndm, drop, retran, ooo"
+        default_value = "acceptq",
+        help = "Sorting key, including: synq, acceptq, rcvm, sndm, drop, retran, ooo"
     )]
-    sort: Option<String>,
+    sort: String,
 }
 
 enum ChannelMsgType {
@@ -122,7 +123,33 @@ fn get_events(opts: &AbnormalCommand) -> Result<(Pstree, Vec<Event>)> {
 pub fn build_abnormal(opts: &AbnormalCommand) -> Result<()> {
     let (mut pstree, mut events) = get_events(opts)?;
     let mut top = opts.top;
-    events.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
+
+    match opts.sort.as_str() {
+        "acceptq" => {
+            events.sort_by(|a, b| b.accept_queue.cmp(&a.accept_queue));
+        }
+        "synq" => {
+            events.sort_by(|a, b| b.syn_queue.cmp(&a.syn_queue));
+        }
+        "rcvm" => {
+            events.sort_by(|a, b| b.rcv_mem.cmp(&a.rcv_mem));
+        }
+        "sndm" => {
+            events.sort_by(|a, b| b.snd_mem.cmp(&a.snd_mem));
+        }
+        "drop" => {
+            events.sort_by(|a, b| b.drop.cmp(&a.drop));
+        }
+        "retran" => {
+            events.sort_by(|a, b| b.retran.cmp(&a.retran));
+        }
+        "ooo" => {
+            events.sort_by(|a, b| b.ooo.cmp(&a.ooo));
+        }
+        _ => {
+            bail!("Sort key is unknown: {}", opts.sort)
+        }
+    }
 
     println!(
         "{:<20} {:<25} {:<25} {:<15} {:<30} {:<30} {:<30}",
@@ -132,7 +159,7 @@ pub fn build_abnormal(opts: &AbnormalCommand) -> Result<()> {
         "TCP-STATE",
         "MEMORY(sndm, rcvm)",
         "PACKET(drop, retran, ooo)",
-        "Queue(synq, rcvq)",
+        "Queue(synq, acceptq)",
     );
 
     for event in events {
@@ -153,24 +180,9 @@ pub fn build_abnormal(opts: &AbnormalCommand) -> Result<()> {
             Err(e) => {}
         }
 
-        let memory = format!(
-            "{}, {}",
-            event.snd_mem,
-            event.rcv_mem
-        );
-
-        let packet = format!(
-            "{}, {}, {}",
-            event.drop,
-            event.retran,
-            event.ooo
-        );
-
-        let queue = format!(
-            "{}, {}",
-            event.syn_queue,
-            event.accept_queue,
-        );
+        let memory = format!("{}, {}", event.snd_mem, event.rcv_mem);
+        let packet = format!("{}, {}, {}", event.drop, event.retran, event.ooo);
+        let queue = format!("{}, {}", event.syn_queue, event.accept_queue,);
         println!(
             "{:<20} {:<25} {:<25} {:<15} {:<30} {:<30} {:<30}",
             pidstring,

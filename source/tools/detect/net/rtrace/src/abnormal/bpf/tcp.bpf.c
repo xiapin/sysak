@@ -93,15 +93,26 @@ __always_inline void fill_net_params(struct net *net, struct net_params *np)
 __always_inline void fill_tcp_params(struct sock *sk, struct tcp_params *tp)
 {
     struct inet_connection_sock *icsk = (struct inet_connection_sock *)sk;
+    struct tcp_sock *ts = (struct tcp_sock *)tp;
+    
     bpf_probe_read(&tp->state, sizeof(tp->state), &sk->__sk_common.skc_state);
+    
+    // queue
     bpf_probe_read(&tp->sk_ack_backlog, sizeof(tp->sk_ack_backlog), &sk->sk_ack_backlog);
     bpf_probe_read(&tp->icsk_accept_queue, sizeof(tp->icsk_accept_queue), &icsk->icsk_accept_queue.qlen.counter);
     bpf_probe_read(&tp->sk_max_ack_backlog, sizeof(tp->sk_max_ack_backlog), &sk->sk_max_ack_backlog);
 
+    // memory
     bpf_probe_read(&tp->sk_wmem_queued, sizeof(tp->sk_wmem_queued), &sk->sk_wmem_queued);
     bpf_probe_read(&tp->sndbuf, sizeof(tp->sndbuf), &sk->sk_sndbuf);
     bpf_probe_read(&tp->rmem_alloc, sizeof(tp->rmem_alloc), &sk->sk_backlog.rmem_alloc.counter);
     bpf_probe_read(&tp->sk_rcvbuf, sizeof(tp->sk_rcvbuf), &sk->sk_rcvbuf);
+
+    //packet
+    bpf_probe_read(&tp->drop, sizeof(tp->drop), &sk->sk_drops.counter);
+    bpf_probe_read(&tp->retran, sizeof(tp->retran), &ts->total_retrans);
+    bpf_probe_read(&tp->ooo, sizeof(tp->ooo), &ts->rcv_ooopack);
+
 }
 
 #define offsetof(TYPE, MEMBER) ((int)&((TYPE *)0)->MEMBER)

@@ -26,17 +26,22 @@ struct tcp_params
 {
     u8 state;
 
+    // queue
     // length of accept queue
     u32 sk_ack_backlog;
     // length of syn queue
     u32 icsk_accept_queue;
     u32 sk_max_ack_backlog;
 
+    // memory
     u32 sk_wmem_queued;
     u32 sndbuf;
-
     u32 rmem_alloc;
     u32 sk_rcvbuf;
+
+    u32 drop;
+    u32 retran;
+    u32 ooo;
 
 };
 
