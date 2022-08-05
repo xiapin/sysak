@@ -9,4 +9,4 @@
 # step 5. yum install gcc
 
 workpath=`pwd`
-docker exec -it bpf-build sh -c  "cd $workpath && source \"$HOME/.cargo/env\" && cargo build --release && cp $workpath/target/release/rtrace $workpath"
+docker exec -it bpf-build sh -c  "cd $workpath && source \"$HOME/.cargo/env\" && cargo build --release && \cp $workpath/target/release/rtrace $workpath"
