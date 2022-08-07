@@ -165,7 +165,7 @@ _retry:
 		printf("\n");
 		desc++;
 	}
-
+    ret = 0;
 	printf("\n\n");
 	printf("未释放内存汇总:\n");
 	printf("次数    标记次数       函数\n");

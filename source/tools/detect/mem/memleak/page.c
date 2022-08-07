@@ -143,7 +143,7 @@ _retry:
 		printf("\n");
 		desc++;
 	}
-
+    ret = 0;
 	printf("\n\n");
 	printf("未释放内存汇总:\n");
 	printf("次数    总大小       函数\n");
