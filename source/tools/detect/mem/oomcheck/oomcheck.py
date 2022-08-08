@@ -59,7 +59,7 @@ def set_to_list(setstr):
             else:
                 resset.append(int(line))
         except Exception as err:
-            print ("set_to_list loop err {} lines {}\n".format(err, traceback.print_exc()))
+            print ("set_to_list loop err {} lines {}\n".format(err, traceback.print_exc()), file = sys.stderr)
             continue
     return resset
 
@@ -130,7 +130,7 @@ def oomcheck_get_spectime(time, oom_result):
                 num = i
         return num + 1
     except Exception as err:
-        print ("oomcheck_spectime error {}".format(err))
+        print ("oomcheck_spectime error {}".format(err), file = sys.stderr)
 
 def oom_is_node_num(line):
     return "hugepages_size=1048576" in line
@@ -664,7 +664,7 @@ def oom_get_max_task(num, oom_result):
                 res_total['score'] = int(last[-2])
                 res_total['task'] = last[-1]
         except Exception as err:
-            print ("oom_get_max_task loop err {} lines {}\n".format(err, traceback.print_exc()))
+            print ("oom_get_max_task loop err {} lines {}\n".format(err, traceback.print_exc()), file = sys.stderr)
             continue
     return res
 
@@ -704,7 +704,7 @@ def oom_reason_analyze(num, oom_result, summary):
                     oom_get_task_mem(oom_result, line, num)
                     oom_get_pid(oom_result, line, num)
             except Exception as err: 
-                print ("oom_reason_analyze loop err {} lines {}\n".format(err, traceback.print_exc()))
+                print ("oom_reason_analyze loop err {} lines {}\n".format(err, traceback.print_exc()), file = sys.stderr)
                 continue
         oom_result['node_num'] = node_num
         summary = oom_output_msg(oom_result, num, summary)
@@ -717,7 +717,7 @@ def oom_reason_analyze(num, oom_result, summary):
             print(summary)
         return summary
     except Exception as err:
-        print ("oom_reason_analyze err {} lines {}\n".format(err, traceback.print_exc()))
+        print ("oom_reason_analyze err {} lines {}\n".format(err, traceback.print_exc()), file = sys.stderr)
         return ""
 
 def oom_dmesg_analyze(dmesgs, oom_result):
@@ -776,7 +776,7 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                         oom_result['cgroup'][cgroup_name] += 1
 
     except Exception as err:
-        print( "oom_dmesg_analyze failed {}".format(err))
+        print( "oom_dmesg_analyze failed {}".format(err), file = sys.stderr)
 
 def oom_read_dmesg(data, mode, filename):
     if mode == 1:
