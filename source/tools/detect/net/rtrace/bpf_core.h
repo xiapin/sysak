@@ -165,6 +165,22 @@ static __always_inline u32 bpf_core_reqsk_synqueue_len(struct sock *sk)
 
     return synqueue_len;
 }
+
+static __always_inline u32 bpf_core_sock_ack_backlog(struct sock *sk)
+{
+    if (bpf_core_field_size(sk->sk_ack_backlog) == 2)
+    {
+        u16 sk_ack_backlog;
+        bpf_probe_read(&sk_ack_backlog, 2, &sk->sk_ack_backlog);
+        return sk_ack_backlog;
+    }else {
+        u32 sk_ack_backlog;
+        bpf_probe_read(&sk_ack_backlog, 4, &sk->sk_ack_backlog);
+        return sk_ack_backlog;
+    }
+    return ~0;
+}
+
 #endif
 
 #endif
