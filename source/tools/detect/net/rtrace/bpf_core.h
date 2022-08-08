@@ -45,7 +45,8 @@ static __always_inline void *fix_msghdr_base(struct msghdr *msg)
     }
     else
     {
-        struct msghdr___310 *msg310 = (void *)msg;;
+        struct msghdr___310 *msg310 = (void *)msg;
+        ;
         BPF_CORE_READ_INTO(&ptr, msg310, msg_iov, iov_base);
     }
     return ptr;
@@ -58,12 +59,12 @@ static __always_inline u16 bpf_core_sock_sk_protocol(struct sock *sk)
 
 struct netns_ipv4___310_419
 {
-    struct xt_table		*iptable_filter;
-	struct xt_table		*iptable_mangle;
-	struct xt_table		*iptable_raw;
-	struct xt_table		*arptable_filter;
-	struct xt_table		*iptable_security;
-	struct xt_table		*nat_table;
+    struct xt_table *iptable_filter;
+    struct xt_table *iptable_mangle;
+    struct xt_table *iptable_raw;
+    struct xt_table *arptable_filter;
+    struct xt_table *iptable_security;
+    struct xt_table *nat_table;
 };
 
 static __always_inline u64 bpf_core_netns_ipv4_iptable_filter(void *ptr)
@@ -139,7 +140,31 @@ static __always_inline u64 bpf_core_xt_table_name(void *ptr)
         return (u64)(&table->name[0]);
     return 0;
 }
+
+struct listen_sock___310
+{
+    int qlen;
+};
+
+struct request_sock_queue___310
+{
+    struct listen_sock___310 *listen_opt;
+};
+
+static __always_inline u32 bpf_core_reqsk_synqueue_len(struct sock *sk)
+{
+    u32 synqueue_len = 0;
+    struct request_sock_queue___310 *reqsk310 = &((struct inet_connection_sock *)sk)->icsk_accept_queue;
+    if (bpf_core_field_exists(reqsk310->listen_opt))
+        BPF_CORE_READ_INTO(&synqueue_len, reqsk310, listen_opt, qlen);
+    else
+    {
+        struct request_sock_queue *reqsk = reqsk310;
+        bpf_probe_read(&synqueue_len, sizeof(synqueue_len), &reqsk->qlen.counter);
+    }
+
+    return synqueue_len;
+}
 #endif
 
 #endif
-

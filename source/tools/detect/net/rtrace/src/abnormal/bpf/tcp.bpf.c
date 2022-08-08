@@ -99,7 +99,7 @@ __always_inline void fill_tcp_params(struct sock *sk, struct tcp_params *tp)
     
     // queue
     bpf_probe_read(&tp->sk_ack_backlog, sizeof(tp->sk_ack_backlog), &sk->sk_ack_backlog);
-    bpf_probe_read(&tp->icsk_accept_queue, sizeof(tp->icsk_accept_queue), &icsk->icsk_accept_queue.qlen.counter);
+    tp->icsk_accept_queue = bpf_core_reqsk_synqueue_len(sk);
     bpf_probe_read(&tp->sk_max_ack_backlog, sizeof(tp->sk_max_ack_backlog), &sk->sk_max_ack_backlog);
 
     // memory
