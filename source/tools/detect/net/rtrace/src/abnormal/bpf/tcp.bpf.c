@@ -111,8 +111,8 @@ __always_inline void fill_tcp_params(struct sock *sk, struct tcp_params *tp)
     //packet
     bpf_probe_read(&tp->drop, sizeof(tp->drop), &sk->sk_drops.counter);
     bpf_probe_read(&tp->retran, sizeof(tp->retran), &ts->total_retrans);
-    bpf_probe_read(&tp->ooo, sizeof(tp->ooo), &ts->rcv_ooopack);
-
+    if (bpf_core_field_exists(ts->rcv_ooopack))
+        bpf_probe_read(&tp->ooo, sizeof(tp->ooo), &ts->rcv_ooopack);
 }
 
 #define offsetof(TYPE, MEMBER) ((int)&((TYPE *)0)->MEMBER)
