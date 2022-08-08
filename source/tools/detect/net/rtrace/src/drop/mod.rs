@@ -7,7 +7,7 @@ use crate::Command;
 use anyhow::Result;
 use byteorder::{NativeEndian, ReadBytesExt};
 use chrono::prelude::*;
-use eutils_rs::proc::Kallsyms;
+use eutils_rs::proc::{Kallsyms, Netstat};
 use eutils_rs::{net::ProtocolType, net::TcpState, proc::Snmp};
 use procfs::net::DeviceStatus;
 use std::collections::HashMap;
@@ -112,7 +112,7 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
     let kallsyms = Kallsyms::try_from("/proc/kallsyms")?;
     let mut events = Vec::new();
     let mut pre_snmp = eutils_rs::proc::Snmp::from_file("/proc/net/snmp")?;
-    // let mut pre_netstat = eutils_rs::proc::Netstat:from_file("/proc/net/netstat")?;
+    let mut pre_netstat = eutils_rs::proc::Netstat::from_file("/proc/net/netstat")?;
     // let mut pre_netstat;
     let mut pre_dev = procfs::net::dev_status()?;
 
@@ -167,6 +167,10 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
 
             // Netstat::from_file("/proc/net/netstat")?;
             println!("DELTA_NETSTAT");
+            let cur_netstat = pre_netstat;
+            pre_netstat = Netstat::from_file("/proc/net/netstat")?;
+            let delta_netstat = pre_netstat.clone() - cur_netstat;
+            delta_netstat.show_non_zero();
 
             // netdev
             println!("DELTA_DEV");

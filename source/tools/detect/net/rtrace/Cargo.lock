@@ -322,9 +322,9 @@ dependencies = [
 
 [[package]]
 name = "eutils-rs"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bfd9401922f3b17895528c9529ab98688c20b29d40bb7cc17f848bf17307324"
+checksum = "3590518c70e487c68dc1e6d66590f5bb87f9787a081ba7c67366bf7169a98a62"
 dependencies = [
  "anyhow",
  "chrono",
