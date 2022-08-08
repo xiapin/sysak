@@ -375,7 +375,7 @@ def oom_host_output(oom_result, num):
     if free * 0.9  < low:
         is_low = True
     oom['root'] = 'limit'
-    if oom['mems_allowed'][0] != -1 and oom_result['node_num'] != len(oom['mems_allowed']) and is_low:
+    if 'mems_allowed' in oom and oom['mems_allowed'][0] != -1 and oom_result['node_num'] != len(oom['mems_allowed']) and is_low:
         oom['reason'] = OOM_REASON_NODE
         oom['root'] = 'cpuset'
         summary += "total node:%d\n"%(oom_result['node_num'])
@@ -499,6 +499,9 @@ def oom_check_dup(oom, oom_result):
         if oom['type'] == 'cgroup':
             oom['root'] = 'fork'
             summary = ',%d process:%s total memory usage: %dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
+            oom['json']['fork_max_task'] = res_total['task']
+            oom['json']['fork_max_cnt'] = res_total['cnt']
+            oom['json']['fork_max_usage'] = res_total['rss'] * 4
     return summary
 
 def oom_get_podName(cgName, cID, oom_result):
@@ -579,7 +582,7 @@ def oom_output_msg(oom_result,num, summary):
     res['task_mem'] = task_mem
     res['total_rss'] = oom['state_mem']['total_rss']
     summary += "total rss: %d KB\n"%(oom['state_mem']['total_rss'])
-    summary += "task: %s_%s, memory usage: %sKB\n"%(task[1:-1], oom['pid'], task_mem)
+    summary += "task: %s(%s), memory usage: %sKB\n"%(task[1:-1], oom['pid'], task_mem)
     #summary += "进程Kill次数:%s,进程内存占用量:%sKB\n"%(oom_result['task'][task], oom['killed_task_mem']/1024)
     #summary += "oom cgroup:%s"%(oom['cg_name'])
     oom['root'] = 'limit'
