@@ -100,16 +100,20 @@ int BPF_KPROBE(kprobe__tcp_rtt_estimator, struct sock *sk, long mrtt_us)
     return 0;
 }
 
-SEC("tracepoint/tcp/tcp_rcv_space_adjust")
-int tp__tcp_rcv_space_adjust(struct trace_event_raw_tcp_event_sk *ctx)
+
+__always_inline void applatency_entry(void *ctx, u64 sock_cookie)
+{
+    u64 ts = bpf_ktime_get_ns();
+    bpf_map_update_elem(&sockmap, &sock_cookie, &ts, BPF_ANY);
+}
+
+__always_inline void applatency_exit(void *ctx, struct sock *sk, u64 sock_cookie)
 {
     struct event e = {};
     struct latency_hist *lhp;
-    struct sock *sk;
-    u64 sock_cookie, cur_ts, *pre_ts, delta;
+    u64 cur_ts, *pre_ts, delta;
     u32 key = 1;
 
-    sock_cookie = ctx->sock_cookie;
     pre_ts = bpf_map_lookup_elem(&sockmap, &sock_cookie);
     if (pre_ts)
     {
@@ -121,7 +125,6 @@ int tp__tcp_rcv_space_adjust(struct trace_event_raw_tcp_event_sk *ctx)
         {
             if (delta >= lhp->threshold)
             {
-                sk = (struct sock *)ctx->skaddr;
                 e.le.pid = bpf_get_current_pid_tgid();
                 bpf_get_current_comm(e.le.comm, sizeof(e.le.comm));
                 e.event_type = APP_LATENCY_EVENT;
@@ -131,17 +134,35 @@ int tp__tcp_rcv_space_adjust(struct trace_event_raw_tcp_event_sk *ctx)
             }
         }
     }
-    return 0;
 }
 
 SEC("tracepoint/tcp/tcp_probe")
 int tp__tcp_probe(struct trace_event_raw_tcp_probe *ctx)
 {
-    u64 ts = bpf_ktime_get_ns();
-    u64 sock_cookie;
+    if (bpf_core_field_exists(ctx->sock_cookie))
+        applatency_entry(ctx, ctx->sock_cookie);
+    return 0;
+}
 
-    sock_cookie = ctx->sock_cookie;
-    bpf_map_update_elem(&sockmap, &sock_cookie, &ts, BPF_ANY);
+SEC("tracepoint/tcp/tcp_rcv_space_adjust")
+int tp__tcp_rcv_space_adjust(struct trace_event_raw_tcp_event_sk *ctx)
+{
+    if (bpf_core_field_exists(ctx->sock_cookie))
+        applatency_exit(ctx, (struct sock *)ctx->skaddr, ctx->sock_cookie);
+    return 0;
+}
+
+SEC("kprobe/tcp_rcv_established")
+int BPF_KPROBE(tcp_rcv_established, struct sock *sk)
+{
+    applatency_entry(ctx, (u64)sk);
+    return 0;
+}
+
+SEC("kprobe/tcp_rcv_space_adjust")
+int BPF_KPROBE(tcp_rcv_space_adjust, struct sock *sk)
+{
+    applatency_exit(ctx, sk, (u64)sk);
     return 0;
 }
 

@@ -137,9 +137,12 @@ impl<'a> Sli<'a> {
     }
 
     pub fn attach_applatency(&mut self) -> Result<()> {
-        self.skel.links.tp__tcp_probe = Some(self.skel.progs_mut().tp__tcp_probe().attach()?);
-        self.skel.links.tp__tcp_rcv_space_adjust =
-            Some(self.skel.progs_mut().tp__tcp_rcv_space_adjust().attach()?);
+        if eutils_rs::KernelVersion::current()? < eutils_rs::KernelVersion::try_from("3.11.0")? {
+        } else {
+            self.skel.links.tp__tcp_probe = Some(self.skel.progs_mut().tp__tcp_probe().attach()?);
+            self.skel.links.tp__tcp_rcv_space_adjust =
+                Some(self.skel.progs_mut().tp__tcp_rcv_space_adjust().attach()?);
+        }
         Ok(())
     }
 
