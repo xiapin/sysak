@@ -20,6 +20,12 @@ pub struct DropCommand {
     proto: String,
     #[structopt(long, help = "Custom btf path")]
     btf: Option<String>,
+    #[structopt(long, help = "Process identifier of container")]
+    pid: Option<usize>,
+    #[structopt(long, help = "Local network address of traced sock")]
+    src: Option<String>,
+    #[structopt(long, help = "Remote network address of traced sock")]
+    dst: Option<String>,
 
     #[structopt(long, help = "Enable iptables modules")]
     iptables: bool,
@@ -111,11 +117,18 @@ pub fn show_dev_delta(dev1: &HashMap<String, DeviceStatus>, dev2: &HashMap<Strin
 }
 
 pub fn build_drop(opts: &DropCommand) -> Result<()> {
+    let mut snmp_path = "/proc/net/snmp".to_owned();
+    let mut netstat_path = "/proc/net/netstat".to_owned();
+    if let Some(pid) = opts.pid {
+        snmp_path = format!("/proc/{}/net/snmp", pid);
+        netstat_path = format!("/proc/{}/net/netstat", pid);
+    }
+
     let mut drop = Drop::new(log::log_enabled!(log::Level::Debug), &opts.btf)?;
     let kallsyms = Kallsyms::try_from("/proc/kallsyms")?;
     let mut events = Vec::new();
-    let mut pre_snmp = eutils_rs::proc::Snmp::from_file("/proc/net/snmp")?;
-    let mut pre_netstat = eutils_rs::proc::Netstat::from_file("/proc/net/netstat")?;
+    let mut pre_snmp = eutils_rs::proc::Snmp::from_file(&snmp_path)?;
+    let mut pre_netstat = eutils_rs::proc::Netstat::from_file(&netstat_path)?;
     // let mut pre_netstat;
     let mut pre_dev = procfs::net::dev_status()?;
 
@@ -174,14 +187,14 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
 
             println!("DELTA_SNMP");
             let cur_snmp = pre_snmp;
-            pre_snmp = Snmp::from_file("/proc/net/snmp")?;
+            pre_snmp = Snmp::from_file(&snmp_path)?;
             let delta = pre_snmp.clone() - cur_snmp;
             delta.show_non_zero();
 
             // Netstat::from_file("/proc/net/netstat")?;
             println!("DELTA_NETSTAT");
             let cur_netstat = pre_netstat;
-            pre_netstat = Netstat::from_file("/proc/net/netstat")?;
+            pre_netstat = Netstat::from_file(&netstat_path)?;
             let delta_netstat = pre_netstat.clone() - cur_netstat;
             delta_netstat.show_non_zero();
 
