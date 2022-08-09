@@ -109,11 +109,23 @@ impl<'a> Drop<'a> {
         }
     }
 
-    pub fn attach_drop(&mut self) -> Result<()> {
+    pub fn attach_kfreeskb(&mut self) -> Result<()> {
         if eutils_rs::KernelVersion::current()? >= eutils_rs::KernelVersion::try_from("5.10.0")? {
-            self.skel.links.kfree_skb = Some(self.skel.progs_mut().kfree_skb().attach()?);
+            if self.skel.links.kfree_skb.is_none() {
+                self.skel.links.kfree_skb = Some(self.skel.progs_mut().kfree_skb().attach()?);
+            }
         } else {
             self.skel.links.kfree_skb = Some(self.skel.progs_mut().kfree_skb().attach()?);
+        }
+        Ok(())
+    }
+
+    pub fn attach_tcpdrop(&mut self) -> Result<()> {
+        if eutils_rs::KernelVersion::current()? >= eutils_rs::KernelVersion::try_from("5.10.0")? {
+            if self.skel.links.kfree_skb.is_none() {
+                self.skel.links.kfree_skb = Some(self.skel.progs_mut().kfree_skb().attach()?);
+            }
+        } else {
             self.skel.links.tcp_drop = Some(self.skel.progs_mut().tcp_drop().attach()?);
         }
         Ok(())

@@ -32,6 +32,9 @@ pub struct DropCommand {
         help = "Period of display in seconds. 0 mean display immediately when event triggers"
     )]
     period: u64,
+
+    #[structopt(long, help = "disable kfree_skb")]
+    dkfree: bool,
 }
 
 fn show_basic(event: &Event) {
@@ -116,7 +119,11 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
     // let mut pre_netstat;
     let mut pre_dev = procfs::net::dev_status()?;
 
-    drop.attach_drop()?;
+    if !opts.dkfree {
+        drop.attach_kfreeskb()?;
+    }
+    drop.attach_tcpdrop()?;
+
     if opts.iptables {
         drop.attach_iptables()?;
     }
@@ -129,7 +136,14 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
     loop {
         if let Some(event) = drop.poll(std::time::Duration::from_millis(100))? {
             log::debug!("{}", event);
-            events.push(event);
+            let mut stack_string = Vec::new();
+            match drop.get_stack(event.stackid()) {
+                Ok(stack) => {
+                    stack_string = get_stack_string(&kallsyms, stack)?;
+                }
+                Err(e) => stack_string.push(format!("{}", e)),
+            }
+            events.push((event, stack_string));
         }
 
         let cur_ts = eutils_rs::timestamp::current_monotime();
@@ -137,12 +151,11 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
             pre_ts = cur_ts;
 
             println!("Total {} packets drop", events.len());
-            for event in &events {
+            for (event, stack_string) in &events {
                 // show basic
                 show_basic(event);
                 // show stack
-                let stack_string = get_stack_string(&kallsyms, drop.get_stack(event.stackid())?)?;
-                for ss in &stack_string {
+                for ss in stack_string {
                     println!("\t{}", ss);
                 }
 
