@@ -25,7 +25,7 @@ struct env {
 	time_t duration;
 	bool verbose, summary;
 	__u64 threshold;
-	struct summary *sump;
+	struct sched_jit_summary *sump;
 	char *shm_p;
 } env = {
 	.duration = 0,
@@ -37,7 +37,7 @@ struct env {
 static int nr_cpus;
 FILE *filep = NULL;
 char filename[256] = {0};
-struct summary summary, *percpu_summary;
+struct sched_jit_summary summary, *percpu_summary;
 char log_dir[] = "/var/log/sysak/irqoff";
 char defaultfile[] = "/var/log/sysak/irqoff/irqoff.log";
 
@@ -80,7 +80,7 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
 	case 'S':
-		percpu_summary = malloc(nr_cpus*sizeof(struct summary));
+		percpu_summary = malloc(nr_cpus*sizeof(struct sched_jit_summary));
 		if (!percpu_summary)
 			return -ENOMEM;
 		shm_fd = shm_open(arg, O_RDWR, 0666);
@@ -90,14 +90,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			break;
 		}
 
-		p  = mmap(NULL, sizeof(struct summary)+32,
+		p  = mmap(NULL, sizeof(struct sched_jit_summary)+32,
 			PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		if (!p) {
 			fprintf(stdout, "mmap %s: %s", arg, strerror(errno));
 			break;
 		}
 		env.summary = true;
-		env.sump = (struct summary *)p;
+		env.sump = (struct sched_jit_summary *)p;
 		break;
 	case 'v':
 		env.verbose = true;
@@ -235,7 +235,7 @@ static void fill_maxN(struct jit_maxN *maxN, const struct event *e)
 	strncpy(maxN->comm, e->comm, 16);
 }
 
-static void update_summary(struct summary* summary, const struct event *e)
+static void update_summary(struct sched_jit_summary* summary, const struct event *e)
 {
 	int i, ridx;
 	char buf[CONID_LEN] = {0};
@@ -324,7 +324,7 @@ void irqoff_handler(int poll_fd, int map_fd, struct irqoff_bpf *obj,
 		fprintf(filep, "%-21s %-5s %-15s %-8s %-10s %-18s\n",
 			"TIME(irqoff)", "CPU", "COMM", "TID", "LAT(ms)", "STAMP");
 	} else {
-		memset(env.sump, 0, sizeof(struct summary));
+		memset(env.sump, 0, sizeof(struct sched_jit_summary));
 	}
 
 	pb_opts.sample_cb = handle_event;
@@ -481,7 +481,7 @@ cleanup:
 	irqoff_bpf__destroy(obj);
 
 	if (env.sump) {
-		munmap(env.sump, sizeof(struct summary)+32);
+		munmap(env.sump, sizeof(struct sched_jit_summary)+32);
 	}
 
 	return err != 0;

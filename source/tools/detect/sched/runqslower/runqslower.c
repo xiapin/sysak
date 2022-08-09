@@ -32,7 +32,7 @@ struct env {
 	bool previous;
 	bool verbose;
 	bool summary;
-	struct summary *sump;
+	struct sched_jit_summary *sump;
 	char *shm_p;
 } env = {
 	.span = 0,
@@ -115,14 +115,14 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			break;
 		}
 
-		p  = mmap(NULL, sizeof(struct summary)+32,
+		p  = mmap(NULL, sizeof(struct sched_jit_summary)+32,
 			PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		if (!p) {
 			fprintf(stdout, "mmap %s: %s", arg, strerror(errno));
 			break;
 		}
 		env.summary = true;
-		env.sump = (struct summary *)p;
+		env.sump = (struct sched_jit_summary *)p;
 		break;
 	case 'P':
 		env.previous = true;
@@ -213,7 +213,7 @@ static void fill_maxN(struct jit_maxN *maxN, const struct rqevent *e)
 	strncpy(maxN->comm, e->task, 16);
 }
 
-static void update_summary(struct summary* summary, const struct rqevent *e)
+static void update_summary(struct sched_jit_summary* summary, const struct rqevent *e)
 {
 	int i, ridx;
 	char buf[CONID_LEN] = {0};
@@ -359,7 +359,7 @@ int main(int argc, char **argv)
 			fprintf(filep, "%-21s %-6s %-16s %-8s %-10s\n",
 				"TIME(runslw)", "CPU", "COMM", "TID", "LAT(ms)");
 	} else {
-		memset(env.sump, 0, sizeof(struct summary));
+		memset(env.sump, 0, sizeof(struct sched_jit_summary));
 	}
 
 	pb_opts.sample_cb = handle_event;
@@ -406,7 +406,7 @@ cleanup:
 	perf_buffer__free(pb);
 	runqslower_bpf__destroy(obj);
 	if (env.sump) {
-		munmap(env.sump, sizeof(struct summary)+32);
+		munmap(env.sump, sizeof(struct sched_jit_summary)+32);
 	}
 
 	return err != 0;
