@@ -16,8 +16,8 @@ char buffer[4096];
 void *shm_handler(void *arg)
 {
 	int i;
-	struct summary *sump;
-	sump = (struct summary *)arg;
+	struct sched_jit_summary *sump;
+	sump = (struct sched_jit_summary *)arg;
 
 	while(!begin) {
 		sleep(1);
@@ -58,8 +58,8 @@ int main(int argc, char *argv[])
 		perror("popen nosched");
 		return ret;
 	}
-	ftruncate(fd, sizeof(struct summary) + 32);
-	p = mmap(NULL, sizeof(struct summary) + 32,
+	ftruncate(fd, sizeof(struct sched_jit_summary) + 32);
+	p = mmap(NULL, sizeof(struct sched_jit_summary) + 32,
 		PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
 
 	err = pthread_create(&pt, NULL, shm_handler, p);
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
 	}
 	end = 1;
 cleanup:
-	munmap(p, sizeof(struct summary) + 32);
+	munmap(p, sizeof(struct sched_jit_summary) + 32);
 	ret = shm_unlink("noschedselftest");
 	if (ret < 0) {
 		ret = errno;

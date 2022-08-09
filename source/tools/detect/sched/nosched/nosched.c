@@ -34,7 +34,7 @@ struct evn {
 	__u64 thresh;
 	bool summary;
 	bool verbose;
-	struct summary *sump;
+	struct sched_jit_summary *sump;
 	char *shm_p;
 } env = {
 	.thresh = LAT_THRESH_NS,
@@ -187,7 +187,7 @@ static void fill_maxN(struct jit_maxN *maxN, const struct event *e)
 	strncpy(maxN->comm, e->comm, 16);
 }
 
-static void update_summary(struct summary* summary, const struct event *e)
+static void update_summary(struct sched_jit_summary* summary, const struct event *e)
 {
 	int i, ridx;
 	char buf[CONID_LEN] = {0};
@@ -281,7 +281,7 @@ int nosched_handler(int poll_fd, struct nosched_bpf *skel)
 		fprintf(filep, "%-18s %-5s %-15s %-8s %-10s %-21s\n",
 			"TIME(nosched)", "CPU", "COMM", "TID", "LAT(ms)", "DATE");
 	} else {
-		memset(env.sump, 0, sizeof(struct summary));
+		memset(env.sump, 0, sizeof(struct sched_jit_summary));
 	}
 	pb_opts.sample_cb = handle_event;
 	pb_opts.lost_cb = handle_lost_events;
@@ -379,14 +379,14 @@ int main(int argc, char **argv)
 					break;
 				}
 
-				p  = mmap(NULL, sizeof(struct summary)+32,
+				p  = mmap(NULL, sizeof(struct sched_jit_summary)+32,
 				PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0);
 				if (!p) {
 					fprintf(stdout, "mmap %s: %s", optarg, strerror(errno));
 					break;
 				}
 				env.summary = true;
-				env.sump = (struct summary *)p;
+				env.sump = (struct sched_jit_summary *)p;
 				break;
 			case 'v':
 				env.verbose = true;
@@ -457,7 +457,7 @@ int main(int argc, char **argv)
 cleanup:
 	nosched_bpf__destroy(skel);
 	if (env.sump) {
-		munmap(env.sump, sizeof(struct summary)+32);
+		munmap(env.sump, sizeof(struct sched_jit_summary)+32);
 	}
 	return -err;
 }

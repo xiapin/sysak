@@ -1,5 +1,3 @@
-#ifndef __SCHED_JIT_H
-#define __SCHED_JIT_H
 #define CPU_ARRY_LEN	4
 #define TASK_COMM_LEN	16
 #define CONID_LEN	13
@@ -31,4 +29,3 @@ struct sched_jit_summary {
 	struct jit_lastN lastN_array[CPU_ARRY_LEN]; 
 	unsigned long less10ms, less50ms, less100ms, less500ms, less1s,plus1s;
 };
-#endif
