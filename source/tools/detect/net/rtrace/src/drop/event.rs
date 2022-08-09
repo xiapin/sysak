@@ -1,6 +1,8 @@
-use crate::drop_bindings::{event, KFREE_SKB};
+use crate::drop_bindings::{event, KFREE_SKB, addr_pair};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use anyhow::Result;
+
 
 pub enum EventType {
     KfreeSkb,
@@ -124,4 +126,16 @@ impl fmt::Display for IptablesParams {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "table: {}, chain: {}", self.name, self.hook)
     }
+}
+
+
+pub fn string_to_addr_pair(src: &String, dst: &String) -> Result<addr_pair> {
+    let s: SocketAddrV4 = src.parse()?;
+    let d: SocketAddrV4 = dst.parse()?;
+    Ok(addr_pair {
+        saddr: u32::from_le_bytes(s.ip().octets()),
+        daddr: u32::from_le_bytes(d.ip().octets()),
+        sport: s.port(),
+        dport: d.port(),
+    })
 }

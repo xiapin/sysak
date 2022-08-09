@@ -24,10 +24,10 @@ struct
 
 struct
 {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 512);
-    __type(key, u32);
-    __type(value, struct tid_map_value);
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 512);
+	__type(key, u32);
+	__type(value, struct tid_map_value);
 } tid_map SEC(".maps");
 
 struct
@@ -38,9 +38,16 @@ struct
 	__uint(value_size, sizeof(uint64_t) * 20);
 } stackmap SEC(".maps");
 
+struct
+{
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, __u32);
+	__type(value, struct filter);
+} filter_map SEC(".maps");
+
 #define NF_DROP 0
 #define NF_ACCEPT 1
-
 
 __always_inline void fill_stack(void *ctx, struct event *event)
 {
@@ -124,21 +131,49 @@ __always_inline void fill_sk_skb(struct event *event, struct sock *sk, struct sk
 		event->error = ERR_PROTOCOL_NOT_SUPPORT;
 		break;
 	}
-
 }
-
 
 __always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 {
+	u32 key = 0;
+	struct filter *filter = NULL;
 	struct event event = {};
+
+	fill_sk_skb(&event, sk, skb);
+	filter = bpf_map_lookup_elem(&filter_map, &key);
+	if (filter)
+	{
+		if (sk)
+		{
+			// sock addrpair
+			if (filter->ap.daddr && event.skap.daddr != filter->ap.daddr)
+				return;
+			if (filter->ap.saddr && event.skap.saddr != filter->ap.saddr)
+				return;
+			if (filter->ap.dport && event.skap.dport != filter->ap.dport)
+				return;
+			if (filter->ap.sport && event.skap.sport != filter->ap.sport)
+				return;
+		}
+
+		// skb
+		if (filter->ap.daddr && event.ap.saddr != filter->ap.daddr)
+			return;
+		if (filter->ap.saddr && event.ap.daddr != filter->ap.saddr)
+			return;
+		if (filter->ap.dport && event.ap.sport != filter->ap.dport)
+			return;
+		if (filter->ap.sport && event.ap.dport != filter->ap.sport)
+			return;
+	}
+
 	event.type = KFREE_SKB;
 	fill_stack(ctx, &event);
 	// pid info
 	fill_pid(&event);
-	fill_sk_skb(&event, sk, skb);
+
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 }
-
 
 SEC("kprobe/tcp_drop")
 int BPF_KPROBE(tcp_drop, struct sock *sk, struct sk_buff *skb)
@@ -175,7 +210,7 @@ __always_inline void ipt_do_table_entry(struct sk_buff *skb, struct nf_hook_stat
 // 	     const struct nf_hook_state *state,
 // 	     struct xt_table *table)
 SEC("kprobe/ipt_do_table")
-int BPF_KPROBE(ipt_do_table, void* priv, struct sk_buff *skb, struct nf_hook_state *state)
+int BPF_KPROBE(ipt_do_table, void *priv, struct sk_buff *skb, struct nf_hook_state *state)
 {
 	u32 hook;
 	bpf_probe_read(&hook, sizeof(hook), &state->hook);
@@ -204,7 +239,7 @@ int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 		value = bpf_map_lookup_elem(&tid_map, &tid);
 		if (value == NULL)
 			return 0;
-		
+
 		struct nf_hook_state *state = value->state;
 		struct xt_table *table = value->table;
 		struct sk_buff *skb = value->skb;
@@ -213,7 +248,7 @@ int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 		addr = bpf_core_xt_table_name(table);
 		if (addr)
 			bpf_probe_read(event.ip.name, sizeof(event.ip.name), (void *)addr);
-		
+
 		event.ip.hook = value->hook;
 		bpf_probe_read(&sk, sizeof(sk), &skb->sk);
 		fill_stack(ctx, &event);
@@ -224,8 +259,6 @@ int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 	bpf_map_delete_elem(&tid_map, &tid);
 	return 0;
 }
-
-
 
 SEC("kprobe/__nf_conntrack_confirm")
 int BPF_KPROBE(__nf_conntrack_confirm, struct sk_buff *skb)
@@ -238,7 +271,7 @@ SEC("kretprobe/__nf_conntrack_confirm")
 int BPF_KRETPROBE(__nf_conntrack_confirm_ret, int ret)
 {
 	struct event event = {};
-	struct tid_map_value *value; 
+	struct tid_map_value *value;
 	struct sk_buff *skb;
 	struct sock *sk;
 	u32 tid = bpf_get_current_pid_tgid();
@@ -247,7 +280,7 @@ int BPF_KRETPROBE(__nf_conntrack_confirm_ret, int ret)
 		value = bpf_map_lookup_elem(&tid_map, &tid);
 		if (value == NULL)
 			return 0;
-		
+
 		event.type = KFREE_SKB;
 		skb = value->skb;
 		bpf_probe_read(&sk, sizeof(sk), &skb->sk);

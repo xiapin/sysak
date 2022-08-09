@@ -62,12 +62,17 @@ fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<DropSkel<'a>>
 pub struct Drop<'a> {
     skel: DropSkel<'a>,
     rx: Option<Receiver<(usize, Vec<u8>)>>,
+    filter: filter,
 }
 
 impl<'a> Drop<'a> {
     pub fn new(debug: bool, btf: &Option<String>) -> Result<Drop<'a>> {
         let skel = open_load_skel(debug, btf)?;
-        Ok(Drop { skel, rx: None })
+        Ok(Drop {
+            skel,
+            rx: None,
+            filter: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
+        })
     }
 
     pub fn poll(&mut self, timeout: Duration) -> Result<Option<Event>> {
@@ -96,6 +101,30 @@ impl<'a> Drop<'a> {
         log::debug!("start successfully perf thread to receive event");
         Ok(None)
     }
+
+    pub fn set_filter_ap(&mut self, ap: addr_pair) {
+        self.filter.ap = ap;
+    }
+
+    pub fn update_filter(&mut self) -> Result<()> {
+        let mut key = vec![0; self.skel.maps().filter_map().key_size() as usize];
+        let key_ptr = &mut key[0] as *mut u8 as *mut i32;
+        unsafe {
+            *key_ptr = 0;
+        }
+        self.skel.maps_mut().filter_map().update(
+            &key,
+            unsafe {
+                std::slice::from_raw_parts(
+                    &self.filter as *const filter as *const u8,
+                    std::mem::size_of::<filter>(),
+                )
+            },
+            MapFlags::ANY,
+        )?;
+        Ok(())
+    }
+
 
     pub fn get_stack(&mut self, stackid: i32) -> Result<Vec<u8>> {
         let res = self.skel.maps_mut().stackmap().lookup(

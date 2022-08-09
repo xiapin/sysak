@@ -43,6 +43,11 @@ struct addr_pair
     u32 daddr;
 };
 
+struct filter
+{
+    struct addr_pair ap;
+};
+
 struct pid_info
 {
     u32 pid;

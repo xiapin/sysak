@@ -3,6 +3,7 @@ mod event;
 pub use {self::drop::Drop, self::event::Event};
 
 use crate::drop::event::EventType;
+use crate::drop::event::string_to_addr_pair;
 use crate::Command;
 use anyhow::Result;
 use byteorder::{NativeEndian, ReadBytesExt};
@@ -124,6 +125,17 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
         netstat_path = format!("/proc/{}/net/netstat", pid);
     }
 
+    let mut src = String::from("0.0.0.0:0");
+    let mut dst = String::from("0.0.0.0:0");
+
+    if let Some(x) = &opts.src {
+        src = x.clone();
+    }
+    if let Some(x) = &opts.dst {
+        dst = x.clone();
+    }
+    let ap = string_to_addr_pair(&src, &dst)?;
+
     let mut drop = Drop::new(log::log_enabled!(log::Level::Debug), &opts.btf)?;
     let kallsyms = Kallsyms::try_from("/proc/kallsyms")?;
     let mut events = Vec::new();
@@ -131,6 +143,8 @@ pub fn build_drop(opts: &DropCommand) -> Result<()> {
     let mut pre_netstat = eutils_rs::proc::Netstat::from_file(&netstat_path)?;
     // let mut pre_netstat;
     let mut pre_dev = procfs::net::dev_status()?;
+
+    drop.set_filter_ap(ap);
 
     if !opts.dkfree {
         drop.attach_kfreeskb()?;
