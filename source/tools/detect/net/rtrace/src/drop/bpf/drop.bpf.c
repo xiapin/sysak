@@ -73,7 +73,7 @@ __always_inline void fill_sk_skb(struct event *event, struct sock *sk, struct sk
 		bpf_probe_read(&event->skap.sport, sizeof(event->skap.sport), &sk->__sk_common.skc_num);
 		event->skap.dport = bpf_ntohs(event->skap.dport);
 
-		bpf_probe_read(&event->sk_protocol, sizeof(event->sk_protocol), &sk->sk_protocol);
+		event->sk_protocol = bpf_core_sock_sk_protocol(sk);
 		bpf_probe_read(&event->state, sizeof(event->state), &sk->__sk_common.skc_state);
 	}
 
