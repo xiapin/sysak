@@ -459,6 +459,8 @@ def oom_cgroup_output_ext(oom_result, num):
     res = oom['json']
     if not oom_is_cgroup_oom(reason):
         return summary
+    if oom['root'] == 'limit' and reason ==  OOM_REASON_PCGROUP:
+        oom['root'] = 'plimit'
     anon = int(oom["cg_inanon"]) + int(oom["cg_anon"]) - int(oom["cg_rss"])
     ipcs = False
     if anon > int(oom['cg_usage'][:-2])*0.3:
