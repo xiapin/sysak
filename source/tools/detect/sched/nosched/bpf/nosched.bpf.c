@@ -2,6 +2,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
+#include "sched_jit.h"
 #include "../nosched.h"
 
 #define BPF_F_FAST_STACK_CMP	(1ULL << 9)
@@ -110,7 +111,7 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 			if (resched_latency > _(argsp->thresh)) {
 				struct event event = {0};
 				event.stamp = latp->last_seen_need_resched_ns;
-				event.cpuid = cpuid;
+				event.cpu = cpuid;
 				event.delay = now - latp->last_seen_need_resched_ns;
 				event.pid = bpf_get_current_pid_tgid();
 				bpf_get_current_comm(&event.comm, sizeof(event.comm));
@@ -162,7 +163,7 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 			
 			event.stamp = now;
 			event.exit = now;
-			event.cpuid = cpuid;
+			event.cpu = cpuid;
 			event.delay = now - latp->last_seen_need_resched_ns;
 			latp->last_perf_event = now;
 			event.pid = bpf_get_current_pid_tgid();

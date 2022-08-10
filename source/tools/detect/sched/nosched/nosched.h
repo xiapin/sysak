@@ -5,17 +5,12 @@
 #define LAT_THRESH_NS	(10*1000*1000)
 #define TASK_COMM_LEN	16
 #define PERF_MAX_STACK_DEPTH	32
-#define TASK_COMM_LEN	16
-#define PERF_MAX_STACK_DEPTH	32
 
 #ifdef __x86_64__
 #define	TIF_NEED_RESCHED	3
 #elif defined (__aarch64__)
 #define TIF_NEED_RESCHED	1
 #endif
-
-#define CPU_ARRY_LEN	4
-#define CONID_LEN	13
 
 struct args {
 	int flag;
@@ -36,27 +31,5 @@ struct latinfo {
 	__u64 last_perf_event;
 	__u64 thresh;
 	int ticks_without_resched;
-};
-
-struct event {
-	__u32 ret, pid, cpuid;
-	__u64 delay, stamp, enter, exit;
-	char comm[TASK_COMM_LEN];
-};
-
-struct max_sum {
-	__u64 value;
-	__u64 stamp;
-	int cpu, pid;
-	char comm[TASK_COMM_LEN];
-};
-
-struct summary {
-	unsigned long num;
-	__u64	total;
-	struct max_sum max;
-	int cpus[CPU_ARRY_LEN];
-	int jitter[CPU_ARRY_LEN];
-	char container[CPU_ARRY_LEN][CONID_LEN];
 };
 
