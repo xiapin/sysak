@@ -1,7 +1,7 @@
-CFLAGS = -MD -Wall -fPIC --shared -g -O2 -Wno-strict-aliasing
+CFLAGS = -MD -Wall -fPIC --shared -g -O2 -Wno-strict-aliasing -lrt
 CC = gcc
 INCLUDE_DIR = ../include
-LINK = $(CC) -I$(INCLUDE_DIR) -I../src/obj/include $(CFLAGS)
+LINK = $(CC) -I$(INCLUDE_DIR) -I../src/obj/include -I$(SRC)/lib/uapi/include $(CFLAGS)
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
