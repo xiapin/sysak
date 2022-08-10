@@ -1,5 +1,6 @@
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
+#include "sched_jit.h"
 #include "../runqslower.h"
 
 #define TASK_RUNNING	0
@@ -113,7 +114,7 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 	int cpuid;
 	u32 pid, prev_pid;
 	long int prev_state;
-	struct event event = {};
+	struct rqevent event = {};
 	u64 *tsp, delta, threshold, now;
 	struct args *argp;
 
