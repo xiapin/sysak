@@ -1,4 +1,4 @@
-use crate::latency::tcp::TcpUsrEvent;
+use crate::latencylegacy::tcp::TcpUsrEvent;
 use std::fmt;
 use std::rc::Rc;
 

@@ -1,5 +1,5 @@
 use crate::bindings::*;
-use crate::latency::icmp::{IcmpEvent, IcmpEventType};
+use crate::latencylegacy::icmp::{IcmpEvent, IcmpEventType};
 use crate::icmpskel::*;
 use crate::perf::PerfBufferBuilder;
 use anyhow::{bail, Result};

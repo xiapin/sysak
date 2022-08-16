@@ -1,6 +1,6 @@
 use crate::bindings::*;
 use crate::perf::PerfBufferBuilder;
-use crate::latency::tcp::{AddressInfo, TcpEvent};
+use crate::latencylegacy::tcp::{AddressInfo, TcpEvent};
 use crate::tcpskel::*;
 use anyhow::{bail, Result};
 use crossbeam_channel;

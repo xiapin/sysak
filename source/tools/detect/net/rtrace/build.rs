@@ -4,9 +4,9 @@ use std::path::Path;
 
 use libbpf_cargo::SkeletonBuilder;
 
-const LATENCY_TCP_SRC: &str = "./src/latency/bpf/tcp.bpf.c";
-const LATENCY_ICMP_SRC: &str = "./src/latency/bpf/icmp.bpf.c";
-const LATENCY_HDR: &str = "./src/latency/bpf/rtrace.h";
+const LATENCY_TCP_SRC: &str = "./src/latencylegacy/bpf/tcp.bpf.c";
+const LATENCY_ICMP_SRC: &str = "./src/latencylegacy/bpf/icmp.bpf.c";
+const LATENCY_HDR: &str = "./src/latencylegacy/bpf/rtrace.h";
 
 const DROP_BPF_SRC: &str = "./src/drop/bpf/drop.bpf.c";
 const DROP_HDR: &str = "./src/drop/bpf/drop.h";
@@ -113,9 +113,9 @@ fn compile_drop_ebpf() {
         .expect("Couldn't write bindings!");
 }
 
-fn compile_latency_ebpf() {
-    create_dir_all("./src/latency/bpf/.output").unwrap();
-    let tcp_skel = Path::new("./src/latency/bpf/.output/tcp.skel.rs");
+fn compile_latency_legacy_ebpf() {
+    create_dir_all("./src/latencylegacy/bpf/.output").unwrap();
+    let tcp_skel = Path::new("./src/latencylegacy/bpf/.output/tcp.skel.rs");
     match SkeletonBuilder::new()
         .source(LATENCY_TCP_SRC)
         .build_and_generate(&tcp_skel)
@@ -127,7 +127,7 @@ fn compile_latency_ebpf() {
         }
     }
 
-    let icmp_skel = Path::new("./src/latency/bpf/.output/icmp.skel.rs");
+    let icmp_skel = Path::new("./src/latencylegacy/bpf/.output/icmp.skel.rs");
     match SkeletonBuilder::new()
         .source(LATENCY_ICMP_SRC)
         .build_and_generate(&icmp_skel)
@@ -150,7 +150,7 @@ fn compile_latency_ebpf() {
         .generate()
         // Unwrap the Result and panic on failure.
         .expect("Unable to generate bindings");
-    let bind = Path::new("./src/latency/bpf/.output/bindings.rs");
+    let bind = Path::new("./src/latencylegacy/bpf/.output/bindings.rs");
     bindings
         .write_to_file(bind)
         .expect("Couldn't write bindings!");
@@ -184,7 +184,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", SLI_BPF_SRC);
     println!("cargo:rerun-if-changed={}", SLI_HDR);
 
-    compile_latency_ebpf();
+    compile_latency_legacy_ebpf();
     compile_drop_ebpf();
     compile_abnormal_ebpf();
     compile_sli_ebpf();

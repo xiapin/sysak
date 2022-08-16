@@ -13,7 +13,7 @@ pub use {
 use anyhow::Result;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::latency::LatencyCommand;
+use crate::latencylegacy::LatencyCommand;
 
 fn partition_events(events: Vec<Rc<TcpUsrEvent>>) {
     let mut seqs = Vec::new();

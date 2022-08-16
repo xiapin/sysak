@@ -1,4 +1,4 @@
-use crate::latency::tcp::{TcpEvent, TcpEventType, TcpUsrEvent};
+use crate::latencylegacy::tcp::{TcpEvent, TcpEventType, TcpUsrEvent};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 

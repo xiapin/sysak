@@ -13,7 +13,7 @@ pub use {
 
 
 use anyhow::Result;
-use crate::latency::LatencyCommand;
+use crate::latencylegacy::LatencyCommand;
 use std::collections::HashMap;
 
 

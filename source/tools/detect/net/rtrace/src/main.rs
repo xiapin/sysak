@@ -1,9 +1,9 @@
-#[path = "latency/bpf/.output/icmp.skel.rs"]
+#[path = "latencylegacy/bpf/.output/icmp.skel.rs"]
 pub mod icmpskel;
-#[path = "latency/bpf/.output/tcp.skel.rs"]
+#[path = "latencylegacy/bpf/.output/tcp.skel.rs"]
 pub mod tcpskel;
 
-#[path = "latency/bpf/.output/bindings.rs"]
+#[path = "latencylegacy/bpf/.output/bindings.rs"]
 #[allow(non_upper_case_globals)]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
@@ -40,18 +40,18 @@ pub mod sliskel;
 
 mod abnormal;
 mod drop;
-mod latency;
+mod latencylegacy;
 mod perf;
 mod sli;
 
 use anyhow::{bail, Result};
 use drop::build_drop;
 use abnormal::build_abnormal;
-use latency::build_latency;
+use latencylegacy::build_latency;
 use sli::build_sli;
 use structopt::StructOpt;
 
-use latency::LatencyCommand;
+use latencylegacy::LatencyCommand;
 use drop::DropCommand;
 use abnormal::AbnormalCommand;
 use sli::SliCommand;
@@ -65,8 +65,8 @@ pub struct Command {
 
 #[derive(Debug, StructOpt)]
 enum SubCommand {
-    #[structopt(name = "latency", about = "Packet latency diagnosing")]
-    Latency(LatencyCommand),
+    #[structopt(name = "latency_legacy", about = "Packet latency diagnosing")]
+    LatencyLegacy(LatencyCommand),
     #[structopt(name = "drop", about = "Packet drop diagnosing")]
     Drop(DropCommand),
     #[structopt(name = "abnormal", about = "Abnormal connection diagnosing")]
@@ -80,7 +80,7 @@ fn main() -> Result<()> {
     let opts = Command::from_args();
 
     match opts.subcommand {
-        SubCommand::Latency(cmd) => {
+        SubCommand::LatencyLegacy(cmd) => {
             build_latency(&cmd)?;
         }
         SubCommand::Sli(cmd) => {
