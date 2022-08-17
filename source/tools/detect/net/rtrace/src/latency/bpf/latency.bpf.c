@@ -7,6 +7,7 @@
 
 #include "common.h"
 #include "bpf_core.h"
+#include "latency.h"
 
 struct
 {
@@ -26,25 +27,32 @@ struct
 
 static __always_inline u64 log2(u32 v)
 {
-	u32 shift, r;
+    u32 shift, r;
 
-	r = (v > 0xFFFF) << 4; v >>= r;
-	shift = (v > 0xFF) << 3; v >>= shift; r |= shift;
-	shift = (v > 0xF) << 2; v >>= shift; r |= shift;
-	shift = (v > 0x3) << 1; v >>= shift; r |= shift;
-	r |= (v >> 1);
+    r = (v > 0xFFFF) << 4;
+    v >>= r;
+    shift = (v > 0xFF) << 3;
+    v >>= shift;
+    r |= shift;
+    shift = (v > 0xF) << 2;
+    v >>= shift;
+    r |= shift;
+    shift = (v > 0x3) << 1;
+    v >>= shift;
+    r |= shift;
+    r |= (v >> 1);
 
-	return r;
+    return r;
 }
 
 static __always_inline u64 log2l(u64 v)
 {
-	u32 hi = v >> 32;
+    u32 hi = v >> 32;
 
-	if (hi)
-		return log2(hi) + 32;
-	else
-		return log2(v);
+    if (hi)
+        return log2(hi) + 32;
+    else
+        return log2(v);
 }
 
 __always_inline void handle_skb_entry(void *ctx, struct sk_buff *skb)
@@ -62,9 +70,10 @@ __always_inline void handle_skb_exit(void *ctx, struct sk_buff *skb)
         u64 delta = (bpf_ktime_get_ns() - *pre_ts) / 1000000;
         u32 idx = log2l(delta);
 
-        u32 *count = bpf_map_lookup_elem(&hists, &idx);
-        if (count)
-            (*count)++;
+        struct loghist *lh = bpf_map_lookup_elem(&hists, &idx);
+        if (lh)
+            if (idx < 32)
+                lh->hist[idx]++;
     }
 }
 
