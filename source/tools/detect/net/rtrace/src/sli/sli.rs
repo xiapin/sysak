@@ -1,7 +1,7 @@
 use crate::perf::PerfBufferBuilder;
 use crate::sli::event::{Event, LatencyHist};
-use crate::sli_bindings::*;
-use crate::sliskel::*;
+use crate::sli::bindings::*;
+use crate::sli::skel::*;
 use anyhow::{bail, Result};
 use crossbeam_channel;
 use crossbeam_channel::Receiver;

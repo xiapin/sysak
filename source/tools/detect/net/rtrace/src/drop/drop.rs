@@ -1,6 +1,6 @@
 use crate::drop::event::Event;
-use crate::drop_bindings::*;
-use crate::dropskel::*;
+use crate::drop::bindings::*;
+use crate::drop::dropskel::*;
 use crate::perf::PerfBufferBuilder;
 use anyhow::{bail, Result};
 use crossbeam_channel;

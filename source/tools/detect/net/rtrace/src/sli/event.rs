@@ -1,4 +1,4 @@
-use crate::sli_bindings::*;
+use crate::sli::bindings::*;
 use anyhow::{bail, Result};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};

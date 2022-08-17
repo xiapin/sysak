@@ -1,6 +1,6 @@
 use crate::abnormal::event::Event;
-use crate::abnormal_bindings::*;
-use crate::abnormaltcpskel::*;
+use crate::abnormal::bindings::*;
+use crate::abnormal::skel::*;
 use crate::perf::PerfBufferBuilder;
 use anyhow::{bail, Result};
 use crossbeam_channel;
@@ -42,7 +42,7 @@ fn bump_memlock_rlimit() -> Result<()> {
     Ok(())
 }
 
-fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<TcpSkel<'a>> {
+fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<AbnormalSkel<'a>> {
     let btf_cstring;
     let mut btf_cstring_ptr = std::ptr::null();
     if let Some(btf) = btf {
@@ -51,7 +51,7 @@ fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<TcpSkel<'a>> 
     }
 
     bump_memlock_rlimit()?;
-    let mut skel_builder = TcpSkelBuilder::default();
+    let mut skel_builder = AbnormalSkelBuilder::default();
     skel_builder.obj_builder.debug(debug);
     let mut open_opts = skel_builder.obj_builder.opts(std::ptr::null());
     open_opts.btf_custom_path = btf_cstring_ptr;
@@ -60,7 +60,7 @@ fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<TcpSkel<'a>> 
 }
 
 pub struct Tcp<'a> {
-    skel: TcpSkel<'a>,
+    skel: AbnormalSkel<'a>,
     rx: Option<Receiver<(usize, Vec<u8>)>>,
     filter: filter,
 }

@@ -1,3 +1,14 @@
+#[path = "bpf/.output/bindings.rs"]
+#[allow(non_upper_case_globals)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+mod bindings;
+
+#[path = "bpf/.output/drop.skel.rs"]
+mod dropskel;
+
+
 mod drop;
 mod event;
 pub use {self::drop::Drop, self::event::Event};

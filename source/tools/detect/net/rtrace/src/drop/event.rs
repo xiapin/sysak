@@ -1,4 +1,4 @@
-use crate::drop_bindings::{event, KFREE_SKB, addr_pair};
+use crate::drop::bindings::{event, KFREE_SKB, addr_pair};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use anyhow::Result;

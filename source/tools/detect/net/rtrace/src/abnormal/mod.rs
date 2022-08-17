@@ -1,3 +1,12 @@
+#[path = "bpf/.output/bindings.rs"]
+#[allow(non_upper_case_globals)]
+#[allow(non_camel_case_types)]
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+mod bindings;
+#[path = "bpf/.output/abnormal.skel.rs"]
+pub mod skel;
+
 mod event;
 mod pstree;
 mod tcp;
