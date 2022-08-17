@@ -12,7 +12,7 @@
 struct
 {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 32);
+    __uint(max_entries, 10);
     __type(key, u32);
     __type(value, u32);
 } hists SEC(".maps");
@@ -64,45 +64,34 @@ __always_inline void handle_skb_entry(void *ctx, struct sk_buff *skb)
 __always_inline void handle_skb_exit(void *ctx, struct sk_buff *skb)
 {
     u64 *pre_ts = bpf_map_lookup_elem(&skb_map, &skb);
+    u32 key = 0;
 
     if (pre_ts)
     {
         u64 delta = (bpf_ktime_get_ns() - *pre_ts) / 1000000;
         u32 idx = log2l(delta);
 
-        struct loghist *lh = bpf_map_lookup_elem(&hists, &idx);
+        struct loghist *lh = bpf_map_lookup_elem(&hists, &key);
         if (lh)
             if (idx < 32)
                 lh->hist[idx]++;
     }
 }
 
-#define SKB_ENTRY_ARG_FN(pos)                                          \
-    SEC("kprobe/skb_entry" #pos)                                       \
-    int kprobe_skb_entry##pos(struct pt_regs *pt)                      \
-    {                                                                  \
-        struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM##pos(pt); \
-        handle_skb_entry(pt, skb);                                     \
-        return 0;                                                      \
-    }
 
-#define SKB_EXIT_ARG_FN(pos)                                           \
-    SEC("kprobe/skb_exit" #pos)                                        \
-    int kprobe_skb_exit##pos(struct pt_regs *pt)                       \
-    {                                                                  \
-        struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM##pos(pt); \
-        handle_skb_exit(pt, skb);                                      \
-        return 0;                                                      \
-    }
+SEC("kprobe/pfifo_fast_enqueue")
+int BPF_KPROBE(pfifo_fast_enqueue, struct sk_buff *skb)
+{
+    handle_skb_entry(ctx, skb);
+    return 0;
+}
 
-SKB_ENTRY_ARG_FN(1)
-SKB_ENTRY_ARG_FN(2)
-SKB_ENTRY_ARG_FN(3)
-SKB_ENTRY_ARG_FN(4)
+SEC("kretprobe/pfifo_fast_dequeue")
+int BPF_KRETPROBE(pfifo_fast_dequeue, struct sk_buff *skb)
+{
+    handle_skb_exit(ctx, skb);
+    return 0;
+}
 
-SKB_EXIT_ARG_FN(1)
-SKB_EXIT_ARG_FN(2)
-SKB_EXIT_ARG_FN(3)
-SKB_EXIT_ARG_FN(4)
 
 char LICENSE[] SEC("license") = "Dual BSD/GPL";

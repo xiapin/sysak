@@ -1,14 +1,16 @@
-use crate::perf::PerfBufferBuilder;
+use crate::common::*;
+use crate::latency::bindings::*;
 use crate::latency::skel::*;
 use anyhow::{bail, Result};
 use crossbeam_channel;
 use crossbeam_channel::Receiver;
+use libbpf_rs::Map;
+use libbpf_rs::MapFlags;
+use log::Log;
 use once_cell::sync::Lazy;
+use std::ffi::CString;
 use std::sync::Mutex;
 use std::time::Duration;
-use libbpf_rs::MapFlags;
-use std::ffi::CString;
-use crate::common::*;
 
 static GLOBAL_TX: Lazy<Mutex<Option<crossbeam_channel::Sender<(usize, Vec<u8>)>>>> =
     Lazy::new(|| Mutex::new(None));
@@ -27,7 +29,6 @@ pub fn handle_event(_cpu: i32, data: &[u8]) {
 pub fn handle_lost_events(cpu: i32, count: u64) {
     eprintln!("Lost {} events on CPU {}", count, cpu);
 }
-
 
 fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<LatencySkel<'a>> {
     let btf_cstring;
@@ -49,6 +50,7 @@ pub struct Latency<'a> {
     skel: LatencySkel<'a>,
     rx: Option<Receiver<(usize, Vec<u8>)>>,
     pub filter: Filter,
+    zerohist: Loghist,
 }
 
 impl<'a> Latency<'a> {
@@ -58,7 +60,22 @@ impl<'a> Latency<'a> {
             skel,
             rx: None,
             filter: Filter::new(),
+            zerohist: Loghist::zero(),
         })
+    }
+
+    pub fn get_loghist(&mut self) -> Result<Option<Loghist>> {
+        let mut key = vec![0; self.skel.maps().hists().key_size() as usize];
+
+        let res = self.skel.maps_mut().hists().lookup(&key, MapFlags::ANY)?;
+        if let Some(x) = res {
+            return Ok(Some(Loghist::new(x)));
+        }
+        self.skel
+            .maps_mut()
+            .hists()
+            .update(&key, &self.zerohist.vec(), MapFlags::ANY)?;
+        Ok(None)
     }
 
     // pub fn update_filter(&mut self) -> Result<()> {
@@ -108,8 +125,40 @@ impl<'a> Latency<'a> {
     // }
 
     pub fn attach(&mut self) -> Result<()> {
-        self.skel.attach()?;
-        Ok(())
+        Ok(self.skel.attach()?)
+    }
+}
+
+pub struct Loghist {
+    lh: loghist,
+    pub ptr: *const loghist,
+    data: Vec<u8>,
+}
+
+impl Loghist {
+    pub fn zero() -> Loghist {
+        Loghist {
+            lh: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
+            ptr: std::ptr::null(),
+            data: Vec::default(),
+        }
     }
 
+    pub fn new(data: Vec<u8>) -> Loghist {
+        Loghist {
+            lh: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
+            ptr: &data[0] as *const u8 as *const loghist,
+            data,
+        }
+    }
+
+    pub fn vec(&self) -> Vec<u8> {
+        unsafe {
+            std::slice::from_raw_parts(
+                &self.lh as *const loghist as *const u8,
+                std::mem::size_of::<loghist>(),
+            )
+            .to_vec()
+        }
+    }
 }
