@@ -2,6 +2,7 @@ mod abnormal;
 mod drop;
 mod latency;
 mod sli;
+mod utils;
 
 mod common;
 mod perf;
