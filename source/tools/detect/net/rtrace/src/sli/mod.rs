@@ -46,6 +46,9 @@ pub struct SliCommand {
 
     #[structopt(long, help = "Output every sli to shell")]
     shell: bool,
+
+    #[structopt(long, help = "Custom btf path")]
+    btf: Option<String>,
 }
 
 pub struct SliOutput {
@@ -82,10 +85,12 @@ fn latency_sli(sli: &mut Sli) -> Result<()> {
 pub fn build_sli(opts: &SliCommand) -> Result<()> {
     let mut old_snmp = Snmp::from_file("/proc/net/snmp")?;
     let delta_ns = opts.period * 1_000_000_000;
-    let mut sli = Sli::new(log::log_enabled!(log::Level::Debug), opts.threshold)?;
+    let mut sli = Sli::new( opts.threshold)?;
     let mut sli_output: SliOutput = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
     let mut pre_ts = 0;
     let mut has_output = false;
+
+    sli.load(log::log_enabled!(log::Level::Debug), &opts.btf, None, None)?;
 
     if opts.latency {
         sli.attach_latency()?;

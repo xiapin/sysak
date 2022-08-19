@@ -6,53 +6,38 @@ use anyhow::{bail, Result};
 use crossbeam_channel;
 use crossbeam_channel::Receiver;
 use eutils_rs::proc::Kallsyms;
-use libbpf_rs::MapFlags;
+use libbpf_rs::{MapFlags, Link};
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use std::time::Duration;
-use crate::utils::macros::define_perf_event_channel;
+use crate::utils::macros::*;
+
 
 define_perf_event_channel!();
 
-fn bump_memlock_rlimit() -> Result<()> {
-    let rlimit = libc::rlimit {
-        rlim_cur: 128 << 20,
-        rlim_max: 128 << 20,
-    };
-
-    if unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlimit) } != 0 {
-        bail!("Failed to increase rlimit");
-    }
-
-    Ok(())
-}
-
-fn open_load_skel<'a>(debug: bool) -> Result<SliSkel<'a>> {
-    bump_memlock_rlimit()?;
-    let mut skel_builder = SliSkelBuilder::default();
-    skel_builder.obj_builder.debug(debug);
-    let mut open_skel = skel_builder.open()?;
-    Ok(open_skel.load()?)
-}
 
 pub struct Sli<'a> {
     skel: SliSkel<'a>,
+    links: Vec<Link>,
     rx: Option<Receiver<(usize, Vec<u8>)>>,
     zero_latency_hist: latency_hist,
 }
 
 impl<'a> Sli<'a> {
-    pub fn new(debug: bool, threshold: u32) -> Result<Sli<'a>> {
-        let skel = open_load_skel(debug)?;
+    pub fn new(threshold: u32) -> Result<Sli<'a>> {
         let mut zero_latency_hist: latency_hist =
             unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
         zero_latency_hist.threshold = threshold;
         Ok(Sli {
-            skel,
+            links: Vec::default(),
+            skel: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
             rx: None,
             zero_latency_hist,
         })
     }
+
+    defined_skel_load!(SliSkelBuilder);
+    defined_skel_attach!();
 
     pub fn poll(&mut self, timeout: Duration) -> Result<Option<Event>> {
         if let Some(rx) = &self.rx {
@@ -145,4 +130,5 @@ impl<'a> Sli<'a> {
         }
         Ok(())
     }
+
 }

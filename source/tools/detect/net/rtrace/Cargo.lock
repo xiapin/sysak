@@ -79,6 +79,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "bpfskel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -925,6 +934,7 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "bindgen",
+ "bpfskel",
  "byteorder",
  "chrono",
  "clearscreen",
@@ -940,12 +950,10 @@ dependencies = [
  "nix 0.22.3",
  "once_cell",
  "procfs",
- "quote",
  "regex",
  "structopt",
  "strum",
  "strum_macros 0.24.0",
- "syn",
 ]
 
 [[package]]

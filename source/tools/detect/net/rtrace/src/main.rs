@@ -40,6 +40,8 @@ fn main() -> Result<()> {
     env_logger::init();
     let opts = Command::from_args();
 
+    eutils_rs::helpers::bump_memlock_rlimit()?;
+
     match opts.subcommand {
         SubCommand::Abnormal(cmd) => {
             build_abnormal(&cmd)?;
