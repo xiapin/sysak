@@ -10,24 +10,9 @@ use libbpf_rs::MapFlags;
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use std::time::Duration;
+use crate::utils::macros::define_perf_event_channel;
 
-static GLOBAL_TX: Lazy<Mutex<Option<crossbeam_channel::Sender<(usize, Vec<u8>)>>>> =
-    Lazy::new(|| Mutex::new(None));
-
-pub fn handle_event(_cpu: i32, data: &[u8]) {
-    let event = Vec::from(data);
-    GLOBAL_TX
-        .lock()
-        .unwrap()
-        .as_ref()
-        .unwrap()
-        .send((_cpu as usize, event))
-        .unwrap();
-}
-
-pub fn handle_lost_events(cpu: i32, count: u64) {
-    eprintln!("Lost {} events on CPU {}", count, cpu);
-}
+define_perf_event_channel!();
 
 fn bump_memlock_rlimit() -> Result<()> {
     let rlimit = libc::rlimit {

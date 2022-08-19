@@ -940,10 +940,12 @@ dependencies = [
  "nix 0.22.3",
  "once_cell",
  "procfs",
+ "quote",
  "regex",
  "structopt",
  "strum",
  "strum_macros 0.24.0",
+ "syn",
 ]
 
 [[package]]
