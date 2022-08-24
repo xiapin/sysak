@@ -68,6 +68,10 @@ impl Filter {
         Ok(())
     }
 
+    pub fn set_protocol(&mut self, protocol: u16) {
+        self.filter.protocol = protocol;
+    }
+
     pub fn set_threshold(&mut self, threshold: u64) {
         self.filter.threshold = threshold;
     }
@@ -91,6 +95,7 @@ pub struct Event {
     // event: event,
     data: (usize, Vec<u8>),
     pub ptr: *const event,
+    score: Option<u32>
 }
 
 impl Event {
@@ -98,6 +103,7 @@ impl Event {
         Event {
             ptr: &data.1[0] as *const u8 as *const event,
             data,
+            score: None,
         }
     }
 
@@ -195,6 +201,47 @@ impl Event {
             _ => "unknown".to_owned(),
         }
     }
+    // abnormal module params
+    pub fn accept_queue(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.sk_ack_backlog }
+    }
+
+    pub fn syn_queue(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.icsk_accept_queue }
+    }
+
+    pub fn rcv_mem(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.rmem_alloc }
+    }
+
+    pub fn snd_mem(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.sk_wmem_queued }
+    }
+
+    pub fn drop(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.drop }
+    }
+
+    pub fn retran(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.retran }
+    }
+
+    pub fn ooo(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.ooo }
+    }
+
+    pub fn inum(&self) -> u32 {
+        unsafe { (*self.ptr).__bindgen_anon_1.abnormal.i_ino }
+    }
+
+    pub fn set_abnormal_score(&mut self, score: u32) {
+        self.score = Some(score);
+    }
+
+    pub fn abnormal_score(&self) -> u32 {
+        self.score.unwrap()
+    }
+   
 }
 
 pub struct FourSecondsRing {

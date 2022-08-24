@@ -2,6 +2,7 @@
 mod drop;
 mod latency;
 mod latencylegacy;
+mod abnormal;
 // mod sli;
 mod utils;
 mod stack;
@@ -16,6 +17,7 @@ use structopt::StructOpt;
 use drop::{DropCommand, build_drop};
 use latency::latency::{LatencyCommand, build_latency};
 use retran::retran::{RetranCommand, build_retran};
+use abnormal::abnormal::{build_abnormal, AbnormalCommand};
 
 // use abnormal::build_abnormal;
 // use latency::{build_latency, LatencyCommand};
@@ -40,8 +42,8 @@ pub struct Command {
 
 #[derive(Debug, StructOpt)]
 enum SubCommand {
-    // #[structopt(name = "abnormal", about = "Abnormal connection diagnosing")]
-    // Abnormal(AbnormalCommand),
+    #[structopt(name = "abnormal", about = "Abnormal connection diagnosing")]
+    Abnormal(AbnormalCommand),
     #[structopt(name = "drop", about = "Packet drop diagnosing")]
     Drop(DropCommand),
     #[structopt(name = "latency", about = "Packet latency tracing")]
@@ -61,9 +63,9 @@ fn main() -> Result<()> {
     eutils_rs::helpers::bump_memlock_rlimit()?;
 
     match opts.subcommand {
-        // SubCommand::Abnormal(cmd) => {
-        //     build_abnormal(&cmd)?;
-        // }
+        SubCommand::Abnormal(cmd) => {
+            build_abnormal(&cmd, opts.verbose, &opts.btf)?;
+        }
         SubCommand::Drop(cmd) => {
             build_drop(&cmd, opts.verbose, &opts.btf)?;
         }
