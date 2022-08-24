@@ -27,7 +27,8 @@ enum
     EVENT_UNKNOWN,
 };
 
-enum{
+enum
+{
     ERR_OK = 0,
     ERR_PROTOCOL_NOT_DETERMINED,
     ERR_PROTOCOL_NOT_SUPPORT,
@@ -79,8 +80,29 @@ struct event
             u8 sk_protocol;
             struct addr_pair skap;
         } drop_params;
-    };
 
+        // 3. for abnormal module
+        struct
+        {
+            u32 i_ino;
+            // queue
+            // length of accept queue
+            u32 sk_ack_backlog;
+            // length of syn queue
+            u32 icsk_accept_queue;
+            u32 sk_max_ack_backlog;
+
+            // memory
+            u32 sk_wmem_queued;
+            u32 sndbuf;
+            u32 rmem_alloc;
+            u32 sk_rcvbuf;
+
+            u32 drop;
+            u32 retran;
+            u32 ooo;
+        } abnormal;
+    };
     // rcvnxt
 };
 
@@ -135,7 +157,7 @@ static __always_inline void set_addr_pair_by_sock(struct sock *sk, struct addr_p
 
 static __always_inline void onesecond_insert(volatile struct onesecond *os, u64 ns)
 {
-    u32 msec = ns / (1000*1000);
+    u32 msec = ns / (1000 * 1000);
     volatile u32 idx = msec / 32;
 
     if (os->clear & (1 << idx))
@@ -161,8 +183,8 @@ static __always_inline void seconds4_ring_insert(struct seconds4_ring *sr, u64 t
         sr->os[idx & 0x3].ts = ts;
         sr->os[idx & 0x3].clear = 0;
         sr->os[idx & 0x3].bitmap[0] = 0;
-    } 
-    
+    }
+
     onesecond_insert(&sr->os[idx & 0x3], delta);
 }
 
