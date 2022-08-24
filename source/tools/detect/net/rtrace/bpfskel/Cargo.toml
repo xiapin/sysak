@@ -9,6 +9,12 @@ edition = "2021"
 syn = "1.0"
 quote = "1.0"
 anyhow = "1.0.57"
-
-[lib]
-proc-macro = true
+paste = "1.0"
+structopt = "0.3.26"
+libbpf-cargo = "0.12"
+libbpf-rs = "0.18"
+libbpf-sys = "0.8.3+v0.8.1"
+memmap2 = "0.5"
+scroll = "0.11"
+scroll_derive = "0.11"
+num_enum = "0.5"
