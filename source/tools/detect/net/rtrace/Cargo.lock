@@ -83,8 +83,42 @@ name = "bpfskel"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "libbpf-cargo",
+ "libbpf-rs",
+ "libbpf-sys",
+ "memmap2",
+ "num_enum",
+ "paste",
  "quote",
+ "scroll",
+ "scroll_derive",
+ "structopt",
  "syn",
+]
+
+[[package]]
+name = "bpfskeltest"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bindgen",
+ "bpfskel",
+ "byteorder",
+ "chrono",
+ "clearscreen",
+ "crossbeam-channel",
+ "env_logger",
+ "libbpf-cargo",
+ "libbpf-rs",
+ "libbpf-sys",
+ "libc",
+ "log",
+ "nix 0.22.3",
+ "once_cell",
+ "regex",
+ "structopt",
+ "strum",
+ "strum_macros 0.24.0",
 ]
 
 [[package]]
@@ -709,6 +743,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "648001efe5d5c0102d8cea768e348da85d90af8ba91f0bea908f157951493cd4"
 
 [[package]]
+name = "paste"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9423e2b32f7a043629287a536f21951e8c6a82482d0acb1eeebfc90bc2225b22"
+
+[[package]]
 name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -949,6 +989,7 @@ dependencies = [
  "log",
  "nix 0.22.3",
  "once_cell",
+ "paste",
  "procfs",
  "regex",
  "structopt",

@@ -4,6 +4,7 @@ use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 
 use libbpf_cargo::SkeletonBuilder;
+use bpfskel::BpfSkel;
 
 
 const APPS: &'static [&'static str] = &[ "abnormal", "drop", "latency", "sli"];
@@ -29,9 +30,10 @@ fn compile_hdr(hdrfile: &str, bindingfile: &str) {
         .expect("Couldn't write bindings!");
 }
 
-fn compile_bpf(bpfpath: &str, skelpath: &str) {
+fn compile_bpf(bpfpath: &str, objpath: &str, skelpath: &str) {
     match SkeletonBuilder::new()
         .source(bpfpath)
+        .obj(objpath)
         .build_and_generate(&skelpath)
     {
         Ok(()) => {}
@@ -50,8 +52,11 @@ fn compile_app(app: &str) {
 
     // compile bpf code
     let bpffile = format!("{}/{}.bpf.c", bpfdir, app);
+    let objfile = format!("{}/{}.bpf.o", outputdir, app);
     let skelfile = format!("{}/{}.skel.rs", outputdir, app);
-    compile_bpf(&bpffile, &skelfile);
+    let skel = format!("{}/skel.rs", outputdir);
+    compile_bpf(&bpffile, &objfile, &skelfile);
+    BpfSkel::new().obj(&objfile).generate(&skel).unwrap();
 
     // compile hdr
     let hdrfile = format!("{}/{}.h", bpfdir, app);
