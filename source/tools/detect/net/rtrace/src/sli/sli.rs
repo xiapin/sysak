@@ -10,89 +10,10 @@ use libbpf_rs::{MapFlags, Link};
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use std::time::Duration;
-use crate::utils::macros::*;
 
+use eutils_rs::proc::Snmp;
+use crate::sli::skel::*;
 
-define_perf_event_channel!();
-
-
-pub struct Sli<'a> {
-    skel: SliSkel<'a>,
-    links: Vec<Link>,
-    rx: Option<Receiver<(usize, Vec<u8>)>>,
-    zero_latency_hist: latency_hist,
-}
-
-impl<'a> Sli<'a> {
-    pub fn new(threshold: u32) -> Result<Sli<'a>> {
-        let mut zero_latency_hist: latency_hist =
-            unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-        zero_latency_hist.threshold = threshold;
-        Ok(Sli {
-            links: Vec::default(),
-            skel: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
-            rx: None,
-            zero_latency_hist,
-        })
-    }
-
-    defined_skel_load!(SliSkelBuilder);
-    defined_skel_attach!();
-
-    pub fn poll(&mut self, timeout: Duration) -> Result<Option<Event>> {
-        if let Some(rx) = &self.rx {
-            let data_warp = rx.recv_timeout(timeout);
-            match data_warp {
-                Ok(data) => {
-                    let event = Event::new(&data.1[0] as *const u8 as *const event)?;
-                    return Ok(Some(event));
-                }
-                _ => {
-                    return Ok(None);
-                }
-            }
-        }
-        let (tx, rx) = crossbeam_channel::unbounded();
-        self.rx = Some(rx);
-        *GLOBAL_TX.lock().unwrap() = Some(tx);
-        let perf = PerfBufferBuilder::new(self.skel.maps_mut().events())
-            .sample_cb(handle_event)
-            .lost_cb(handle_lost_events)
-            .build()?;
-        std::thread::spawn(move || loop {
-            perf.poll(timeout).unwrap();
-        });
-        log::debug!("start successfully perf thread to receive event");
-        Ok(None)
-    }
-
-    /// update with zero map value.
-    pub fn lookup_and_update_latency_map(&mut self, key: u32) -> Result<Option<LatencyHist>> {
-        let map_key = unsafe {
-            std::slice::from_raw_parts(&key as *const u32 as *const u8, std::mem::size_of::<u32>())
-        };
-        let map_value = unsafe {
-            std::slice::from_raw_parts(
-                &self.zero_latency_hist as *const latency_hist as *const u8,
-                std::mem::size_of::<latency_hist>(),
-            )
-        };
-        let res = self
-            .skel
-            .maps_mut()
-            .latency_map()
-            .lookup(map_key, MapFlags::ANY)?;
-        if let Some(r) = res {
-            self.skel
-                .maps_mut()
-                .latency_map()
-                .update(map_key, map_value, MapFlags::ANY)?;
-            return Ok(Some(LatencyHist::new(
-                &r[0] as *const u8 as *const latency_hist,
-            )));
-        }
-        Ok(None)
-    }
 
     pub fn attach_latency(&mut self) -> Result<()> {
         let ksyms = Kallsyms::try_from("/proc/kallsyms")?;
@@ -132,3 +53,182 @@ impl<'a> Sli<'a> {
     }
 
 }
+
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+pub struct SliCommand {
+    #[structopt(long, help = "Collect drop metrics")]
+    drop: bool,
+
+    #[structopt(long, help = "Collect retransmission metrics")]
+    retran: bool,
+
+    #[structopt(long, help = "Collect latency metrics")]
+    latency: bool,
+    #[structopt(
+        short,
+        long,
+        help = "Collect latency between kernel and application in receiving side"
+    )]
+    applat: bool,
+    #[structopt(
+        long,
+        default_value = "1000",
+        help = "Max latency to trace, default is 1000ms"
+    )]
+    threshold: u32,
+
+    #[structopt(long, default_value = "3", help = "Data collection cycle, in seconds")]
+    period: u64,
+
+    #[structopt(long, help = "Output every sli to shell")]
+    shell: bool,
+
+    #[structopt(long, help = "Custom btf path")]
+    btf: Option<String>,
+}
+
+
+pub fn build_sli(opts: &SliCommand) -> Result<()> {
+    let mut old_snmp = Snmp::from_file("/proc/net/snmp")?;
+    let delta_ns = opts.period * 1_000_000_000;
+    // let mut sli = Sli::new( opts.threshold)?;
+    let mut skel = Skel::default();
+    let mut sli_output: SliOutput = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+    let mut pre_ts = 0;
+    let mut has_output = false;
+
+    // sli.open_load(log::log_enabled!(log::Level::Debug), &opts.btf, vec![], vec![])?;
+
+    let mut openskel = skel.open(log::log_enabled!(log::Level::Debug), &opts.btf)?;
+    let mut enabled = vec![];
+    if opts.latency {
+
+        let ksyms = Kallsyms::try_from("/proc/kallsyms")?;
+        if ksyms.has_sym("tcp_rtt_estimator") {
+            enabled.push("kprobe__tcp_rtt_estimator");
+        } else {
+            enabled.push("kprobe__tcp_ack");
+        }
+
+        // sli.attach_latency()?;
+        // sli.lookup_and_update_latency_map(0)?;
+    }
+
+    if opts.applat {
+        if eutils_rs::KernelVersion::current()? < eutils_rs::KernelVersion::try_from("3.11.0")? {
+        } else {
+            enabled.push("tp__tcp_probe");
+            enabled.push("tp__tcp_rcv_space_adjust");
+        }
+        // sli.attach_applatency()?;
+        // sli.lookup_and_update_latency_map(1)?;
+    }
+
+    if opts.drop {
+        // sli.attach_drop()?;
+        enabled.push("tcp_drop");
+    }
+
+    loop {
+        if let Some(event) = sli.poll(std::time::Duration::from_millis(100))? {
+            // log::debug!("{}", event);
+            sli_output.events.push(event);
+        }
+
+        let cur_ts = eutils_rs::timestamp::current_monotime();
+        if cur_ts - pre_ts < delta_ns {
+            continue;
+        }
+
+        pre_ts = cur_ts;
+
+        let new_snmp = Snmp::from_file("/proc/net/snmp")?;
+
+        has_output = false;
+
+        if opts.retran {
+            sli_output.outsegs = snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "OutSegs"))?;
+            sli_output.retran = snmp_delta(&old_snmp, &new_snmp, ("Tcp:", "RetransSegs"))?;
+
+            if opts.shell {
+                println!(
+                    "OutSegs: {}, Retran: {}, %Retran: {}",
+                    sli_output.outsegs,
+                    sli_output.retran,
+                    sli_output.retran as f64 / sli_output.outsegs as f64
+                );
+                has_output = true;
+            }
+        }
+
+        if opts.latency {
+            if let Some(x) = sli.lookup_and_update_latency_map(0)? {
+                sli_output.latencyhist = x;
+            }
+
+            if opts.shell {
+                println!("rtt histogram");
+                println!("{}", sli_output.latencyhist);
+                for event in &sli_output.events {
+                    match event {
+                        Event::LatencyEvent(le) => {
+                            println!("{}", le);
+                        }
+                        _ => {}
+                    }
+                }
+                has_output = true;
+            }
+        }
+
+        if opts.applat {
+            if opts.shell {
+                let mut first = true;
+                for event in &sli_output.events {
+                    match event {
+                        Event::AppLatencyEvent(le) => {
+                            if first {
+                                has_output = true;
+                                first = false;
+                                println!("application latency event:");
+                            }
+                            println!("{}", le);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        if opts.drop {
+            if opts.shell {
+                let mut first = true;
+                for event in &sli_output.events {
+                    match event {
+                        Event::DropEvent(de) => {
+                            if first {
+                                has_output = true;
+                                first = false;
+                                println!("packet drop event:");
+                            }
+                            println!("{}", de);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        old_snmp = new_snmp;
+        // clear
+        sli_output = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+        if has_output {
+            println!("\n\n");
+        }
+    }
+}
+
+
+
