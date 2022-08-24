@@ -1,7 +1,7 @@
-use crate::bindings::*;
+use crate::latencylegacy::bindings::*;
 use crate::perf::PerfBufferBuilder;
 use crate::latencylegacy::tcp::{AddressInfo, TcpEvent};
-use crate::tcpskel::*;
+use crate::latencylegacy::tcpskel::*;
 use anyhow::{bail, Result};
 use crossbeam_channel;
 use crossbeam_channel::Receiver;
@@ -44,7 +44,7 @@ fn bump_memlock_rlimit() -> Result<()> {
     Ok(())
 }
 
-fn open_load_skel<'a>(debug: bool) -> Result<TcpSkel<'a>> {
+fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<TcpSkel<'a>> {
     bump_memlock_rlimit()?;
     let mut skel_builder = TcpSkelBuilder::default();
     skel_builder.obj_builder.debug(debug);
@@ -70,8 +70,8 @@ pub struct Tcp<'a> {
 }
 
 impl<'a> Tcp<'a> {
-    pub fn new(debug: bool) -> Result<Tcp<'a>> {
-        let skel = open_load_skel(debug)?;
+    pub fn new(debug: bool, btf: &Option<String>) -> Result<Tcp<'a>> {
+        let skel = open_load_skel(debug, btf)?;
         Ok(Tcp {
             skel,
             rx: None,

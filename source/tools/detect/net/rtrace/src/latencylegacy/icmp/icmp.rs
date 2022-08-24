@@ -1,6 +1,6 @@
-use crate::bindings::*;
+use crate::latencylegacy::bindings::*;
 use crate::latencylegacy::icmp::{IcmpEvent, IcmpEventType};
-use crate::icmpskel::*;
+use crate::latencylegacy::icmpskel::*;
 use crate::perf::PerfBufferBuilder;
 use anyhow::{bail, Result};
 use crossbeam_channel;
@@ -37,8 +37,8 @@ pub struct Icmp<'a> {
 }
 
 impl<'a> Icmp<'a> {
-    pub fn new(debug: bool) -> Result<Icmp<'a>> {
-        let skel = open_load_skel(debug)?;
+    pub fn new(debug: bool, btf: &Option<String>) -> Result<Icmp<'a>> {
+        let skel = open_load_skel(debug, btf)?;
         Ok(Icmp {
             skel,
             rx: None,
@@ -93,7 +93,7 @@ fn bump_memlock_rlimit() -> Result<()> {
     Ok(())
 }
 
-fn open_load_skel<'a>(debug: bool) -> Result<IcmpSkel<'a>> {
+fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<IcmpSkel<'a>> {
     bump_memlock_rlimit()?;
     let mut skel_builder = IcmpSkelBuilder::default();
     skel_builder.obj_builder.debug(debug);

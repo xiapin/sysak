@@ -1,4 +1,4 @@
-use crate::bindings::*;
+use crate::latencylegacy::bindings::*;
 use anyhow::Result;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};

@@ -1,25 +1,18 @@
-
-
-
-
 mod event;
 mod icmp;
-
 
 pub use {
     self::event::{IcmpEvent, IcmpEventType},
     self::icmp::Icmp,
 };
 
-
+use crate::latencylegacy::LatencyLegacyCommand;
 use anyhow::Result;
-use crate::latencylegacy::LatencyCommand;
 use std::collections::HashMap;
 
-
-pub fn build_icmp(opts: &LatencyCommand) -> Result<()> {
+pub fn build_icmp(opts: &LatencyLegacyCommand, debug: bool, btf: &Option<String>) -> Result<()> {
     let mut hm: HashMap<(u16, u16), Vec<IcmpEvent>> = HashMap::default();
-    let mut icmp = Icmp::new(log::log_enabled!(log::Level::Debug))?;
+    let mut icmp = Icmp::new(debug, btf)?;
     icmp.attach()?;
 
     let delta = eutils_rs::timestamp::delta_of_mono_real_time();
@@ -28,7 +21,12 @@ pub fn build_icmp(opts: &LatencyCommand) -> Result<()> {
     loop {
         if let Some(event) = icmp.poll(std::time::Duration::from_millis(100))? {
             let key = (event.id(), event.seq());
-            let pre_key = (event.id(), event.seq() - 1);
+            let pre_key;
+            if key.1 == 0 {
+                pre_key = key;
+            } else {
+                pre_key = (event.id(), event.seq() - 1);
+            }
             let item = hm.entry(key).or_insert(Vec::new());
             item.push(event);
 
@@ -53,7 +51,6 @@ fn vec_string(vec: &Vec<(u64, IcmpEventType)>) -> Option<String> {
     }
     None
 }
-
 
 fn icmp_handle_events(events: Vec<IcmpEvent>, delta: u64) {
     let mut snd = Vec::new();

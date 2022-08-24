@@ -1,4 +1,4 @@
-use crate::bindings::*;
+use crate::latencylegacy::bindings::*;
 use std::fmt;
 
 #[derive(Clone, Copy)]

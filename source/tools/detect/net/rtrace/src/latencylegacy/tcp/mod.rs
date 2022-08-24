@@ -13,7 +13,7 @@ pub use {
 use anyhow::Result;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::latencylegacy::LatencyCommand;
+use crate::latencylegacy::LatencyLegacyCommand;
 
 fn partition_events(events: Vec<Rc<TcpUsrEvent>>) {
     let mut seqs = Vec::new();
@@ -105,8 +105,8 @@ impl Net {
     }
 }
 
-pub fn build_tcp(opts: &LatencyCommand) -> Result<()> {
-    let mut tcp = Tcp::new(log::log_enabled!(log::Level::Debug))?;
+pub fn build_tcp(opts: &LatencyLegacyCommand, debug:bool, btf: &Option<String>) -> Result<()> {
+    let mut tcp = Tcp::new(debug, btf)?;
     let mut src = String::from("0.0.0.0:0");
     let mut dst = String::from("0.0.0.0:0");
     let mut net = Net::new();
