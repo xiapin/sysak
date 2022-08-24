@@ -5,6 +5,7 @@ mod latencylegacy;
 // mod sli;
 mod utils;
 mod stack;
+mod retran;
 
 mod common;
 mod perf;
@@ -14,7 +15,7 @@ use structopt::StructOpt;
 
 use drop::{DropCommand, build_drop};
 use latency::latency::{LatencyCommand, build_latency};
-
+use retran::retran::{RetranCommand, build_retran};
 
 // use abnormal::build_abnormal;
 // use latency::{build_latency, LatencyCommand};
@@ -49,6 +50,8 @@ enum SubCommand {
     LatencyLegacy(LatencyLegacyCommand),
     // #[structopt(name = "sli", about = "Collection machine sli")]
     // Sli(SliCommand),
+    #[structopt(name = "retran", about = "Packet retransmission tracing")]
+    Retran(RetranCommand),
 }
 
 fn main() -> Result<()> {
@@ -73,6 +76,9 @@ fn main() -> Result<()> {
         // SubCommand::Sli(cmd) => {
         //     build_sli(&cmd)?;
         // }
+        SubCommand::Retran(cmd) => {
+            build_retran(&cmd, opts.verbose, &opts.btf)?;
+        }
     }
 
     Ok(())
