@@ -46,9 +46,19 @@ fn bump_memlock_rlimit() -> Result<()> {
 
 fn open_load_skel<'a>(debug: bool, btf: &Option<String>) -> Result<TcpSkel<'a>> {
     bump_memlock_rlimit()?;
+    let btf_cstring;
+    let mut btf_cstring_ptr = std::ptr::null();
+    if let Some(x) = btf {
+        btf_cstring = std::ffi::CString::new(x.clone())?;
+        btf_cstring_ptr = btf_cstring.as_ptr();
+    }
+
     let mut skel_builder = TcpSkelBuilder::default();
     skel_builder.obj_builder.debug(debug);
-    let mut open_skel = skel_builder.open()?;
+    let mut open_opts = skel_builder.obj_builder.opts(std::ptr::null());
+    open_opts.btf_custom_path = btf_cstring_ptr;
+    let mut open_skel = skel_builder.open_opts(open_opts)?;
+
     if KernelVersion::current()? < KernelVersion::try_from("3.11.0")? {
         open_skel
             .progs_mut()
