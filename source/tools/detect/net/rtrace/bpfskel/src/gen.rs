@@ -277,7 +277,7 @@ fn gen_skel_contents(raw_obj_name: &str, obj_file_path: &Path) -> Result<String>
                 Ok(open_skel)
             }}
 
-            fn load(
+            pub fn load(
                 &mut self,
                 mut openskel: Open{name}Skel<'a>,
                 enabled: Vec<&str>,
@@ -309,7 +309,7 @@ fn gen_skel_contents(raw_obj_name: &str, obj_file_path: &Path) -> Result<String>
                 Ok(())
             }}
 
-            fn open_load(
+            pub fn open_load(
                 &mut self,
                 debug: bool,
                 btf: &Option<String>,
