@@ -9,6 +9,7 @@ use structopt::StructOpt;
 // use tcp::Tcp;
 use crate::abnormal::skel::*;
 use crate::common::*;
+use crate::utils::macros::*;
 
 pub struct AbnortmalOutput {}
 
@@ -117,17 +118,18 @@ fn get_events(
     Ok((pstree, events))
 }
 
+#[derive(Debug)]
 struct Score {
     state: TcpState,
-    acceptq: u32,
-    synq: u32,
-    rcvm: u32,
-    sndm: u32,
-    drop: u32,
-    retran: u32,
-    ooo: u32,
-    score: f64,
-    idx: usize,
+    acceptq: u64,
+    synq: u64,
+    rcvm: u64,
+    sndm: u64,
+    drop: u64,
+    retran: u64,
+    ooo: u64,
+    score: u64,
+    idx: usize, // index in events vetor
 }
 
 impl Default for Score {
@@ -141,7 +143,7 @@ impl Default for Score {
             drop: 1,
             retran: 1,
             ooo: 1,
-            score: 0.0,
+            score: 0,
             idx: 1,
         }
     }
@@ -151,79 +153,111 @@ impl Score {
     pub fn new(event: &Event, idx: usize) -> Score {
         Score {
             state: TcpState::from(event.state() as i32),
-            acceptq: event.accept_queue(),
-            synq: event.syn_queue(),
-            rcvm: event.rcv_mem(),
-            sndm: event.snd_mem(),
-            drop: event.drop(),
-            retran: event.retran(),
-            ooo: event.ooo(),
-            score: 0.0,
+            acceptq: event.accept_queue() as u64,
+            synq: event.syn_queue() as u64,
+            rcvm: event.rcv_mem() as u64,
+            sndm: event.snd_mem() as u64,
+            drop: event.drop() as u64,
+            retran: event.retran() as u64,
+            ooo: event.ooo() as u64,
+            score: 0,
             idx,
         }
     }
 
-    pub fn accept_queue(&self) -> u32 {
+    pub fn accept_queue(&self) -> u64 {
         self.acceptq
     }
-    pub fn syn_queue(&self) -> u32 {
+    pub fn syn_queue(&self) -> u64 {
         self.synq
     }
-    pub fn rcv_mem(&self) -> u32 {
+    pub fn rcv_mem(&self) -> u64 {
         self.rcvm
     }
-    pub fn snd_mem(&self) -> u32 {
+    pub fn snd_mem(&self) -> u64 {
         self.sndm
     }
-    pub fn drop(&self) -> u32 {
+    pub fn drop(&self) -> u64 {
         self.drop
     }
-    pub fn retran(&self) -> u32 {
+    pub fn retran(&self) -> u64 {
         self.retran
     }
-    pub fn ooo(&self) -> u32 {
+    pub fn ooo(&self) -> u64 {
         self.ooo
     }
-    pub fn score(&self) -> f64 {
+    pub fn score(&self) -> u64 {
         self.score
     }
     pub fn idx(&self) -> usize {
         self.idx
     }
 
-    pub fn max(&mut self, event: &Event) {
-        self.acceptq = std::cmp::max(self.acceptq, event.accept_queue());
-        self.synq = std::cmp::max(self.synq, event.syn_queue());
-        self.rcvm = std::cmp::max(self.rcvm, event.rcv_mem());
-        self.sndm = std::cmp::max(self.sndm, event.snd_mem());
-        self.drop = std::cmp::max(self.drop, event.drop());
-        self.retran = std::cmp::max(self.retran, event.retran());
-        self.ooo = std::cmp::max(self.ooo, event.ooo());
-    }
-
-    pub fn compute_score(&mut self, max_score: &Score) {
-        let base: f64 = 2.0;
-
-        let acceptq = base.powf(self.acceptq as f64 / max_score.acceptq as f64) - 1.0;
-        let synq = base.powf(self.synq as f64 / max_score.synq as f64) - 1.0;
-        let rcvm = base.powf(self.rcvm as f64 / max_score.rcvm as f64) - 1.0;
-        let sndm = base.powf(self.sndm as f64 / max_score.sndm as f64) - 1.0;
-        let drop = base.powf(self.drop as f64 / max_score.drop as f64) - 1.0;
-        let retran = base.powf(self.retran as f64 / max_score.retran as f64) - 1.0;
-        let ooo = base.powf(self.ooo as f64 / max_score.ooo as f64) - 1.0;
-
-        let mut score = 0.0;
-        match self.state {
-            TcpState::Listen => {
-                score += acceptq * 10.0 + synq * 10.0;
-            }
+    pub fn max(&mut self, score: &Score) {
+        match score.state {
+            TcpState::Close => {}
             _ => {
-                score += (rcvm + sndm) * 5.0;
+                struct_members_max_assign!(
+                    self, self, score, acceptq, synq, rcvm, sndm, drop, retran, ooo
+                );
             }
         }
-        score += drop * 10.0 + retran * 5.0 + ooo;
+    }
 
-        self.score = score;
+    pub fn min(&mut self, score: &Score) {
+        match score.state {
+            TcpState::Close => {}
+            _ => {
+                struct_members_min_assign!(
+                    self, self, score, acceptq, synq, rcvm, sndm, drop, retran, ooo
+                );
+            }
+        }
+    }
+
+    pub fn compute_score(&mut self, max_score: &Score, min_score: &Score) {
+        let base: f64 = 2.0;
+
+        let mut normalization = Score::default();
+        let precision = 10000;
+        struct_members_normalization_assign!(
+            normalization,
+            self,
+            min_score,
+            max_score,
+            precision,
+            score,
+            acceptq,
+            synq,
+            rcvm,
+            sndm,
+            drop,
+            retran,
+            ooo
+        );
+
+        let mut total_weight_score = 0;
+        let mut score = 0;
+        match self.state {
+            TcpState::Listen => {
+                score += normalization.acceptq * 10 + normalization.synq * 10;
+                total_weight_score = precision * 10 * 2;
+            }
+            _ => {
+                score += (normalization.sndm + normalization.rcvm) * 5;
+                total_weight_score = precision * 5 * 2;
+            }
+        }
+
+        match self.state {
+            TcpState::Close => {}
+            _ => {
+                score += normalization.drop * 10 + normalization.retran * 5 + normalization.ooo;
+                total_weight_score = precision * (10 + 5 + 1);
+            }
+        }
+
+        self.score = score * 100 / total_weight_score;
     }
 }
 
@@ -233,21 +267,22 @@ pub fn build_abnormal(opts: &AbnormalCommand, debug: bool, btf: &Option<String>)
 
     let mut scores = Vec::new();
     let mut max_score = Score::default();
-    let mut max_score_float = 0.0;
+    let mut min_score = Score::default();
 
     for (idx, event) in events.iter().enumerate() {
-        scores.push(Score::new(event, idx));
-        max_score.max(event);
+        let score = Score::new(event, idx);
+        max_score.max(&score);
+        min_score.min(&score);
+        scores.push(score);
     }
 
     for score in &mut scores {
-        score.compute_score(&max_score);
-        max_score_float = f64::max(max_score_float, score.score());
+        score.compute_score(&max_score, &min_score);
     }
 
     match opts.sort.as_str() {
         "score" => {
-            scores.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
+            scores.sort_by(|a, b| b.score().cmp(&a.score()));
         }
         "acceptq" => {
             scores.sort_by(|a, b| b.accept_queue().cmp(&a.accept_queue()));
@@ -317,7 +352,7 @@ pub fn build_abnormal(opts: &AbnormalCommand, debug: bool, btf: &Option<String>)
             memory,
             packet,
             queue,
-            (score.score() / max_score_float * 100.0) as u64
+            score.score()
         )
         // println!("{:?}", event);
     }
