@@ -362,8 +362,14 @@ fn gen_skel_contents(raw_obj_name: &str, obj_file_path: &Path) -> Result<String>
                 r#"
                 pub fn poll(&mut self, timeout: Duration) -> Result<Option<(usize, Vec<u8>)>> {{
                     if let Some(rx) = &self.rx {{
-                        let data = rx.recv_timeout(timeout)?;
-                        return Ok(Some(data));
+                        match rx.recv_timeout(timeout) {{
+                            Ok(data) => {{
+                                return Ok(Some(data));
+                            }}
+                            Err(e) => {{
+                                return Ok(None);
+                            }}
+                        }}
                     }}
                     let (tx, rx) = crossbeam_channel::unbounded();
                     self.rx = Some(rx);
