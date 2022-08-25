@@ -498,12 +498,17 @@ def oom_check_dup(oom, oom_result):
     res_total = oom_result['max_total']
     summary = '\n'
     if (res_total['rss']*4 > oom['killed_task_mem']*1.5) and (res_total['cnt'] > 2):
-        if oom['type'] == 'cgroup':
-            oom['root'] = 'fork'
-            summary = ',%d process:%s total memory usage: %dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
-            oom['json']['fork_max_task'] = res_total['task']
-            oom['json']['fork_max_cnt'] = res_total['cnt']
-            oom['json']['fork_max_usage'] = res_total['rss'] * 4
+        oom['root'] = 'fork'
+        tmprss = sorted(oom['rss_all'].items(),key=lambda k:k[1]['rss'], reverse=True)[0:10]
+        oom['rss_list_desc'] = []
+        for task_info in tmprss:
+            task = task_info[0]
+            oom['rss_list_desc'].append({'task':task, 'rss':oom['rss_all'][task]['rss']})
+        oom['json']['rss_list_desc'] = oom['rss_list_desc']
+        summary = ',%d process:%s total memory usage: %dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
+        oom['json']['fork_max_task'] = res_total['task']
+        oom['json']['fork_max_cnt'] = res_total['cnt']
+        oom['json']['fork_max_usage'] = res_total['rss'] * 4
     return summary
 
 def oom_get_podName(cgName, cID, oom_result):
@@ -668,6 +673,7 @@ def oom_get_max_task(num, oom_result):
         except Exception as err:
             print ("oom_get_max_task loop err {} lines {}\n".format(err, traceback.print_exc()), file = sys.stderr)
             continue
+    oom['rss_all'] = rss_all
     return res
 
 def oom_reason_analyze(num, oom_result, summary):
