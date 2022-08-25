@@ -43,15 +43,16 @@ fn get_events(
 ) -> Result<(Pstree, Vec<Event>)> {
     let (ts, tr) = crossbeam_channel::unbounded();
     let (ms, mr) = (ts.clone(), tr.clone());
-    thread::spawn(move || {
+    let pstree_thread = thread::spawn(move || {
         let pid = unsafe { gettid() };
         ts.send(ChannelMsgType::Pid(pid as u32)).unwrap();
         thread::sleep(time::Duration::from_millis(10));
         match tr.recv().unwrap() {
             ChannelMsgType::Start => {
                 let mut pstree = Pstree::new();
-                pstree.update().unwrap();
-                ts.send(ChannelMsgType::PstreeIns(pstree)).unwrap();
+                pstree.update().expect("failed to update pstree");
+                ts.send(ChannelMsgType::PstreeIns(pstree))
+                    .expect("failed to send pstree");
             }
             _ => {}
         }
@@ -72,14 +73,13 @@ fn get_events(
             bail!("failed to get pstree thread pid")
         }
     }
-
     let mut events = Vec::default();
 
     let mut skel = Skel::default();
     skel.open_load(debug, btf, vec![], vec![])?;
 
     let mut filter = Filter::new();
-    filter.set_ap(&opts.src, &opts.dst);
+    filter.set_ap(&opts.src, &opts.dst)?;
     filter.set_pid(pstree_thread_pid);
     filter.set_protocol(libc::IPPROTO_TCP as u16);
 
@@ -99,7 +99,8 @@ fn get_events(
         }
     }
 
-    let mut pstree;
+    let pstree;
+    assert!(!mr.is_empty());
     match mr.recv()? {
         ChannelMsgType::PstreeIns(ins) => {
             log::debug!("receive pstree instance");
@@ -109,6 +110,10 @@ fn get_events(
             bail!("failed to get pstree thread pid")
         }
     }
+
+    pstree_thread
+        .join()
+        .expect("Couldn't join on the associated thread");
     Ok((pstree, events))
 }
 
@@ -237,12 +242,12 @@ pub fn build_abnormal(opts: &AbnormalCommand, debug: bool, btf: &Option<String>)
 
     for score in &mut scores {
         score.compute_score(&max_score);
-        max_score_float =f64::max(max_score_float, score.score());
+        max_score_float = f64::max(max_score_float, score.score());
     }
 
     match opts.sort.as_str() {
         "score" => {
-            scores.sort_by(|a, b| b.score().partial_cmp(&b.score()).unwrap());
+            scores.sort_by(|a, b| b.score().partial_cmp(&a.score()).unwrap());
         }
         "acceptq" => {
             scores.sort_by(|a, b| b.accept_queue().cmp(&a.accept_queue()));
@@ -308,7 +313,7 @@ pub fn build_abnormal(opts: &AbnormalCommand, debug: bool, btf: &Option<String>)
             pidstring,
             event.local(),
             event.remote(),
-            event.state(),
+            TcpState::from(event.state() as i32),
             memory,
             packet,
             queue,
