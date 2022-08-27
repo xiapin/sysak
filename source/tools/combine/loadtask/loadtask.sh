@@ -250,7 +250,7 @@ current_analyse() {
 		high_cost+="sys "
 		extra_cmd="[sysmonitor]"
 		extra_info="high memory or kernel competition "
-		if [ "$is_cpuflamegraph" != "true" ];then
+		if [ "$is_cpuflamegraph" == "true" ];then
 			if [ -f  $TOOLS_ROOT/cpu_flamegraph ]; then
 				$TOOLS_ROOT/cpu_flamegraph -d 5
 			fi
