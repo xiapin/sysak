@@ -290,7 +290,7 @@ bool cached_cmp(const pair<unsigned long, struct file_info*>& a, const pair<unsi
 static int output_file_cached(unsigned int top)
 {
     map<unsigned long,struct file_info*>::iterator iter; 
-    vector<pair<unsigned long, struct file_info *>> vec(files.begin(), files.end());
+    vector< pair <unsigned long, struct file_info *> > vec(files.begin(), files.end());
     struct file_info *info;
  
     for (iter = files.begin(); iter != files.end(); ++iter) {
