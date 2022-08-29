@@ -436,6 +436,19 @@ static void print_each_tool(bool all)
         printf("If you want to known the detail about the system, please use 'sysak list -a'.\n");
 }
 
+static int char_num(char *str, char c)
+{
+    char *pos;
+    int num = 0, i = 0;
+    int len = strlen(str);
+
+    for (i; i < len ; i++){
+        if (str[i] == c)
+            num++;
+    }
+    return num;
+}
+
 static int build_subcmd_info_from_file(FILE *fp, bool all)
 {
     struct tool_list *list;
@@ -463,6 +476,10 @@ static int build_subcmd_info_from_file(FILE *fp, bool all)
         if (strcmp(tools_class_module, "combine") == 0) {
             list = &tool_lists[USER_TOOL];
         } else if (strncmp(tools_class_module, "detect", 6) == 0) {
+            if (char_num(tools_class_module, '/') >= 2){
+                free(node);
+                continue;
+            }
             list = &tool_lists[EXPERT_TOOL];
             sscanf(tools_class_module, "detect/%[^:]", node->tool.module);
         } else if (strncmp(tools_class_module, "monitor", 7) == 0) {
