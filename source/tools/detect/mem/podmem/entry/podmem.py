@@ -202,7 +202,6 @@ def build_tmp_file(podinfo, cid, con):
 
 def dump2json(res,filename):
     jsonStr = json.dumps(res)
-    print(filename)
     if not os.path.exists(os.path.dirname(filename)):
         os.popen("mkdir -p "+os.path.dirname(filename)).read()
     with open(filename, 'w+') as jsonFile:
@@ -260,9 +259,17 @@ def cgroup_to_json(podinfo, cinodes, files):
 
     if mode == 'cgroup':
         output['subline'] = cmdline['cgroup'].strip().split('/')[-1]
-    data = [] 
-    if mode=='cgroup' or mode == 'system':
-        output['data'] = files
+    output['data'] = {}
+    if mode=='cgroup':
+        output['data'][output['subline']] = []
+        tmp = {}
+        tmp['sort_file'] = files
+        output['data'][output['subline']].append(tmp)
+    elif mode == 'system':
+        output['data']['system'] = []
+        tmp = {}
+        tmp['sort_file'] = files
+        output['data']['system'].append(tmp)
     podinfo['output'] = output
     return True
 
