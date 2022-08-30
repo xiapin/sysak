@@ -30,7 +30,6 @@ def container_init(con):
     con["uid"] = ''
     con["podname"] = ''
     con["files"] = []
-    con["sort_files"] = {}
     con["type"] = 'cgroup'
     con["rss"] = 0
     con["cache"] = 0
@@ -224,6 +223,8 @@ def podmem_to_json(podinfo, cinodes, files):
     for key, cid in podinfo['container'].items():    
         new_cid = {}
         new_cid['sort_file'] = {}
+        if len(cid['files']) == 0:
+            continue
         new_cid['sort_file'] = cid['files']
         new_cid['id'] = cid['id']
         new_cid['cache'] = cid['cache']/1024
