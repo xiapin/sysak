@@ -38,7 +38,17 @@ macro_rules! struct_members_normalization_assign {
     };
 }
 
+///
+macro_rules! ebpf_common_use {
+    ($name: ident) => {
+        use crate::$name::skel::*;
+        use anyhow::{bail, Result};
+        use structopt::StructOpt;
+        use crate::common::*;
+    }
+}
+
 pub(crate) use {
     same_struct_member_sub, struct_members_max_assign, struct_members_min_assign,
-    struct_members_normalization_assign,
+    struct_members_normalization_assign, ebpf_common_use
 };
