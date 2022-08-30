@@ -264,8 +264,11 @@ class hangAnalysis():
 			totalIosDicts[disk] += 1
 			statDict = statDicts['summary'][diskIdx]
 			abnormalList = sDict['abnormal'].split()
-			hungComponentIdx = components.index(abnormalList[0].split('(')[0])
-			hungDelay = long(abnormalList[-2])
+			component = abnormalList[0].split('(')[0]
+			if component not in components:
+				return
+			hungComponentIdx = components.index(component)
+			hungDelay = float(abnormalList[-2])
 			statDict['hung ios'][hungComponentIdx]['count'] += 1
 			maxHungDelay = statDict['hung ios'][hungComponentIdx]['max']
 			minHungDelay = statDict['hung ios'][hungComponentIdx]['min']
