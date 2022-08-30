@@ -191,7 +191,7 @@ def build_tmp_file(podinfo, cid, con):
     cinfo = con
     if not os.path.exists(cinfo['cgroup']):
         return True
-    if cinfo['cache'] < 100:
+    if cinfo['cache'] < 10:
         return True
 
     fd = open('/tmp/.memcg.txt','a+')
@@ -227,7 +227,7 @@ def podmem_to_json(podinfo, cinodes, files):
             continue
         new_cid['sort_file'] = cid['files']
         new_cid['id'] = cid['id']
-        new_cid['cache'] = cid['cache']/1024
+        new_cid['cache'] = cid['cache']
         new_cid['rss'] = cid['rss']
         new_cid['shmem'] = cid['shmem']
         new_cid['podname'] = cid['podname']
