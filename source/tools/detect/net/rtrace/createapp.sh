@@ -29,6 +29,9 @@ cat > $appname.bpf.c << EOF
 #include "common.h"
 #include "bpf_core.h"
 #include "$appname.h"
+
+
+char _license[] SEC("license") = "GPL";
 EOF
 
 touch $appname.h

@@ -13,6 +13,7 @@ pub enum EventType {
     DropNfconntrackDrop,
 
     LatencyEvent,
+    ConnectLatencyEvent,
     Unknown,
 }
 
@@ -24,6 +25,7 @@ impl From<u32> for EventType {
             DROP_IPTABLES_DROP => EventType::DropIptables,
             DROP_NFCONNTRACK_DROP => EventType::DropNfconntrackDrop,
             LATENCY_EVENT => EventType::LatencyEvent,
+            CONNECT_LATENCY_EVENT => EventType::ConnectLatencyEvent,
             _ => EventType::Unknown,
         }
     }

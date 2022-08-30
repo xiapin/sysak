@@ -7,6 +7,7 @@ mod abnormal;
 mod utils;
 mod stack;
 mod retran;
+mod connectlatency;
 
 mod common;
 mod perf;
@@ -18,6 +19,7 @@ use drop::{DropCommand, build_drop};
 use latency::latency::{LatencyCommand, build_latency};
 use retran::retran::{RetranCommand, build_retran};
 use abnormal::abnormal::{build_abnormal, AbnormalCommand};
+use connectlatency::connectlatency::{build_connectlatency, ConnectlatencyCommand};
 
 // use abnormal::build_abnormal;
 // use latency::{build_latency, LatencyCommand};
@@ -54,6 +56,8 @@ enum SubCommand {
     // Sli(SliCommand),
     #[structopt(name = "retran", about = "Packet retransmission tracing")]
     Retran(RetranCommand),
+    #[structopt(name = "connectlatency", about = "connect latency")]
+    ConnectLatency(ConnectlatencyCommand),
 }
 
 fn main() -> Result<()> {
@@ -80,6 +84,9 @@ fn main() -> Result<()> {
         // }
         SubCommand::Retran(cmd) => {
             build_retran(&cmd, opts.verbose, &opts.btf)?;
+        }
+        SubCommand::ConnectLatency(cmd) => {
+            build_connectlatency(&cmd, opts.verbose, &opts.btf)?;
         }
     }
 

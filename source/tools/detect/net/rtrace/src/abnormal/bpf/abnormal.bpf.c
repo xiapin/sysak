@@ -17,7 +17,7 @@ struct
     __type(value, u64);
 } inner_checked_socks SEC(".maps");
 
-__always_inline int event_sock_filter(struct sock *sk)
+__always_inline int event_sock_filter(struct sock *sk) 
 {
     __u32 key = 0;
     __u16 protocol;

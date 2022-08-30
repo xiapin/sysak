@@ -45,6 +45,7 @@ macro_rules! ebpf_common_use {
         use anyhow::{bail, Result};
         use structopt::StructOpt;
         use crate::common::*;
+        use std::fmt;
     }
 }
 

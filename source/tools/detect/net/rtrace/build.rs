@@ -7,7 +7,7 @@ use libbpf_cargo::SkeletonBuilder;
 use bpfskel::BpfSkel;
 
 
-const APPS: &'static [&'static str] = &[ "abnormal", "drop", "latency", "sli"];
+const APPS: &'static [&'static str] = &[ "abnormal", "drop", "latency", "sli", "connectlatency"];
 const COMMONHDR: &str = "common.h";
 
 
@@ -85,7 +85,8 @@ fn main() {
     for app in APPS {
         compile_app(*app);
     }
-
+    
+    create_dir_all("src/bindings").unwrap();
     let commonbinding = format!("src/bindings/commonbinding.rs");
     compile_hdr(COMMONHDR, &commonbinding);
 
