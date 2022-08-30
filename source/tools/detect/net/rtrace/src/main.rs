@@ -1,7 +1,7 @@
 // mod abnormal;
 mod drop;
 mod latency;
-mod latencylegacy;
+// mod latencylegacy;
 mod abnormal;
 // mod sli;
 mod utils;
@@ -21,7 +21,7 @@ use abnormal::abnormal::{build_abnormal, AbnormalCommand};
 
 // use abnormal::build_abnormal;
 // use latency::{build_latency, LatencyCommand};
-use latencylegacy::{build_latency_legacy, LatencyLegacyCommand};
+// use latencylegacy::{build_latency_legacy, LatencyLegacyCommand};
 // use sli::build_sli;
 
 // use abnormal::AbnormalCommand;
@@ -48,8 +48,8 @@ enum SubCommand {
     Drop(DropCommand),
     #[structopt(name = "latency", about = "Packet latency tracing")]
     Latency(LatencyCommand),
-    #[structopt(name = "latencylegacy", about = "Packet latency tracing(legacy version)")]
-    LatencyLegacy(LatencyLegacyCommand),
+    // #[structopt(name = "latencylegacy", about = "Packet latency tracing(legacy version)")]
+    // LatencyLegacy(LatencyLegacyCommand),
     // #[structopt(name = "sli", about = "Collection machine sli")]
     // Sli(SliCommand),
     #[structopt(name = "retran", about = "Packet retransmission tracing")]
@@ -72,9 +72,9 @@ fn main() -> Result<()> {
         SubCommand::Latency(cmd) => {
             build_latency(&cmd, opts.verbose, &opts.btf)?;
         }
-        SubCommand::LatencyLegacy(cmd) => {
-            build_latency_legacy(&cmd, opts.verbose, &opts.btf)?;
-        }
+        // SubCommand::LatencyLegacy(cmd) => {
+        //     build_latency_legacy(&cmd, opts.verbose, &opts.btf)?;
+        // }
         // SubCommand::Sli(cmd) => {
         //     build_sli(&cmd)?;
         // }
