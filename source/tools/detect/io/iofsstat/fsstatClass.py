@@ -12,13 +12,12 @@ from collections import OrderedDict
 from diskstatClass import diskstatClass
 from diskstatClass import getDevt
 from diskstatClass import humConvert
+from subprocess import PIPE, Popen
 
 
 def execCmd(cmd):
-    r = os.popen(cmd+" 2>/dev/null")
-    text = r.read()
-    r.close()
-    return text
+    p = Popen(cmd, shell=True, stdout=PIPE, stderr=PIPE)
+    return p.stdout.read().decode('utf-8')
 
 
 def getTgid(pid):
@@ -126,38 +125,35 @@ def getFullName(fileInfoDict):
 
 
 def echoFile(filename, txt):
-    execCmd("echo \""+txt+"\" > "+filename)
+    execCmd("echo \'"+txt+"\' > "+filename)
 
 
 def echoFileAppend(filename, txt):
-    execCmd("echo \""+txt+"\" >> "+filename)
+    execCmd("echo \'"+txt+"\' >> "+filename)
 
 
 def supportKprobe(name):
-    cmd = "cat /sys/kernel/debug/tracing/available_filter_functions |grep " + name
-    ss = execCmd(cmd).strip()
-    for res in ss.split('\n'):
-        if ':' in res:
-            res = res.split(":", 1)[1]
-        if ' [' in res:  # for ko symbol
-            res = res.split(" [", 1)[0]
-        if res == name:
-            return True
+    file = '/sys/kernel/debug/tracing/available_filter_functions'
+    with open(file) as f:
+        ss = f.read()
+    if ss.find(name) > 0:
+        return True
     return False
 
 
 class fsstatClass(diskstatClass):
-    def __init__(self, devname, pid, utilThresh, cycle, bwThresh, top, json):
-        super(fsstatClass, self).__init__(devname, utilThresh, cycle, json)
+    def __init__(self, devname, pid, utilThresh, bwThresh, top, json, nodiskStat, miscStat):
+        super(fsstatClass, self).__init__(devname, utilThresh, json, nodiskStat)
         self.expression = []
         self.pid = pid
         self.devname = devname
+        self.miscStat = miscStat
         self.top = int(top) if top is not None else 99999999
         self.bwThresh = int(bwThresh) if bwThresh is not None else 0
         self.devt = getDevt(self.devname) if devname is not None else -1
         tracingBaseDir = "/sys/kernel/debug/tracing"
         self.kprobeEvent = tracingBaseDir+"/kprobe_events"
-        self.tracingDir = tracingBaseDir+'/instances/iofsstat'
+        self.tracingDir = tracingBaseDir+'/instances/iofsstat4fs'
         self.kprobeDir = self.tracingDir+"/events/kprobes"
         self.kprobe = []
         self.inputExp = []
@@ -168,7 +164,7 @@ class fsstatClass(diskstatClass):
             int(version[0]) == 3 and int(version[1]) > 10) else '0x8'
         offlen = '0x10'
         if int(version[0]) <= 3:
-            offlen = '0x8' if 'ali' in vinfo else '0x18'
+            offlen = '0x8' if int(version[1]) < 13 else '0x18'
         arch = execCmd('lscpu | grep Architecture').split(
             ":", 1)[1].strip()
         if arch.startswith("arm"):
@@ -188,8 +184,8 @@ class fsstatClass(diskstatClass):
             'bfname=+0x0(+0x28(+0x18(%s))):string '\
             'd1fname=+0x0(+0x28(+0x18(+0x18(%s)))):string '\
             'd2fname=+0x0(+0x28(+0x18(+0x18(+0x18(%s))))):string '\
-            'd3fname=+0x0(+0x28(+0x18(+0x18(+0x18(+0x18(%s)))))):string ' % \
-            (argv0, argv0, argv1, argv0, argv0, argv0, argv0, argv0)
+            'd3fname=+0x0(+0x28(+0x18(+0x18(+0x18(+0x18(%s)))))):string '\
+            'comm=$comm' % (argv0, argv0, argv1, argv0, argv0, argv0, argv0, argv0)
 
         devList = []
         if self.devname is not None:
@@ -204,40 +200,22 @@ class fsstatClass(diskstatClass):
 
         for entry in self.fsmountInfo:
             fstype = entry.split()[2]
-            kprobe = fstype+"_file_write_iter"
-            if kprobe in self.kprobe:
-                continue
-            if supportKprobe(kprobe):
-                pass
-            elif supportKprobe(fstype+"_file_write"):
-                kprobe = fstype+"_file_write"
-            elif supportKprobe(fstype+"_file_aio_write"):
-                kprobe = fstype+"_file_aio_write"
-            elif supportKprobe("generic_file_aio_write"):
-                kprobe = "generic_file_aio_write"
-            else:
-                print("not available write kprobe")
-                sys.exit(0)
-            writeKprobe = 'p '+kprobe+' '+kprobeArgs
-            self.kprobe.append(kprobe)
-            self.inputExp.append(writeKprobe)
-
-            kprobe = fstype+"_file_read_iter"
-            if supportKprobe(kprobe):
-                pass
-            elif supportKprobe(fstype+"_file_read"):
-                kprobe = fstype+"_file_read"
-            elif supportKprobe(fstype+"_file_aio_read"):
-                kprobe = fstype+"_file_aio_read"
-            elif supportKprobe("generic_file_aio_read"):
-                kprobe = "generic_file_aio_read"
-            else:
-                print("not available read kprobe")
-                sys.exit(0)
-            readKprobe = 'p '+kprobe+' '+kprobeArgs
-            self.kprobe.append(kprobe)
-            self.inputExp.append(readKprobe)
-
+            for op in ['write', 'read']:
+                kPoints = [fstype+"_file_"+op+"_iter", fstype+"_file_"+op,
+                    fstype+"_file_aio_"+op, "generic_file_aio_"+op]
+                if list(set(self.kprobe) & set(kPoints)):
+                    continue
+                kprobe = None
+                for k in kPoints:
+                    if supportKprobe(k):
+                        kprobe = k
+                        break
+                if not kprobe:
+                    print("not available %s kprobe" % op)
+                    sys.exit(0)
+                pointKprobe = 'p '+kprobe+' '+kprobeArgs
+                self.kprobe.append(kprobe)
+                self.inputExp.append(pointKprobe)
             self.expression = self.inputExp
         self.outlogFormatBase = 10
 
@@ -249,10 +227,10 @@ class fsstatClass(diskstatClass):
         for exp in self.expression:
             probe = 'p_'+exp.split()[1]+'_0'
             enableKprobe = self.kprobeDir+"/"+probe+"/enable"
+            filterKprobe = self.kprobeDir+"/"+probe+"/filter"
             if os.path.exists(enableKprobe):
                 echoFile(enableKprobe, "0")
                 if devt > 0:
-                    filterKprobe = self.kprobeDir+"/"+probe+"/filter"
                     echoFile(filterKprobe, "0")
                 echoFileAppend(self.kprobeEvent, '-:%s' % probe)
 
@@ -278,6 +256,8 @@ class fsstatClass(diskstatClass):
         for exp in self.expression:
             probe = 'p_'+exp.split()[1]+'_0'
             enableKprobe = self.kprobeDir+"/"+probe+"/enable"
+            if not os.path.exists(enableKprobe):
+                continue
             echoFile(enableKprobe, "0")
             if self.devt > 0:
                 filterKprobe = self.kprobeDir+"/"+probe+"/filter"
@@ -287,84 +267,67 @@ class fsstatClass(diskstatClass):
 
     def showJson(self, stat):
         secs = self.cycle
-        top = 0
-        statJsonStr = '{\
-			"time":"",\
-			"fsstats":[]}'
+        statJsonStr = '{"time":"","fsstats":[]}'
         fstatDicts = json.loads(statJsonStr, object_pairs_hook=OrderedDict)
         fstatDicts['time'] = time.strftime(
             '%Y/%m/%d %H:%M:%S', time.localtime())
+        stSecs = str(secs)+'s' if secs > 1 else 's'
         for key, item in stat.items():
             if (item["cnt_wr"] + item["cnt_rd"]) == 0:
                 continue
-            if top >= self.top:
-                break
-            top += 1
-            item["cnt_wr"] /= secs
-            item["bw_wr"] = humConvert(item["bw_wr"]/secs, True)
-            item["cnt_rd"] /= secs
-            item["bw_rd"] = humConvert(item["bw_rd"]/secs, True)
+            item["bw_wr"] = \
+                humConvert(item["bw_wr"], True).replace('s', stSecs) if item["bw_wr"] else 0
+            item["bw_rd"] = \
+                humConvert(item["bw_rd"], True).replace('s', stSecs) if item["bw_rd"] else 0
             fsstatJsonStr = '{\
-				"inode":0,\
-				"comm":"",\
-				"tgid":0,\
-				"pid":0,\
-				"cnt_rd":0,\
-				"bw_rd":0,\
-				"cnt_wr":0,\
-				"bw_wr":0,\
-				"device":0,\
-				"file":0}'
+                "inode":0,"comm":"","tgid":0,"pid":0,"cnt_rd":0,\
+                "bw_rd":0,"cnt_wr":0,"bw_wr":0,"device":0,"file":0}'
             fsstatDict = json.loads(
                 fsstatJsonStr, object_pairs_hook=OrderedDict)
-            fsstatDict["inode"] = key
             for key, val in item.items():
                 fsstatDict[key] = val
             fstatDicts["fsstats"].append(fsstatDict)
         if len(fstatDicts["fsstats"]) > 0:
-            print(json.dumps(fstatDicts))
+            self.writeDataToJson(json.dumps(fstatDicts))
 
     def show(self):
-        top = 0
         bwTotal = 0
         stat = {}
+        mStat = {}
         secs = self.cycle
         with open(self.tracingDir+"/trace") as f:
-            traceText = list(filter(
-                lambda x: any(e in x for e in self.kprobe),
-                f.readlines()))
+            traceText = \
+                list(filter(lambda x: any(e in x for e in self.kprobe), f.readlines()))
 
         # pool-1-thread-2-5029  [002] .... 5293018.252338: p_ext4_file_write_iter_0:\
         # (ext4_file_write_iter+0x0/0x6d0 [ext4]) dev=265289729 inode_num=530392 len=38
         # ...
         for entry in traceText:
-            matchObj = re.match(r'(.*) \[([^\[\]]*)\] (.*) dev=(.*) ' +
-                                'inode_num=(.*) len=(.*) mntfname=(.*) ' +
-                                'bfname=(.*) d1fname=(.*) d2fname=(.*) d3fname=(.*)\n', entry)
-            # print(entry)
-            if matchObj is not None:
-                commInfo = matchObj.group(1).rsplit('-', 1)
-            else:
+            matchObj = re.match(
+                    r'(.*) \[([^\[\]]*)\] (.*) dev=(.*) inode_num=(.*) len=(.*)'+
+                    ' mntfname=(.*) bfname=(.*) d1fname=(.*) d2fname=(.*) d3fname=(.*) comm=(.*)\n',
+                    entry)
+            #print(entry)
+            if matchObj is None:
                 continue
-            pid = commInfo[1].strip()
-            if self.pid is not None and pid != self.pid:
-                continue
+            pid = (matchObj.group(1).rsplit('-', 1))[1].strip()
             dev = int(matchObj.group(4), self.outlogFormatBase)
-            if self.devt > 0 and self.devt != dev:
+            if (self.pid is not None and pid != self.pid) or \
+                (self.devt > 0 and self.devt != dev):
                 continue
-            device = super(fsstatClass, self).getDevNameByDevt(dev)
-            # if super(fsstatClass, self).notCareDevice(device) == True:
-            #	continue
+            device = self.getDevNameByDevt(dev)
+            if self.miscStat is not None:
+                disk = self.getMasterDev(device)
+                if not mStat.has_key(disk):
+                    mStat.setdefault(disk, {})
+                stat = mStat[disk]
             ino = int(matchObj.group(5), self.outlogFormatBase)
-            if bool(stat.has_key(ino)) != True:
-                comm = fixComm(commInfo[0].lstrip(), pid)
-                if '..' in comm:
-                    continue
-                fsmountinfo = []
-                for f in self.fsmountInfo:
-                    if ('/dev/'+device) in f:
-                        fsmountinfo.append(f)
-
+            comm = fixComm(matchObj.group(12).strip("\""), pid)
+            if '..' in comm:
+                continue
+            inoTask = str(ino)+':'+str(comm)+':'+device
+            if not stat.has_key(inoTask):
+                fsmountinfo = [f for f in self.fsmountInfo if ('/dev/'+device) in f]
                 fileInfoDict = {
                     'device': device,
                     'mntfname': matchObj.group(7).strip("\""),
@@ -372,56 +335,70 @@ class fsstatClass(diskstatClass):
                     'd1fname': matchObj.group(9).strip("\""),
                     'd2fname': matchObj.group(10).strip("\""),
                     'd3fname': matchObj.group(11).strip("\""),
-                    'fsmountinfo': fsmountinfo,
-                    'ino': ino, 'pid': pid}
-                stat.setdefault(ino,
-                                {"comm": comm, "tgid": getTgid(pid), "pid": pid,
-                                 "cnt_wr": 0, "bw_wr": 0, "cnt_rd": 0, "bw_rd": 0,
-                                 "device": device,
-                                 "file": getFullName(fileInfoDict)})
+                    'fsmountinfo': fsmountinfo, 'ino': ino, 'pid': pid}
+                stat.setdefault(
+                    inoTask,
+                    {"inode":str(ino), "comm": comm, "tgid": getTgid(pid), "pid": pid,
+                    "cnt_wr": 0, "bw_wr": 0, "cnt_rd": 0, "bw_rd": 0, "device": device,
+                    "file": getFullName(fileInfoDict)})
             size = int(matchObj.group(6), self.outlogFormatBase)
             if 'write' in entry:
-                stat[ino]["cnt_wr"] += 1
-                stat[ino]["bw_wr"] += int(size)
+                stat[inoTask]["cnt_wr"] += 1
+                stat[inoTask]["bw_wr"] += int(size)
             if 'read' in entry:
-                stat[ino]["cnt_rd"] += 1
-                stat[ino]["bw_rd"] += int(size)
+                stat[inoTask]["cnt_rd"] += 1
+                stat[inoTask]["bw_rd"] += int(size)
+            if pid != stat[inoTask]["pid"]:
+                stat[inoTask]["pid"] = pid
+                stat[inoTask]["tgid"] = getTgid(pid)
             bwTotal += int(size)
 
-        if (bwTotal/secs) < self.bwThresh or \
-                ((self.bwThresh > 0 and
-                  (bwTotal/secs) < super(fsstatClass, self).getDiskBW())):
+        if self.miscStat is not None:
+            for d,val in self.miscStat:
+                if d not in mStat.keys():
+                    mStat.setdefault(d, {})
+                mStat[d].update(dict(val))
+            tmpStat = []
+            for d,val in mStat.items():
+                idxSort = 'bw_wr'
+                if self.getDiskStatInd(d, 'w_iops') < self.getDiskStatInd(d, 'r_iops'):
+                    idxSort = 'bw_rd'
+                s = sorted(val.items(), key=lambda e: (e[1][idxSort]), reverse=True)[:self.top]
+                tmpStat.append((d, s))
+            del self.miscStat[:]
+            self.miscStat.extend(tmpStat)
             return
+        else:
+            if (self.bwThresh and (bwTotal/secs) < self.bwThresh):
+                return
 
-        if super(fsstatClass, self).enableJsonShow() == False:
+        stat = sorted(stat.items(), key=lambda e: (
+                e[1]["bw_wr"]+e[1]["bw_rd"]), reverse=True)[:self.top]
+
+        if self.enableJsonShow() == False:
             print(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime()))
-        if super(fsstatClass, self).disableShow() == False:
+        if self.disableShow() == False:
             super(fsstatClass, self).show()
 
-        if stat:
-            stat = OrderedDict(sorted(stat.items(),
-                                      key=lambda e: (e[1]["bw_wr"]+e[1]["bw_rd"]), reverse=True))
-        if super(fsstatClass, self).enableJsonShow() == True:
+        if self.enableJsonShow() == True:
             self.showJson(stat)
             return
 
         print("%-20s%-8s%-8s%-8s%-12s%-8s%-12s%-12s%-12s%s"
               % ("comm", "tgid", "pid", "cnt_rd", "bw_rd",
                  "cnt_wr", "bw_wr", "inode", "device", "filepath"))
-        for key, item in stat.items():
+        stSecs = str(secs)+'s' if secs > 1 else 's'
+        for key, item in stat:
             if (item["cnt_wr"] + item["cnt_rd"]) == 0:
                 continue
-            if top >= self.top:
-                break
-            top += 1
-            item["cnt_wr"] /= secs
-            item["bw_wr"] = humConvert(item["bw_wr"]/secs, True)
-            item["cnt_rd"] /= secs
-            item["bw_rd"] = humConvert(item["bw_rd"]/secs, True)
+            item["bw_wr"] = \
+                humConvert(item["bw_wr"], True).replace('s', stSecs) if item["bw_wr"] else 0
+            item["bw_rd"] = \
+                humConvert(item["bw_rd"], True).replace('s', stSecs) if item["bw_rd"] else 0
             print("%-20s%-8s%-8s%-8d%-12s%-8d%-12s%-12s%-12s%s"
-                  % (item["comm"], item["tgid"], item["pid"],
-                     item["cnt_rd"], item["bw_rd"], item["cnt_wr"],
-                     item["bw_wr"], key, item["device"], item["file"]))
+                  % (item["comm"], item["tgid"], item["pid"], item["cnt_rd"],
+                  item["bw_rd"], item["cnt_wr"], item["bw_wr"], item["inode"],
+                  item["device"], item["file"]))
         print("")
 
     def entry(self, interval):
