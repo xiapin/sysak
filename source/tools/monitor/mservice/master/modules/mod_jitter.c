@@ -213,10 +213,9 @@ set_jitter_record(struct module *mod, double st_array[],
 		st_array[3] = -1;
 
 	idx = sum_ex.idx;
-	printf("jit[%d]:deltaN=%f, deltaT=%f\n", idx, st_array[2], st_array[3]);
 	sum_ex.sum[idx].delta_num = st_array[2];
 	sum_ex.sum[idx].delta_total = st_array[3];
-	sum_ex.idx = (idx+1)%(mod->n_item); 
+	sum_ex.idx = (idx+1)%(mod->n_item);
 	//pre_array[0] = st_array[0];
 	//pre_array[1] = st_array[1];
 }
