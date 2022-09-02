@@ -1,0 +1,12 @@
+[package]
+name = "utils"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libbpf-rs = { git = "https://github.com/libbpf/libbpf-rs.git" }
+anyhow = "1.0.57"
+libc = "0.2"
+libbpf-sys = "0.8.3+v0.8.1"
