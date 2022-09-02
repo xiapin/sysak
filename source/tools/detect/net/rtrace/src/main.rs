@@ -1,96 +1,85 @@
-#[path = "latency/bpf/.output/icmp.skel.rs"]
-pub mod icmpskel;
-#[path = "latency/bpf/.output/tcp.skel.rs"]
-pub mod tcpskel;
-
-#[path = "latency/bpf/.output/bindings.rs"]
-#[allow(non_upper_case_globals)]
-#[allow(non_camel_case_types)]
-#[allow(non_snake_case)]
-#[allow(dead_code)]
-mod bindings;
-
-#[path = "drop/bpf/.output/drop.skel.rs"]
-pub mod dropskel;
-
-#[path = "drop/bpf/.output/bindings.rs"]
-#[allow(non_upper_case_globals)]
-#[allow(non_camel_case_types)]
-#[allow(non_snake_case)]
-#[allow(dead_code)]
-mod drop_bindings;
-
-#[path = "abnormal/bpf/.output/bindings.rs"]
-#[allow(non_upper_case_globals)]
-#[allow(non_camel_case_types)]
-#[allow(non_snake_case)]
-#[allow(dead_code)]
-mod abnormal_bindings;
-#[path = "abnormal/bpf/.output/tcp.skel.rs"]
-pub mod abnormaltcpskel;
-
-#[path = "sli/bpf/.output/bindings.rs"]
-#[allow(non_upper_case_globals)]
-#[allow(non_camel_case_types)]
-#[allow(non_snake_case)]
-#[allow(dead_code)]
-mod sli_bindings;
-#[path = "sli/bpf/.output/sli.skel.rs"]
-pub mod sliskel;
-
-mod abnormal;
+// mod abnormal;
 mod drop;
 mod latency;
+// mod latencylegacy;
+mod abnormal;
+// mod sli;
+mod utils;
+mod stack;
+mod retran;
+
+mod common;
 mod perf;
-mod sli;
 
 use anyhow::{bail, Result};
-use drop::build_drop;
-use abnormal::build_abnormal;
-use latency::build_latency;
-use sli::build_sli;
 use structopt::StructOpt;
 
-use latency::LatencyCommand;
-use drop::DropCommand;
-use abnormal::AbnormalCommand;
-use sli::SliCommand;
+use drop::{DropCommand, build_drop};
+use latency::latency::{LatencyCommand, build_latency};
+use retran::retran::{RetranCommand, build_retran};
+use abnormal::abnormal::{build_abnormal, AbnormalCommand};
+
+// use abnormal::build_abnormal;
+// use latency::{build_latency, LatencyCommand};
+// use latencylegacy::{build_latency_legacy, LatencyLegacyCommand};
+// use sli::build_sli;
+
+// use abnormal::AbnormalCommand;
+// use sli::SliCommand;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rtrace", about = "Diagnosing tools of kernel network")]
 pub struct Command {
     #[structopt(subcommand)]
     subcommand: SubCommand,
+
+    #[structopt(long, help = "Custom btf path")]
+    btf: Option<String>,
+
+    #[structopt(short, long, help = "Verbose debug output")]
+    verbose: bool,
 }
 
 #[derive(Debug, StructOpt)]
 enum SubCommand {
-    #[structopt(name = "latency", about = "Packet latency diagnosing")]
-    Latency(LatencyCommand),
-    #[structopt(name = "drop", about = "Packet drop diagnosing")]
-    Drop(DropCommand),
     #[structopt(name = "abnormal", about = "Abnormal connection diagnosing")]
     Abnormal(AbnormalCommand),
-    #[structopt(name = "sli", about = "Collection machine sli")]
-    Sli(SliCommand),
+    #[structopt(name = "drop", about = "Packet drop diagnosing")]
+    Drop(DropCommand),
+    #[structopt(name = "latency", about = "Packet latency tracing")]
+    Latency(LatencyCommand),
+    // #[structopt(name = "latencylegacy", about = "Packet latency tracing(legacy version)")]
+    // LatencyLegacy(LatencyLegacyCommand),
+    // #[structopt(name = "sli", about = "Collection machine sli")]
+    // Sli(SliCommand),
+    #[structopt(name = "retran", about = "Packet retransmission tracing")]
+    Retran(RetranCommand),
 }
 
 fn main() -> Result<()> {
     env_logger::init();
     let opts = Command::from_args();
 
+    eutils_rs::helpers::bump_memlock_rlimit()?;
+
     match opts.subcommand {
-        SubCommand::Latency(cmd) => {
-            build_latency(&cmd)?;
-        }
-        SubCommand::Sli(cmd) => {
-            build_sli(&cmd)?;
-        }
         SubCommand::Abnormal(cmd) => {
-            build_abnormal(&cmd)?;
+            build_abnormal(&cmd, opts.verbose, &opts.btf)?;
         }
         SubCommand::Drop(cmd) => {
-            build_drop(&cmd)?;
+            build_drop(&cmd, opts.verbose, &opts.btf)?;
+        }
+        SubCommand::Latency(cmd) => {
+            build_latency(&cmd, opts.verbose, &opts.btf)?;
+        }
+        // SubCommand::LatencyLegacy(cmd) => {
+        //     build_latency_legacy(&cmd, opts.verbose, &opts.btf)?;
+        // }
+        // SubCommand::Sli(cmd) => {
+        //     build_sli(&cmd)?;
+        // }
+        SubCommand::Retran(cmd) => {
+            build_retran(&cmd, opts.verbose, &opts.btf)?;
         }
     }
 

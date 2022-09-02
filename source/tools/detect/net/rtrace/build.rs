@@ -1,41 +1,22 @@
 use std::env;
+use std::fmt::format;
 use std::fs::create_dir_all;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use libbpf_cargo::SkeletonBuilder;
+use bpfskel::BpfSkel;
 
-const LATENCY_TCP_SRC: &str = "./src/latency/bpf/tcp.bpf.c";
-const LATENCY_ICMP_SRC: &str = "./src/latency/bpf/icmp.bpf.c";
-const LATENCY_HDR: &str = "./src/latency/bpf/rtrace.h";
 
-const DROP_BPF_SRC: &str = "./src/drop/bpf/drop.bpf.c";
-const DROP_HDR: &str = "./src/drop/bpf/drop.h";
+const APPS: &'static [&'static str] = &[ "abnormal", "drop", "latency"];
+const COMMONHDR: &str = "common.h";
 
-const ABNORMAL_TCP_BPF_SRC: &str = "./src/abnormal/bpf/tcp.bpf.c";
-const ABNORMAL_HDR: &str = "./src/abnormal/bpf/abnormal.h";
 
-const SLI_BPF_SRC: &str = "./src/sli/bpf/sli.bpf.c";
-const SLI_HDR: &str = "./src/sli/bpf/sli.h";
-
-fn compile_sli_ebpf() {
-    create_dir_all("./src/sli/bpf/.output").unwrap();
-
-    let sli_skel = Path::new("./src/sli/bpf/.output/sli.skel.rs");
-    match SkeletonBuilder::new()
-        .source(SLI_BPF_SRC)
-        .build_and_generate(&sli_skel)
-    {
-        Ok(()) => {}
-        Err(e) => {
-            println!("{}", e);
-            panic!()
-        }
-    }
+fn compile_hdr(hdrfile: &str, bindingfile: &str) {
 
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
         // bindings for.
-        .header(SLI_HDR)
+        .header(hdrfile)
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
@@ -43,19 +24,17 @@ fn compile_sli_ebpf() {
         .generate()
         // Unwrap the Result and panic on failure.
         .expect("Unable to generate bindings");
-    let bind = Path::new("./src/sli/bpf/.output/bindings.rs");
+
     bindings
-        .write_to_file(bind)
+        .write_to_file(bindingfile)
         .expect("Couldn't write bindings!");
 }
 
-fn compile_abnormal_ebpf() {
-    create_dir_all("./src/abnormal/bpf/.output").unwrap();
-
-    let tcp_skel = Path::new("./src/abnormal/bpf/.output/tcp.skel.rs");
+fn compile_bpf(bpfpath: &str, objpath: &str, skelpath: &str) {
     match SkeletonBuilder::new()
-        .source(ABNORMAL_TCP_BPF_SRC)
-        .build_and_generate(&tcp_skel)
+        .source(bpfpath)
+        .obj(objpath)
+        .build_and_generate(&skelpath)
     {
         Ok(()) => {}
         Err(e) => {
@@ -63,97 +42,26 @@ fn compile_abnormal_ebpf() {
             panic!()
         }
     }
-
-    let bindings = bindgen::Builder::default()
-        // The input header we would like to generate
-        // bindings for.
-        .header(ABNORMAL_HDR)
-        // Tell cargo to invalidate the built crate whenever any of the
-        // included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        // Finish the builder and generate the bindings.
-        .generate()
-        // Unwrap the Result and panic on failure.
-        .expect("Unable to generate bindings");
-    let bind = Path::new("./src/abnormal/bpf/.output/bindings.rs");
-    bindings
-        .write_to_file(bind)
-        .expect("Couldn't write bindings!");
 }
 
-fn compile_drop_ebpf() {
-    create_dir_all("./src/drop/bpf/.output").unwrap();
+fn compile_app(app: &str) {
+    let bpfdir = format!("src/{}/bpf/", app);
+    let outputdir = format!("{}/.output", bpfdir);
 
-    let drop_skel = Path::new("./src/drop/bpf/.output/drop.skel.rs");
-    match SkeletonBuilder::new()
-        .source(DROP_BPF_SRC)
-        .build_and_generate(&drop_skel)
-    {
-        Ok(()) => {}
-        Err(e) => {
-            println!("{}", e);
-            panic!()
-        }
-    }
+    create_dir_all(&outputdir).unwrap();
 
-    let bindings = bindgen::Builder::default()
-        // The input header we would like to generate
-        // bindings for.
-        .header(DROP_HDR)
-        // Tell cargo to invalidate the built crate whenever any of the
-        // included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        // Finish the builder and generate the bindings.
-        .generate()
-        // Unwrap the Result and panic on failure.
-        .expect("Unable to generate bindings");
-    let bind = Path::new("./src/drop/bpf/.output/bindings.rs");
-    bindings
-        .write_to_file(bind)
-        .expect("Couldn't write bindings!");
-}
+    // compile bpf code
+    let bpffile = format!("{}/{}.bpf.c", bpfdir, app);
+    let objfile = format!("{}/{}.bpf.o", outputdir, app);
+    let skelfile = format!("{}/{}.skel.rs", outputdir, app);
+    let skel = format!("{}/skel.rs", outputdir);
+    compile_bpf(&bpffile, &objfile, &skelfile);
+    BpfSkel::new().obj(&objfile).generate(&skel).unwrap();
 
-fn compile_latency_ebpf() {
-    create_dir_all("./src/latency/bpf/.output").unwrap();
-    let tcp_skel = Path::new("./src/latency/bpf/.output/tcp.skel.rs");
-    match SkeletonBuilder::new()
-        .source(LATENCY_TCP_SRC)
-        .build_and_generate(&tcp_skel)
-    {
-        Ok(()) => {}
-        Err(e) => {
-            println!("{}", e);
-            panic!()
-        }
-    }
-
-    let icmp_skel = Path::new("./src/latency/bpf/.output/icmp.skel.rs");
-    match SkeletonBuilder::new()
-        .source(LATENCY_ICMP_SRC)
-        .build_and_generate(&icmp_skel)
-    {
-        Ok(()) => {}
-        Err(e) => {
-            println!("{}", e);
-            panic!()
-        }
-    }
-
-    let bindings = bindgen::Builder::default()
-        // The input header we would like to generate
-        // bindings for.
-        .header(LATENCY_HDR)
-        // Tell cargo to invalidate the built crate whenever any of the
-        // included header files changed.
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        // Finish the builder and generate the bindings.
-        .generate()
-        // Unwrap the Result and panic on failure.
-        .expect("Unable to generate bindings");
-    let bind = Path::new("./src/latency/bpf/.output/bindings.rs");
-    bindings
-        .write_to_file(bind)
-        .expect("Couldn't write bindings!");
+    // compile hdr
+    let hdrfile = format!("{}/{}.h", bpfdir, app);
+    let bindingfile = format!("{}/bindings.rs", outputdir);
+    compile_hdr(&hdrfile, &bindingfile);
 }
 
 fn main() {
@@ -164,28 +72,22 @@ fn main() {
         return;
     }
 
-    // It's unfortunate we cannot use `OUT_DIR` to store the generated skeleton.
-    // Reasons are because the generated skeleton contains compiler attributes
-    // that cannot be `include!()`ed via macro. And we cannot use the `#[path = "..."]`
-    // trick either because you cannot yet `concat!(env!("OUT_DIR"), "/skel.rs")` inside
-    // the path attribute either (see https://github.com/rust-lang/rust/pull/83366).
-    //
-    // However, there is hope! When the above feature stabilizes we can clean this
-    // all up.
-    println!("cargo:rerun-if-changed={}", DROP_BPF_SRC);
-    println!("cargo:rerun-if-changed={}", DROP_HDR);
-    println!("cargo:rerun-if-changed={}", LATENCY_TCP_SRC);
-    println!("cargo:rerun-if-changed={}", LATENCY_ICMP_SRC);
-    println!("cargo:rerun-if-changed={}", LATENCY_HDR);
+    println!("cargo:rerun-if-changed=./src/drop/bpf/drop.h");
 
-    println!("cargo:rerun-if-changed={}", ABNORMAL_TCP_BPF_SRC);
-    println!("cargo:rerun-if-changed={}", ABNORMAL_HDR);
+    println!("cargo:rerun-if-changed={}", COMMONHDR);
+    for app in APPS {
+        let bpffile = format!("./src/{}/bpf/{}.bpf.c", *app, *app);
+        let hdrfile = format!("./src/{}/bpf/{}.h", *app, *app);
+        println!("cargo:rerun-if-changed={}", bpffile);
+        println!("cargo:rerun-if-changed={}", hdrfile);
+    }
 
-    println!("cargo:rerun-if-changed={}", SLI_BPF_SRC);
-    println!("cargo:rerun-if-changed={}", SLI_HDR);
+    for app in APPS {
+        compile_app(*app);
+    }
 
-    compile_latency_ebpf();
-    compile_drop_ebpf();
-    compile_abnormal_ebpf();
-    compile_sli_ebpf();
+    create_dir_all("src/bindings").unwrap();
+    let commonbinding = format!("src/bindings/commonbinding.rs");
+    compile_hdr(COMMONHDR, &commonbinding);
+
 }

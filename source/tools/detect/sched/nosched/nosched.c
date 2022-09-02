@@ -7,12 +7,15 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/resource.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>	/* bpf_obj_pin */
 #include <getopt.h>
 #include "pidComm.h"
+#include "sched_jit.h"
 #include "bpf/nosched.skel.h"
 #include "nosched.h"
 
@@ -23,7 +26,6 @@ char filename[256] = {0};
 char log_dir[] = "/var/log/sysak/nosched";
 char defaultfile[] = "/var/log/sysak/nosched/nosched.log";
 
-struct summary summary, *percpu_summary;
 static struct ksym syms[MAX_SYMS];
 static volatile sig_atomic_t exiting;
 static int sym_cnt,  stackmp_fd;
@@ -32,10 +34,13 @@ struct evn {
 	__u64 thresh;
 	bool summary;
 	bool verbose;
+	struct sched_jit_summary *sump;
+	char *shm_p;
 } env = {
 	.thresh = LAT_THRESH_NS,
 	.summary = false,
 	.verbose = false,
+	.shm_p = NULL,
 };
 
 static void usage(char *prog)
@@ -46,7 +51,7 @@ static void usage(char *prog)
 	"  -t THRESH_TIME       specify the threshold time(ms), default=10ms\n"
 	"  -f result.log        result file, default is /var/log/sysak/nosched.log\n"
 	"  -s TIME              specify how long to run \n"
-	"  -S                   record the result as summary mod\n"
+	"  -S shmkey            record the result as summary mod\n"
 	;
 
 	fprintf(stderr, str, prog);
@@ -173,73 +178,64 @@ static int prepare_dictory(char *path)
 		return 0;
 }
 
-static void update_summary(struct summary* summary, const struct event *e)
+static void fill_maxN(struct jit_maxN *maxN, const struct event *e)
 {
-	int idx;
+	maxN->delay = e->delay;
+	maxN->cpu = e->cpu;
+	maxN->pid = e->pid;
+	maxN->stamp = e->stamp;
+	strncpy(maxN->comm, e->comm, 16);
+}
+
+static void update_summary(struct sched_jit_summary* summary, const struct event *e)
+{
+	int i, ridx;
 	char buf[CONID_LEN] = {0};
 
 	summary->num++;
-	idx = summary->num % CPU_ARRY_LEN;
 	summary->total += e->delay;
-	summary->cpus[idx] = e->cpuid;
-	summary->jitter[idx] = e->delay;
-	if (get_container(buf, e->pid))
-		strncpy(summary->container[idx], "000000000000", sizeof(summary->container[idx]));
-	else
-		strncpy(summary->container[idx], buf, sizeof(summary->container[idx]));
 
-	if (summary->max.value < e->delay) {
-		summary->max.value = e->delay;
-		summary->max.cpu = e->cpuid;
-		summary->max.pid = e->pid;
-		summary->max.stamp = e->stamp;
-		strncpy(summary->max.comm, e->comm, 16);
-	}
-}
-
-static int record_summary(struct summary *summary, long offset, bool total)
-{
-	char *p;
-	int i, idx, pos;
-	char buf[128] = {0};
-	char header[16] = {0};
-
-	snprintf(header, 15, "cpu%ld", offset);
-	p = buf;
-	pos = sprintf(p,"%-7s %-5lu %-6llu",
-		total?"nosche":header,
-		summary->num, summary->total);
-
-	if (total) {
-		idx = summary->num % CPU_ARRY_LEN;
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %d", summary->cpus[(idx+i)%CPU_ARRY_LEN]);
-		}
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %5d", summary->jitter[(idx+i)%CPU_ARRY_LEN]);
-		}
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %s", summary->container[(idx+i)%CPU_ARRY_LEN]);
-		}
-		p = p+pos;
-		pos = sprintf(p, "\n");
+	if (e->delay < 10) {
+		summary->less10ms++;
+	} else if (e->delay < 50) {
+		summary->less50ms++;
+	} else if (e->delay < 100) {
+		summary->less100ms++;
+	} else if (e->delay < 500) {
+		summary->less500ms++;
+	} else if (e->delay < 1000) {
+		summary->less1s++;
 	} else {
-		p = p+pos;
-		pos = sprintf(p, "   %-4llu %-12llu %-3d %-9d %-15s\n",
-			summary->max.value, summary->max.stamp,
-			summary->max.cpu, summary->max.pid, summary->max.comm);
+		summary->plus1s++;
 	}
 
-	if (total)
-		fseek(filep, 0, SEEK_SET);
+	ridx = summary->num % CPU_ARRY_LEN;
+	summary->lastN_array[ridx].cpu = e->cpu;
+	summary->lastN_array[ridx].delay = e->delay;
+	if (get_container(buf, e->pid))
+		strncpy(summary->lastN_array[ridx].con, "000000000000", sizeof(summary->lastN_array[ridx].con));
 	else
-		fseek(filep, (offset)*(p-buf+pos), SEEK_CUR);
+		strncpy(summary->lastN_array[ridx].con, buf, sizeof(summary->lastN_array[ridx].con));
 
-	fprintf(filep, "%s", buf);
-	return 0;
+	if (e->delay > summary->topNmin) {
+		__u64 tmp;
+		int idx;
+		struct jit_maxN *maxi;
+
+		idx = 0;
+		tmp = summary->maxN_array[0].delay;
+		/* sort: user insert sort */
+		for (i = 1; i < CPU_ARRY_LEN; i++) {
+			maxi = &summary->maxN_array[i];
+			if (tmp > maxi->delay) {
+				tmp = maxi->delay;
+				idx = i;
+			}
+ 		}
+		summary->topNmin = tmp;
+		summary->min_idx = idx;
+		fill_maxN(&summary->maxN_array[idx], e);
+	} 
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -257,20 +253,12 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
 	e->delay = e->delay/(1000*1000);
 	if (env.summary) {
-		struct summary *sumi;
-
-		if (e->cpuid > nr_cpus - 1)
+		if (e->cpu > nr_cpus - 1)
 			return;
-
-		sumi = &percpu_summary[e->cpuid];
-		update_summary(&summary, e);
-		update_summary(sumi, e);
-		if(record_summary(&summary, 0, true))
-			return;
-		record_summary(sumi, e->cpuid, false);
+		update_summary(env.sump, e);
 	} else {
 		fprintf(filep, "%-18.6f %-5d %-15s %-8d %-10llu %-21s\n",
-			((double)e->stamp/1000000000), e->cpuid, e->comm,
+			((double)e->stamp/1000000000), e->cpu, e->comm,
 			e->pid, e->delay, (e->exit==e->stamp)?"(EOF)":ts);
 		if (e->exit == 0)
 			print_stack(stackmp_fd, e->ret);
@@ -293,14 +281,7 @@ int nosched_handler(int poll_fd, struct nosched_bpf *skel)
 		fprintf(filep, "%-18s %-5s %-15s %-8s %-10s %-21s\n",
 			"TIME(nosched)", "CPU", "COMM", "TID", "LAT(ms)", "DATE");
 	} else {
-		int i;
-		char buf[128] = {' '};
-		fprintf(filep, "nosche\n");
-		for (i = 0; i < nr_cpus; i++)
-			fprintf(filep, "cpu%d  %s\n", i, buf);
-		fseek(filep, 0, SEEK_SET);
-		for (i=0; i < CPU_ARRY_LEN; i++)
-			strncpy(summary.container[i], "000000000000", sizeof(summary.container[i]));
+		memset(env.sump, 0, sizeof(struct sched_jit_summary));
 	}
 	pb_opts.sample_cb = handle_event;
 	pb_opts.lost_cb = handle_lost_events;
@@ -343,9 +324,10 @@ static void sig_alarm(int signo)
 
 int main(int argc, char **argv)
 {
+	char *p;
 	struct nosched_bpf *skel;
 	struct args args;
-	int c, option_index, args_key;
+	int c, option_index, args_key, shm_fd;
 	unsigned long span = 0;
 	int err, map_fd0, map_fd1, map_fd2;
 
@@ -354,7 +336,7 @@ int main(int argc, char **argv)
 		return err;
 
 	for (;;) {
-		c = getopt_long(argc, argv, "t:f:s:Svh", NULL, &option_index);
+		c = getopt_long(argc, argv, "t:f:s:S:vh", NULL, &option_index);
 		if (c == -1)
 			break;
 
@@ -390,11 +372,21 @@ int main(int argc, char **argv)
 				}
 				break;
 			case 'S':
-				nr_cpus = libbpf_num_possible_cpus();
-				percpu_summary = malloc(nr_cpus*sizeof(struct summary));
-				if (!percpu_summary)
-					return -ENOMEM;
-				env.summary = 1;
+				shm_fd = shm_open(optarg, O_RDWR, 0666);
+				if (shm_fd < 0) {
+					/* we do not use summary, use detail instead. */
+					fprintf(stdout, "shm_open %s: %s", optarg, strerror(errno));
+					break;
+				}
+
+				p  = mmap(NULL, sizeof(struct sched_jit_summary)+32,
+				PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0);
+				if (!p) {
+					fprintf(stdout, "mmap %s: %s", optarg, strerror(errno));
+					break;
+				}
+				env.summary = true;
+				env.sump = (struct sched_jit_summary *)p;
 				break;
 			case 'v':
 				env.verbose = true;
@@ -464,5 +456,8 @@ int main(int argc, char **argv)
 
 cleanup:
 	nosched_bpf__destroy(skel);
+	if (env.sump) {
+		munmap(env.sump, sizeof(struct sched_jit_summary)+32);
+	}
 	return -err;
 }

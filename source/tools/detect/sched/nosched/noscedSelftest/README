@@ -1,0 +1,5 @@
+1 安装sysak
+2 编译测试程序
+ gcc noscedSelftest.c -lrt -pthread -o noscedSelftest 
+3 运行
+ ./noscedSelftest

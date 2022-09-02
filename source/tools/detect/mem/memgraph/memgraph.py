@@ -591,7 +591,7 @@ def memgraph_check_memfrag(meminfo):
 def memgraph_check_event(meminfo):
     event = {}
     util = (meminfo["MemTotal"] - meminfo["MemAvailable"])*100/meminfo["MemTotal"]
-    event["util"] = util
+    event["util"] = round(util,2)
     ret = memgraph_check_memcg(meminfo)
     event["memcg"] = ret
     ret = memgraph_check_memfrag(meminfo)

@@ -5,12 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "pidComm.h"
+#include "sched_jit.h"
 #include "runqslower.h"
 #include "bpf/runqslower.skel.h"
 
@@ -21,7 +24,6 @@ char log_dir[] = "/var/log/sysak/runqslow/";
 char defaultfile[] = "/var/log/sysak/runqslow/runqslow.log";
 char filename[256] = {0};
 
-struct summary summary, *percpu_summary;
 struct env {
 	pid_t pid;
 	pid_t tid;
@@ -30,24 +32,28 @@ struct env {
 	bool previous;
 	bool verbose;
 	bool summary;
+	struct sched_jit_summary *sump;
+	char *shm_p;
 } env = {
 	.span = 0,
 	.threshold = 50*1000*1000,
+	.shm_p = NULL,
 };
 
 const char *argp_program_version = "runqslower 0.1";
 const char argp_program_doc[] =
 "Trace high run queue latency.\n"
 "\n"
-"USAGE: runqslower [--help] [-s SPAN] [-t TID] [-P] [threshold] [-f ./runslow.log]\n"
+"USAGE: runqslower [-h] [-s SPAN] [-t TID] [-S SUM] [-f LOG] [-P] [threshold]\n"
 "\n"
 "EXAMPLES:\n"
 "    runqslower          # trace latency higher than 50ms (default)\n"
-"    runqslower -f a.log # trace latency and record result to a.log (default to /var/log/sysak/runqslow/runqslow.log)\n"
-"    runqslower 12     # trace latency higher than 12 ms\n"
+"    runqslower -f a.log # record result to a.log (default ~/sysak/runqslow/runqslow.log)\n"
+"    runqslower 12       # trace latency higher than 12 ms\n"
 "    runqslower -p 123   # trace pid 123\n"
 "    runqslower -t 123   # trace tid 123 (use for threads only)\n"
 "    schedmoni -s 10     # monitor for 10 seconds\n"
+"    schedmoni -S shm_f  # log summary info to sharememory shm_f\n"
 "    runqslower -P       # also show previous task name and TID\n";
 
 static const struct argp_option opts[] = {
@@ -55,7 +61,7 @@ static const struct argp_option opts[] = {
 	{ "tid", 't', "TID", 0, "Thread TID to trace"},
 	{ "span", 's', "SPAN", 0, "How long to run"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "summary", 'S', NULL, 0, "Output the summary info" },
+	{ "summary", 'S', "SUM", 0, "Output the summary info" },
 	{ "previous", 'P', NULL, 0, "also show previous task name and TID" },
 	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
@@ -88,8 +94,9 @@ static int prepare_dictory(char *path)
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
+	char *p;
 	static int pos_args;
-	int pid;
+	int pid, shm_fd;
 	long long threshold;
 	unsigned long span;
 
@@ -101,11 +108,21 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		env.verbose = true;
 		break;
 	case 'S':
-		nr_cpus = libbpf_num_possible_cpus();
-		percpu_summary = malloc(nr_cpus*sizeof(struct summary));
-		if (!percpu_summary)
-			return -ENOMEM;
+		shm_fd = shm_open(arg, O_RDWR, 0666);
+		if (shm_fd < 0) {
+			/* we do not use summary, use detail instead. */
+			fprintf(stdout, "shm_open %s: %s", arg, strerror(errno));
+			break;
+		}
+
+		p  = mmap(NULL, sizeof(struct sched_jit_summary)+32,
+			PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		if (!p) {
+			fprintf(stdout, "mmap %s: %s", arg, strerror(errno));
+			break;
+		}
 		env.summary = true;
+		env.sump = (struct sched_jit_summary *)p;
 		break;
 	case 'P':
 		env.previous = true;
@@ -187,77 +204,70 @@ static void sig_int(int signo)
 	exiting = 1;
 }
 
-static void update_summary(struct summary* summary, const struct event *e)
+static void fill_maxN(struct jit_maxN *maxN, const struct rqevent *e)
 {
-	int idx;
+	maxN->delay = e->delay;
+	maxN->cpu = e->cpuid;
+	maxN->pid = e->pid;
+	maxN->stamp = e->stamp;
+	strncpy(maxN->comm, e->task, 16);
+}
+
+static void update_summary(struct sched_jit_summary* summary, const struct rqevent *e)
+{
+	int i, ridx;
 	char buf[CONID_LEN] = {0};
 
 	summary->num++;
-	idx = summary->num % CPU_ARRY_LEN;
 	summary->total += e->delay;
-	summary->cpus[idx] = e->cpuid;
-	summary->jitter[idx] = e->delay;
-	if (get_container(buf, e->pid))
-		strncpy(summary->container[idx], "000000000000", sizeof(summary->container[idx]));
-	else
-		strncpy(summary->container[idx], buf, sizeof(summary->container[idx]));
 
-	if (summary->max.value < e->delay) {
-		summary->max.value = e->delay;
-		summary->max.cpu = e->cpuid;
-		summary->max.pid = e->pid;
-		summary->max.stamp = e->stamp;
-		strncpy(summary->max.comm, e->task, 16);
-	}
-}
-
-static int record_summary(struct summary *summary, long offset, bool total)
-{
-	char *p;
-	int i, idx, pos;
-	char buf[128] = {0};
-	char header[16] = {0};
-
-	snprintf(header, 15, "cpu%ld", offset);
-	p = buf;
-	pos = sprintf(p,"%-7s %-5lu %-6llu",
-		total?"rqslow":header,
-		summary->num, summary->total);
-
-	if (total) {
-		idx = summary->num % CPU_ARRY_LEN;
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %d", summary->cpus[(idx+i)%CPU_ARRY_LEN]);
-		}
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %5d", summary->jitter[(idx+i)%CPU_ARRY_LEN]);
-		}
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %s", summary->container[(idx+i)%CPU_ARRY_LEN]);
-		}
-		p = p+pos;
-		pos = sprintf(p, "\n");
+	if (e->delay < 10) {
+		summary->less10ms++;
+	} else if (e->delay < 50) {
+		summary->less50ms++;
+	} else if (e->delay < 100) {
+		summary->less100ms++;
+	} else if (e->delay < 500) {
+		summary->less500ms++;
+	} else if (e->delay < 1000) {
+		summary->less1s++;
 	} else {
-		p = p+pos;
-		pos = sprintf(p, "   %-4llu %-12llu %-3d %-9d %-15s\n",
-			summary->max.value, summary->max.stamp/1000,
-			summary->max.cpu, summary->max.pid, summary->max.comm);
+		summary->plus1s++;
 	}
-	if (total)
-		fseek(filep, 0, SEEK_SET);
+
+	ridx = summary->num % CPU_ARRY_LEN;
+	summary->lastN_array[ridx].cpu = e->cpuid;
+	summary->lastN_array[ridx].delay = e->delay;
+	if (get_container(buf, e->pid))
+		strncpy(summary->lastN_array[ridx].con, "000000000000", sizeof(summary->lastN_array[ridx].con));
 	else
-		fseek(filep, (offset)*(p-buf+pos), SEEK_CUR);
-	fprintf(filep, "%s", buf);
-	return 0;
+		strncpy(summary->lastN_array[ridx].con, buf, sizeof(summary->lastN_array[ridx].con));
+
+	if (e->delay > summary->topNmin) {
+		__u64 tmp;
+		int idx;
+		struct jit_maxN *maxi;
+
+		idx = 0;
+		tmp = summary->maxN_array[0].delay;
+		/* sort: user insert sort */
+		for (i = 1; i < CPU_ARRY_LEN; i++) {
+			maxi = &summary->maxN_array[i];
+			if (tmp > maxi->delay) {
+				tmp = maxi->delay;
+				idx = i;
+			}
+		}
+		summary->topNmin = tmp;
+		summary->min_idx = idx;
+		fill_maxN(&summary->maxN_array[idx], e);
+	} 
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	struct event tmpe, *e;
-	const struct event *ep = data;
+	struct rqevent tmpe, *e;
+	const struct rqevent *ep = data;
 	struct tm *tm;
 	char ts[64];
 	time_t t;
@@ -269,15 +279,9 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
 	e->delay = e->delay/(1000*1000);
 	if (env.summary) {
-		struct summary *sumi;
 		if (e->cpuid > nr_cpus - 1)
 			return;
-		sumi = &percpu_summary[e->cpuid];
-		update_summary(&summary, e);
-		update_summary(sumi, e);
-		if(record_summary(&summary, 0, true))
-			return;
-		record_summary(sumi, e->cpuid, false);
+		update_summary(env.sump, e);
 	} else {
 		if (env.previous)
 			fprintf(filep, "%-21s %-6d %-16s %-8d %-10llu %-16s %-6d\n",
@@ -355,15 +359,9 @@ int main(int argc, char **argv)
 			fprintf(filep, "%-21s %-6s %-16s %-8s %-10s\n",
 				"TIME(runslw)", "CPU", "COMM", "TID", "LAT(ms)");
 	} else {
-		int i;
-		char buf[128] = {' '};
-		fprintf(filep, "rqslow\n");
-		for (i = 0; i < nr_cpus; i++)
-			fprintf(filep, "cpu%d  %s\n", i, buf);
-		fseek(filep, 0, SEEK_SET);
-		for (i=0; i < 4; i++)
-			strncpy(summary.container[i], "000000000000", sizeof(summary.container[i]));
+		memset(env.sump, 0, sizeof(struct sched_jit_summary));
 	}
+
 	pb_opts.sample_cb = handle_event;
 	pb = perf_buffer__new(bpf_map__fd(obj->maps.events), 64, &pb_opts);
 	if (!pb) {
@@ -407,6 +405,9 @@ int main(int argc, char **argv)
 cleanup:
 	perf_buffer__free(pb);
 	runqslower_bpf__destroy(obj);
+	if (env.sump) {
+		munmap(env.sump, sizeof(struct sched_jit_summary)+32);
+	}
 
 	return err != 0;
 }

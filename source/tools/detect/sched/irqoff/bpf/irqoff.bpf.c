@@ -2,6 +2,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include "../irqoff.h"
+#include "sched_jit.h"
 
 #define PERF_MAX_STACK_DEPTH	127
 #define MAX_ENTRIES	10240

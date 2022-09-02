@@ -1,7 +1,3 @@
-/*
- * iostat.c for 2.6.* with file /proc/diskstat
- * Linux I/O performance monitoring utility
- */
 #include "tsar.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,53 +5,57 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/param.h>
+#include <linux/types.h>
 #include <linux/major.h>
+#include "sched_jit.h"
 
 #define NR_MODS	3
 #define BUF_SIZE	(NR_MODS * 4096)
+
 char g_buf[BUF_SIZE];
 char line[512];
 int jitter_init = 0;
 char *jitter_usage = "    --jit                Application jitter stats";
 char *jit_mod[] = {"rqslow", "noschd", "irqoff"};
-char *log_path[] = {
-	"/var/log/sysak/mservice/runqslower",
-	"/var/log/sysak/mservice/nosched",
-	"/var/log/sysak/mservice/irqoff",
+char *jit_shm_key = "sysak_mservice_jitter_shm";
+
+struct exten_sum {
+	long delta_num;
+	U_64 delta_total;
 };
 
-struct summary {
-	unsigned long num;
-	unsigned long long total;
-	int lastcpu0, lastcpu1, lastcpu2, lastcpu3;
-	unsigned long lastjit0, lastjit1, lastjit2, lastjit3;
+struct exten_sum_idx {
+	int idx;
+	struct exten_sum sum[NR_MODS];
 };
 
+struct jitter_shm {
+	struct sched_jit_summary nosched;
+	struct sched_jit_summary irqoff;
+	struct sched_jit_summary rqslow;
+};
+
+static struct jitter_shm *jitshm = NULL;
+struct exten_sum_idx sum_ex;
 static struct mod_info jitter_info[] = {
-	{"   num", HIDE_BIT,  0,  STATS_NULL},		/* total numbers of happend */
-	{"  time", HIDE_BIT,  0,  STATS_NULL},		/* the sum-time of delay */
-	{" lCPU0", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[0] */
-	{" lCPU1", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[1] */
-	{" lCPU2", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[2] */
-	{" lCPU3", HIDE_BIT,  0,  STATS_NULL},	/* last happened cpu[3] */
-	{"dltnum", HIDE_BIT,  0,  STATS_NULL},	/* delta numbers of happend */
-	{" dlttm", HIDE_BIT,  0,  STATS_NULL},	/* the delta time of delay */
+	/* 0~9 */
+	{"   num", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of happend */
+	{"  time", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of delay */
+	{"dltnum", SUMMARY_BIT,  0,  STATS_NULL},	/* delta numbers of happend */
+	{" dlttm", SUMMARY_BIT,  0,  STATS_NULL},	/* the delta time of delay */
+	{" <10ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 10ms */
+	{" <50ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 50ms */
+	{"<100ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 100ms */
+	{"<500ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 500ms */
+	{"   <1s", DETAIL_BIT,  0,  STATS_NULL},	/* less than 1s */
+	{"   >1s", DETAIL_BIT,  0,  STATS_NULL},	/* more than 1s */
 };
 
 #define NR_JITTER_INFO sizeof(jitter_info)/sizeof(struct mod_info)
-struct summary summary;
-
-int prepare_jitter_dictory(char *path)
-{
-	int ret;
-
-	ret = mkdir(path, 0777);
-	if (ret < 0 && errno != EEXIST)
-		return errno;
-	else
-		return 0;
-}
 
 static int cg_jitter_inited(void)
 {
@@ -75,11 +75,56 @@ static int cg_jitter_inited(void)
 	return jit_inited;
 }
 
+static int check_and_init_shm(void)
+{
+	int fd, ret;
+	char *p;
+	static int jitshm_inited = 0;
+
+	if (jitshm_inited) {
+		return 0;
+	}
+
+	fd = shm_open(jit_shm_key, O_CREAT|O_RDWR|O_TRUNC, 06666);
+	if (fd < 0) {
+		ret = errno;
+		perror("shm_open jit_shm_key");
+		return ret;
+	}
+
+	ret = ftruncate(fd, sizeof(struct jitter_shm));
+	if (ret < 0) {
+		ret = errno;
+		perror("ftruncate jit_shm_key");
+		goto shm_fail;
+	}
+
+	p = mmap(NULL, sizeof(struct jitter_shm),
+		PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if (p == MAP_FAILED) {
+		ret = errno;
+		perror("mmap jit_shm_key");
+		goto shm_fail;
+	}
+
+	jitshm_inited = 1;
+	jitshm = (struct jitter_shm *)p;
+
+	return 0;
+
+shm_fail:
+	shm_unlink(jit_shm_key);
+	return ret;
+}
+
 int init_jitter(void)
 {
 	int ret;
 	FILE *fp1, *fp2, *fp3;
-	char *mservice_log_dir = "/var/log/sysak/mservice/";
+
+	ret = check_and_init_shm();
+	if (ret < 0)
+		return ret;
 
 	ret = cg_jitter_inited();
 	if (ret > 0)
@@ -87,79 +132,48 @@ int init_jitter(void)
 	else if (ret < 0)
 		return ret;
 
-	ret = prepare_jitter_dictory(mservice_log_dir);
-	if (ret)
-		return ret;
-
 	/* todo: what if command can't be find? */
 	/* threshold is 40ms */
-	fp1 = popen("sysak runqslower -S -f /var/log/sysak/mservice/runqslower 40 2>/dev/null &", "r");
+	fp1 = popen("sysak runqslower -S sysak_mservice_jitter_shm 40 2>/dev/null &", "r");
 	if (!fp1) {
 		perror("popen runqslower");
 		return -1;
 	}
 
-	fp2 = popen("sysak nosched -S -f /var/log/sysak/mservice/nosched -t 10 2>/dev/null &", "r");
+	fp2 = popen("sysak nosched -S sysak_mservice_jitter_shm -t 10 2>/dev/null &", "r");
 	if (!fp2) {
 		perror("popen nosched");
 		return -1;
 	}
 
-	fp3 = popen("sysak irqoff -S -f /var/log/sysak/mservice/irqoff 10 2>/dev/null &", "r");
+	fp3 = popen("sysak irqoff -S sysak_mservice_jitter_shm  10 2>/dev/null &", "r");
 	if (!fp3) {
 		perror("popen irqoff");
 		return -1;
 	}
 	jitter_init = 1;
-	jitter_info[2].summary_bit = jitter_info[3].summary_bit = jitter_info[4].summary_bit = jitter_info[5].summary_bit = DETAIL_BIT;
-	jitter_info[6].summary_bit = jitter_info[7].summary_bit = SUMMARY_BIT;
+
 	return 0;
-}
-
-static int get_jitter_info(char *path, struct summary *sump)
-{
-	int ret = -1;
-	FILE *fp;
-
-	if((fp = fopen(path, "r")) == NULL) {
-		fprintf(stderr, "fopen %s fail\n", path);
-		return ret;
-	}
-	memset(line, 0, sizeof(line));
-
-	/* null "line" is a real scene,so return 0 for continue walking*/
-	ret = 0;
-	if (fgets(line, sizeof(line), fp) != NULL) {
-		/* "irqoff", "noschd", "rqslow" has 6 charactors */
-		sscanf(line+6, "%lu %llu %d %d %d %d %lu %lu %lu %lu",
-			&sump->num, &sump->total,
-			&sump->lastcpu0, &sump->lastcpu1,
-			&sump->lastcpu2, &sump->lastcpu3,
-			&sump->lastjit0, &sump->lastjit1,
-			&sump->lastjit2, &sump->lastjit3);
-	}
-	rewind(fp);
-	fclose(fp);
-	return ret;
 }
 
 void print_jitter_stats(struct module *mod)
 {
-	int i, ret, pos;
+	int i, pos;
+	struct sched_jit_summary *jitsum[NR_MODS];
+	memset(g_buf, 0, BUF_SIZE);
 
 	pos = 0;
-	memset(g_buf, 0, BUF_SIZE);
+	jitsum[0] = &jitshm->nosched;
+	jitsum[1] = &jitshm->irqoff;
+	jitsum[2] = &jitshm->rqslow;
 	for (i = 0; i < NR_MODS; i++) {
-		memset(&summary, 0, sizeof(struct summary));
-		ret = get_jitter_info(log_path[i], &summary);
-		if (ret < 0)
-			continue;
-		pos += snprintf(g_buf + pos, BUF_SIZE - pos, "%s=%ld,%llu,%d,%d,%d,%d,%lu,%lu,%lu,%lu,%d" ITEM_SPLIT,
-			jit_mod[i], summary.num, summary.total,
-			summary.lastcpu0, summary.lastcpu1,
-			summary.lastcpu2, summary.lastcpu3,
-			summary.lastjit0, summary.lastjit1,
-			summary.lastjit2, summary.lastjit3, pos);
+		pos += snprintf(g_buf + pos, BUF_SIZE - pos,
+			"%s=%ld,%llu,%ld,%llu,%ld,%ld,%ld,%ld,%ld,%ld, %d" ITEM_SPLIT,
+			jit_mod[i], jitsum[i]->num, jitsum[i]->total,
+			sum_ex.sum[i].delta_num, sum_ex.sum[i].delta_total,
+			jitsum[i]->less10ms, jitsum[i]->less50ms,
+			jitsum[i]->less100ms, jitsum[i]->less500ms,
+			jitsum[i]->less1s, jitsum[i]->plus1s,pos);
 	}
 	set_mod_record(mod, g_buf);
 }
@@ -178,21 +192,33 @@ static void
 set_jitter_record(struct module *mod, double st_array[],
     U_64 pre_array[], U_64 cur_array[], int inter)
 {
+	int idx;
+
 	st_array[0] = cur_array[0];
 	st_array[1] = cur_array[1];
-	st_array[2] = cur_array[2];
-	st_array[3] = cur_array[3];
 	st_array[4] = cur_array[4];
 	st_array[5] = cur_array[5];
+	st_array[6] = cur_array[6];
+	st_array[7] = cur_array[7];
+	st_array[8] = cur_array[8];
+	st_array[9] = cur_array[9];
 
 	if (cur_array[0] >= pre_array[0])
-		st_array[6] = cur_array[0] - pre_array[0];
+		st_array[2] = cur_array[0] - pre_array[0];
 	else
-		st_array[6] = -1;
+		st_array[2] = -1;
 	if (cur_array[1] >= pre_array[1])
-		st_array[7] = cur_array[1] - pre_array[1];
+		st_array[3] = cur_array[1] - pre_array[1];
 	else
-		st_array[7] = -1;
+		st_array[3] = -1;
+
+	idx = sum_ex.idx;
+	printf("jit[%d]:deltaN=%f, deltaT=%f\n", idx, st_array[2], st_array[3]);
+	sum_ex.sum[idx].delta_num = st_array[2];
+	sum_ex.sum[idx].delta_total = st_array[3];
+	sum_ex.idx = (idx+1)%(mod->n_item); 
+	//pre_array[0] = st_array[0];
+	//pre_array[1] = st_array[1];
 }
 
 void

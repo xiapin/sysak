@@ -6,6 +6,8 @@
 #include <time.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -14,6 +16,7 @@
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "pidComm.h"
+#include "sched_jit.h"
 #include "irqoff.h"
 #include "./bpf/irqoff.skel.h"
 
@@ -22,16 +25,19 @@ struct env {
 	time_t duration;
 	bool verbose, summary;
 	__u64 threshold;
+	struct sched_jit_summary *sump;
+	char *shm_p;
 } env = {
 	.duration = 0,
 	.threshold = 10*1000*1000,	/* 10ms */
 	.summary = false,
+	.shm_p = NULL,
 };
 
 static int nr_cpus;
 FILE *filep = NULL;
 char filename[256] = {0};
-struct summary summary, *percpu_summary;
+struct sched_jit_summary summary, *percpu_summary;
 char log_dir[] = "/var/log/sysak/irqoff";
 char defaultfile[] = "/var/log/sysak/irqoff/irqoff.log";
 
@@ -46,18 +52,18 @@ const char *argp_program_version = "irqoff 0.1";
 const char argp_program_doc[] =
 "Catch the irq-off time more than threshold.\n"
 "\n"
-"USAGE: irqoff [--help] [-t THRESH(ms)] [-f LOGFILE] [duration(s)]\n"
+"USAGE: irqoff [--help] [-t THRESH(ms)] [-S SHM] [-f LOGFILE] [duration(s)]\n"
 "\n"
 "EXAMPLES:\n"
 "    irqoff                # run forever, and detect irqoff more than 10ms(default)\n"
-"    irqoff -S 	  	   # record the result as summary mod\n"
+"    irqoff -S SHM         # record the summary results to share memory\n"
 "    irqoff -t 15          # detect irqoff with threshold 15ms (default 10ms)\n"
 "    irqoff -f a.log       # record result to a.log (default to ~sysak/irqoff/irqoff.log)\n";
 
 static const struct argp_option opts[] = {
 	{ "threshold", 't', "THRESH", 0, "Threshold to detect, default 10ms"},
 	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
-	{ "summary", 'S', NULL, 0, "Summary the output" },
+	{ "summary", 'S', "SHM", 0, "Summary the output" },
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -65,7 +71,8 @@ static const struct argp_option opts[] = {
 
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
-	int ret = errno;
+	char *p;
+	int shm_fd, ret = errno;
 	static int pos_args;
 
 	switch (key) {
@@ -73,10 +80,24 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
 		break;
 	case 'S':
-		percpu_summary = malloc(nr_cpus*sizeof(struct summary));
+		percpu_summary = malloc(nr_cpus*sizeof(struct sched_jit_summary));
 		if (!percpu_summary)
 			return -ENOMEM;
+		shm_fd = shm_open(arg, O_RDWR, 0666);
+		if (shm_fd < 0) {
+			/* we do not use summary, use detail instead. */
+			fprintf(stdout, "shm_open %s: %s", arg, strerror(errno));
+			break;
+		}
+
+		p  = mmap(NULL, sizeof(struct sched_jit_summary)+32,
+			PROT_READ|PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		if (!p) {
+			fprintf(stdout, "mmap %s: %s", arg, strerror(errno));
+			break;
+		}
 		env.summary = true;
+		env.sump = (struct sched_jit_summary *)p;
 		break;
 	case 'v':
 		env.verbose = true;
@@ -205,73 +226,64 @@ static int attach_prog_to_perf(struct irqoff_bpf *obj,
 	return ret;
 }
 
-static void update_summary(struct summary* summary, const struct event *e)
+static void fill_maxN(struct jit_maxN *maxN, const struct event *e)
 {
-	int idx;
+	maxN->delay = e->delay;
+	maxN->cpu = e->cpu;
+	maxN->pid = e->pid;
+	maxN->stamp = e->stamp;
+	strncpy(maxN->comm, e->comm, 16);
+}
+
+static void update_summary(struct sched_jit_summary* summary, const struct event *e)
+{
+	int i, ridx;
 	char buf[CONID_LEN] = {0};
 
 	summary->num++;
-	idx = summary->num % CPU_ARRY_LEN;
 	summary->total += e->delay;
-	summary->cpus[idx] = e->cpu;
-	summary->jitter[idx] = e->delay;
+
+	if (e->delay < 10) {
+		summary->less10ms++;
+	} else if (e->delay < 50) {
+		summary->less50ms++;
+	} else if (e->delay < 100) {
+		summary->less100ms++;
+	} else if (e->delay < 500) {
+		summary->less500ms++;
+	} else if (e->delay < 1000) {
+		summary->less1s++;
+ 	} else {
+		summary->plus1s++;
+	}
+
+	ridx = summary->num % CPU_ARRY_LEN;
+	summary->lastN_array[ridx].cpu = e->cpu;
+	summary->lastN_array[ridx].delay = e->delay;
 	if (get_container(buf, e->pid))
-		strncpy(summary->container[idx], "000000000000", sizeof(summary->container[idx]));
+		strncpy(summary->lastN_array[ridx].con, "000000000000", sizeof(summary->lastN_array[ridx].con));
 	else
-		strncpy(summary->container[idx], buf, sizeof(summary->container[idx]));
+		strncpy(summary->lastN_array[ridx].con, buf, sizeof(summary->lastN_array[ridx].con));
 
-	if (summary->max.value < e->delay) {
-		summary->max.value = e->delay;
-		summary->max.cpu = e->cpu;
-		summary->max.pid = e->pid;
-		summary->max.stamp = e->stamp;
-		strncpy(summary->max.comm, e->comm, 16);
-	}
-}
+	if (e->delay > summary->topNmin) {
+		__u64 tmp;
+		int idx;
+		struct jit_maxN *maxi;
 
-static int record_summary(struct summary *summary, long offset, bool total)
-{
-	char *p;
-	int i, idx, pos;
-	char buf[128] = {0};
-	char header[16] = {0};
-
-	snprintf(header, 15, "cpu%ld", offset);
-	p = buf;
-	pos = sprintf(p,"%-7s %-5lu %-6llu",
-		total?"irqoff":header,
-		summary->num, summary->total);
-
-	if (total) {
-		idx = summary->num % CPU_ARRY_LEN;
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %d", summary->cpus[(idx+i)%CPU_ARRY_LEN]);
+		idx = 0;
+		tmp = summary->maxN_array[0].delay;
+		/* sort: user insert sort */
+		for (i = 1; i < CPU_ARRY_LEN; i++) {
+			maxi = &summary->maxN_array[i];
+			if (tmp > maxi->delay) {
+				tmp = maxi->delay;
+				idx = i;
+			}
 		}
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %5d", summary->jitter[(idx+i)%CPU_ARRY_LEN]);
-		}
-		for (i = 1; i <= CPU_ARRY_LEN; i++) {
-			p = p+pos;
-			pos = sprintf(p, " %s", summary->container[(idx+i)%CPU_ARRY_LEN]);
-		}
-		p = p+pos;
-		pos = sprintf(p, "\n");
-	} else {
-		p = p+pos;
-		pos = sprintf(p, "   %-4llu %-12llu %-3d %-9d %-15s\n",
-			summary->max.value, summary->max.stamp/1000,
-			summary->max.cpu, summary->max.pid, summary->max.comm);
-	}
-
-	if (total)
-		fseek(filep, 0, SEEK_SET);
-	else
-		fseek(filep, (offset)*(p-buf+pos), SEEK_CUR);
-
-	fprintf(filep, "%s", buf);
-	return 0;
+		summary->topNmin = tmp;
+		summary->min_idx = idx;
+		fill_maxN(&summary->maxN_array[idx], e);
+	} 
 }
 
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
@@ -289,17 +301,10 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
 	e->delay = e->delay/(1000*1000);
 	if (env.summary) {
-		struct summary *sumi;
-
 		if (e->cpu > nr_cpus - 1)
 			return;
 
-		sumi = &percpu_summary[e->cpu];
-		update_summary(&summary, e);
-		update_summary(sumi, e);
-		if(record_summary(&summary, 0, true))
-			return;
-		record_summary(sumi, e->cpu, false);
+		update_summary(env.sump, e);
 	} else {
 		fprintf(filep, "%-21s %-5d %-15s %-8d %-10llu %-18.6f\n",
 			ts, e->cpu, e->comm, e->pid, e->delay, ((double)e->stamp/1000000000));
@@ -319,14 +324,7 @@ void irqoff_handler(int poll_fd, int map_fd, struct irqoff_bpf *obj,
 		fprintf(filep, "%-21s %-5s %-15s %-8s %-10s %-18s\n",
 			"TIME(irqoff)", "CPU", "COMM", "TID", "LAT(ms)", "STAMP");
 	} else {
-		int i;
-		char buf[128] = {' '};
-		fprintf(filep, "irqoff\n");
-		for (i = 0; i < nr_cpus; i++)
-			fprintf(filep, "cpu%d  %s\n", i, buf);
-		fseek(filep, 0, SEEK_SET);
-		for (i=0; i < 4; i++)
-			strncpy(summary.container[i], "000000000000", sizeof(summary.container[i]));
+		memset(env.sump, 0, sizeof(struct sched_jit_summary));
 	}
 
 	pb_opts.sample_cb = handle_event;
@@ -481,6 +479,10 @@ cleanup:
 	if (ksyms)
 		free(ksyms);
 	irqoff_bpf__destroy(obj);
+
+	if (env.sump) {
+		munmap(env.sump, sizeof(struct sched_jit_summary)+32);
+	}
 
 	return err != 0;
 }

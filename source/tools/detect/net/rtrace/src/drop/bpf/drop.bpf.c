@@ -17,18 +17,11 @@ struct tid_map_value
 
 struct
 {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
-} events SEC(".maps");
-
-struct
-{
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 512);
 	__type(key, u32);
 	__type(value, struct tid_map_value);
-} tid_map SEC(".maps");
+} inner_tid_map SEC(".maps");
 
 struct
 {
@@ -37,14 +30,6 @@ struct
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, sizeof(uint64_t) * 20);
 } stackmap SEC(".maps");
-
-struct
-{
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, __u32);
-	__type(value, struct filter);
-} filter_map SEC(".maps");
 
 #define NF_DROP 0
 #define NF_ACCEPT 1
@@ -57,8 +42,8 @@ __always_inline void fill_stack(void *ctx, struct event *event)
 __always_inline void fill_pid(struct event *event)
 {
 	// pid info
-	event->pi.pid = bpf_get_current_pid_tgid() >> 32;
-	bpf_get_current_comm(event->pi.comm, sizeof(event->pi.comm));
+	event->pid = bpf_get_current_pid_tgid() >> 32;
+	bpf_get_current_comm(event->comm, sizeof(event->comm));
 }
 
 __always_inline void fill_sk_skb(struct event *event, struct sock *sk, struct sk_buff *skb)
@@ -74,13 +59,13 @@ __always_inline void fill_sk_skb(struct event *event, struct sock *sk, struct sk
 	if (sk)
 	{
 		// address pair
-		bpf_probe_read(&event->skap.daddr, sizeof(event->skap.daddr), &sk->__sk_common.skc_daddr);
-		bpf_probe_read(&event->skap.dport, sizeof(event->skap.dport), &sk->__sk_common.skc_dport);
-		bpf_probe_read(&event->skap.saddr, sizeof(event->skap.saddr), &sk->__sk_common.skc_rcv_saddr);
-		bpf_probe_read(&event->skap.sport, sizeof(event->skap.sport), &sk->__sk_common.skc_num);
-		event->skap.dport = bpf_ntohs(event->skap.dport);
+		bpf_probe_read(&event->drop_params.skap.daddr, sizeof(event->drop_params.skap.daddr), &sk->__sk_common.skc_daddr);
+		bpf_probe_read(&event->drop_params.skap.dport, sizeof(event->drop_params.skap.dport), &sk->__sk_common.skc_dport);
+		bpf_probe_read(&event->drop_params.skap.saddr, sizeof(event->drop_params.skap.saddr), &sk->__sk_common.skc_rcv_saddr);
+		bpf_probe_read(&event->drop_params.skap.sport, sizeof(event->drop_params.skap.sport), &sk->__sk_common.skc_num);
+		event->drop_params.skap.dport = bpf_ntohs(event->drop_params.skap.dport);
 
-		event->sk_protocol = bpf_core_sock_sk_protocol(sk);
+		event->drop_params.sk_protocol = bpf_core_sock_sk_protocol(sk);
 		bpf_probe_read(&event->state, sizeof(event->state), &sk->__sk_common.skc_state);
 	}
 
@@ -146,17 +131,17 @@ __always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 		if (sk)
 		{
 			// sock addrpair
-			if (filter->ap.daddr && event.skap.daddr != filter->ap.daddr)
+			if (filter->ap.daddr && event.drop_params.skap.daddr != filter->ap.daddr)
 				return;
-			if (filter->ap.saddr && event.skap.saddr != filter->ap.saddr)
+			if (filter->ap.saddr && event.drop_params.skap.saddr != filter->ap.saddr)
 				return;
-			if (filter->ap.dport && event.skap.dport != filter->ap.dport)
+			if (filter->ap.dport && event.drop_params.skap.dport != filter->ap.dport)
 				return;
-			if (filter->ap.sport && event.skap.sport != filter->ap.sport)
+			if (filter->ap.sport && event.drop_params.skap.sport != filter->ap.sport)
 				return;
 		}
 
-		// skb
+		// skb 
 		if (filter->ap.daddr && event.ap.saddr != filter->ap.daddr)
 			return;
 		if (filter->ap.saddr && event.ap.daddr != filter->ap.saddr)
@@ -167,12 +152,12 @@ __always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb)
 			return;
 	}
 
-	event.type = KFREE_SKB;
+	event.type = DROP_KFREE_SKB;
 	fill_stack(ctx, &event);
 	// pid info
 	fill_pid(&event);
 
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+	bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU, &event, sizeof(event));
 }
 
 SEC("kprobe/tcp_drop")
@@ -201,7 +186,7 @@ __always_inline void ipt_do_table_entry(struct sk_buff *skb, struct nf_hook_stat
 	value.state = state;
 	value.table = table;
 	value.hook = hook;
-	bpf_map_update_elem(&tid_map, &tid, &value, BPF_ANY);
+	bpf_map_update_elem(&inner_tid_map, &tid, &value, BPF_ANY);
 }
 
 // for kernel 4.19 and 5.10
@@ -236,7 +221,7 @@ int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 
 	if (ret == NF_DROP)
 	{
-		value = bpf_map_lookup_elem(&tid_map, &tid);
+		value = bpf_map_lookup_elem(&inner_tid_map, &tid);
 		if (value == NULL)
 			return 0;
 
@@ -244,19 +229,19 @@ int BPF_KRETPROBE(ipt_do_table_ret, int ret)
 		struct xt_table *table = value->table;
 		struct sk_buff *skb = value->skb;
 
-		event.type = IPTABLES;
+		event.type = DROP_IPTABLES_DROP;
 		addr = bpf_core_xt_table_name(table);
 		if (addr)
-			bpf_probe_read(event.ip.name, sizeof(event.ip.name), (void *)addr);
+			bpf_probe_read(event.drop_params.name, sizeof(event.drop_params.name), (void *)addr);
 
-		event.ip.hook = value->hook;
+		event.drop_params.hook = value->hook;
 		bpf_probe_read(&sk, sizeof(sk), &skb->sk);
 		fill_stack(ctx, &event);
 		fill_pid(&event);
 		fill_sk_skb(&event, sk, skb);
-		bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+		bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU, &event, sizeof(event));
 	}
-	bpf_map_delete_elem(&tid_map, &tid);
+	bpf_map_delete_elem(&inner_tid_map, &tid);
 	return 0;
 }
 
@@ -277,20 +262,20 @@ int BPF_KRETPROBE(__nf_conntrack_confirm_ret, int ret)
 	u32 tid = bpf_get_current_pid_tgid();
 	if (ret == NF_DROP)
 	{
-		value = bpf_map_lookup_elem(&tid_map, &tid);
+		value = bpf_map_lookup_elem(&inner_tid_map, &tid);
 		if (value == NULL)
 			return 0;
 
-		event.type = KFREE_SKB;
+		event.type = DROP_NFCONNTRACK_DROP;
 		skb = value->skb;
 		bpf_probe_read(&sk, sizeof(sk), &skb->sk);
 		fill_stack(ctx, &event);
 		fill_pid(&event);
 		fill_sk_skb(&event, sk, skb);
-		bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+		bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU, &event, sizeof(event));
 	}
 
-	bpf_map_delete_elem(&tid_map, &tid);
+	bpf_map_delete_elem(&inner_tid_map, &tid);
 	return 0;
 }
 
