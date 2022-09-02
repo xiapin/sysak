@@ -223,7 +223,7 @@ def memgraph_graph(meminfo):
     res["used"] = memgraph_free(meminfo) + meminfo['Shmem']
     user = {}
     user["anon"] = meminfo["Active(anon)"] + meminfo["Inactive(anon)"]
-    user["cache"] = meminfo["Cached"]
+    user["filecache"] = meminfo["Cached"] - meminfo["Shmem"]
     user["buffers"] = meminfo["Buffers"]
     user["mlock"] = meminfo["Mlocked"]
     if "2048" in meminfo:
