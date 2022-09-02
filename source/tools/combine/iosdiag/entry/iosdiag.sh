@@ -43,7 +43,21 @@ upload_data() {
 datafile_analysis() {
 	if [ -e "$logfile" ]
 	then
-		python $data_analysis --$1 -s -f $logfile $threshold_arg
+		run_python = "python"
+		if [ -e "/usr/bin/python" ]; then
+			run_python = "/usr/bin/python"
+		elif [ -e "/usr/bin/python2" ]; then
+			run_python = "/usr/bin/python2"
+		elif [ -e "/usr/bin/python2.7" ]; then
+			run_python = "/usr/bin/python2.7"
+		elif [ -e "/usr/bin/python3" ]; then
+			run_python = "/usr/bin/python3"
+		elif [ -e "/usr/bin/python3.10" ]; then
+			run_python = "/usr/bin/python3.10"
+		elif [ -e "/usr/bin/python3.5" ]; then
+			run_python = "/usr/bin/python3.5"
+		fi
+		$run_python $data_analysis --$1 -s -f $logfile $threshold_arg
 	fi
 }
 
