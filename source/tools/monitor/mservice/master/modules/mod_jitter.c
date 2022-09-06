@@ -13,14 +13,14 @@
 #include <linux/major.h>
 #include "sched_jit.h"
 
-#define NR_MODS	3
+#define NR_MODS	2
 #define BUF_SIZE	(NR_MODS * 4096)
 
 char g_buf[BUF_SIZE];
 char line[512];
 int jitter_init = 0;
 char *jitter_usage = "    --jit                Application jitter stats";
-char *jit_mod[] = {"rqslow", "noschd", "irqoff"};
+char *jit_mod[] = {"noschd", "irqoff", "rqslow"};
 char *jit_shm_key = "sysak_mservice_jitter_shm";
 
 struct exten_sum {
@@ -120,7 +120,7 @@ shm_fail:
 int init_jitter(void)
 {
 	int ret;
-	FILE *fp1, *fp2, *fp3;
+	FILE *fp2, *fp3;
 
 	ret = check_and_init_shm();
 	if (ret < 0)
@@ -133,20 +133,13 @@ int init_jitter(void)
 		return ret;
 
 	/* todo: what if command can't be find? */
-	/* threshold is 40ms */
-	fp1 = popen("sysak runqslower -S sysak_mservice_jitter_shm 40 2>/dev/null &", "r");
-	if (!fp1) {
-		perror("popen runqslower");
-		return -1;
-	}
-
-	fp2 = popen("sysak nosched -S sysak_mservice_jitter_shm -t 10 2>/dev/null &", "r");
+	fp2 = popen("sysak nosched -S sysak_mservice_jitter_shm -t 50 2>/dev/null &", "r");
 	if (!fp2) {
 		perror("popen nosched");
 		return -1;
 	}
 
-	fp3 = popen("sysak irqoff -S sysak_mservice_jitter_shm  10 2>/dev/null &", "r");
+	fp3 = popen("sysak irqoff -S sysak_mservice_jitter_shm  50 2>/dev/null &", "r");
 	if (!fp3) {
 		perror("popen irqoff");
 		return -1;
