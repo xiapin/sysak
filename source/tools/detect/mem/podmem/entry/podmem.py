@@ -445,5 +445,4 @@ if __name__ == "__main__":
     else:
         get_container_id(podinfo)
     check_k8s_env(podinfo)
-    print(podinfo['args'])
     pod_mem_run(podinfo)
