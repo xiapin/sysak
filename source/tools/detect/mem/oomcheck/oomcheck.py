@@ -37,6 +37,8 @@ WEEK_LIST = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 CWEEK_LIST = ['一','二','三','四','五','六','日']
 MONTH_LIST = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 CMONTH_LIST = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
+mems_pattern = re.compile("cpuset=(.*)[ ,]+mems_allowed=([0-9\-\/\,]*)")
+node_pattern = re.compile("nodemask=\(?([0-9\-\/\,null]*)\)?")
 
 
 if sys.version[0] == '2':
@@ -49,6 +51,8 @@ def set_to_list(setstr):
     for line in setstr:
         try:
             line = line.strip()
+            if not line:
+                continue
             if line[0] == '(' and line[-1] == ')':
                 line = line[1:-1]
             if line.find('null') >= 0:
@@ -136,8 +140,11 @@ def oom_is_node_num(line):
     return "hugepages_size=1048576" in line
 
 def oom_get_mem_allowed(oom_result, line, num):
-    cpuset = line.strip().split("cpuset=")[1].split()[0]
-    allowed = line.strip().split("mems_allowed=")[1]
+    gp = mems_pattern.search(line)
+    if not gp:
+        return
+    cpuset = gp.group(1)
+    allowed = gp.group(2)
     oom_result['sub_msg'][num]['mems_allowed'] = set_to_list(allowed)
     oom_result['sub_msg'][num]['cpuset'] = cpuset
 
@@ -223,7 +230,10 @@ def oom_get_order(oom_result, line, num):
     oom_result['sub_msg'][num]['order'] = order
 
 def oom_get_nodemask(oom_result, line, num):
-    nodemask = line.strip().split("nodemask=")[1].split()[0][:-1]
+    gp = node_pattern.search(line)
+    if not gp:
+        return
+    nodemask = gp.group(1)
     oom_result['sub_msg'][num]['nodemask'] = set_to_list(nodemask)
 
 def oom_set_node_oom(oom_result, num, node_num):
@@ -248,12 +258,12 @@ def oom_get_hugepage(oom_result, line, num):
     oom['meminfo']['hugepage'] = oom['meminfo']['hugepage'] + hugetotal*hugesize
     #print("hugetotal: {} size:{}".format(hugetotal, hugesize))
 
-meminfo_pattern = ([re.compile("(active_anon):(\S+) (inactive_anon):(\S+) isolated_anon:\S+")
-, re.compile("(active_file):(\S+) (inactive_file):(\S+) isolated_file:\S+")
-, re.compile("(unevictable):(\S+) dirty:\S+ writeback:\S+ unstable:\S+")
+meminfo_pattern = ([re.compile("(active_anon):(\S+) (inactive_anon):(\S+) (isolated_anon):(\S+)")
+, re.compile("(active_file):(\S+) (inactive_file):(\S+) (isolated_file):(\S+)")
+, re.compile("(unevictable):(\S+) (dirty):(\S+) (writeback):(\S+)")
 , re.compile("(slab_reclaimable):(\S+) (slab_unreclaimable):(\S+)")
-, re.compile("mapped:\S+ shmem:\S+ (pagetables):(\S+) bounce:\S+")
-, re.compile("free:\S+ (free_pcp):(\S+) free_cma:\S+")])
+, re.compile("(mapped):(\S+) (shmem):(\S+) (pagetables):(\S+) bounce:\S+")
+, re.compile("(free):(\S+) (free_pcp):(\S+) (free_cma):(\S+)")])
 def oom_get_meminfo(oom_result, lines, index, num):
     oom = oom_result['sub_msg'][num]
     oom['meminfo']['slab'] = 0
@@ -265,6 +275,7 @@ def oom_get_meminfo(oom_result, lines, index, num):
     oom['meminfo']['unevictable'] = 0
     oom['meminfo']['pagetables'] = 0
     oom['meminfo']['free'] = 0
+    oom['meminfo']['free_pcp'] = 0
     oom['meminfo']['rmem'] = 0
     oom['meminfo']['hugepage'] = 0
     oom['meminfo']['total_mem'] = 0
@@ -686,9 +697,9 @@ def oom_reason_analyze(num, oom_result, summary):
                 line = lines[key]
                 if "invoked oom-killer" in line:
                     oom_get_order(oom_result, line, num)
-                    if 'nodemask' in line:
-                        oom_get_nodemask(oom_result, line, num)
-                elif "mems_allowed=" in line:
+                if 'nodemask' in line:
+                    oom_get_nodemask(oom_result, line, num)
+                if "mems_allowed=" in line:
                     oom_get_mem_allowed(oom_result, line, num)
                 elif "Task in" in line:
                     oom_get_cgroup_name(oom_result, line, num)
@@ -873,11 +884,11 @@ def usage():
             -j --output json
             -n --# of output results
            for example:
-           python oomcheck.py
-           python oomcheck.py -t "2021-09-13 15:32:22"
-           python oomcheck.py -t 970665.476522
-           python oomcheck.py -f oom_file.txt
-           python oomcheck.py -f oom_file.txt -t 970665.476522
+           sysak oomcheck.py
+           sysak oomcheck.py -t "2021-09-13 15:32:22"
+           sysak oomcheck.py -t 970665.476522
+           sysak oomcheck.py -f oom_file.txt
+           sysak oomcheck.py -f oom_file.txt -t 970665.476522
         """
     )
 
