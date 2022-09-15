@@ -149,7 +149,7 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     /* skip file cache < 100K */ 
     if (cached*4 < 100)
         return 0;
-
+    
     att = get_offset("address_space", "host");
     if (!att) {
         return 0;
@@ -159,7 +159,6 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     if (!att) {
         return 0;
     }
-    
     kcore_readmem(inode + att->offset, &i_ino, sizeof(i_ino)); 
     iter = files.find(i_ino);    
     if (iter != files.end()) {
@@ -185,10 +184,13 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     kcore_readmem(inode + att->offset, &inode_dentry, sizeof(inode));
     if (!is_kvaddr(inode_dentry))
         return 0;
-    att = get_offset("dentry", "d_u");
+    att = get_offset("dentry", "d_alias");
     if (!att) {
-        return 0;
+        att = get_offset("dentry", "d_u");
+        if (!att)
+            return 0;
     }
+
     dentry_first = inode_dentry - att->offset;
     memset(filename, 0, 1024);
     att = get_offset("dentry", "d_parent");
@@ -201,7 +203,6 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
         return 0;
     }
     kcore_readmem(dentry_first+att->offset + sizeof(void*), &hdentry, sizeof(hdentry));
- 
     if ((dentry_first != pdentry) && !hdentry)
         del = 1;
     do {
@@ -211,7 +212,6 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
         int ret = 0;
 
         get_filename(dentry_first, filename, 1024);
-        
         len = strlen(filename); 
         if (len <=0 || ((len == 1) && (filename[0] == '/')))
             break;
@@ -268,7 +268,6 @@ unsigned long get_cgroup_inode(unsigned long pfn)
 
     ret = kpagecgroup_read(&ino, sizeof(ino), pfn*sizeof(ino));
     if (ret != sizeof(ino)) {
-        printf("read cgroup ino error \n");
         return 0;
     }
     return ino;

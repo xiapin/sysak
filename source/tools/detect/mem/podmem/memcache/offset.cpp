@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 extern "C" {
 #include "btfparse.h"
 }
@@ -22,6 +23,20 @@ int sym_init(const char *btf_name)
     return !!(handle == NULL);
 }
 
+int sym_uninit(void)
+{
+    map<string,struct member_attribute *>::iterator iter; 
+    struct member_attribute *info;
+ 
+    for (iter = struct_offset.begin(); iter != struct_offset.end(); ++iter) {
+        info = (*iter).second;
+        if (info) {
+            free(info);
+        }   
+    }   
+    return 0; 
+}
+
 struct member_attribute *get_offset(string struct_name,  string member_name)
 {
     string index;
@@ -35,7 +50,7 @@ struct member_attribute *get_offset(string struct_name,  string member_name)
     } 
     att = btf_find_struct_member((struct btf*)handle, struct_name.c_str(), member_name.c_str());
     if (!att) {
-        printf("get %s error \n", index.c_str());
+        //printf("get %s error \n", index.c_str());
         return NULL;
     }
     //printf("%s:offset:%d, size:%d\n", index.c_str(),att->offset, att->size);
@@ -86,7 +101,7 @@ static int download_btf(void)
     cmd = "uname -r";
     do_cmd(cmd.c_str(), kernel, LEN);
     //printf("kernel:%s\n", kernel);
-    snprintf(dw, LEN + LEN, "wget -O /boot/vmlinux-%s https://netinfo-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
+    snprintf(dw, LEN + LEN, "wget -q -O /boot/vmlinux-%s https://netinfo-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
 
     do_cmd(dw, kernel, LEN);
     return 0;
@@ -137,7 +152,7 @@ int offset_init(void)
     get_offset("inode", "i_size");
     get_offset("inode", "i_sb");
     get_offset("inode", "i_dentry");
-    get_offset("dentry", "d_u");
+    get_offset("dentry", "d_alias");
     get_offset("dentry", "d_parent");
     get_offset("dentry", "d_hash");
     get_offset("dentry", "d_name");

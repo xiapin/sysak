@@ -23,6 +23,9 @@
 extern int scan_pageflags(struct options * opt);
 extern int memcg_cgroup_file(char *cgroupfile);
 extern int memcg_cgroup_path(const char *cgrouppath);
+extern int offset_init(void);
+extern int sym_uninit(void);
+
 
 struct options opt = {0};
 
@@ -71,7 +74,11 @@ ssize_t kpageflags_read(void *buf, size_t count, off_t offset)
 
 ssize_t kpagecgroup_read(void *buf, size_t count, off_t offset)
 {
-	return pread(kpagecgroup_fd, buf, count, offset);
+    ssize_t ret = 0;
+    if (kpagecgroup_fd > 0)
+	    ret = pread(kpagecgroup_fd, buf, count, offset);
+
+    return ret;
 }
 
 /*
@@ -290,8 +297,6 @@ static uint64_t get_max_phy_addr()
 	return max_phy_addr;
 }
 
-extern int offset_init(void);
-
 static int setup(void)
 {
 	g_max_phy_addr = get_max_phy_addr();
@@ -326,7 +331,7 @@ static void cleanup(void)
     if (kpagecgroup_fd > 0) {
         close(kpagecgroup_fd);
     }
-
+    sym_uninit();
 	kcore_exit();
 }
 
@@ -401,7 +406,9 @@ int main(int argc, char *argv[])
 		LOG_ERROR("failed to setup\n");
 		goto out;
 	}
-
+    if (kpagecgroup_fd <= 0 && opt.podmem == true) {
+        opt.fullscan = 1;
+    }
     if (opt.cgroupfile) {
         memcg_cgroup_file(opt.cgroupfile);
     }

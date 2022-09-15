@@ -1,5 +1,4 @@
-#!/bin/python2
-
+#!/usr/bin/env python3
 import os
 import sys
 import json
@@ -305,7 +304,6 @@ def pod_mem_run(podinfo):
         tmp['delete'] = int(item[8].split('=')[1])
         cinode = int(item[4].split('=')[1])
         files.append(tmp)
-
         if not cinode in inodes.keys():
             inodes[cinode] = []
         inodes[cinode].append(tmp)
@@ -423,6 +421,10 @@ def build_cgroup(podinfo):
     podinfo['container'][cgroup] = con
 
 def check_k8s_env(podinfo):
+
+    if not os.path.exists("/proc/kpagecgroup"):
+        podinfo['args']['mode'] = 'system'
+        return True
     if podinfo['args']['mode'] != 'allcgroup':
         return True
 
