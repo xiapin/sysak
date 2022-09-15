@@ -34,7 +34,7 @@ e.g.
   ./iowaitstat.py -p [PID] -c 1
 			Report iowait for task with [PID] per 1secs
 ```
-## block-layer io统计
+## 示例
 ```
 sudo ./iowaitstat.py -c 1 #每秒统计每进程iowait贡献情况
 
