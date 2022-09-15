@@ -34,6 +34,7 @@ static int g_stop;
 static int g_log_fd = -1;
 static char *g_json_buf;
 
+extern int enable_debug_log(void);
 extern unsigned long get_threshold_us(void);
 static int exec_shell_cmd(char *cmd)
 {
@@ -99,7 +100,8 @@ static void iosdiag_collect(void)
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
 {
-    //return vfprintf(stderr, format, args);
+	if (enable_debug_log())
+		return vfprintf(stderr, format, args);
 	return 0;
 }
 

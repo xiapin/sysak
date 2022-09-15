@@ -23,11 +23,18 @@ static void usage(void)
 		"latency -t ms disk_devname          Set IO latency threshold(default 1000ms)\n"
 		"latency -T sec disk_devname         How long to detect IO latency(default 10s)\n"
 		"latency -f log disk_devname         Specify the output file log\n"
+		"latency -v                          Display debug log during load bpf\n"
 		"\ne.g.\n"
 		"latency vda                         Detect IO latency in disk \"vda\"\n"
 		"latency -t 10 vda                   Set IO latency threshold 10ms and detect IO latency in disk \"vda\"\n"
 		"latency -t 10 -T 30 vda             Detect IO latency in disk \"vda\" 30 secs\n");
 	exit(-1);
+}
+
+static int g_verbose;
+int enable_debug_log(void)
+{
+	return g_verbose;
 }
 
 static unsigned long g_threshold_us;
@@ -44,7 +51,7 @@ int main(int argc, char *argv[])
 	char *devname;
 	char resultfile_path[256];
 
-	while ((ch = getopt(argc, argv, "T:t:f:h")) != -1) {
+	while ((ch = getopt(argc, argv, "T:t:f:hv")) != -1) {
 		switch (ch) {
 			case 'T':
 				timeout_s = (unsigned int)strtoul(optarg, NULL, 0);
@@ -56,6 +63,9 @@ int main(int argc, char *argv[])
 				break;
 			case 'f':
 				result_dir = optarg;
+				break;
+			case 'v':
+				g_verbose = 1;
 				break;
 			case 'h':
 			default:
