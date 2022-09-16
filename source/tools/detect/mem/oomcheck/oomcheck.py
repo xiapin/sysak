@@ -413,6 +413,7 @@ def oom_host_output(oom_result, num):
         summary += "order:%d\n"%(oom['order'])
         oom['reason'] = OOM_REASON_MEMFRAG
         oom['root'] = 'frag'
+        #oom['json']['order'] = oom['order']
     leak = oom_is_memleak(oom, oom_result)
     if leak != False:
         oom['reason'] = OOM_REASON_MEMLEAK
@@ -510,12 +511,6 @@ def oom_check_dup(oom, oom_result):
     summary = '\n'
     if (res_total['rss']*4 > oom['killed_task_mem']*1.5) and (res_total['cnt'] > 2):
         oom['root'] = 'fork'
-        tmprss = sorted(oom['rss_all'].items(),key=lambda k:k[1]['rss'], reverse=True)[0:10]
-        oom['rss_list_desc'] = []
-        for task_info in tmprss:
-            task = task_info[0]
-            oom['rss_list_desc'].append({'task':task, 'rss':oom['rss_all'][task]['rss']})
-        oom['json']['rss_list_desc'] = oom['rss_list_desc']
         summary = ',%d process:%s total memory usage: %dKB\n'%(res_total['cnt'],res_total['task'],res_total['rss']*4)
         oom['json']['fork_max_task'] = res_total['task']
         oom['json']['fork_max_cnt'] = res_total['cnt']
@@ -583,6 +578,7 @@ def oom_output_msg(oom_result,num, summary):
     oom = oom_result['sub_msg'][num]
 
     oom_init_json(oom_result, num)
+    oom['json']['rss_list_desc'] = oom['rss_list_desc']
     res = oom['json']
     res['total_oom'] = oom_result['oom_total_num']
     res['cg_name'] = oom['cg_name']
@@ -685,6 +681,11 @@ def oom_get_max_task(num, oom_result):
             sys.stderr.write("oom_get_max_task loop err {} lines {}\n".format(err, traceback.print_exc()))
             continue
     oom['rss_all'] = rss_all
+    tmprss = sorted(oom['rss_all'].items(),key=lambda k:k[1]['rss'], reverse=True)[0:10]
+    oom['rss_list_desc'] = []
+    for task_info in tmprss:
+        task = task_info[0]
+        oom['rss_list_desc'].append({'task':task, 'rss':oom['rss_all'][task]['rss']})
     return res
 
 def oom_reason_analyze(num, oom_result, summary):
