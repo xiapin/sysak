@@ -180,6 +180,7 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 	tgid = _(p->tgid);
 	pid = _(p->pid);
 
+	__builtin_memset(comm, 0, sizeof(comm));
 	if (!pid)
 		return 0;
 
@@ -210,7 +211,7 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 		if (targ_pid && targ_pid != pid)
 			return 0;
 	}
-
+	__builtin_memset(&enq_info, 0, sizeof(struct enq_info));
 	ts = bpf_ktime_get_ns();
 	enq_info.ts = ts;
 	enq_info.rqlen = runqlen;
