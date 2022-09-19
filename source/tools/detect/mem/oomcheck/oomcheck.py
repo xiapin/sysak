@@ -413,7 +413,7 @@ def oom_host_output(oom_result, num):
         summary += "order:%d\n"%(oom['order'])
         oom['reason'] = OOM_REASON_MEMFRAG
         oom['root'] = 'frag'
-        #oom['json']['order'] = oom['order']
+        oom['json']['order'] = oom['order']
     leak = oom_is_memleak(oom, oom_result)
     if leak != False:
         oom['reason'] = OOM_REASON_MEMLEAK
