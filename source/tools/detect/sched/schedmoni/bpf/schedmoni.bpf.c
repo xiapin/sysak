@@ -95,19 +95,23 @@ struct {
 	len;					\
 })
 
-#define strequal(a, pcom) ({				\
-	bool ret = true;				\
-	int i;						\
-	unsigned long size = pcom.size;			\
-	for (int i = 0; i < 16; i++) {			\
-		if (i >= size)				\
-			break;				\
-		if (a[i] != pcom.comm[i]) {		\
-			ret = false;			\
-			break;}				\
-	}						\
-	ret;						\
-})
+static inline int strequal(const char *src, const char *dst)
+{
+	bool ret = true;
+	int i;
+	unsigned char c1, c2;
+
+	#pragma clang loop unroll(full)
+	for (int i = 0; i < 16; i++) {
+		c1 = *src++;
+		c2 = *dst++;
+		if ((!c1 || !c2) || (c1 != c2)) {
+			ret = false;
+			break;
+		}
+	}
+	return ret;
+}
 
 static inline u64 get_thresh(void)
 {
@@ -194,7 +198,10 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 			comm_i = _(argp->comm_i);
 		bpf_probe_read(comm, sizeof(comm), &(p->comm));
 		if (comm_i.size) {
-			comm_eqaul = strequal(comm,  comm_i);
+			const char *src, *dst;
+			src = comm;
+			dst = comm_i.comm;
+			comm_eqaul = strequal(src,  dst);
 			if (!comm_eqaul)
 				return 0;
 		} else {
