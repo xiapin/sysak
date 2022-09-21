@@ -1,5 +1,5 @@
 target := oomcheck
 mods := oomcheck
-DEPEND := "python-dep{python3}"
+DEPEND := "python-dep{all}"
 include $(SRC)/mk/py.mk
 

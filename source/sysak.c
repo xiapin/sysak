@@ -47,6 +47,9 @@ char *module = "/sysak.ko";
 char *log_path="/var/log/sysak";
 char *system_modules = "/proc/modules";
 char *sysak_root_path = "/usr/local/sysak";
+char *python_bin = "/usr/bin/python";
+char *python2_bin = "/usr/bin/python2";
+char *python3_bin = "/usr/bin/python3";
 
 char kern_version[KVERSION];
 char machine[KVERSION];
@@ -366,7 +369,14 @@ static int do_prev_depend(void)
 static void add_python_depend(char *depend,char *cmd)
 {
     if (!strcmp(depend, "all")) {
-        snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
+        if (!access(python_bin,0))
+            snprintf(tools_exec, sizeof(tools_exec), "python %s", cmd);
+        else if (!access(python2_bin,0))
+            snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
+        else if (!access(python3_bin,0))
+            snprintf(tools_exec, sizeof(tools_exec), "python3 %s", cmd);
+        else
+            printf("please install python!\n");
     } else if (!strcmp(depend, "python3")) {
         snprintf(tools_exec, sizeof(tools_exec), "python3 %s", cmd);
     } else if(!strcmp(depend, "python2")) {
