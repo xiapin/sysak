@@ -81,8 +81,9 @@ static void usage(void)
     fprintf(stdout,
                 "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
                 "       cmd:\n"
-                "              list [-a], show subcmds\n"
-                "              help, help information for specify subcmd\n"
+                "              list [-a],	show subcmds\n"
+                "              -h/help, 	help information for specify subcmd\n"
+                "              -g, 		auto download btf and components\n"
                 "       subcmd: see the result of list\n");
 }
 
@@ -650,7 +651,7 @@ static int parse_arg(int argc, char *argv[])
         return 0;
     }
 
-    if (!strcmp(argv[1], "help")) {
+    if (!strcmp(argv[1], "help") || !strcmp(argv[1], "-h")) {
         usage();
         return 0;
     }
