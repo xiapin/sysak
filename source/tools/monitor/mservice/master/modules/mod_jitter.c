@@ -139,7 +139,7 @@ int init_jitter(void)
 		return -1;
 	}
 
-	fp3 = popen("sysak irqoff -S sysak_mservice_jitter_shm  50 2>/dev/null &", "r");
+	fp3 = popen("sysak irqoff -S sysak_mservice_jitter_shm -t 50 2>/dev/null &", "r");
 	if (!fp3) {
 		perror("popen irqoff");
 		return -1;
