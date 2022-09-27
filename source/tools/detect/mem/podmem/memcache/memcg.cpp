@@ -32,6 +32,7 @@ struct file_info {
     char filename[256];
     unsigned long  inode;
     unsigned long cached;
+    unsigned long cgcached;
     unsigned long size;
     unsigned long active;
     unsigned long inactive;
@@ -168,6 +169,8 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
         }else {
             info->inactive += 1;
         }
+        if (info->cinode == cinode)
+            info->cgcached++;
         return 0; 
     }
     att = get_offset("inode", "i_size");
@@ -246,6 +249,7 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     info->inode = i_ino;
     info->shmem = shmem;
     info->cached = cached*4;
+    info->cgcached = 1;
     info->active = 0;
     info->inactive = 0;
     info->del = del;
@@ -305,8 +309,10 @@ static int output_file_cached(unsigned int top)
         if (!info) {
             continue;
         }
-        printf("inode=%lu file=%s cached=%lu size=%lu cinode=%lu active=%lu inactive=%lu shmem=%d delete=%d\n", info->inode, info->filename, info->cached, info->size, info->cinode, info->active*4, info->inactive*4, info->shmem, info->del);    
-      free(info);
+        printf("inode=%lu file=%s cached=%lu size=%lu cinode=%lu active=%lu inactive=%lu shmem=%d \ 
+                delete=%d cgcached=%lu\n", info->inode, info->filename, info->cached, info->size,\ 
+                info->cinode, info->active*4, info->inactive*4, info->shmem, info->del, info->cgcached*4);    
+        free(info);
         if (i >= top - 1)
             break;
     }
