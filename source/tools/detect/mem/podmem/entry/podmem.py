@@ -302,6 +302,7 @@ def pod_mem_run(podinfo):
         tmp['inactive'] = int(item[6].split('=')[1])
         tmp['shmem'] = int(item[7].split('=')[1])
         tmp['delete'] = int(item[8].split('=')[1])
+        tmp['cgcached'] = int(item[9].split('=')[1])
         cinode = int(item[4].split('=')[1])
         files.append(tmp)
         if not cinode in inodes.keys():
@@ -339,7 +340,7 @@ def pod_mem_run(podinfo):
             print(out)
         for tmp in cinfo['files']:
             print(tmp['file'])
-            res = "size: {} cached: {} ".format(tmp['size'], tmp['cached'])
+            res = "size: {} cached: {} cgcached: {} ".format(tmp['size'], tmp['cached'], tmp['cgcached'])
             res +=  "active: {} inactive: {} ".format(tmp['active'],tmp['inactive']) 
             res +=  "shmem: {} delete: {}".format(tmp['shmem'], tmp['delete'])
             print(res)
