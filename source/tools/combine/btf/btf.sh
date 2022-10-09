@@ -3,7 +3,8 @@
 # email: chengshuyi@linux.alibaba.com
 
 zip_path=${SYSAK_WORK_PATH}/tools/BTF/btf.7z
-btf_dir=${SYSAK_WORK_PATH}/tools
+btf_dir=${SYSAK_WORK_PATH}/tools/`uname -r`
+tool_dir=${SYSAK_WORK_PATH}/tools
 btf_path=${btf_dir}/vmlinux-$(uname -r)
 vmlinux_path=""
 
@@ -28,7 +29,7 @@ generate_btf() {
     if [ ! -f "$vmlinux_path" ]; then
         echo "vmlinux file not exist: $vmlinux_path}"
     fi
-    ${btf_dir}/pahole -J --kabi_prefix=__UNIQUE_ID_rh_kabi_hide --btf_encode_detached=${btf_path} ${vmlinux_path}
+    ${tool_dir}/pahole -J --kabi_prefix=__UNIQUE_ID_rh_kabi_hide --btf_encode_detached=${btf_path} ${vmlinux_path}
     echo "btf file has been generated, the path is: ${btf_path}"
 }
 
