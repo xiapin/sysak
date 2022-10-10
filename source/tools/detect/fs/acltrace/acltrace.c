@@ -147,9 +147,7 @@ int main(int argc, char *argv[])
     sleep(period);
 	prepare_dictory(log_dir);
 
-	/* direct reclaim trace */
     fd = bpf_map__fd(skel->maps.acl_map);
-	printf("Reclaim:\n");
     printf("%-12s\t%-12s\t%-12s\t%-16s\t%-12s\t%-16s\n", "pid", "comm", "dentry", "xattrs", "count", "last_time");
 	
 	if (access(log_data,0) != 0){
