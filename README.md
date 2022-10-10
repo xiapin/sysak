@@ -17,4 +17,4 @@ Quick start to use SysAK:
 2) make
 3) ./out/sysak list -a
 
-See more info about sysAK tools at doc/
+See more info about SysAK tools at doc/
