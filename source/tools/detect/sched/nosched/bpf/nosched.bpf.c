@@ -57,23 +57,44 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int nr)
 	return result;
 }
 
+static inline int test_tsk_thread_flag_low(struct task_struct *tsk, int flag)
+{
+	struct thread_info *tfp;
+
+	tfp = (struct thread_info *)(BPF_CORE_READ(tsk, stack));
+	return test_ti_thread_flag(tfp, flag);
+}
+
+/*
+ * Note: This is based on 
+ *   1) ->thread_info is always be the first element of task_struct if CONFIG_THREAD_INFO_IN_TASK=y
+ *   2) ->state now is the most nearly begin of task_struct except ->thread_info if it has.
+ * return ture if struct thread_info is in task_struct */
+static bool test_THREAD_INFO_IN_TASK(struct task_struct *p)
+{
+	volatile long *pstate;
+	size_t len;
+
+	pstate = &(p->state);
+
+	len = (u64)pstate - (u64)p;
+	return (len == sizeof(struct thread_info));
+}
+
 static inline int test_tsk_thread_flag(struct task_struct *tsk, int flag)
 {
-	struct thread_info tf, *tfp;
+	struct thread_info *tfp;
 
-#ifdef VER310_LATER
-		tfp = &(tsk->thread_info);
-		bpf_probe_read(&tf, sizeof(tf), &(tsk->thread_info));
-		tfp = &tf;
-#else
-		tfp = (struct thread_info *)(BPF_CORE_READ(tsk, stack));
-#endif
+	tfp = (struct thread_info *)tsk;
 	return test_ti_thread_flag(tfp, flag);
 }
 
 static inline int test_tsk_need_resched(struct task_struct *tsk, int flag)
 {
-	return test_tsk_thread_flag(tsk, flag);
+	if (test_THREAD_INFO_IN_TASK(tsk))
+		return test_tsk_thread_flag(tsk, flag);
+	else
+		return test_tsk_thread_flag_low(tsk, flag);
 }
 
 SEC("kprobe/account_process_tick")
