@@ -1,6 +1,6 @@
 What is SysAK
 
-SysAK ( **Sys** tem  **A** nalysis  **K** it) is a toolbox that contains valuable tools for Linux SRE,
+SysAK(System Analysis Kit) is a toolbox that contains valuable tools for Linux SRE,
 such as problem diagnosing, events monitoring/tracing, and operating of system and service.
 These tools come from everyday work experience and other popular internal tools from Alibaba,
 like diagnose-tools, ossre, NX, etc.
