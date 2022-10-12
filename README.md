@@ -1,14 +1,14 @@
-what is SysAK
+What is SysAK
 
-SysAK (system analyse kit) is a toolbox contains useful tools for linux SRE,
+SysAK ( **Sys** tem  **A** nalysis  **K** it) is a toolbox that contains valuable tools for Linux SRE,
 such as problem diagnosing, events monitoring/tracing, and operating of system and service.
-These tools come from everyday work experience and other good tools from Alibaba,
-like diagnose-tools, ossre, NX etc.
+These tools come from everyday work experience and other popular internal tools from Alibaba,
+like diagnose-tools, ossre, NX, etc.
 
 It is distributed under the Mulan Permissive Software License，Version 2 - see the
 accompanying LICENSE file for more details.
 And keep the origin License for the lib dir -include kernel modules and libbpf, which is compatible 
-with usermode tools.
+with user-mode tools.
 
 
 
@@ -17,4 +17,4 @@ Quick start to use SysAK:
 2) make
 3) ./out/sysak list -a
 
-See more info about SysAK tools at doc/
+More usage documentation of SysAK are included in doc/
