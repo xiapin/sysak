@@ -30,8 +30,8 @@ static int parse(char *p, char *arry[])
 				printf(" malloc %ld fail\n", size);
 				break;
 			}
+			memset(new, 0, size);
 			strncpy(new, p, size - 1);
-			new[size] = '\0';
 			t++;
 			while (!isdigtal(*t) && (*t != '\0')) {
 				t++;
