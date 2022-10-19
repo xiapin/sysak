@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "syscall_helpers.h"
@@ -588,6 +590,19 @@ static void init_output(struct appnoise_bpf *obj)
     map[OT_WAIT] = bpf_map__fd(obj->maps.wait_thread_info);
 }
 
+static void bump_memlock_rlimit(void)
+{
+	struct rlimit rlim_new = {
+		.rlim_cur	= RLIM_INFINITY,
+		.rlim_max	= RLIM_INFINITY,
+	};
+
+	if (setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
+		fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
+		exit(1);
+	}
+}
+
 int main(int argc, char *argv[])
 {
     static const struct argp argp = {
@@ -609,6 +624,7 @@ int main(int argc, char *argv[])
     if(err)
         return err;
 
+    bump_memlock_rlimit();
     obj = appnoise_bpf__open();
     if(!obj)
     {
