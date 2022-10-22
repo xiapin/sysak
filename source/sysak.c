@@ -302,8 +302,8 @@ static int down_install(const char *component_name)
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else if (strcmp(component_name, "btf") == 0) {
-        sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s/%s",
-                sysak_components_server, machine, kern_version, tools_path, kern_version);
+        sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s",
+                sysak_components_server, machine, kern_version, tools_path);
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else {
@@ -322,7 +322,7 @@ static int check_or_install_components(const char *name)
     if (strcmp(name, "sysak_modules") == 0)
         sprintf(compents_path, "%s%s%s", module_path, kern_version, module);
     else if (strcmp(name, "btf") == 0)
-        sprintf(compents_path, "%s%s/vmlinux-%s", tools_path, kern_version, kern_version);
+        sprintf(compents_path, "%s/vmlinux-%s", tools_path, kern_version);
     else
         sprintf(compents_path, "%s%s", tools_path, name);
 
