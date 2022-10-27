@@ -304,8 +304,9 @@ static bool print_hist_(int hist_map_id, int i)
 
 static bool print_hist (int fd)
 {
+    int i;
     bool res = true;
-    for(int i = 0 ; i < nr_hist;i++)
+    for(i = 0 ; i < nr_hist;i++)
     {
         res = print_hist_(fd,i);
         if(!res)
@@ -319,7 +320,7 @@ static bool print_hist (int fd)
 
 static bool print_wait(int fd)
 {
-    int i = 0, err;
+    int j, i = 0, err;
     pid_t pre,key,keys[MAX_ENTRIES];
     struct thread_info_t values[MAX_ENTRIES],info;
 
@@ -338,7 +339,7 @@ static bool print_wait(int fd)
     if(i == 0)
         return true;
 
-    for(int j = 0; j < i ; j++)
+    for(j = 0; j < i ; j++)
     {
         err = bpf_map_lookup_elem(fd,&keys[j],&info);
         if (err && errno != ENOENT) {
@@ -350,7 +351,7 @@ static bool print_wait(int fd)
         strcpy(values[j].name,info.name);
     }
 
-    for(int j = 0 ; j < i ; j++)
+    for(j = 0 ; j < i ; j++)
     {
 		err = bpf_map_delete_elem(fd, &keys[j]);
 		if (err) {
@@ -362,7 +363,7 @@ static bool print_wait(int fd)
     qsort(values,i,sizeof(values[0]),compar_);
 
     printf("%-20s %8s %8s\n","<TASK> -> CURR","PID","COUNT");
-    for(int j = 0 ; j < i ;j++)
+    for(j = 0 ; j < i ;j++)
     {
         printf("%-20s %8d %8lld\n",values[j].name,values[j].pid,values[j].count);
     }
@@ -372,7 +373,7 @@ static bool print_wait(int fd)
 
 static bool print_irq(int fd)
 {
-    int err,i=0,keys[MAX_ENTRIES_IRQ];
+    int j, err, i = 0, keys[MAX_ENTRIES_IRQ];
     unsigned int pre , key;
     struct irq_info_t infos[MAX_ENTRIES_IRQ];
 
@@ -391,7 +392,7 @@ static bool print_irq(int fd)
     if (i == 0)
         return true;
 
-    for(int j = 0; j < i ;j++)
+    for(j = 0; j < i ;j++)
     {
         err = bpf_map_lookup_elem(fd,&keys[j],&infos[j]);
         if (err && errno != ENOENT) {
@@ -399,7 +400,7 @@ static bool print_irq(int fd)
 			return false;
 		}
     }
-    for (int j = 0; j < i; j++) {
+    for(j = 0; j < i; j++) {
 		err = bpf_map_delete_elem(fd, &keys[j]);
 		if (err) {
 			printf("failed to delete element: err = %d\n", err);
@@ -409,7 +410,7 @@ static bool print_irq(int fd)
     qsort(infos,i,sizeof(infos[0]),compar);
 
     printf("%-20s %-6s %-s(%s)\n","IRQ","COUNT","TOTAL",hist_units[hist_irq]);
-    for(int j = 0 ; j < i && j < env.top ;j++)
+    for(j = 0 ; j < i && j < env.top ;j++)
     {
             printf("%-20s %-6llu %-10llu\n",infos[j].name,infos[j].count,infos[j].total_time);
     }
@@ -466,7 +467,7 @@ static bool print_syscall(int fd)
 {
     struct syscall_info infos[MAX_ENTRIES];
     int keys[MAX_ENTRIES];
-    int i = 0,err;
+    int j, i = 0,err;
     unsigned int pre , key;
     struct info info;
 
@@ -485,7 +486,7 @@ static bool print_syscall(int fd)
     if (i == 0)
         return true;
 
-    for(int j = 0; j < i ;j++)
+    for(j = 0; j < i ;j++)
     {
         err = bpf_map_lookup_elem(fd,&keys[j],&info);
         if (err && errno != ENOENT) {
@@ -498,7 +499,7 @@ static bool print_syscall(int fd)
         syscall_name(infos[j].id,infos[j].name,sizeof(infos[j].name));
     }
 
-	for (int j = 0; j < i; j++) {
+	for(j = 0; j < i; j++) {
 		err = bpf_map_delete_elem(fd, &keys[j]);
 		if (err) {
 			printf("failed to delete element: err = %d\n", err);
@@ -509,7 +510,7 @@ static bool print_syscall(int fd)
     qsort(infos, i , sizeof(infos[0]), compar);
 
     printf("%-22s %8s %8s(%s)\n","SYSCALL","COUNT","TOTAL",hist_units[hist_syscall]);
-    for(int j = 0 ; j < i && j < env.top ;j++)
+    for(j = 0 ; j < i && j < env.top ;j++)
     {
         printf("%-22s %8lld %8lld\n",infos[j].name,infos[j].count,infos[j].total_time);
     }
@@ -520,7 +521,7 @@ static bool print_numa(int fd)
 {
     pid_t pre,key,keys[MAX_ENTRIES];
     struct thread_info_t values[MAX_ENTRIES],value;
-    int i = 0,err;
+    int j, i = 0,err;
     for(pre = -1;i<MAX_ENTRIES;)
     {
         err = bpf_map_get_next_key(fd,&pre,&key);
@@ -536,7 +537,7 @@ static bool print_numa(int fd)
     if (i == 0)
         return true;
     
-    for(int j = 0 ; j < i ; j++)
+    for(j = 0 ; j < i ; j++)
     {
         err = bpf_map_lookup_elem(fd,&keys[j],&value);
         if (err && errno != ENOENT) {
@@ -548,7 +549,7 @@ static bool print_numa(int fd)
         strcpy(values[j].name,value.name);
     }
     
-    for(int j = 0 ; j < i ; j ++)
+    for(j = 0 ; j < i ; j ++)
     {
         err = bpf_map_delete_elem(fd,&keys[j]);
         if (err) {
@@ -560,7 +561,7 @@ static bool print_numa(int fd)
     qsort(values,i,sizeof(values[0]),compar_);
 
     printf("Cross-NUMA Memory Access Info\n%-22s %8s %8s\n","NAME","PID","COUNT");
-    for(int j = 0 ; j < i ; j++)
+    for(j = 0 ; j < i ; j++)
     {
         printf("%-22s %8d %8lld\n",values[j].name,values[j].pid,values[j].count);
     }
@@ -664,6 +665,7 @@ int main(int argc, char *argv[])
     init_output(obj);
 
     while(1){
+	int i;
         bool res = true;
         sleep(env.interval);
         
@@ -672,7 +674,7 @@ int main(int argc, char *argv[])
         strftime(ts, sizeof(ts), "%H:%M:%S", tm);
         printf("%-8s\n", ts);
 
-        for(int i = 0 ; i < OT_NR;i++)
+        for(i = 0 ; i < OT_NR;i++)
         {
             res = print_func[i](map[i]);
             if(!res)
