@@ -28,6 +28,7 @@ def container_init(con):
     con["ino"] = 0
     con["uid"] = ''
     con["podname"] = ''
+    con["cname"] = ''
     con["files"] = []
     con["type"] = 'cgroup'
     con["rss"] = 0
@@ -63,7 +64,7 @@ def get_container_info(podinfo, cid, con):
         con['podname'] = res['status']['labels']['io.kubernetes.pod.name']
         con['type'] = 'k8s'
     if con['podname']  == '':
-        con['podname'] = cid
+        con['podname'] = con["cname"]
 
 def get_container_id(podinfo):
     podinfo["runtime"] = get_runtime(podinfo)
@@ -82,7 +83,13 @@ def get_container_id(podinfo):
         con = {}
         container_init(con)
         con["podid"] = item[-1]
+        con["cname"] = item[-1]
+        if podinfo['runtime'].find('crictl') != -1:
+            con["cname"] = item[-3]
         con["id"] = item[0]
+        if len(con["cname"]) == 0:
+            con["cname"] = con["id"]
+
         if podinfo['args']['mode'] == 'cid':
             if item[0] != podinfo['args']['cid']:
                 continue
@@ -226,6 +233,7 @@ def podmem_to_json(podinfo, cinodes, files):
             continue
         new_cid['sort_file'] = cid['files']
         new_cid['id'] = cid['id']
+        new_cid['cname'] = cid['cname']
         new_cid['cache'] = cid['cache']
         new_cid['rss'] = cid['rss']
         new_cid['shmem'] = cid['shmem']
@@ -330,11 +338,11 @@ def pod_mem_run(podinfo):
         if mode == 'cgroup':
             print("cgroup: {}".format(cid))
         elif mode == 'pod':
-            print("container id: {} podname:{}".format(cid, cinfo['podname']))
+            print("container name: {} podname:{}".format(cinfo['cname'], cinfo['podname']))
         elif mode == 'cid':
-            print("container id {}".format(cid))
+            print("container name {}".format(cinfo['cname']))
         elif mode == 'allcgroup':
-            out = "container id:%s"%(cid)
+            out = "container name:%s"%(cinfo['cname'])
             if cinfo['podname'] != '':
                 out += ' podname:%s'%(cinfo['podname'])
             print(out)
