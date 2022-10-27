@@ -442,6 +442,7 @@ def oom_cgroup_output(oom_result, num):
     summary += "oom cgroup: %s\n"%(oom['cg_name'])
     res['cg_usage'] = oom['cg_usage']
     res['cg_limit'] = oom['cg_limit']
+    res['cgroup_oom_num'] = oom_result['cgroup'][oom['cg_name']]
     return summary
 
 def oom_get_ipcs(oom_result, shmem):
@@ -573,6 +574,7 @@ def oom_init_json(oom_result, num):
     res['leaktype'] = 'unknow'
     res['leakusage'] = 0
     res['shmem'] = 0
+    res['cgroup_oom_num'] = 0
 
 def oom_output_msg(oom_result,num, summary):
     oom = oom_result['sub_msg'][num]
