@@ -305,7 +305,6 @@ static inline int get_con_cgpath_bypid(char *subpath, long pid, const char* cg, 
 			strncpy(subpath, p+1, alen); /* skip ":" */
 			len = strlen(subpath);
 			subpath[len-1] = 0; 		/* skip the newline:\n */
-			printf("[%s]\n", subpath);
 			ret = 0;
 		}
 	}
@@ -322,10 +321,9 @@ static inline char *get_cgroup_path(const char *name, const char *cg, char *path
 		return NULL;
 	index = snprintf(path, len, "/sys/fs/cgroup/%s/", cg);
 	ret = get_con_cgpath_bypid(path+index, pid, cg, len-index-1);
-	if (!ret) {
-		printf("path=%s\n", path);
+	if (!ret)
 		return path;
-	}
+
 	return NULL;
 }
 
