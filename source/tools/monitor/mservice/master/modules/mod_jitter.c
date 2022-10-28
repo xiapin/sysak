@@ -133,13 +133,13 @@ int init_jitter(void)
 		return ret;
 
 	/* todo: what if command can't be find? */
-	fp2 = popen("sysak nosched -S sysak_mservice_jitter_shm -t 50 2>/dev/null &", "r");
+	fp2 = popen("sysak -g nosched -S sysak_mservice_jitter_shm -t 50 2>/dev/null &", "r");
 	if (!fp2) {
 		perror("popen nosched");
 		return -1;
 	}
 
-	fp3 = popen("sysak irqoff -S sysak_mservice_jitter_shm -t 50 2>/dev/null &", "r");
+	fp3 = popen("sysak -g irqoff -S sysak_mservice_jitter_shm -t 50 2>/dev/null &", "r");
 	if (!fp3) {
 		perror("popen irqoff");
 		return -1;
