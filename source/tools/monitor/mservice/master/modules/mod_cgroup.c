@@ -651,11 +651,10 @@ static void init_cgroups(void)
 	n_cgs = 0;
 
 	/*check docker exit*/
-	if ((access("/bin/docker", F_OK) != F_OK &&
+	if (access("/bin/docker", F_OK) != F_OK &&
 		access("/usr/bin/docker", F_OK) != F_OK &&
 		access("/bin/docker", F_OK) != F_OK &&
-		access("/usr/bin/docker", F_OK) != F_OK) ||
-		!dockerd_alive()) {
+		access("/usr/bin/docker", F_OK) != F_OK) {
 		ret = enum_containers_ext("/sys/fs/cgroup/cpu/docker/");
 	} else {
 		ret = enum_containers();
