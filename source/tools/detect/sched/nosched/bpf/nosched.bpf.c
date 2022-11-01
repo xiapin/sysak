@@ -168,8 +168,15 @@ struct trace_event_raw_sched_switch {
 SEC("tp/sched/sched_switch")
 int handle_switch(struct trace_event_raw_sched_switch *ctx)
 {
+	int args_key;
 	u64 cpuid;
 	struct latinfo lati, *latp;
+	struct args *argp;
+
+	__builtin_memset(&args_key, 0, sizeof(int));
+	argp = bpf_map_lookup_elem(&args_map, &args_key);
+	if (!argp)
+		return 0;
 
 	cpuid = bpf_get_smp_processor_id();
 	latp = bpf_map_lookup_elem(&info_map, &cpuid);
@@ -179,9 +186,8 @@ int handle_switch(struct trace_event_raw_sched_switch *ctx)
 
 		now = bpf_ktime_get_ns();
 		event.enter = latp->last_seen_need_resched_ns;
-		if (event.enter && latp->thresh && 
-			(now - event.enter > latp->thresh)) {
-			
+		if (argp->thresh && event.enter &&
+			(now - event.enter > argp->thresh)) {
 			event.stamp = now;
 			event.exit = now;
 			event.cpu = cpuid;

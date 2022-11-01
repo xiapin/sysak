@@ -29,7 +29,6 @@ struct key_t {
 struct latinfo {
 	__u64 last_seen_need_resched_ns;
 	__u64 last_perf_event;
-	__u64 thresh;
 	int ticks_without_resched;
 };
 

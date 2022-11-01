@@ -255,7 +255,8 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	if (env.summary) {
 		if (e->cpu > nr_cpus - 1)
 			return;
-		update_summary(env.sump, e);
+		if (e->exit != 0)
+			update_summary(env.sump, e);
 	} else {
 		fprintf(filep, "%-18.6f %-5d %-15s %-8d %-10llu %-21s\n",
 			((double)e->stamp/1000000000), e->cpu, e->comm,
