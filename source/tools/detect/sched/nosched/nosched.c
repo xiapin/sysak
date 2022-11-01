@@ -20,6 +20,7 @@
 #include "nosched.h"
 
 #define MAX_SYMS 300000
+#define SIZE_512MB	(512*1024*1024)
 unsigned int nr_cpus;
 FILE *filep = NULL;
 char filename[256] = {0};
@@ -238,6 +239,15 @@ static void update_summary(struct sched_jit_summary* summary, const struct event
 	} 
 }
 
+void check_rewind_file(const char *path, FILE *fp)
+{
+	struct stat buf;
+
+	stat(path, &buf);
+	if (buf.st_size > SIZE_512MB)
+		rewind(fp);
+}
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event tmpe, *e;
@@ -265,6 +275,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			print_stack(stackmp_fd, e->ret);
 		fflush(filep);
 	}
+	check_rewind_file(filename, filep);
 }
 
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
