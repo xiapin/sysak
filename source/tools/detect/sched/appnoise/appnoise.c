@@ -321,7 +321,7 @@ static bool print_hist (int fd)
 static bool print_wait(int fd)
 {
     int j, i = 0, err;
-    pid_t pre,key,keys[MAX_ENTRIES];
+    pid_t pre = -1, key, keys[MAX_ENTRIES];
     struct thread_info_t values[MAX_ENTRIES],info;
 
     for(pre = -1;i < MAX_ENTRIES;)
@@ -374,7 +374,7 @@ static bool print_wait(int fd)
 static bool print_irq(int fd)
 {
     int j, err, i = 0, keys[MAX_ENTRIES_IRQ];
-    unsigned int pre , key;
+    unsigned int pre = -1, key;
     struct irq_info_t infos[MAX_ENTRIES_IRQ];
 
     for(pre = -1; i < MAX_ENTRIES_IRQ;)
@@ -468,7 +468,7 @@ static bool print_syscall(int fd)
     struct syscall_info infos[MAX_ENTRIES];
     int keys[MAX_ENTRIES];
     int j, i = 0,err;
-    unsigned int pre , key;
+    unsigned int pre = -1, key;
     struct info info;
 
     for(pre = -1; i < MAX_ENTRIES;)
@@ -519,7 +519,7 @@ static bool print_syscall(int fd)
 
 static bool print_numa(int fd)
 {
-    pid_t pre,key,keys[MAX_ENTRIES];
+    pid_t pre = -1, key, keys[MAX_ENTRIES];
     struct thread_info_t values[MAX_ENTRIES],value;
     int j, i = 0,err;
     for(pre = -1;i<MAX_ENTRIES;)

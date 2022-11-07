@@ -192,7 +192,7 @@ static int prepare_dictory(char *path)
 static int report_data(struct workqlatency_bpf *skel, enum trace_class_type type)
 {
 	int err = 0,fd_report;
-	struct work_key prev, key;
+	struct work_key prev = { .cpu = -1 }, key;
 	struct report_data elem_rd;
 	char date_start[MAX_DATE], date_end[MAX_DATE];
 	char workname[MAX_SYMS] = {0};

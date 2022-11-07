@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     int err,fd;
 	struct acltrace_bpf *skel;
     struct acl_data elem;
-	__u32 lookup_key, next_key;
+	__u32 lookup_key = -1, next_key;
 	FILE *fp;
 
     while ((opt = getopt_long(argc, argv, "t:hv", longopts, NULL)) != -1) {
