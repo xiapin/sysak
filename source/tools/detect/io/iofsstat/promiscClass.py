@@ -15,13 +15,16 @@ from fsstatClass import fsstatClass
 
 
 class promiscClass():
-    def __init__(self, devname, utilThresh, iopsThresh, bwThresh, top, json, nodiskStat):
+    def __init__(
+        self, devname, utilThresh, iopsThresh, bwThresh, top, json,
+        nodiskStat, Pattern):
         self._iostat = []
         self._fsstat = []
         self.fs = fsstatClass(devname, None, utilThresh, bwThresh,
-                              top, json, nodiskStat, self._fsstat)
+                              top, json, nodiskStat, self._fsstat, Pattern)
         self.io = iostatClass(devname, None, utilThresh, iopsThresh,
-                              bwThresh, top, json, nodiskStat, self._iostat)
+                              bwThresh, top, json, nodiskStat, self._iostat, 
+                              Pattern)
 
 
     def _selectKworker(self, iostat, fsItem, kworker):
@@ -93,7 +96,8 @@ class promiscClass():
                     if 'file' not in iostat[taskI].keys():
                         iostat[taskI].setdefault('file', [])
                     iostat[taskI]["file"].append(item["file"])
-                    rmList.append((key, item))
+                    if item["bw_wr"] <= (iostat[taskI]["bps_wr"] * 15):
+                        rmList.append((key, item))
                     continue
                 if kworker:
                     if item["bw_wr"] < item["bw_rd"]:
@@ -115,20 +119,20 @@ class promiscClass():
         mstatDicts = json.loads(statJsonStr, object_pairs_hook=OrderedDict)
         mstatDicts['time'] = time.strftime('%Y/%m/%d %H:%M:%S', time.localtime())
         stSecs = str(secs)+'s' if secs > 1 else 's'
-        for disk, iostat in iostats.items():
-            for key, item in dict(iostat).items():
-                if (item["iops_rd"]+item["iops_wr"]) == 0 or (item["bps_rd"]+item["bps_wr"]) == 0:
-                    continue
-                item["bps_rd"] = humConvert(
-                    item["bps_rd"], True).replace('s', str(secs)+'s') if item["bps_rd"] else '0'
-                item["bps_wr"] = humConvert(
-                    item["bps_wr"], True).replace('s', str(secs)+'s') if item["bps_wr"] else '0'
-                if 'file' not in item.keys():
-                    item.setdefault('file', '-')
-                if 'kworker' in item["comm"] and 'bufferio' in item.keys():
-                    for i in item["bufferio"]:
-                        i["Wrbw"] = humConvert(i["Wrbw"], True).replace('s', str(secs)+'s')
-                mstatDicts["mstats"].append(item)
+
+        for key, item in iostats:
+            if (item["iops_rd"]+item["iops_wr"]) == 0 or (item["bps_rd"]+item["bps_wr"]) == 0:
+                continue
+            item["bps_rd"] = humConvert(
+                item["bps_rd"], True).replace('s', str(secs)+'s') if item["bps_rd"] else '0'
+            item["bps_wr"] = humConvert(
+                item["bps_wr"], True).replace('s', str(secs)+'s') if item["bps_wr"] else '0'
+            if 'file' not in item.keys():
+                item.setdefault('file', '-')
+            if 'kworker' in item["comm"] and 'bufferio' in item.keys():
+                for i in item["bufferio"]:
+                    i["Wrbw"] = humConvert(i["Wrbw"], True).replace('s', str(secs)+'s')
+            mstatDicts["mstats"].append(item)
         if len(mstatDicts["mstats"]) > 0:
             self.io.writeDataToJson(json.dumps(mstatDicts))
 
@@ -139,29 +143,37 @@ class promiscClass():
             return
 
         iostats = self._miscIostatFromFsstat()
+        if not iostats:
+            return
+        tmp = {}
+        for d in iostats.values():
+            tmp.update(dict(d))
+        iostats = sorted(
+            tmp.items(),
+            key=lambda e: (int(e[1]["bps_rd"])+int(e[1]["bps_wr"])),
+            reverse=True)
         if self.io.enableJsonShow() == True:
             self._miscShowJson(iostats)
             return
 
         print('%-20s%-8s%-12s%-16s%-12s%-12s%-8s%s' %
               ("comm", "pid", "iops_rd", "bps_rd", "iops_wr", "bps_wr", "device", "file"))
-        for disk, iostat in iostats.items():
-            for key, item in dict(iostat).items():
-                if (item["iops_rd"]+item["iops_wr"]) == 0 or (item["bps_rd"]+item["bps_wr"]) == 0:
-                    continue
-                item["bps_rd"] = humConvert(
-                    item["bps_rd"], True).replace('s', str(secs)+'s') if item["bps_rd"] else '0'
-                item["bps_wr"] = humConvert(
-                    item["bps_wr"], True).replace('s', str(secs)+'s') if item["bps_wr"] else '0'
-                file = str(item["file"]) if 'file' in item.keys() else '-'
-                print('%-20s%-8s%-12s%-16s%-12s%-12s%-8s%s' %
-                    (item["comm"], str(item["pid"]), str(item["iops_rd"]), item["bps_rd"],
-                    str(item["iops_wr"]), item["bps_wr"], item["device"], file))
-                if 'kworker' in item["comm"] and 'bufferio' in item.keys():
-                    for i in item["bufferio"]:
-                        i["Wrbw"] = humConvert(i["Wrbw"], True).replace('s', str(secs)+'s')
-                        print('  |----%-32s WrBw:%-12s Device:%-8s File:%s' %
-                            (i['task'], i["Wrbw"], i["device"], i["file"]))
+        for key, item in iostats:
+            if (item["iops_rd"]+item["iops_wr"]) == 0 or (item["bps_rd"]+item["bps_wr"]) == 0:
+                continue
+            item["bps_rd"] = humConvert(
+                item["bps_rd"], True).replace('s', str(secs)+'s') if item["bps_rd"] else '0'
+            item["bps_wr"] = humConvert(
+                item["bps_wr"], True).replace('s', str(secs)+'s') if item["bps_wr"] else '0'
+            file = str(item["file"]) if 'file' in item.keys() else '-'
+            print('%-20s%-8s%-12s%-16s%-12s%-12s%-8s%s' %
+                (item["comm"], str(item["pid"]), str(item["iops_rd"]), item["bps_rd"],
+                str(item["iops_wr"]), item["bps_wr"], item["device"], file))
+            if 'kworker' in item["comm"] and 'bufferio' in item.keys():
+                for i in item["bufferio"]:
+                    i["Wrbw"] = humConvert(i["Wrbw"], True).replace('s', str(secs)+'s')
+                    print('  |----%-32s WrBw:%-12s Device:%-8s File:%s' %
+                        (i['task'], i["Wrbw"], i["device"], i["file"]))
         print("")
 
 
