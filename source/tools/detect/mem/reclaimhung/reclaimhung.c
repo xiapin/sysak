@@ -162,6 +162,7 @@ int main(int argc, char *argv[])
 		fp_re = fopen(reclaim_data, "a+");
 	}
 
+	lookup_key = -1;
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &elem_r);
 		if (err < 0) {
@@ -189,6 +190,7 @@ int main(int argc, char *argv[])
 		fp_cm = fopen(compact_data, "a+");
 	}
 
+	lookup_key = -1;
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &elem_c);
 		if (err < 0) {
@@ -217,6 +219,7 @@ int main(int argc, char *argv[])
 		fp_cg = fopen(cgroup_reclaim_data, "a+");
 	}
 
+	lookup_key = -1;
 	while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
 		err = bpf_map_lookup_elem(fd, &next_key, &cg_elem_r);
 		if (err < 0) {

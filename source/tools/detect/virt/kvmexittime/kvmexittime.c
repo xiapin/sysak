@@ -124,7 +124,7 @@ int main(int argc, char **argv)
 	struct kvmexittime_bpf *obj;
 	struct args args = {};
  	struct kvm_exit_time tm;
- 	__u32 lookup_key, next_key;
+	__u32 lookup_key = -1, next_key;
 	__u64 i=0, total_cnt = 0, total_ct = 0, total_sot = 0, total_oct = 0;
 
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);

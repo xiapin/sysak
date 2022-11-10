@@ -4,110 +4,25 @@
 #include <bpf/bpf_core_read.h>
 #include "../schedmoni.h"
 #include "../nosched.h"
+#include "schedmoni.bpf.h"
 
-#define TASK_RUNNING	0
-#define _(P) ({typeof(P) val; __builtin_memset(&val, 0, sizeof(val)); bpf_probe_read(&val, sizeof(val), &P); val;})
+static inline int strequal(const char *src, const char *dst)
+{
+	bool ret = true;
+	int i;
+	unsigned char c1, c2;
 
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(max_entries, 4);
-	__type(key, u32);
-	__type(value, struct args);
-} argmap SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 10240);
-	__type(key, u32);
-	__type(value, struct enq_info);
-} start SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
-} events_rnslw SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
-} events_nosch SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
-} events_irqof SEC(".maps");
-
-struct bpf_map_def SEC("maps") stackmap = {
-	.type = BPF_MAP_TYPE_STACK_TRACE,
-	.key_size = sizeof(u32),
-	.value_size = PERF_MAX_STACK_DEPTH * sizeof(u64),
-	.max_entries = 1000,
-};
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
-	__uint(max_entries, MAX_MONI_NR);
-	__type(key, u64);
-	__type(value, struct latinfo);
-} info_map SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, u32);
-	__type(value, struct tm_info);
-} tm_map SEC(".maps");
-
-#define GETARG_FROM_ARRYMAP(map,argp,type,member)({	\
-	int i = 0;					\
-	type retval;					\
-	__builtin_memset(&retval, 0, sizeof(type));	\
-	argp = bpf_map_lookup_elem(&map, &i);		\
-	if (argp) {					\
-		retval = _(argp->member);		\
-	}						\
-	retval;						\
-	})
-
-#define BPF_F_FAST_STACK_CMP	(1ULL << 9)
-#define KERN_STACKID_FLAGS	(0 | BPF_F_FAST_STACK_CMP)
-
-#define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
-#define BITS_PER_LONG	64
-
-#define get_current_rqlen(p) ({			\
-	int len = 0;				\
-	struct cfs_rq *cfs;			\
-	struct sched_entity *se, *parent;	\
-	se = &p->se;				\
-	for (int i = 0; i < 10; i++) {		\
-		parent = _(se->parent);		\
-		if (parent)			\
-			se = parent;		\
-		else				\
-			break;			\
-	}					\
-	cfs = BPF_CORE_READ(se, cfs_rq);	\
-	len = _(cfs->nr_running);		\
-	len;					\
-})
-
-#define strequal(a, pcom) ({				\
-	bool ret = true;				\
-	int i;						\
-	unsigned long size = pcom.size;			\
-	for (int i = 0; i < 16; i++) {			\
-		if (i >= size)				\
-			break;				\
-		if (a[i] != pcom.comm[i]) {		\
-			ret = false;			\
-			break;}				\
-	}						\
-	ret;						\
-})
+	#pragma clang loop unroll(full)
+	for (int i = 0; i < 16; i++) {
+		c1 = *src++;
+		c2 = *dst++;
+		if ((!c1 || !c2) || (c1 != c2)) {
+			ret = false;
+			break;
+		}
+	}
+	return ret;
+}
 
 static inline u64 get_thresh(void)
 {
@@ -153,18 +68,44 @@ static inline int test_ti_thread_flag(struct thread_info *ti, int nr)
 
 static inline int test_tsk_thread_flag(struct task_struct *tsk, int flag)
 {
-	struct thread_info tf, *tfp;
+	struct thread_info *tfp;
 
-	tfp = &(tsk->thread_info);
-	bpf_probe_read(&tf, sizeof(tf), &(tsk->thread_info));
-	tfp = &tf;
+	tfp = (struct thread_info *)tsk;
 	return test_ti_thread_flag(tfp, flag);
+}
+
+static inline int test_tsk_thread_flag_low(struct task_struct *tsk, int flag)
+{
+	struct thread_info *tfp;
+
+	tfp = (struct thread_info *)(BPF_CORE_READ(tsk, stack));
+	return test_ti_thread_flag(tfp, flag);
+}
+
+/*
+ * Note: This is based on 
+ *   1) ->thread_info is always be the first element of task_struct if CONFIG_THREAD_INFO_IN_TASK=y
+ *   2) ->state now is the most nearly begin of task_struct except ->thread_info if it has.
+ * return ture if struct thread_info is in task_struct */
+static bool test_THREAD_INFO_IN_TASK(struct task_struct *p)
+{
+	volatile long *pstate;
+	size_t len;
+
+	pstate = &(p->state);
+
+	len = (u64)pstate - (u64)p;
+	return (len == sizeof(struct thread_info));
 }
 
 static inline int test_tsk_need_resched(struct task_struct *tsk, int flag)
 {
-	return test_tsk_thread_flag(tsk, flag);
+	if (test_THREAD_INFO_IN_TASK(tsk))
+		return test_tsk_thread_flag(tsk, flag);
+	else
+		return test_tsk_thread_flag_low(tsk, flag);
 }
+
 
 /* record enqueue timestamp */
 static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
@@ -180,6 +121,7 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 	tgid = _(p->tgid);
 	pid = _(p->pid);
 
+	__builtin_memset(comm, 0, sizeof(comm));
 	if (!pid)
 		return 0;
 
@@ -193,7 +135,10 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 			comm_i = _(argp->comm_i);
 		bpf_probe_read(comm, sizeof(comm), &(p->comm));
 		if (comm_i.size) {
-			comm_eqaul = strequal(comm,  comm_i);
+			const char *src, *dst;
+			src = comm;
+			dst = comm_i.comm;
+			comm_eqaul = strequal(src,  dst);
 			if (!comm_eqaul)
 				return 0;
 		} else {
@@ -210,7 +155,7 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 		if (targ_pid && targ_pid != pid)
 			return 0;
 	}
-
+	__builtin_memset(&enq_info, 0, sizeof(struct enq_info));
 	ts = bpf_ktime_get_ns();
 	enq_info.ts = ts;
 	enq_info.rqlen = runqlen;
@@ -218,11 +163,11 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 	return 0;
 }
 
-SEC("raw_tracepoint/sched_wakeup")
-int raw_tracepoint__sched_wakeup(struct bpf_raw_tracepoint_args *ctx)
+SEC("kprobe/ttwu_do_wakeup")
+int BPF_KPROBE(ttwu_do_wakeup, struct rq *rq, struct task_struct *p, 
+		int wake_flags, struct rq_flags *rf)
 {
 	unsigned int runqlen = 0;
-	struct task_struct *p = (void *)ctx->args[0];
 
 	if (!program_ready())
 		return 0;
@@ -231,11 +176,11 @@ int raw_tracepoint__sched_wakeup(struct bpf_raw_tracepoint_args *ctx)
 	return trace_enqueue(p, runqlen);
 }
 
-SEC("raw_tracepoint/sched_wakeup_new")
-int raw_tracepoint__sched_wakeup_new(struct bpf_raw_tracepoint_args *ctx)
+#if 1
+SEC("kprobe/wake_up_new_task")
+int BPF_KPROBE(wake_up_new_task, struct task_struct *p)
 {
 	unsigned int runqlen = 0;
-	struct task_struct *p = (void *)ctx->args[0];
 
 	if (!program_ready())
 		return 0;
@@ -243,9 +188,10 @@ int raw_tracepoint__sched_wakeup_new(struct bpf_raw_tracepoint_args *ctx)
 	runqlen = get_current_rqlen(p);
 	return trace_enqueue(p, runqlen);
 }
+#endif
 
 SEC("tp/sched/sched_switch")
-int handle_switch(struct trace_event_raw_sched_switch *ctx)
+int handle_switch(struct sched_switch_tp_args *ctx)
 {
 	struct task_struct *prev;
 	struct enq_info *enq;

@@ -173,7 +173,7 @@ void mess_list_free()
 static int usage_restore()
 {
 	int fd = bpf_map__fd(obj->maps.usage_hash_map);
-	unsigned long key, next_key;
+	unsigned long key = -1, next_key;
 	struct memcg_usage usage;
 	struct memcg_mess *m;
 	int ret = 0;
@@ -203,7 +203,7 @@ static int usage_restore()
 static void free_map(void)
 {
 	int fd = bpf_map__fd(obj->maps.usage_hash_map);
-	unsigned long key, next_key;
+	unsigned long key = -1, next_key;
 
 	while (bpf_map_get_next_key(fd, &key, &next_key) == 0) {
 		bpf_map_delete_elem(fd, &next_key);

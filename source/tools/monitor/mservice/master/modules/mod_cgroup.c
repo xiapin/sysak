@@ -164,6 +164,7 @@ struct cgroup_info {
 
 unsigned int n_cgs = 0;  /* Number of cgroups */
 char buffer[256];       /* Temporary buffer for parsing */
+char buf_1024[1024];       /* Temporary buffer for parsing */
 
 struct jitter_shm {
 	struct sched_jit_summary nosched;
@@ -260,10 +261,70 @@ static struct mod_info cg_info[] = {
 
 #define NR_CGROUP_INFO sizeof(cg_info)/sizeof(struct mod_info)
 
-static inline char *get_cgroup_path(const char *name, const char *child, char *path)
+static inline long get_con_pid(const char *con)
 {
-	snprintf(path, LEN_1024, "/sys/fs/cgroup/%s/docker/%s/", child, name);
-	return path;
+	long pid;
+	FILE *result;
+	char cmd[128], buffer[128];
+
+	//cmd="docker inspect --format "{{ .State.Pid}}" b21c04e42a1"
+	snprintf(cmd, sizeof(cmd), "docker inspect --format \"{{ .State.Pid}}\" %s", con);
+	result = popen(cmd, "r");
+	if (feof(result) || !fgets(buffer, sizeof(buffer), result))
+		return 0;
+
+	pid = strtol(buffer, NULL, 10);
+	return pid;
+}
+
+/*
+ *@subpath: get the path the container's cgroup path
+ *@pid: the Pid of the container
+ *@cg: the group, like cpuset, cpu, memory...
+ * */
+static inline int get_con_cgpath_bypid(char *subpath, long pid, const char* cg, int alen)
+{
+	int ret = -1;
+	FILE *fp;
+	char cgroup_path[64] = {0};
+
+	snprintf(cgroup_path, sizeof(cgroup_path), "/proc/%ld/cgroup", pid);
+	fp = fopen(cgroup_path, "r");
+	if (!fp)
+		return errno;
+
+	memset(buf_1024, 0, 1024);
+	while(fgets(buf_1024, 1024, fp)) {
+		size_t len;
+		char *token;
+		if((token = strstr(buf_1024, cg)) != NULL) {
+			char *p;
+			p = strchr(token, ':');
+			if (!p)
+				continue;
+			strncpy(subpath, p+1, alen); /* skip ":" */
+			len = strlen(subpath);
+			subpath[len-1] = 0; 		/* skip the newline:\n */
+			ret = 0;
+		}
+	}
+	return ret;
+}
+
+static inline char *get_cgroup_path(const char *name, const char *cg, char *path, int len)
+{
+	int ret, index;
+	long pid;
+
+	pid = get_con_pid(name);
+	if (pid <= 0)
+		return NULL;
+	index = snprintf(path, len, "/sys/fs/cgroup/%s/", cg);
+	ret = get_con_cgpath_bypid(path+index, pid, cg, len-index-1);
+	if (!ret)
+		return path;
+
+	return NULL;
 }
 
 static unsigned long cgroup_init_time;
@@ -282,7 +343,7 @@ static int perf_event_init(struct cgroup_info *cgroup)
 	long long **counts;
 	char path[LEN_256];
 
-	if (!get_cgroup_path(cgroup->name, "perf_event", path))
+	if (!get_cgroup_path(cgroup->name, "perf_event", path, sizeof(path)))
 		return -1;
 
 	cgrp_id = open(path, O_RDONLY);
@@ -566,7 +627,7 @@ bool dockerd_alive(void)
 		if (fp) {
 			if (!fgets(comm, sizeof(comm), fp))
 				goto out;
-			if (!strcmp(comm, "dockerd")) {
+			if (!strncmp(comm, "dockerd", strlen("dockerd"))) {
 				ret =  true;
 				goto out;
 			}
@@ -590,11 +651,10 @@ static void init_cgroups(void)
 	n_cgs = 0;
 
 	/*check docker exit*/
-	if ((access("/bin/docker", F_OK) != F_OK &&
+	if (access("/bin/docker", F_OK) != F_OK &&
 		access("/usr/bin/docker", F_OK) != F_OK &&
 		access("/bin/docker", F_OK) != F_OK &&
-		access("/usr/bin/docker", F_OK) != F_OK) ||
-		!dockerd_alive()) {
+		access("/usr/bin/docker", F_OK) != F_OK) {
 		ret = enum_containers_ext("/sys/fs/cgroup/cpu/docker/");
 	} else {
 		ret = enum_containers();
@@ -614,7 +674,7 @@ static int get_load_and_enhanced_cpu_stats(int cg_idx)
 	FILE *file;
 	int items = 0, ret = 0;
 
-	if (!get_cgroup_path(cgroups[cg_idx].name, "cpuacct", filepath))
+	if (!get_cgroup_path(cgroups[cg_idx].name, "cpuacct", filepath, sizeof(filepath)))
 		return 0;
 
 	strcat(filepath, "/cpuacct.proc_stat");
@@ -705,7 +765,7 @@ static int get_cpu_stats(int cg_idx)
 	FILE *file;
 	int items = 0, ret = 0;
 
-	if (!get_cgroup_path(cgroups[cg_idx].name, "cpu", filepath))
+	if (!get_cgroup_path(cgroups[cg_idx].name, "cpu", filepath, sizeof(filepath)))
 		return 0;
 
 	strcat(filepath, "/cpu.stat");
@@ -799,7 +859,7 @@ static int get_memory_stats(int cg_idx)
 	int items = 0, ret = 0;
 	unsigned long long active_file, inactive_file, usage_in_bytes;
 
-	if (!get_cgroup_path(cgroups[cg_idx].name, "memory", filepath))
+	if (!get_cgroup_path(cgroups[cg_idx].name, "memory", filepath, sizeof(filepath)))
 		return 0;
 
 	path_end = filepath + strlen(filepath);
@@ -940,7 +1000,7 @@ static int get_blkinfo_stats(int cg_idx)
 	char *path_end = filepath;
 	int items = 0, ret = 0;
 
-	if (!get_cgroup_path(cgroups[cg_idx].name, "blkio", filepath))
+	if (!get_cgroup_path(cgroups[cg_idx].name, "blkio", filepath, sizeof(filepath)))
 		return 0;
 
 	path_end = filepath + strlen(filepath);

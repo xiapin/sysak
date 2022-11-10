@@ -47,6 +47,9 @@ char *module = "/sysak.ko";
 char *log_path="/var/log/sysak";
 char *system_modules = "/proc/modules";
 char *sysak_root_path = "/usr/local/sysak";
+char *python_bin = "/usr/bin/python";
+char *python2_bin = "/usr/bin/python2";
+char *python3_bin = "/usr/bin/python3";
 
 char kern_version[KVERSION];
 char machine[KVERSION];
@@ -78,8 +81,9 @@ static void usage(void)
     fprintf(stdout,
                 "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
                 "       cmd:\n"
-                "              list [-a], show subcmds\n"
-                "              help, help information for specify subcmd\n"
+                "              list [-a],	show subcmds\n"
+                "              -h/help, 	help information for specify subcmd\n"
+                "              -g, 		auto download btf and components\n"
                 "       subcmd: see the result of list\n");
 }
 
@@ -298,8 +302,8 @@ static int down_install(const char *component_name)
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else if (strcmp(component_name, "btf") == 0) {
-        sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s/%s",
-                sysak_components_server, machine, kern_version, tools_path, kern_version);
+        sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s",
+                sysak_components_server, machine, kern_version, tools_path);
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else {
@@ -318,7 +322,7 @@ static int check_or_install_components(const char *name)
     if (strcmp(name, "sysak_modules") == 0)
         sprintf(compents_path, "%s%s%s", module_path, kern_version, module);
     else if (strcmp(name, "btf") == 0)
-        sprintf(compents_path, "%s%s/vmlinux-%s", tools_path, kern_version, kern_version);
+        sprintf(compents_path, "%s/vmlinux-%s", tools_path, kern_version);
     else
         sprintf(compents_path, "%s%s", tools_path, name);
 
@@ -366,7 +370,14 @@ static int do_prev_depend(void)
 static void add_python_depend(char *depend,char *cmd)
 {
     if (!strcmp(depend, "all")) {
-        snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
+        if (!access(python_bin,0))
+            snprintf(tools_exec, sizeof(tools_exec), "python %s", cmd);
+        else if (!access(python2_bin,0))
+            snprintf(tools_exec, sizeof(tools_exec), "python2 %s", cmd);
+        else if (!access(python3_bin,0))
+            snprintf(tools_exec, sizeof(tools_exec), "python3 %s", cmd);
+        else
+            printf("please install python!\n");
     } else if (!strcmp(depend, "python3")) {
         snprintf(tools_exec, sizeof(tools_exec), "python3 %s", cmd);
     } else if(!strcmp(depend, "python2")) {
@@ -640,7 +651,7 @@ static int parse_arg(int argc, char *argv[])
         return 0;
     }
 
-    if (!strcmp(argv[1], "help")) {
+    if (!strcmp(argv[1], "help") || !strcmp(argv[1], "-h")) {
         usage();
         return 0;
     }

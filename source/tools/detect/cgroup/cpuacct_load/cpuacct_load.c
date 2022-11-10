@@ -68,7 +68,7 @@ static void print_cpuacct_load(struct cpuacct_load_bpf *obj, unsigned int knid)
 {
 	int fd = bpf_map__fd(obj->maps.cpuacct_load_hash_map);
 	int j, k, loop;
-	unsigned long key, next_key;
+	unsigned long key = -1, next_key;
 	struct cpuacct_load load;
 	bool find = false;
 	char dir[PATH_MAX];

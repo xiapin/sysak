@@ -101,7 +101,6 @@ check_packages_depend() {
 	if [ -f "$SH_ABS_PATH" ];then
 		rm -f $SH_ABS_PATH
 	fi
-	chmod +x $SH_ABS_PATH
 
 	echo "$(grep "DEP_PKG_INSTALL" $(pwd)/source/ -nr | awk -F ":=" '{print$2}'| tr -d "\"")"| while read line
 	do
@@ -120,6 +119,7 @@ check_packages_depend() {
 		IFS="$OLDIFS"
 		echo "cd $PWD" >> $SH_ABS_PATH
 	done
+	chmod +x $SH_ABS_PATH
 	exec ./$PACKAGEBUILD_TMP/$BUILD_SH
 	cd $PWD
 }
