@@ -132,8 +132,11 @@ static struct mod_info percpu_info[] = {
     {" guest", HIDE_BIT,  MERGE_SUM,  STATS_NULL},
 };
 
+char *percpu_lable = "cpu";
+
 void
 mod_register(struct module *mod)
 {
+	mod->lable = percpu_lable;
     register_mod_fields(mod, "--percpu", percpu_usage, percpu_info, 9, read_percpu_stats, set_percpu_record);
 }

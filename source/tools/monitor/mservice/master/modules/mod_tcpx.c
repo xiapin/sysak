@@ -133,5 +133,6 @@ static struct mod_info tcpx_info[]={
 void
 mod_register(struct module *mod)
 {
+	mod->lable = NULL;
     register_mod_fields(mod, "--tcpx", tcpx_usage, tcpx_info, 15, read_stat_tcpx, NULL);
 }

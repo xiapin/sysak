@@ -47,12 +47,12 @@ static struct mod_info jitter_info[] = {
 	{"  time", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of delay */
 	{"dltnum", SUMMARY_BIT,  0,  STATS_NULL},	/* delta numbers of happend */
 	{" dlttm", SUMMARY_BIT,  0,  STATS_NULL},	/* the delta time of delay */
-	{" <10ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 10ms */
-	{" <50ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 50ms */
-	{"<100ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 100ms */
-	{"<500ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 500ms */
-	{"   <1s", DETAIL_BIT,  0,  STATS_NULL},	/* less than 1s */
-	{"   >1s", DETAIL_BIT,  0,  STATS_NULL},	/* more than 1s */
+	{" lt10ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 10ms */
+	{" lt50ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 50ms */
+	{"lt100ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 100ms */
+	{"lt500ms", DETAIL_BIT,  0,  STATS_NULL},	/* less than 500ms */
+	{"   lt1s", DETAIL_BIT,  0,  STATS_NULL},	/* less than 1s */
+	{"   bt1s", DETAIL_BIT,  0,  STATS_NULL},	/* more than 1s */
 };
 
 #define NR_JITTER_INFO sizeof(jitter_info)/sizeof(struct mod_info)
@@ -213,9 +213,12 @@ set_jitter_record(struct module *mod, double st_array[],
 	//pre_array[1] = st_array[1];
 }
 
+char *jit_lable = "mode";
+
 void
 mod_register(struct module *mod)
 {
+	mod->lable = jit_lable;
 	register_mod_fields(mod, "--jit", jitter_usage, jitter_info,
 			NR_JITTER_INFO, read_jitter_stat, set_jitter_record);
 }

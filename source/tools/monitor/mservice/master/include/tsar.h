@@ -59,6 +59,6 @@ extern struct module    *mods[MAX_MOD_NUM];
 extern struct statistic statis;
 extern pthread_mutex_t module_record_mutex;
 extern pthread_mutex_t module_warn_mutex;
-extern int fire_warn;
+extern U_64 fire_warn;
 
 #endif

@@ -60,6 +60,7 @@ struct module {
     double *mean_array;
     double *min_array;
 	int warn_triger;
+	char *lable;
 
     /* callback function of module */
     void (*data_collect) (struct module *, char *);

@@ -48,8 +48,8 @@ unsigned int max_partitions = MAX_PARTITIONS;  /* Max of partitions */
 static struct mod_info io_info[] = {
     {" rrqms", DETAIL_BIT,  MERGE_SUM,  STATS_NULL},
     {" wrqms", DETAIL_BIT,  MERGE_SUM,  STATS_NULL},
-    {" %rrqm", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
-    {" %wrqm", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
+    {" rrqm", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},	//%
+    {" wrqm", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},	//%
     {"    rs", DETAIL_BIT,  MERGE_SUM,  STATS_NULL},
     {"    ws", DETAIL_BIT,  MERGE_SUM,  STATS_NULL},
     {" rsecs", DETAIL_BIT,  MERGE_SUM,  STATS_NULL},
@@ -338,8 +338,11 @@ set_io_record(struct module *mod, double st_array[],
         st_array[16] = 100.0;
 }
 
+char *io_lable = "device";
+
 void
 mod_register(struct module *mod)
 {
+	mod->lable = io_lable;
     register_mod_fields(mod, "--io", io_usage, io_info, 17, read_io_stat, set_io_record);
 }

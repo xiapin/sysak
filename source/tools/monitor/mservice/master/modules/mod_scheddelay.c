@@ -97,9 +97,12 @@ static struct mod_info scheddelay_info[] = {
 	{" pcnt", DETAIL_BIT,  MERGE_ITEM,  STATS_NULL},	/* pcount */
 };
 
+char *scheddelay_lable = "cpu";
+
 void
 mod_register(struct module *mod)
 {
+	mod->lable = scheddelay_lable;
 	register_mod_fields(mod, "--scheddelay", scheddelay_usage, scheddelay_info,
 		    NR_SCHEDDELAY_INFO, read_scheddelay_stats, set_scheddelay_record);
 }

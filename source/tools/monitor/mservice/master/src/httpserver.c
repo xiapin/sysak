@@ -52,6 +52,7 @@ int output_http(int sk, int req, const char*sub_req)
 	char *precord, *psub;
 	U_64 *raw_array;
 	double    *st_array;
+	char lable[32] = {0};
 
 	line[0] = 0;
 
@@ -77,14 +78,16 @@ int output_http(int sk, int req, const char*sub_req)
 					if ((req == REQUEST_METRIC_CGROUP || req == REQUEST_METRIC_CGROUP_RAW)
 						 && strcmp(precord, sub_req))
 						ignore = 1;
-					snprintf(opt_line, LEN_64, "%s{%s,", mod->opt_line+2, precord);
+					snprintf(opt_line, LEN_64, "%s_", mod->opt_line+2);
+					snprintf(lable, sizeof(lable), "{%s=\"%s\"}",mod->lable, precord);
 					precord = strstr(psub + 1, ";");
 					if (precord)
 						precord = precord + 1;
 					if (ignore)
 						continue;
                                 } else {
-                                        snprintf(opt_line, LEN_64, "%s{", mod->opt_line+2);
+					memset(lable, 0, sizeof(lable));
+                                        snprintf(opt_line, LEN_64, "%s_", mod->opt_line+2);
                                 }
 				if (req > REQUEST_METRIC_CGROUP_ALL && req < REQUEST_MAX)
 					raw_array = &mod->cur_array[j * mod->n_col];
@@ -95,11 +98,11 @@ int output_http(int sk, int req, const char*sub_req)
 						continue;
 
 					if (req > REQUEST_METRIC_CGROUP_ALL && req < REQUEST_MAX)
-                                        	n = snprintf(detail, LEN_1M, "%s%s} %6llu\n",
-							opt_line, trim(mod->info[k].hdr, LEN_128), raw_array[k]);
+                                        	n = snprintf(detail, LEN_1M, "%s%s%s %6llu\n",
+							opt_line, trim(mod->info[k].hdr, LEN_128), lable, raw_array[k]);
 					else
-                                        	n = snprintf(detail, LEN_1M, "%s%s} %6.2f\n",
-							opt_line, trim(mod->info[k].hdr, LEN_128), st_array[k]);
+                                        	n = snprintf(detail, LEN_1M, "%s%s%s %6.2f\n",
+							opt_line, trim(mod->info[k].hdr, LEN_128), lable, st_array[k]);
                                         if (n >= LEN_1M - 1) {
                                                 do_debug(LOG_FATAL, "mod %s lenth is overflow %d\n", mod->name, n);
                                         }

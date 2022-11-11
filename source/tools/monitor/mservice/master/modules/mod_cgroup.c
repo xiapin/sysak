@@ -207,7 +207,7 @@ static struct mod_info cg_info[] = {
 	{"drgl100", HIDE_BIT,  0,  STATS_NULL},
 	{"drgl500", HIDE_BIT,  0,  STATS_NULL},
 	{"drgl1s", HIDE_BIT,  0,  STATS_NULL},
-	{"drgl1s+", HIDE_BIT,  0,  STATS_NULL},
+	{"drgl1se", HIDE_BIT,  0,  STATS_NULL},
 	{"drglcnt", HIDE_BIT,  0,  STATS_NULL},
 	{"drgltime", HIDE_BIT,  0,  STATS_NULL},
 	{" drml1", HIDE_BIT,  0,  STATS_NULL},
@@ -216,7 +216,7 @@ static struct mod_info cg_info[] = {
 	{"drml100", HIDE_BIT,  0,  STATS_NULL},
 	{"drml500", HIDE_BIT,  0,  STATS_NULL},
 	{"drml1s", HIDE_BIT,  0,  STATS_NULL},
-	{"drml1s+", HIDE_BIT,  0,  STATS_NULL},
+	{"drml1se", HIDE_BIT,  0,  STATS_NULL},
 	{"drmlcnt", HIDE_BIT,  0,  STATS_NULL},
 	{"drmltime", HIDE_BIT,  0,  STATS_NULL},
 	{"  dcl1", HIDE_BIT,  0,  STATS_NULL},
@@ -225,7 +225,7 @@ static struct mod_info cg_info[] = {
 	{"dcl100", HIDE_BIT,  0,  STATS_NULL},
 	{"dcl500", HIDE_BIT,  0,  STATS_NULL},
 	{" dcl1s", HIDE_BIT,  0,  STATS_NULL},
-	{"dcl1s+", HIDE_BIT,  0,  STATS_NULL},
+	{"dcl1se", HIDE_BIT,  0,  STATS_NULL},
 	{"dclcnt", HIDE_BIT,  0,  STATS_NULL},
 	{"dcltime", HIDE_BIT,  0,  STATS_NULL},
 	/* io info 51-64*/
@@ -1442,8 +1442,11 @@ set_cgroup_record(struct module *mod, double st_array[],
 	set_cg_jit_record(&st_array[71], &pre_array[71], &cur_array[71]);
 }
 
+char *cg_lable = "cgroup";
+
 void
 mod_register(struct module *mod)
 {
+	mod->lable = cg_lable;
     register_mod_fields(mod, "--cg", cg_usage, cg_info, NR_CGROUP_INFO, read_cgroup_stat, set_cgroup_record);
 }

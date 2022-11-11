@@ -95,5 +95,6 @@ static struct mod_info vmevent_info[] = {
 void
 mod_register(struct module *mod)
 {
+	mod->lable = NULL;
     register_mod_fields(mod, "--vmevent", vmevent_storage, vmevent_info, 7, read_vmstat_vmevent, set_vmevent_record);
 }

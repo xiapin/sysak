@@ -26,7 +26,7 @@ struct module   *mods[MAX_MOD_NUM];
 
 pthread_mutex_t module_record_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t module_warn_mutex = PTHREAD_MUTEX_INITIALIZER;
-int fire_warn;
+U_64 fire_warn;
 
 void
 usage()

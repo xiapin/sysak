@@ -163,5 +163,6 @@ static struct mod_info cpu_info[] = {
 void
 mod_register(struct module *mod)
 {
+	mod->lable = NULL;
     register_mod_fields(mod, "--cpu", cpu_usage, cpu_info, 10, read_cpu_stats, set_cpu_record);
 }

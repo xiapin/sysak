@@ -69,6 +69,7 @@ static struct mod_info numabalance_info[] = {
 void
 mod_register(struct module *mod)
 {
+	mod->lable = NULL;
     register_mod_fields(mod, "--numabalance", numabalance_storage,
             numabalance_info, 3, read_vmstat_numabalance, set_numabalance_record);
 }
