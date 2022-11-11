@@ -25,6 +25,8 @@ struct configure conf;
 struct module   *mods[MAX_MOD_NUM];
 
 pthread_mutex_t module_record_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t module_warn_mutex = PTHREAD_MUTEX_INITIALIZER;
+int fire_warn;
 
 void
 usage()
@@ -268,6 +270,25 @@ void *cron_thread(void *arg)
     }
 }
 
+extern unsigned int gnr_cpus;
+void *warn_record_thread(void *arg)
+{
+	struct top_utils top;
+
+	/* Todo: The inits of all warn events may be summary in *a* function */
+	init_top_struct(&top, conf.output_dictory);
+	gnr_cpus = sysconf(_SC_NPROCESSORS_CONF);
+	while (1) {
+		/* dispatch it */
+		if (fire_warn | PERCPU_TRIGER<<32) {
+ 			record_top_util_proces(&top);
+			fire_warn &= ~(PERCPU_TRIGER<<32);
+		}
+		/* todo: ugly! we should be sync but not poll, please help me!!^_^ */
+		sleep(1);
+	}
+}
+
 void run_agent(void)
 {
     system(conf.agent_cmd);
@@ -275,7 +296,7 @@ void run_agent(void)
 
 static void serivce_main(void)
 {
-    pthread_t th;
+    pthread_t th, th_warn;
     int res;
 
     printf("server mode %s\n", conf.server_mode);
@@ -287,6 +308,11 @@ static void serivce_main(void)
            return;
         }
     }
+	res = pthread_create(&th_warn, NULL, warn_record_thread, NULL);
+	if (res) {
+		printf("create warn record thread failed\n");
+		return;
+	}
 
     if (strstr(conf.server_mode, "http")) {
         printf("mservice start http server..\n");
@@ -297,6 +323,7 @@ static void serivce_main(void)
         printf("mservice start agent: %s\n", conf.agent_cmd);
         run_agent();
     }
+
 }
 
 int

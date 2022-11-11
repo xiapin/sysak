@@ -59,6 +59,7 @@ struct module {
     double *max_array;
     double *mean_array;
     double *min_array;
+	int warn_triger;
 
     /* callback function of module */
     void (*data_collect) (struct module *, char *);

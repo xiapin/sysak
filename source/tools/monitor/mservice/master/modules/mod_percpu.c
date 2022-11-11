@@ -1,4 +1,5 @@
 #include "tsar.h"
+#include <stdbool.h>
 
 #define STAT_PATH "/proc/stat"
 
@@ -108,6 +109,15 @@ set_percpu_record(struct module *mod, double st_array[],
 
     /* util = user + sys + hirq + sirq + nice */
     st_array[5] = st_array[0] + st_array[1] + st_array[3] + st_array[4] + st_array[6];
+#if 0
+	/* this is a example for warn triger */
+	{	int idx = (st_array - &mod->st_array[0])/mod->n_col;
+		if (st_array[5] > 50) {
+			mod->warn_triger = (TRIGER_PERCPU << 32) | idx;
+		}
+	}
+#endif
+		
 }
 
 static struct mod_info percpu_info[] = {

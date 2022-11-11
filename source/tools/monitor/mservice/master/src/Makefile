@@ -1,5 +1,5 @@
 CC = gcc
-SRC = tsar.c config.c debug.c framework.c output_file.c output_print.c output_db.c output_tcp.c output_nagios.c httpserver.c common.c
+SRC = tsar.c config.c debug.c framework.c output_file.c output_print.c output_db.c output_tcp.c output_nagios.c output_warn.c httpserver.c common.c
 OBJ = $(patsubst %.c, %.o,$(SRC))
 
 BIN = mservice

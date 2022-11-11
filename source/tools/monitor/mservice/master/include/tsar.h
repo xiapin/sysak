@@ -45,6 +45,7 @@
 #include "output_tcp.h"
 #include "output_nagios.h"
 #include "output_http.h"
+#include "output_warn.h"
 #include "common.h"
 
 struct statistic {
@@ -57,5 +58,7 @@ extern struct configure conf;
 extern struct module    *mods[MAX_MOD_NUM];
 extern struct statistic statis;
 extern pthread_mutex_t module_record_mutex;
+extern pthread_mutex_t module_warn_mutex;
+extern int fire_warn;
 
 #endif

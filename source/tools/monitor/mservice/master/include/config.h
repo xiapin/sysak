@@ -77,6 +77,7 @@ struct configure {
 
     /* output file */
     char    output_file_path[LEN_128];
+    char    output_dictory[LEN_128];
 
     /* service mode*/
     char server_mode[LEN_128];

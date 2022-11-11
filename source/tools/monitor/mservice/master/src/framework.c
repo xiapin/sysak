@@ -241,6 +241,12 @@ realloc_module_array(struct module *mod, int n_n_item)
     }
 }
 
+void fire_warn_func(struct module *mod, U_64 warn_bitmaps)
+{
+	/* Todo: this is ugly, give it a elegant help, please */
+	fire_warn = warn_bitmaps;
+}
+
 /*
  * set st result in st_array
  */
@@ -344,7 +350,7 @@ int
 collect_record_stat()
 {
     int    i, n_item, ret, no_p_hdr = 1;
-    U_64  *tmp, array[MAX_COL_NUM] = {0};
+    U_64  warn_triger = 0, *tmp, array[MAX_COL_NUM] = {0};
     struct module *mod = NULL;
 
     for (i = 0; i < statis.total_mod_num; i++) {
@@ -393,6 +399,8 @@ collect_record_stat()
             /* get st record */
             if (no_p_hdr && mod->pre_flag && ret) {
                 set_st_record(mod);
+		if (mod->warn_triger)
+			warn_triger |= mod->warn_triger;
             }
 
             if (!ret) {
@@ -410,7 +418,8 @@ collect_record_stat()
         mod->pre_array = mod->cur_array;
         mod->cur_array = tmp;
     }
-
+	if (warn_triger)
+		fire_warn_func(mod, warn_triger);
     return no_p_hdr;
 }
 
