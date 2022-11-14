@@ -18,23 +18,23 @@ static int get_request(const char *buf, char *sub_req, int len)
 	char req_str[LEN_256];
 
 	sscanf(buf, "GET /%255s HTTP", req_str);
-	if (strcmp(req_str, "metric") == 0 || strcmp(req_str, "metric/") == 0) {
+	if (strcmp(req_str, "metrics") == 0 || strcmp(req_str, "metrics/") == 0) {
 		return REQUEST_METRIC_ROOT;
 	}
-	else if (strcmp(req_str, "metric/cgroups") == 0 || strcmp(req_str, "metric/cgroups/") == 0) {
+	else if (strcmp(req_str, "metrics/cgroups") == 0 || strcmp(req_str, "metrics/cgroups/") == 0) {
 		return REQUEST_METRIC_CGROUP_ALL;
 	}
-	else if (strncmp(req_str, "metric/cgroups/", 15) == 0) {
+	else if (strncmp(req_str, "metrics/cgroups/", 15) == 0) {
 		strncpy(sub_req, req_str + 15, len - 1);
 		return REQUEST_METRIC_CGROUP;
 	}
-	else if (strcmp(req_str, "metric/raw") == 0 || strcmp(req_str, "metric/raw/") == 0) {
+	else if (strcmp(req_str, "metrics/raw") == 0 || strcmp(req_str, "metrics/raw/") == 0) {
 		return REQUEST_METRIC_ROOT_RAW;
 	}
-	else if (strcmp(req_str, "metric/raw/cgroups") == 0 || strcmp(req_str, "metric/raw/cgroups/") == 0) {
+	else if (strcmp(req_str, "metrics/raw/cgroups") == 0 || strcmp(req_str, "metrics/raw/cgroups/") == 0) {
 		return REQUEST_METRIC_CGROUP_ALL_RAW;
 	}
-	else if (strncmp(req_str, "metric/raw/cgroups/", 19) == 0) {
+	else if (strncmp(req_str, "metrics/raw/cgroups/", 19) == 0) {
 		strncpy(sub_req, req_str + 19, len - 1);
 		return REQUEST_METRIC_CGROUP_RAW;
 	}
