@@ -328,8 +328,8 @@ class fsstatClass(diskstatClass):
         # (ext4_file_write_iter+0x0/0x6d0 [ext4]) dev=265289729 inode_num=530392 len=38
         # ...
         for entry in traceText:
-            if ('dev=' not in entry) or ('.so' in entry and 'lib' in entry) or (
-                '=\"etc\"' in entry) or ('=\"usr\"' in entry and (
+            if ('dev=' not in entry) or ('=\"etc\"' in entry) or (
+                '=\"usr\"' in entry and (
                 '=\"bin\"' in entry or '=\"sbin\"' in entry)):
                 continue
 
@@ -337,7 +337,9 @@ class fsstatClass(diskstatClass):
                     r'(.*) \[([^\[\]]*)\] (.*) dev=(.*) inode_num=(.*) len=(.*)'+
                     ' mntfname=(.*) bfname=(.*) d1fname=(.*) d2fname=(.*)'+
                     ' d3fname=(.*)'+commArgs, entry)
-            if matchObj is None:
+            if matchObj is None or ('.so' in matchObj.group(8).strip("\"") and\
+                'lib' in matchObj.group(9).strip("\"") and \
+                'usr' in matchObj.group(10).strip("\"")):
                 continue
 
             pid = (matchObj.group(1).rsplit('-', 1))[1].strip()
