@@ -72,7 +72,7 @@ install:
 	mkdir -p /var/log/sysak
 	cp $(SRC)/../rpm/sysak_server.conf /usr/local/sysak/
 ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf),)
-		cp $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf /etc/sysak/
+		cp $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf /usr/local/sysak/
 		cp $(SRC)/../rpm/sysak.service /usr/lib/systemd/system/
 endif
 
