@@ -171,7 +171,7 @@ class diskstatClass(object):
 
     def __showJson(self):
         deviceStatDicts = self.deviceStatDicts
-    
+        stSecs = str(self.cycle)+'s' if self.cycle > 1 else 's'
         statJsonStr = '{\
             "time":"",\
             "diskstats":[]}'
@@ -183,6 +183,8 @@ class diskstatClass(object):
             dstatJsonStr = '{\
                 "diskname":"","r_rqm":0,"w_rqm":0,"r_iops":0,"w_iops":0,\
                 "r_bps":0,"w_bps":0,"wait":0,"r_wait":0,"w_wait":0,"util%":0}'
+            stat['w_bps'] = humConvert(stat['w_bps'], True).replace('s', stSecs) if stat['w_bps'] else 0
+            stat['r_bps'] = humConvert(stat['r_bps'], True).replace('s', stSecs) if stat['r_bps'] else 0
             dstatDict = json.loads(dstatJsonStr, object_pairs_hook=OrderedDict)
             dstatDict["diskname"] = devname
             for key,val in stat.items():
