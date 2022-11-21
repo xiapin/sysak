@@ -132,7 +132,24 @@ def hugepagesz_supported(hugepagesz):
             return True
     return False
 
+def get_reserved_mem(meminfo):
+    cmd = "cat /proc/iomem | grep -wE 'Reserved|Crash kernel|Kernel code|Kernel data|Kernel bss'"
+    ret = os.popen(cmd).read().split("\n")
+    total = 0 
+    for line in ret:
+        line = line.strip()
+        if len(line) < 10: 
+            continue
+        addr = line.split(":")[0].strip()
+        start = addr.split("-")[0].strip()
+        end = addr.split("-")[1].strip()
+        size = int(end,16) - int(start,16)
+        total += size
+    meminfo['res'] = total/1024
+
 def get_page_used(meminfo):
+    get_reserved_mem(meminfo)
+    
     user = meminfo["Active(anon)"] + meminfo["Inactive(anon)"]
     user += meminfo["Active(file)"] + meminfo["Inactive(file)"]
     user += meminfo["Mlocked"]
@@ -140,7 +157,7 @@ def get_page_used(meminfo):
         user += meminfo["2048"]
     if "1048576" in meminfo:
         user += meminfo["1048576"]
-    kernelOther = meminfo["Slab"] + meminfo["KernelStack"] + meminfo["PageTables"]
+    kernelOther = meminfo["Slab"] + meminfo["KernelStack"] + meminfo["PageTables"] + meminfo['res']
     kernelOther += meminfo["VmallocUsed"]
     pageUsed = meminfo["MemTotal"] - meminfo["MemFree"] - user - kernelOther
     if pageUsed < 1:
@@ -233,6 +250,7 @@ def memgraph_graph(meminfo):
     user["shmem"] = meminfo["Shmem"]
     res["user"] = user
     kernel = {}
+    kernel["res"] = meminfo["res"]
     kernel["SReclaimable"] = meminfo["SReclaimable"]
     kernel["SUnreclaim"] = meminfo["SUnreclaim"]
     kernel["KernelStack"] = meminfo["KernelStack"]
