@@ -206,7 +206,7 @@ class iowaitClass():
             pid = commInfo[1].strip()
             if self.pid is not None and pid != self.pid:
                 continue
-            if bool(stat.has_key(pid)) != True:
+            if pid not in stat.keys():
                 if len(commArgs):
                     comm = matchObj.group(7).strip("\"")
                 else:

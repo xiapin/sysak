@@ -133,13 +133,13 @@ class iostatClass(diskstatClass):
             if device == '-' or self.notCareDevice(device) == True:
                 continue
             if self.miscStat is not None:
-                if not mStat.has_key(device):
+                if device not in mStat.keys():
                     mStat.setdefault(device, {})
                 stat = mStat[device]
             iotype = oneIO[-5-comm.count(' ')]
             sectors = oneIO[-2-comm.count(' ')]
             task = str(pid)+':'+device
-            if bool(stat.has_key(task)) != True:
+            if task not in stat.keys():
                 stat.setdefault(task,
                                 {"comm":"", "pid": pid, "iops_rd": 0,
                                 "iops_wr": 0, "bps_rd": 0, "bps_wr": 0,

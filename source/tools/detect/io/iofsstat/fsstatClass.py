@@ -361,13 +361,13 @@ class fsstatClass(diskstatClass):
                 continue
             if self.miscStat is not None:
                 disk = self.getMasterDev(dev)
-                if not mStat.has_key(disk):
+                if disk not in mStat.keys():
                     mStat.setdefault(disk, {})
                 stat = mStat[disk]
 
             ino = int(matchObj.group(5), self.outlogFormatBase)
             inoTask = str(ino)+':'+str(comm)+':'+device
-            if not stat.has_key(inoTask):
+            if inoTask not in stat.keys():
                 fsmountinfo = [f for f in self.fsmountInfo if ('/dev/'+device) in f]
                 fileInfoDict['device'] = device
                 fileInfoDict['mntfname'] = matchObj.group(7).strip("\"")

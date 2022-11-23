@@ -102,7 +102,7 @@ class diskstatClass(object):
                 '5':[0,0], '6':[0,0], '7':[0,0], '8':[0,0],\
                 '10':[0,0], '11':[0,0]}
             for idx,value in field.items():
-                value[0] = long(stat[int(idx)+2])
+                value[0] = int(stat[int(idx)+2])
             if stat[2] not in fieldDicts.keys():
                 fieldDicts.setdefault(stat[2], field)
                 path = os.readlink('/sys/class/block/'+stat[2]).split('/')
@@ -136,7 +136,7 @@ class diskstatClass(object):
                 stat[2] not in self.devname:
                 continue
             for idx,value in fieldDicts[stat[2]].items():
-                value[1] = long(stat[int(idx)+2])
+                value[1] = int(stat[int(idx)+2])
 
         for devname,field in fieldDicts.items():
             if self.devname is not None and devname not in self.devname and \

@@ -63,7 +63,7 @@ def main():
     signal.signal(signal.SIGHUP, signal_exit_handler)
     signal.signal(signal.SIGTERM, signal_exit_handler)
     if args.Timeout is not None:
-        timeoutSec = args.Timeout if args.Timeout > 0 else 10
+        timeoutSec = args.Timeout if int(args.Timeout) > 0 else 10
         secs = secs if secs > 0 else 1
         signal.signal(signal.SIGALRM, signal_exit_handler)
         signal.alarm(int(timeoutSec))
