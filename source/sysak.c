@@ -24,6 +24,7 @@ enum TOOL_TYPE {
     USER_TOOL,
     EXPERT_TOOL,
     MONITOR_TOOL,
+    BCLINUX_TOOL,
     MAX_TOOL_TYPE
 };
 
@@ -73,7 +74,8 @@ bool auto_get_components = false;
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
     {"sysak tools for user self-help analysis", NULL},
     {"sysak tools for system detail info", NULL},
-    {"sysak monitor service", NULL}
+    {"sysak monitor service", NULL},
+    {"sysak tools for bclinux", NULL}
 };
 
 static void usage(void)
@@ -422,7 +424,7 @@ static int exectue(int argc, char *argv[])
 
 static void print_each_tool(bool all)
 {
-    int i, max_idx = all ? MONITOR_TOOL : USER_TOOL;
+    int i, max_idx = all ? BCLINUX_TOOL : USER_TOOL;
     struct tool_list_node *curr;
     char last_module[MAX_NAME_LEN] = {0};
 
@@ -495,6 +497,8 @@ static int build_subcmd_info_from_file(FILE *fp, bool all)
             sscanf(tools_class_module, "detect/%[^:]", node->tool.module);
         } else if (strncmp(tools_class_module, "monitor", 7) == 0) {
             list = &tool_lists[MONITOR_TOOL];
+        } else if (strncmp(tools_class_module, "bclinux", 7) == 0) {
+            list = &tool_lists[BCLINUX_TOOL];
         } else {
             free(node);
             continue;
