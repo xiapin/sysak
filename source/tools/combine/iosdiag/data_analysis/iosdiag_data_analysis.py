@@ -261,12 +261,12 @@ class hangAnalysis():
 
 		diskIdx = diskIdxDicts[disk]
 		if "abnormal" in str(sDict):
-			totalIosDicts[disk] += 1
 			statDict = statDicts['summary'][diskIdx]
 			abnormalList = sDict['abnormal'].split()
 			component = abnormalList[0].split('(')[0]
 			if component not in components:
 				return
+			totalIosDicts[disk] += 1
 			hungComponentIdx = components.index(component)
 			hungDelay = float(abnormalList[-2])
 			statDict['hung ios'][hungComponentIdx]['count'] += 1
