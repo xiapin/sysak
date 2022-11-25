@@ -88,9 +88,9 @@ set_scheddelay_record(struct module *mod, double st_array[],
 
 static struct mod_info scheddelay_info[] = {
 	{"  yld", HIDE_BIT,  0,  STATS_NULL},	/* yld_count */
-	{" schd", HIDE_BIT,  0,  STATS_NULL},	/* sched_count */
+	{" schd", DETAIL_BIT,  0,  STATS_NULL},	/* sched_count */
 	{" idle", HIDE_BIT,  0,  STATS_NULL},	/* sched_goidle */
-	{" ttwc", HIDE_BIT,  0,  STATS_NULL},	/* ttwu_count */
+	{" ttwc", DETAIL_BIT,  0,  STATS_NULL},	/* ttwu_count */
 	{" ttwl", HIDE_BIT,  0,  STATS_NULL},	/* ttwu_local */
 	{" rqtm", HIDE_BIT,  0,  STATS_NULL},	/* rq_cpu_time */
 	{"delay", DETAIL_BIT,  MERGE_ITEM,  STATS_NULL},	/* run_delay */
