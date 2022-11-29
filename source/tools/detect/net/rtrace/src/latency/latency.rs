@@ -1,222 +1,292 @@
-use crate::latency::skel::*;
+use crate::message::MessageType;
 use anyhow::{bail, Result};
-use crate::latency::pidevent::PidEventType;
-use crate::latency::sockevent::SockEventType;
-use crate::latency::event::EventTypeTs;
+use crossbeam_channel::{Receiver, Sender};
+use eutils_rs::timestamp::current_monotime;
+use icmp::{IcmpEventType, IcmpEvents};
+use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use crate::common::*;
-use crate::utils::LogDistribution;
+use utils::*;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Clone, StructOpt)]
 pub struct LatencyCommand {
-    #[structopt(long, help = "Custom btf path")]
+    #[structopt(long, default_value = "tcp", help = "Network protocol type")]
+    proto: String,
+    #[structopt(long, help = "enable json output format")]
+    json: bool,
+    #[structopt(long, default_value = "3", help = "program running time in seconds")]
+    duration: usize,
+}
+
+struct Latency {
+    cmd: LatencyCommand,
+    debug: bool,
     btf: Option<String>,
-    #[structopt(long, help = "Pid of tracing process")]
-    pid: Option<u32>,
-    #[structopt(long, help = "Local network address of tracing skb")]
-    src: Option<String>,
-    #[structopt(long, help = "Remote network address of tracing skb")]
-    dst: Option<String>,
-    #[structopt(long, help = "tracing skb with high latency in netstack")]
-    netstack: bool,
-    #[structopt(long, help = "tracing packet latency from kernel to application")]
-    kernelapp: bool,
-
-    #[structopt(long, default_value = "200", help = "latency threshold in ms")]
-    threshold: u64,
-
-    #[structopt(long, default_value = "3", help = "Period of display in seconds.")]
-    period: u64,
-
-    #[structopt(
-        long,
-        default_value = "10240",
-        help = "Maximum number of tracing process"
-    )]
-    pidnum: u32,
-    #[structopt(long, default_value = "10240", help = "Maximum number of tracing sock")]
-    socknum: u32,
+    timeout: std::time::Duration,
+    rx: Receiver<MessageType>,
+    tx: Sender<MessageType>,
 }
 
-fn get_enabled_points(opts: &LatencyCommand) -> Vec<&str> {
-    let mut enabled = vec![];
-    if opts.netstack {
-        enabled.push("pfifo_fast_enqueue");
-        enabled.push("pfifo_fast_dequeue");
-    }
-
-    if opts.kernelapp {
-        enabled.push("tcp_rcv_established");
-        enabled.push("sock_def_readable");
-        enabled.push("tp__sched_switch");
-        enabled.push("tp__tcp_rcv_space_adjust");
-        enabled.push("kprobe_tcp_v4_destroy_sock");
-    }
-    enabled
-}
-
-pub fn build_latency(opts: &LatencyCommand, debug: bool, btf: &Option<String>) -> Result<()> {
-    // 1. get open skel
-    let mut skel = Skel::default();
-    let mut openskel = skel.open(debug, btf)?;
-
-    // 2. set map size before load
-    openskel
-        .maps_mut()
-        .sockmap()
-        .set_max_entries(opts.socknum)?;
-    openskel
-        .maps_mut()
-        .socktime_array()
-        .set_max_entries(opts.socknum)?;
-    openskel.maps_mut().pidmap().set_max_entries(opts.pidnum)?;
-    openskel
-        .maps_mut()
-        .pidtime_array()
-        .set_max_entries(opts.pidnum)?;
-    // 3. load
-    let mut enabled = get_enabled_points(opts);
-    skel.load_enabled(openskel, enabled)?;
-    // 4. set filter map
-    let mut filter = Filter::new();
-    filter.set_ap(&opts.src, &opts.dst)?;
-    if let Some(pid) = opts.pid {
-        filter.set_pid(pid);
-    }
-    filter.set_threshold(opts.threshold * 1000_000);
-    skel.filter_map_update(0, unsafe {
-        std::mem::transmute::<commonbinding::filter, filter>(filter.filter())
-    })?;
-    // 5. attach
-    skel.attach()?;
-
-    loop {
-        if opts.netstack {
-            // std::thread::sleep(std::time::Duration::from_secs(opts.period));
-            // let ohist = latency.get_loghist()?;
-            // if let Some(hist) = ohist {
-            //     let logdis = hist.to_logdistribution();
-            //     println!("{}", logdis);
-            // }
+impl Latency {
+    pub fn new(cmd: &LatencyCommand, debug: bool, btf: &Option<String>) -> Self {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        Latency {
+            cmd: cmd.clone(),
+            debug: debug,
+            btf: btf.clone(),
+            timeout: std::time::Duration::from_millis(200),
+            rx,
+            tx,
         }
+    }
 
-        if opts.kernelapp {
-            if let Some(data) = skel.poll(std::time::Duration::from_millis(100))? {
-                let event = Event::new(data);
+    fn start_icmp_thread(&self) {
+        let mut icmp = icmp::Icmp::new(self.debug, &self.btf);
+        let tx = self.tx.clone();
+        let timeout = self.timeout;
+        std::thread::spawn(move || loop {
+            if let Some(event) = icmp.poll(timeout).unwrap() {
+                tx.send(MessageType::MessageIcmpEvent(event.0)).unwrap();
+                tx.send(MessageType::MessageIcmpEvent(event.1)).unwrap();
+            }
+        });
+    }
 
-                match event.event_type() {
-                    EventType::LatencyEvent => {
-                        let queue_ts = event.queue_ts();
-                        let rcv_ts = event.rcv_ts();
-                        let latency_ms = (rcv_ts - queue_ts) / 1_000_000;
-                        let pidtime_array_idx = event.pidtime_array_idx();
-                        let socktime_array_idx = event.socktime_array_idx();
+}
 
-                        let mut eventts_vec = Vec::new();
 
-                        if let Some(x) = skel.pidtime_array_lookup(pidtime_array_idx)? {
-                            for i in 0..PID_EVENTS_MAX {
-                                let pidevent_ty = PidEventType::from(i);
-                                for ts in tss_in_range(
-                                    &x.pidevents[i as usize] as *const seconds4_ring
-                                        as *const commonbinding::seconds4_ring,
-                                    queue_ts,
-                                    rcv_ts,
-                                ) {
-                                    eventts_vec.push(EventTypeTs::PidEvent(pidevent_ty, ts));
-                                }
-                            }
-                        }
+#[derive(Serialize, Deserialize, Default)]
+struct LatencySenderJson {
+    send: u64,
+    out: u64,
+    recv: u64,
+}
 
-                        if let Some(x) = skel.socktime_array_lookup(socktime_array_idx)? {
-                            for i in 0..SOCK_EVENTS_MAX {
-                                let sockevent_ty = SockEventType::from(i);
+#[derive(Serialize, Deserialize, Default)]
+struct LatencyReceiverJson {
+    recv: u64,
+    send: u64,
+}
 
-                                for ts in tss_in_range(
-                                    &x.sockevents[i as usize] as *const seconds4_ring
-                                        as *const commonbinding::seconds4_ring,
-                                    queue_ts,
-                                    rcv_ts,
-                                ) {
-                                    eventts_vec.push(EventTypeTs::SockEvent(sockevent_ty, ts));
-                                }
-                            }
-                        }
+#[derive(Serialize, Deserialize, Default)]
+struct LatencyIcmpJson {
+    sender: Vec<LatencySenderJson>,
+    receiver: Vec<LatencyReceiverJson>,
 
-                        eventts_vec.push(EventTypeTs::KernelRcv(queue_ts));
-                        eventts_vec.push(EventTypeTs::AppRcv(rcv_ts));
-                        eventts_vec.sort_by(|a, b| a.ts().cmp(&b.ts()));
+    send_event_count: usize,
+    recv_envet_count: usize,
+    partial_event_count: usize,
 
-                        // pid/comm src -> dst ms
-                        println!(
-                            "{:>10}/{:<16} {:>25} -> {:<25} latency {}ms",
-                            event.pid(),
-                            event.comm(),
-                            event.local(),
-                            event.remote(),
-                            latency_ms
-                        );
-                        print!("{}", eventts_vec[0]);
-                        for i in 1..eventts_vec.len() {
-                            print!(
-                                "->{}-> {}",
-                                (eventts_vec[i].ts() - eventts_vec[i - 1].ts()) / 1_000_000,
-                                eventts_vec[i]
-                            );
-                        }
-                        println!("");
-                    }
-                    _ => {
-                        bail!("Unrecognized event type")
-                    }
+    sender_max: LatencySenderJson,
+    sender_min: LatencySenderJson,
+    sender_avg: LatencySenderJson,
+
+    receiver_max: LatencyReceiverJson,
+    receiver_min: LatencyReceiverJson,
+    receiver_avg: LatencyReceiverJson,
+}
+
+fn sender_json(events: &IcmpEvents) -> Option<LatencySenderJson> {
+    let mut ping_send = None;
+    let mut dev_xmit = None;
+    let mut netif_rcv = None;
+    let mut ping_rcv = None;
+    for (idx, event) in events.events.iter().enumerate() {
+        match event.ty {
+            IcmpEventType::PingSnd => {
+                if ping_send.is_none() {
+                    ping_send = Some(idx);
                 }
+            }
+            IcmpEventType::PingNetDevXmit => {
+                dev_xmit = Some(idx);
+            }
+            IcmpEventType::PingNetifRcv => {
+                netif_rcv = Some(idx);
+            }
+            IcmpEventType::PingRcv => {
+                ping_rcv = Some(idx);
+            }
+            _ => {}
+        }
+    }
+
+    if ping_send.is_none() || dev_xmit.is_none() || netif_rcv.is_none() || ping_rcv.is_none() {
+        return None;
+    }
+
+    Some(LatencySenderJson {
+        send: events.events[dev_xmit.unwrap()].ts - events.events[ping_send.unwrap()].ts,
+        out: events.events[netif_rcv.unwrap()].ts - events.events[dev_xmit.unwrap()].ts,
+        recv: events.events[ping_rcv.unwrap()].ts - events.events[netif_rcv.unwrap()].ts,
+    })
+}
+
+fn receiver_json(events: &IcmpEvents) -> Option<LatencyReceiverJson> {
+    let mut dev_xmit = None;
+    let mut netif_rcv = None;
+    let mut icmp_rcv = None;
+    for (idx, event) in events.events.iter().enumerate() {
+        match event.ty {
+            IcmpEventType::PingNetDevXmit => {
+                dev_xmit = Some(idx);
+            }
+            IcmpEventType::PingNetifRcv => {
+                if netif_rcv.is_none() {
+                    netif_rcv = Some(idx);
+                }
+            }
+            IcmpEventType::PingIcmpRcv => {
+                icmp_rcv = Some(idx);
+            }
+            _ => {}
+        }
+    }
+
+    if dev_xmit.is_none() || netif_rcv.is_none() || icmp_rcv.is_none() {
+        return None;
+    }
+
+    Some(LatencyReceiverJson {
+        send: events.events[dev_xmit.unwrap()].ts - events.events[icmp_rcv.unwrap()].ts,
+        recv: events.events[icmp_rcv.unwrap()].ts - events.events[netif_rcv.unwrap()].ts,
+    })
+}
+
+impl LatencyIcmpJson {
+    pub fn add_event(&mut self, events: &IcmpEvents) {
+        if events.sender {
+            if let Some(json) = sender_json(events) {
+                self.sender.push(json);
+            } else {
+                self.partial_event_count += 1;
+            }
+        } else {
+            if let Some(json) = receiver_json(events) {
+                self.receiver.push(json);
+            } else {
+                self.partial_event_count += 1;
             }
         }
     }
-    Ok(())
+
+    pub fn stat(&mut self) {
+
+        self.recv_envet_count = self.receiver.len();
+        self.send_event_count = self.sender.len();
+        let mut t1 = 0;
+        let mut t2 = 0;
+        let mut t3 = 0;
+        if !self.sender.is_empty() {
+            self.sender_min.send  = u64::MAX;
+            self.sender_min.out  = u64::MAX;
+            self.sender_min.recv  = u64::MAX;
+            for send in &self.sender {
+                self.sender_max.send = std::cmp::max(self.sender_max.send, send.send);
+                self.sender_max.out = std::cmp::max(self.sender_max.out, send.out);
+                self.sender_max.recv = std::cmp::max(self.sender_max.recv, send.recv);
+    
+                self.sender_min.send = std::cmp::min(self.sender_min.send, send.send);
+                self.sender_min.out = std::cmp::min(self.sender_min.out, send.out);
+                self.sender_min.recv = std::cmp::min(self.sender_min.recv, send.recv);
+    
+                t1 += send.send;
+                t2 += send.out;
+                t3 += send.recv;
+            }
+    
+            self.sender_avg.send = t1 / self.sender.len() as u64;
+            self.sender_avg.out = t2 / self.sender.len() as u64;
+            self.sender_avg.recv = t3 / self.sender.len() as u64;
+        }
+
+        if !self.receiver.is_empty() {
+            t1 = 0;
+            t3 = 0;
+            self.receiver_min.send = u64::MAX;
+            self.receiver_min.recv = u64::MAX;
+            for recv in &self.receiver {
+                self.receiver_max.send = std::cmp::max(self.receiver_max.send, recv.send);
+                self.receiver_max.recv = std::cmp::max(self.receiver_max.recv, recv.recv);
+    
+                self.receiver_min.send = std::cmp::min(self.receiver_min.send, recv.send);
+                self.receiver_min.recv = std::cmp::min(self.receiver_min.recv, recv.recv);
+    
+                t1 += recv.send;
+                t3 += recv.recv;
+            }
+    
+            self.receiver_avg.send = t1 / self.receiver.len() as u64;
+            self.receiver_avg.recv = t3 / self.receiver.len() as u64;
+        }
+        
+    }
 }
 
-pub struct Loghist {
-    lh: loghist,
+fn run_latency_icmp(cmd: &LatencyCommand, debug: bool, btf: &Option<String>) {
+    let mut latency = Latency::new(cmd, debug, btf);
+    latency.start_icmp_thread();
+
+    let mut boot_ts = 0;
+    let mut start_ts = 0;
+    let mut end_ts = 0;
+    let mut show_message = "".to_owned();
+
+    let start = current_monotime();
+    let duration = (cmd.duration as u64) * 1_000_000_000;
+    let mut latency_json = LatencyIcmpJson::default();
+
+    loop {
+        match latency.rx.recv_timeout(std::time::Duration::from_millis(200)) {
+            Ok(event) => match event {
+                MessageType::MessageIcmpEvent(icmpe) => {
+                    if icmpe.events.len() == 0 {
+                        continue;
+                    }
+
+                    if cmd.json {
+                        latency_json.add_event(&icmpe);
+                    } else {
+                        show_message = icmpe.to_string();
+                        start_ts = icmpe.start_ts();
+                        end_ts = icmpe.end_ts();
+                    }
+                }
+                _ => {}
+            },
+            Err(_) => {
+                if !cmd.json {
+                    continue;
+                }
+            }
+        }
+        if boot_ts == 0 {
+            boot_ts = start_ts;
+        }
+
+        if current_monotime() - start > duration {
+            break;
+        }
+        if !cmd.json {
+            println!(
+                "SinceBootTimeDuration: {}ms -> {}ms\n{}",
+                (start_ts - boot_ts) / 1_000_000,
+                (end_ts - boot_ts) / 1_000_000,
+                show_message
+            );
+        }
+    }
+
+    latency_json.stat();
+    println!("{}", serde_json::to_string(&latency_json).unwrap());
 }
 
-impl Loghist {
-    pub fn zero() -> Loghist {
-        Loghist {
-            lh: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
+pub fn run_latency(cmd: &LatencyCommand, debug: bool, btf: &Option<String>) {
+    let mut latency = Latency::new(cmd, debug, btf);
+
+    match cmd.proto.as_str() {
+        "icmp" => {
+            run_latency_icmp(cmd, debug, btf);
         }
-    }
-
-    pub fn new(data: Vec<u8>) -> Loghist {
-        let mut lh = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
-        let ptr = &data[0] as *const u8 as *const loghist;
-
-        unsafe {
-            std::ptr::copy_nonoverlapping(ptr, &mut lh, 1);
-        }
-
-        Loghist { lh }
-    }
-
-    pub fn to_logdistribution(&self) -> LogDistribution {
-        let mut logdis = LogDistribution::default();
-
-        let mut idx = 0;
-        for i in self.lh.hist {
-            logdis.dis[idx] = i as usize;
-            idx += 1;
-        }
-
-        logdis
-    }
-
-    pub fn vec(&self) -> Vec<u8> {
-        unsafe {
-            std::slice::from_raw_parts(
-                &self.lh as *const loghist as *const u8,
-                std::mem::size_of::<loghist>(),
-            )
-            .to_vec()
-        }
+        _ => {}
     }
 }

@@ -1,33 +1,21 @@
-// mod abnormal;
-mod drop;
 mod latency;
-mod latencylegacy;
-mod abnormal;
-// mod sli;
-mod utils;
-mod stack;
-mod retran;
-mod connectlatency;
+use crate::latency::latency::{run_latency, LatencyCommand};
 
-mod common;
-mod perf;
+mod delta;
+use crate::delta::delta::{run_delta, DeltaCommand};
+
+mod drop;
+use crate::drop::drop::{run_drop, DropCommand};
+
+mod retran;
+use crate::retran::{RetranCommand, run_retran};
 
 use anyhow::{bail, Result};
 use structopt::StructOpt;
 
-use drop::{DropCommand, build_drop};
-use latency::latency::{LatencyCommand, build_latency};
-use retran::retran::{RetranCommand, build_retran};
-use abnormal::abnormal::{build_abnormal, AbnormalCommand};
-use connectlatency::connectlatency::{build_connectlatency, ConnectlatencyCommand};
 
-// use abnormal::build_abnormal;
-// use latency::{build_latency, LatencyCommand};
-use latencylegacy::{build_latency_legacy, LatencyLegacyCommand};
-// use sli::build_sli;
-
-// use abnormal::AbnormalCommand;
-// use sli::SliCommand;
+mod message;
+use std::path::Path;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rtrace", about = "Diagnosing tools of kernel network")]
@@ -44,49 +32,35 @@ pub struct Command {
 
 #[derive(Debug, StructOpt)]
 enum SubCommand {
-    #[structopt(name = "abnormal", about = "Abnormal connection diagnosing")]
-    Abnormal(AbnormalCommand),
     #[structopt(name = "drop", about = "Packet drop diagnosing")]
     Drop(DropCommand),
     #[structopt(name = "latency", about = "Packet latency tracing")]
     Latency(LatencyCommand),
-    #[structopt(name = "latencylegacy", about = "Packet latency tracing(legacy version)")]
-    LatencyLegacy(LatencyLegacyCommand),
-    // #[structopt(name = "sli", about = "Collection machine sli")]
-    // Sli(SliCommand),
-    #[structopt(name = "retran", about = "Packet retransmission tracing")]
+    #[structopt(name = "delta", about = "Store or display delta information")]
+    Delta(DeltaCommand),
+    #[structopt(name = "retran", about = "Tracing retransmit")]
     Retran(RetranCommand),
-    #[structopt(name = "connectlatency", about = "connect latency")]
-    ConnectLatency(ConnectlatencyCommand),
 }
 
 fn main() -> Result<()> {
     env_logger::init();
     let opts = Command::from_args();
 
+    let mut btf = opts.btf.clone();
     eutils_rs::helpers::bump_memlock_rlimit()?;
 
     match opts.subcommand {
-        SubCommand::Abnormal(cmd) => {
-            build_abnormal(&cmd, opts.verbose, &opts.btf)?;
-        }
         SubCommand::Drop(cmd) => {
-            build_drop(&cmd, opts.verbose, &opts.btf)?;
+            run_drop(&cmd, opts.verbose, &btf);
         }
         SubCommand::Latency(cmd) => {
-            build_latency(&cmd, opts.verbose, &opts.btf)?;
+            run_latency(&cmd, opts.verbose, &btf);
         }
-        SubCommand::LatencyLegacy(cmd) => {
-            build_latency_legacy(&cmd, opts.verbose, &opts.btf)?;
+        SubCommand::Delta(cmd) => {
+            run_delta(&cmd);
         }
-        // SubCommand::Sli(cmd) => {
-        //     build_sli(&cmd)?;
-        // }
         SubCommand::Retran(cmd) => {
-            build_retran(&cmd, opts.verbose, &opts.btf)?;
-        }
-        SubCommand::ConnectLatency(cmd) => {
-            build_connectlatency(&cmd, opts.verbose, &opts.btf)?;
+            run_retran(&cmd, opts.verbose, &btf);
         }
     }
 
