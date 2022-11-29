@@ -12,7 +12,6 @@ pub mod macros;
 
 pub use {
     self::logdistribution::LogDistribution,
-    self::distribution::Distribution,
     self::delta_dev::DeltaDev,
     self::delta_netstat::DeltaNetstat,
     self::delta_snmp::DeltaSnmp,

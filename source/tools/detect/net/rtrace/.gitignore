@@ -2,3 +2,6 @@
 .output/
 .vscode/
 src/bindings/
+backup/
+rtrace
+rtrace.tar.gz

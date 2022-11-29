@@ -17,6 +17,8 @@ typedef unsigned int u32;
 typedef long long unsigned int u64;
 #endif
 
+#define MAX_STACK_DEPTH     20        // max depth of each stack trace to track
+
 enum
 {
     DROP_KFREE_SKB = 0,
@@ -24,6 +26,7 @@ enum
     DROP_IPTABLES_DROP,
     DROP_NFCONNTRACK_DROP,
     LATENCY_EVENT,
+    CONNECT_LATENCY_EVENT,
     EVENT_UNKNOWN,
 };
 
@@ -102,9 +105,12 @@ struct event
             u32 retran;
             u32 ooo;
         } abnormal;
+        struct 
+        {
+            u64 sock;
+        } connectlatency;
     };
     // rcvnxt
-};
 
 struct filter
 {
@@ -131,20 +137,73 @@ struct seconds4_ring
 
 #ifdef __VMLINUX_H__
 
+// return u64
+#define ns() bpf_ktime_get_ns()
+// return u32
+#define pid() (bpf_get_current_pid_tgid() >> 32)
+// return u32
+#define tid() ((u32)bpf_get_current_pid_tgid())
+#define COMM(comm) bpf_get_current_comm(comm, sizeof(comm))
+#define comm(c) COMM(c)
+// return u32
+#define cpu() bpf_get_smp_processor_id()
+
+// https://github.com/aquasecurity/tracee/blob/main/pkg/ebpf/c/tracee.bpf.c
+#define BPF_MAP(_name, _type, _key_type, _value_type, _max_entries) \
+    struct                                                          \
+    {                                                               \
+        __uint(type, _type);                                        \
+        __uint(max_entries, _max_entries);                          \
+        __type(key, _key_type);                                     \
+        __type(value, _value_type);                                 \
+    } _name SEC(".maps");
+
+#define BPF_HASH(_name, _key_type, _value_type, _max_entries) \
+    BPF_MAP(_name, BPF_MAP_TYPE_HASH, _key_type, _value_type, _max_entries)
+
+#define BPF_LRU_HASH(_name, _key_type, _value_type, _max_entries) \
+    BPF_MAP(_name, BPF_MAP_TYPE_LRU_HASH, _key_type, _value_type, _max_entries)
+
+#define BPF_ARRAY(_name, _value_type, _max_entries) \
+    BPF_MAP(_name, BPF_MAP_TYPE_ARRAY, u32, _value_type, _max_entries)
+
+#define BPF_PERCPU_ARRAY(_name, _value_type, _max_entries) \
+    BPF_MAP(_name, BPF_MAP_TYPE_PERCPU_ARRAY, u32, _value_type, _max_entries)
+
+#define BPF_PROG_ARRAY(_name, _max_entries) \
+    BPF_MAP(_name, BPF_MAP_TYPE_PROG_ARRAY, u32, u32, _max_entries)
+
+#define BPF_PERF_OUTPUT(_name, _max_entries) \
+    BPF_MAP(_name, BPF_MAP_TYPE_PERF_EVENT_ARRAY, int, __u32, _max_entries)
+
+// stack traces: the value is 1 big byte array of the stack addresses
+typedef __u64 stack_trace_t[MAX_STACK_DEPTH];
+#define BPF_STACK_TRACE(_name, _max_entries)                                                       \
+    BPF_MAP(_name, BPF_MAP_TYPE_STACK_TRACE, u32, stack_trace_t, _max_entries)
+
+
+#define READ_KERN(ptr)                                    \
+    ({                                                    \
+        typeof(ptr) _val;                                 \
+        __builtin_memset((void *)&_val, 0, sizeof(_val)); \
+        bpf_core_read((void *)&_val, sizeof(_val), &ptr); \
+        _val;                                             \
+    })
+
+#define READ_USER(ptr)                                         \
+    ({                                                         \
+        typeof(ptr) _val;                                      \
+        __builtin_memset((void *)&_val, 0, sizeof(_val));      \
+        bpf_core_read_user((void *)&_val, sizeof(_val), &ptr); \
+        _val;                                                  \
+    })
+
 struct
 {
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(u32));
     __uint(value_size, sizeof(u32));
 } perf_map SEC(".maps");
-
-struct
-{
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
-    __type(key, u32);
-    __type(value, struct filter);
-} filter_map SEC(".maps");
 
 static __always_inline void set_addr_pair_by_sock(struct sock *sk, struct addr_pair *ap)
 {

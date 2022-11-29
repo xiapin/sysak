@@ -50,6 +50,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "bincode"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f609ceb2c41b0d0277314a789ef0e7eb14593d5485f7c67320bed3924ebb1b33"
+dependencies = [
+ "bincode_derive",
+]
+
+[[package]]
+name = "bincode_derive"
+version = "2.0.0-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913287a8f3e00db4c7ae1b87e9b9b8cebd6b89217eaadfc281fa5c897da35dc3"
+dependencies = [
+ "virtue",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.59.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -59,6 +77,29 @@ dependencies = [
  "cexpr",
  "clang-sys",
  "clap 2.34.0",
+ "env_logger",
+ "lazy_static",
+ "lazycell",
+ "log",
+ "peeking_take_while",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "which",
+]
+
+[[package]]
+name = "bindgen"
+version = "0.60.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "062dddbc1ba4aca46de6338e2bf87771414c335f7b2f2036e8f3e9befebf88e6"
+dependencies = [
+ "bitflags",
+ "cexpr",
+ "clang-sys",
+ "clap 3.2.2",
  "env_logger",
  "lazy_static",
  "lazycell",
@@ -94,31 +135,30 @@ dependencies = [
  "scroll_derive",
  "structopt",
  "syn",
+ "tempfile",
 ]
 
 [[package]]
-name = "bpfskeltest"
+name = "builder"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "buildertest"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bindgen",
- "bpfskel",
- "byteorder",
- "chrono",
- "clearscreen",
+ "builder",
  "crossbeam-channel",
- "env_logger",
- "libbpf-cargo",
  "libbpf-rs",
  "libbpf-sys",
- "libc",
  "log",
- "nix 0.22.3",
  "once_cell",
- "regex",
- "structopt",
- "strum",
- "strum_macros 0.24.0",
 ]
 
 [[package]]
@@ -163,6 +203,27 @@ name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
+
+[[package]]
+name = "cenum-rs"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "cenum-rs"
+version = "0.1.0"
+source = "git+https://github.com/chengshuyi/cenum-rs.git#9c15c90d1945648508ae4b723693fa3f2211815a"
+dependencies = [
+ "libc",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "cexpr"
@@ -218,7 +279,7 @@ dependencies = [
  "ansi_term",
  "atty",
  "bitflags",
- "strsim",
+ "strsim 0.8.0",
  "textwrap 0.11.0",
  "unicode-width",
  "vec_map",
@@ -230,11 +291,14 @@ version = "3.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e538f9ee5aa3b3963f09a997035f883677966ed50fce0292611927ce6f6d8c6"
 dependencies = [
+ "atty",
  "bitflags",
  "clap_derive",
  "clap_lex",
  "indexmap",
  "lazy_static",
+ "strsim 0.10.0",
+ "termcolor",
  "textwrap 0.15.0",
 ]
 
@@ -303,6 +367,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctrlc"
+version = "3.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b37feaa84e6861e00a1f5e5aa8da3ee56d605c9992d33e082786754828e20865"
+dependencies = [
+ "nix 0.24.2",
+ "winapi",
+]
+
+[[package]]
 name = "dirs"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -321,6 +395,26 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
+]
+
+[[package]]
+name = "drop"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bindgen 0.60.1",
+ "builder",
+ "cenum-rs 0.1.0 (git+https://github.com/chengshuyi/cenum-rs.git)",
+ "crossbeam-channel",
+ "eutils-rs",
+ "libbpf-cargo",
+ "libbpf-rs",
+ "libbpf-sys",
+ "libc",
+ "log",
+ "once_cell",
+ "plain",
+ "utils",
 ]
 
 [[package]]
@@ -485,6 +579,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
+name = "icmp"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bindgen 0.60.1",
+ "builder",
+ "cenum-rs 0.1.0",
+ "crossbeam-channel",
+ "libbpf-cargo",
+ "libbpf-rs",
+ "libbpf-sys",
+ "libc",
+ "log",
+ "once_cell",
+ "plain",
+ "utils",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -529,9 +642,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libbpf-cargo"
-version = "0.12.0"
+version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaf5aa8869d22f08ce73f6a39c99edced1ee8a9cf03ed3dd72c3fdfa30e3ca5e"
+checksum = "aa9bdbd32bc3fd6a2b6ca7a73cf1a4976c1da51be8367849226573348f338ec0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -551,9 +664,9 @@ dependencies = [
 
 [[package]]
 name = "libbpf-rs"
-version = "0.18.0"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55e3866eeb5fbe7d4df56865d409edb8dac7a1dcc7a99570423ab71fbfbd100a"
+checksum = "ae623007dfcd01956d889e06f2c003106573158fe61e88450e9f448466d6dbed"
 dependencies = [
  "bitflags",
  "lazy_static",
@@ -567,9 +680,9 @@ dependencies = [
 
 [[package]]
 name = "libbpf-sys"
-version = "0.8.3+v0.8.1"
+version = "1.0.4+v1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31a75b565b9fa61e0ca3b5bf7b7af09d8f794f66e0cfce982d44f10e81aa010c"
+checksum = "6295785ed176d06d7a03595331cd89b986a0f4af84a7f35e8e745af9787f0b13"
 dependencies = [
  "cc",
  "pkg-config",
@@ -710,6 +823,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_cpus"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19e64526ebdee182341572e50e9ad03965aa510cd94427a4549448f285e957a1"
+dependencies = [
+ "hermit-abi",
+ "libc",
+]
+
+[[package]]
 name = "num_enum"
 version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -732,9 +855,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.11.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b10983b38c53aebdf33f542c6275b0f58a238129d00c4ae0e6fb59738d783ca"
+checksum = "2f7254b99e31cad77da24b08ebf628882739a608578bb1bcdfc1f9c21260d7c0"
 
 [[package]]
 name = "os_str_bytes"
@@ -744,15 +867,24 @@ checksum = "648001efe5d5c0102d8cea768e348da85d90af8ba91f0bea908f157951493cd4"
 
 [[package]]
 name = "paste"
-version = "1.0.8"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9423e2b32f7a043629287a536f21951e8c6a82482d0acb1eeebfc90bc2225b22"
+checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
 
 [[package]]
 name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
+
+[[package]]
+name = "perf-event-open-sys"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce9bedf5da2c234fdf2391ede2b90fabf585355f33100689bc364a3ea558561a"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "phf"
@@ -797,6 +929,12 @@ name = "pkg-config"
 version = "0.3.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1df8c4ec4b0627e53bdf214615ad287367e482558cf84b109250b37464dc03ae"
+
+[[package]]
+name = "plain"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "ppv-lite86"
@@ -944,9 +1082,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.5"
+version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a11647b6b25ff05a515cb92c365cec08801e83423a235b51e231e1808747286"
+checksum = "4c4eb3267174b8c6c2f654116623910a0fef09c4753f8dd83db29c48a0df988b"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -955,9 +1093,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.25"
+version = "0.6.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
+checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
 
 [[package]]
 name = "remove_dir_all"
@@ -969,19 +1107,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "retran"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bindgen 0.60.1",
+ "builder",
+ "cenum-rs 0.1.0 (git+https://github.com/chengshuyi/cenum-rs.git)",
+ "crossbeam-channel",
+ "eutils-rs",
+ "gettid",
+ "libbpf-cargo",
+ "libbpf-rs",
+ "libbpf-sys",
+ "libc",
+ "log",
+ "num_cpus",
+ "once_cell",
+ "perf-event-open-sys",
+ "plain",
+ "serde",
+ "serde_json",
+ "utils",
+]
+
+[[package]]
 name = "rtrace"
 version = "0.2.0"
 dependencies = [
  "anyhow",
- "bindgen",
+ "bincode",
+ "bindgen 0.59.2",
  "bpfskel",
  "byteorder",
  "chrono",
  "clearscreen",
  "crossbeam-channel",
+ "ctrlc",
+ "drop",
  "env_logger",
  "eutils-rs",
- "gettid",
+ "icmp",
  "libbpf-cargo",
  "libbpf-rs",
  "libbpf-sys",
@@ -991,10 +1157,13 @@ dependencies = [
  "once_cell",
  "paste",
  "procfs",
- "regex",
+ "retran",
+ "serde",
+ "serde_json",
  "structopt",
  "strum",
  "strum_macros 0.24.0",
+ "utils",
 ]
 
 [[package]]
@@ -1057,18 +1226,18 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.137"
+version = "1.0.147"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61ea8d54c77f8315140a05f4c7237403bf38b72704d031543aa1d16abbf517d1"
+checksum = "d193d69bae983fc11a79df82342761dfbf28a99fc8d203dca4c3c1b590948965"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.137"
+version = "1.0.147"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f26faba0c3959972377d3b2d306ee9f71faee9714294e41bb777f83f88578be"
+checksum = "4f1d362ca8fc9c3e3a7484440752472d68a6caa98f1ab81d99b5dfe517cec852"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1103,6 +1272,12 @@ name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
+
+[[package]]
+name = "strsim"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "structopt"
@@ -1281,6 +1456,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ed742d4ea2bd1176e236172c8429aaf54486e7ac098db29ffe6529e0ce50973"
 
 [[package]]
+name = "utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "byteorder",
+ "cenum-rs 0.1.0",
+ "eutils-rs",
+ "libbpf-rs",
+ "libbpf-sys",
+ "libc",
+ "log",
+ "num_cpus",
+ "once_cell",
+ "paste",
+ "procfs",
+]
+
+[[package]]
 name = "vec_map"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1291,6 +1485,12 @@ name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
+
+[[package]]
+name = "virtue"
+version = "0.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "757cfbfe0d17ee6f22fe97e536d463047d451b47cf9d11e2b7d1398b0ef274dd"
 
 [[package]]
 name = "vsprintf"
