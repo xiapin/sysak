@@ -307,7 +307,7 @@ def oom_get_meminfo(oom_result, lines, index, num):
 def oom_get_total_mem(oom_result, line, num):
     if "pages RAM" not in line:
         return True
-    total = line.strip().split(']')[1].strip().split()[0]
+    total = line.strip().split()[-3]
     total = int(total)*4
     oom_result['sub_msg'][num]['meminfo']['total_mem'] = total
     return True
@@ -315,7 +315,7 @@ def oom_get_total_mem(oom_result, line, num):
 def oom_get_rmem(oom_result, line, num):
     if "pages reserved" not in line:
         return True
-    rmem = line.strip().split(']')[1].strip().split()[0]
+    rmem = line.strip().split()[-3]
     rmem = int(rmem)*4
     oom_result['sub_msg'][num]['meminfo']['rmem'] = rmem
 
