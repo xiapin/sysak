@@ -105,12 +105,15 @@ struct event
             u32 retran;
             u32 ooo;
         } abnormal;
+
+        // 4. for connect latency
         struct 
         {
             u64 sock;
         } connectlatency;
     };
     // rcvnxt
+};
 
 struct filter
 {
