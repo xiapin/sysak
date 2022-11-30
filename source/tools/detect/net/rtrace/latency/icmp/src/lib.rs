@@ -132,7 +132,7 @@ impl fmt::Display for IcmpEvents {
 
         write!(f, "id: {} seq: {}, ", self.id, self.seq)?;
         let mut pre_ts = self.events[0].ts;
-        write!(f, "{}({})", self.events[0].ty, self.events[0].cpu)?;
+        write!(f, "{}({},{}/{})", self.events[0].ty, self.events[0].cpu, self.events[0].pid, self.events[0].comm)?;
         for i in 1..self.events.len() {
             let delta = (self.events[i].ts - pre_ts) / 1000;
             pre_ts = self.events[i].ts;
