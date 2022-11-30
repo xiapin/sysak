@@ -194,10 +194,14 @@ for i in $target_list;do
 done
 
 if [ $disable_libbpf = "YES" ]; then
-disable_target=$(grep "bpf\.mk" $(pwd)/source/tools/ -nEr --color | xargs -I {} expr {} : '.*/source/tools/\(.*\)/\(.*\)' | awk -F "/" '{print$2}' | uniq)
-for single_target in $disable_target;do
-disable_list="$single_target|$disable_list"
-done
+	disable_target_1=$(grep "bpf\.mk" $(pwd)/source/tools/ -nEr --color | xargs -I {} expr {} : '.*/source/tools/\(.*\)/\(.*\)' |grep -E "combine|bpf_test|cgroup"|awk -F "/" '{print $2}' | uniq)
+	for single_target_1 in $disable_target_1;do
+		disable_list="$single_target_1|$disable_list"
+	done
+	disable_target_2=$(grep "bpf\.mk" $(pwd)/source/tools/ -nEr --color | xargs -I {} expr {} : '.*/source/tools/\(.*\)/\(.*\)' |grep -v -E "combine|bpf_test|cgroup"|awk -F "/" '{print $3}' | uniq)
+	for single_target_2 in $disable_target_2;do
+		disable_list="$single_target_2|$disable_list"
+	done
 fi
 
 if [ $enable_all = "yes" ]; then
