@@ -293,20 +293,29 @@ static int down_install_ext_tools(const char *tool)
 
 static int down_install(const char *component_name)
 {
+    char ko_path[MAX_WORK_PATH_LEN];
+
     if (!get_server_addr())
         return -1;
 
     if (strcmp(component_name, "sysak_modules") == 0) {
         if (!get_module_tag())
             return -1;
-        sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s",
-                sysak_components_server, machine, module_tag, module_path, kern_version);
+
+	sprintf(ko_path, "%s/%s", module_path, kern_version);
+        if (access(ko_path,0) != 0)
+            mkdir(ko_path, 0755 );
+
+        //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s",
+        //        sysak_components_server, machine, module_tag, module_path, kern_version);
+        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko",
+                sysak_components_server, machine, kern_version, module_path, kern_version);
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else if (strcmp(component_name, "btf") == 0) {
-        sprintf(download_cmd, "wget %s/btf/%s/vmlinux-%s -P %s",
-                sysak_components_server, machine, kern_version, tools_path);
-        printf("%s ... \n", download_cmd);
+	sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s",
+                sysak_components_server, machine, kern_version, tools_path, kern_version);
+	printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else {
         return down_install_ext_tools(component_name);
