@@ -1,1 +1,1 @@
-/root/sysak/source/tools/detect/net/rtrace/bpf_core.h
+../../../bpf_core.h
