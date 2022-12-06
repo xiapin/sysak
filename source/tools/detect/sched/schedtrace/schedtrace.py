@@ -156,7 +156,7 @@ def raw_to_json(inf, outf):
 		event = strs[1].split()[0]
 		dic['event'] = parse_info(event, info, target_pid)
 		dic['info'] = info
-		#dic = {'time':float(time), 'event':event, 'info':info}  #dictory is disorder
+		#dic = {'time':float(time), 'event':event, 'info':info}  #directory is disorder
 		ofp.write(json.dumps(dic, sort_keys=False)+',\n')
 	ifp.close()
 	ofp.close()

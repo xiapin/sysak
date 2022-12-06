@@ -81,7 +81,7 @@ void stamp_to_date(__u64 stamp, char dt[], int len)
 }
 
 
-static int prepare_dictory(char *path)
+static int prepare_directory(char *path)
 {
 	int ret = 0;
 
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
 	}
 
     sleep(period);
-	prepare_dictory(log_dir);
+	prepare_directory(log_dir);
 
 	/* direct reclaim trace */
     fd = bpf_map__fd(skel->maps.reclaim_map);

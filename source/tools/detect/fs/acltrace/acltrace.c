@@ -79,7 +79,7 @@ void stamp_to_date(__u64 stamp, char dt[], int len)
 }
 
 
-static int prepare_dictory(char *path)
+static int prepare_directory(char *path)
 {
 	int ret = 0;
 
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
 	}
 	printf("Starting trace, Can hit <Ctrl+C> to abort and report\n");
     sleep(period);
-	prepare_dictory(log_dir);
+	prepare_directory(log_dir);
 
     fd = bpf_map__fd(skel->maps.acl_map);
     printf("%-12s\t%-12s\t%-12s\t%-16s\t%-12s\t%-16s\n", "pid", "comm", "dentry", "xattrs", "count", "last_time");

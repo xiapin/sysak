@@ -195,8 +195,8 @@ parse_line(char *buff)
     } else if (!strcmp(token, "output_file_path")) {
         parse_string(conf.output_file_path);
 
-    } else if (!strcmp(token, "output_dictory")) {
-        parse_string(conf.output_dictory);
+    } else if (!strcmp(token, "output_directory")) {
+        parse_string(conf.output_directory);
     } else if (!strcmp(token, "output_db_addr")) {
         parse_string(conf.output_db_addr);
 

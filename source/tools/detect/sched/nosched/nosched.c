@@ -168,7 +168,7 @@ static void print_stack(int fd, __u32 ret)
 	}
 }
 
-static int prepare_dictory(char *path)
+static int prepare_directory(char *path)
 {
 	int ret;
 
@@ -343,7 +343,7 @@ int main(int argc, char **argv)
 	unsigned long span = 0;
 	int err, map_fd0, map_fd1, map_fd2;
 
-	err = prepare_dictory(log_dir);
+	err = prepare_directory(log_dir);
 	if (err)
 		return err;
 

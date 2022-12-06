@@ -106,7 +106,7 @@ static inline FILE* open_logfile(char *filename, FILE **fporig)
 	return fp;
 }
 
-static int prepare_dictory(char *path)
+static int prepare_directory(char *path)
 {
 	int ret;
 
@@ -265,7 +265,7 @@ int main(int argc, char **argv)
 
 	bump_memlock_rlimit();
 
-	err = prepare_dictory(log_dir);
+	err = prepare_directory(log_dir);
 	if (err)
 		return err;
 

@@ -81,7 +81,7 @@ static void bump_memlock_rlimit(void)
 	}
 }
 
-static int prepare_dictory(char *path)
+static int prepare_directory(char *path)
 {
 	int ret;
 
@@ -311,7 +311,7 @@ int main(int argc, char **argv)
 	struct perf_buffer_opts pb_opts = {};
 	struct args args = {};
 
-	err = prepare_dictory(log_dir);
+	err = prepare_directory(log_dir);
 	if (err)
 		return err;
 

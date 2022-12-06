@@ -366,7 +366,7 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 	return vfprintf(stderr, format, args);
 }
 
-static int prepare_dictory(char *path)
+static int prepare_directory(char *path)
 {
 	int ret;
 
@@ -398,9 +398,9 @@ int main(int argc, char **argv)
 		.doc = argp_program_doc,
 	};
 
-	err = prepare_dictory(log_dir);
+	err = prepare_directory(log_dir);
 	if (err) {
-		fprintf(stderr, "prepare_dictory %s fail\n", log_dir);
+		fprintf(stderr, "prepare_directory %s fail\n", log_dir);
 		return err;
 	}
 	ksyms = NULL;

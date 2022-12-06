@@ -156,7 +156,7 @@ void stamp_to_date(__u64 stamp, char dt[], int len)
 	strftime(dt, len, "%F %H:%M:%S", tm);
 }
 
-static int prepare_dictory(char *path)
+static int prepare_directory(char *path)
 {
 	int ret = 0;
 
@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
 	libbpf_set_print(libbpf_print_fn);
 	bump_memlock_rlimit();
 
-	prepare_dictory(log_dir);
+	prepare_directory(log_dir);
 
 	err = load_kallsyms();
 	if (err) {

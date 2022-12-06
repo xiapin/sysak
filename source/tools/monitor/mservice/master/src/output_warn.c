@@ -126,7 +126,7 @@ int record_top_util_proces(struct top_utils *top)
 	snprintf(hms, sizeof(hms), "%02d:%02d:%02d",
 		nowdt->tm_hour, nowdt->tm_min, nowdt->tm_sec);
 
-	logf = check_log_file(top, conf.output_dictory, ymd, hms, nowdt);
+	logf = check_log_file(top, conf.output_directory, ymd, hms, nowdt);
 	if (!logf)
 		logf = stdout;
 	/*

@@ -275,10 +275,10 @@ void *warn_record_thread(void *arg)
 {
 	struct top_utils top;
 
-	if (strlen(conf.output_dictory) < 1)
+	if (strlen(conf.output_directory) < 1)
 		return 0;
 	/* Todo: The inits of all warn events may be summary in *a* function */
-	init_top_struct(&top, conf.output_dictory);
+	init_top_struct(&top, conf.output_directory);
 	gnr_cpus = sysconf(_SC_NPROCESSORS_CONF);
 	while (1) {
 		/* dispatch it */
