@@ -49,6 +49,8 @@ static void read_proc_stats(struct stats_load *st_load, char *buf)
 			sscanf(line + 14, "%llu", &st_load->nr_io);
 		}
 	}
+	if (fclose(fp))
+		perror("read_proc_stats: fclose fail\n");
 }
 
 static int read_sched_debug(struct stats_load *st_load, char *buf)
@@ -72,6 +74,8 @@ static int read_sched_debug(struct stats_load *st_load, char *buf)
 		total_unint = 0;
 
 	st_load->nr_unint = total_unint;
+	if (fclose(fp))
+		perror("read_sched_debug: fclose fail\n");
 	return total_unint;
 }
 
