@@ -342,10 +342,8 @@ static int check_or_install_components(const char *name)
             printf("auto_get_components is %d", auto_get_components);
             download = true;
         } else {
-            while (user_input != 'y' && user_input != 'Y' && user_input != 'n' && user_input != 'N') {
-                printf("%s %s", name, promt);
-                scanf("%c", &user_input);
-            }
+            printf("%s %s", name, promt);
+            scanf("%c", &user_input);
 
             if (user_input == 'y' || user_input == 'Y')
                 download = true;
