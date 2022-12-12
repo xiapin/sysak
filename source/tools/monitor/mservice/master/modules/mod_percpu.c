@@ -46,6 +46,8 @@ static int begine_read_nrrun(U_64 *nr_run, int nr_cpu)
 		}
 	}
 
+	if (fclose(fp))
+		perror("begine_read_nrrun: fclose fail\n");
 	return nr;
 }
 
