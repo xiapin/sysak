@@ -49,7 +49,7 @@ mkdir -p \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 %preun
 systemctl stop sysak
 /sbin/lsmod | grep sysak > /dev/null
-if [ $? -eq 0 ]; then
+if [ \$? -eq 0 ]; then
 	/sbin/rmmod sysak
 	exit 0
 fi
