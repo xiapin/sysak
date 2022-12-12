@@ -313,8 +313,10 @@ static int down_install(const char *component_name)
         printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else if (strcmp(component_name, "btf") == 0) {
-	sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s",
-                sysak_components_server, machine, kern_version, tools_path, kern_version);
+	//sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s",
+        //       sysak_components_server, machine, kern_version, tools_path, kern_version);
+	sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s",
+               sysak_components_server, machine, kern_version, tools_path);
 	printf("%s ... \n", download_cmd);
         return system(download_cmd);
     } else {
