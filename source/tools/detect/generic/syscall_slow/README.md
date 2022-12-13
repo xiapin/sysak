@@ -21,10 +21,10 @@ $sudo sysak syscall_slow -n 0 -c cat -f a.log
 ## 日志输出说明
 上面结果a.log输出说明如下(时间单位：毫秒；  切换单位：次数)：
 ``` 
-               总延时   实际运行  被抢占时间  睡眠时间   系统态时间   自愿切换  被动切换  系统调用
-                   \        \         ｜         ｜         ｜          ｜        /          /
-TIME(syscall)        DELAY   REAL    WAIT       SLEEP       SYS        vcsw    ivcsw       syscall 
-2022-05-26_11:16:01  2484     0       0         2484        0          1       0           read 
+               总延时   实际运行  被抢占时间  睡眠时间   系统态时间   自愿切换  被动切换  系统调用  任务名/id
+                   \        \         ｜         ｜         ｜          ｜        /          /         |
+TIME(syscall)        DELAY   REAL    WAIT       SLEEP       SYS        vcsw    ivcsw       syscall  pid(comm) 
+2022-05-26_11:16:01  2484     0       0         2484        0          1       0           read     34562(cat)
 <0xffffffff868814a3> __sched_text_start
 <0xffffffff868814a3> __sched_text_start
 <0xffffffff868816e3> schedule

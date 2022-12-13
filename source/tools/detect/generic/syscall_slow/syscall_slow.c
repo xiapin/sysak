@@ -199,10 +199,10 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			snprintf(tmp, sizeof(tmp), "%ld", e->sysid);
 			syscall = tmp;
 		}
-		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6s\n",
+		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-9s %lu(%s)\n",
 			ts, e->delay/(1000*1000), e->realtime/(1000*1000),
 			e->itime/(1000*1000), e->vtime/(1000*1000),
-			e->stime/(1000*1000), e->nvcsw, e->nivcsw, syscall);
+			e->stime/(1000*1000), e->nvcsw, e->nivcsw, syscall, e->pid, e->comm);
 		fflush(filep);
 		print_stack(stackmp_fd, e->ret, ksyms);
 	}
@@ -215,9 +215,9 @@ void syscall_slow_handler(int poll_fd, int map_fd, struct syscall_slow_bpf *obj)
 	struct perf_buffer *pb = NULL;
 	struct perf_buffer_opts pb_opts = {};
 
-	fprintf(filep, "%-21s %-8s %-6s %-6s %-6s %-6s %-6s %-6s %-6s\n",
+	fprintf(filep, "%-21s %-8s %-6s %-6s %-6s %-6s %-6s %-6s %-9s %s\n",
 		"TIME(syscall)", "DELAY", "REAL", "WAIT", "SLEEP",
-		"SYS", "vcsw", "ivcsw", "syscall");
+		"SYS", "vcsw", "ivcsw", "syscall", "pid(comm)");
 
 	pb_opts.sample_cb = handle_event;
 	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
