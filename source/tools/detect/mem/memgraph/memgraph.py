@@ -554,6 +554,14 @@ def memgrapth_output_json(meminfo, filepath):
     res["memGraph"] = meminfo["graph"]
     res["event"] = meminfo["event"]
     res["memleak"] = meminfo["memleak"]
+    summary= ''
+    if meminfo["event"]["leak"] == True:
+       summary += " %s memory leak usage:%s"%(meminfo["memleak"]["type"], meminfo["memleak"]["usage"])
+    if meminfo["event"]["memcg"] == True:
+        summary += "  memory cgroup leak"
+    if len(summary) == 0:
+        summary = "success"
+    res["summary"] = summary
     taskMem = meminfo["taskMem"]
     taskInfo = meminfo["taskInfo"]
     tmp_mem = []
@@ -615,7 +623,7 @@ def memgraph_check_memcg(meminfo):
           break
         num = int(values[2])
         break
-    return num > 1000
+    return num > 1500
 
 def memgraph_check_memfrag(meminfo):
     key = "Normal"
