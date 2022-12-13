@@ -132,7 +132,40 @@ def hugepagesz_supported(hugepagesz):
             return True
     return False
 
+
+def get_dmesg_reserved_mem(meminfo):
+    cmd = "dmesg | grep -w 'Memory:' | grep -w 'reserved' "
+    ret = os.popen(cmd).read().strip()
+    if len(ret) < 20:
+        return 0
+    ret = ret.strip().split("reserved")[0]
+    ret = ret.strip().split()
+    if len(ret) < 5:
+        return 0
+    res = ret[-1].strip()[:-1]
+    return int(res)
+
+def get_total_mem(meminfo):
+    cmd = "cat /proc/iomem | grep 'System RAM' "
+    ret = os.popen(cmd).read().split("\n")
+    total = 0
+    for line in ret:
+        line = line.strip()
+        if len(line) < 10:
+            continue
+        addr = line.split(":")[0].strip()
+        start = addr.split("-")[0].strip()
+        end = addr.split("-")[1].strip()
+        size = int(end,16) - int(start,16)
+        total += size
+    meminfo['MemTotalIoMem'] = total/1024
+
 def get_reserved_mem(meminfo):
+    res = get_dmesg_reserved_mem(meminfo)
+    if res != 0:
+        meminfo['res'] = res
+        return res
+
     cmd = "cat /proc/iomem | grep -wE 'Reserved|Crash kernel|Kernel code|Kernel data|Kernel bss'"
     ret = os.popen(cmd).read().split("\n")
     total = 0 
@@ -149,7 +182,7 @@ def get_reserved_mem(meminfo):
 
 def get_page_used(meminfo):
     get_reserved_mem(meminfo)
-    
+    #get_total_mem(meminfo)
     user = meminfo["Active(anon)"] + meminfo["Inactive(anon)"]
     user += meminfo["Active(file)"] + meminfo["Inactive(file)"]
     user += meminfo["Mlocked"]
@@ -157,13 +190,13 @@ def get_page_used(meminfo):
         user += meminfo["2048"]
     if "1048576" in meminfo:
         user += meminfo["1048576"]
-    kernelOther = meminfo["Slab"] + meminfo["KernelStack"] + meminfo["PageTables"] + meminfo['res']
+    kernelOther = meminfo["Slab"] + meminfo["KernelStack"] + meminfo["PageTables"]
     kernelOther += meminfo["VmallocUsed"]
     pageUsed = meminfo["MemTotal"] - meminfo["MemFree"] - user - kernelOther
     if pageUsed < 1:
         pageUsed = 1024
     meminfo["allocPage"] = pageUsed
-    meminfo["kernelUsed"] = pageUsed + kernelOther
+    meminfo["kernelUsed"] = pageUsed + kernelOther + meminfo["res"]
     meminfo["userUsed"] = user
     return meminfo
 
@@ -232,7 +265,7 @@ def memgraph_free(meminfo):
 
 def memgraph_graph(meminfo):
     res = {}
-    res["total"] = meminfo["MemTotal"]
+    res["total"] = meminfo["MemTotal"] + meminfo['res']
     res["free"] = meminfo["MemFree"]
     res["userUsed"] = meminfo["userUsed"]
     res["kernelUsed"] = meminfo["kernelUsed"]
@@ -250,7 +283,7 @@ def memgraph_graph(meminfo):
     user["shmem"] = meminfo["Shmem"]
     res["user"] = user
     kernel = {}
-    kernel["res"] = meminfo["res"]
+    kernel["reserved"] = meminfo["res"]
     kernel["SReclaimable"] = meminfo["SReclaimable"]
     kernel["SUnreclaim"] = meminfo["SUnreclaim"]
     kernel["KernelStack"] = meminfo["KernelStack"]
