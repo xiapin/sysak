@@ -101,7 +101,7 @@ void irqoff_handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 		sum = &env.summary[IRQOF];
 		arryItem = cJSON_CreateObject();
 		cJSON_AddStringToObject(arryItem, "date", ts);
-		cJSON_AddStringToObject(arryItem, "class", "irq延迟");
+		cJSON_AddStringToObject(arryItem, "class", "IRQOFF DELAY");
 		cJSON_AddNumberToObject(arryItem, "latency", e->delay);
 		cJSON_AddNumberToObject(arryItem, "cpu", e->cpuid);
 		snprintf(current, sizeof(current), "%s (%d)", e->task, e->pid);
