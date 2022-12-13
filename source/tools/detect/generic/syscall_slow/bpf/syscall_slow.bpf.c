@@ -159,7 +159,7 @@ int handle_raw_sys_enter(struct raw_sys_enter_arg *ctx)
 		}
 	}
 
-	if (!match || (filter.sysnr != ctx->id))
+	if (!match || (filter.sysnr == ctx->id))
 		return 0;
 
 	task = (void *)bpf_get_current_task();
@@ -211,7 +211,7 @@ int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 		}
 	}
 
-	if (!match || (filter.sysnr != ctx->id))
+	if (!match || (filter.sysnr == ctx->id))
 		return 0;
 
 	task = (void *)bpf_get_current_task();
