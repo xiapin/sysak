@@ -8,6 +8,8 @@
 #include <pthread.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
+#include <linux/version.h>
 #include <sys/types.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
@@ -240,6 +242,45 @@ static void sig_exiting(int signo)
 	exiting = 1;
 }
 
+int check_kprobe(struct schedmoni_bpf *obj)
+{
+	int i, ret = 0;
+	char *str, *endptr;
+	unsigned long ver[3];
+	struct utsname ut;
+
+	ret = uname(&ut);
+	if (ret < 0)
+		return -errno;
+
+	str = ut.release;
+	for (i = 0; i < 3; i++) {
+		ver[i] = strtoul(str, &endptr, 10);
+		if ((errno == ERANGE && (ver[i] == LONG_MAX || ver[i] == LONG_MIN))
+			|| (errno != 0 && ver[i] == 0)) {
+			perror("strtol");
+			return -errno;
+		}
+		str = endptr+1;
+	}
+
+	if (ver[0] >= 4 && ver[1] >= 19) {
+		ret = bpf_program__set_autoload(obj->progs.kp_ttwu_do_wakeup, false);
+		if (ret < 0) {
+			printf("FAIL:bpf_program__set_autoload kp_ttwu_do_wakeup\n");
+			return ret;
+		}
+	} else {
+		bpf_program__set_autoload(obj->progs.raw_tp__sched_wakeup, false);
+		if (ret < 0) {
+			printf("FAIL:bpf_program__set_autoload raw_tp__sched_wakeup\n");
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz);
 void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt);
 void *runslw_handler(void *arg);
@@ -327,6 +368,11 @@ int main(int argc, char **argv)
 	bpf_program__set_autoload(obj->progs.sw_irqoff_event1, false);
 	bpf_program__set_autoload(obj->progs.sw_irqoff_event2, false);
 #endif
+	err = check_kprobe(obj);
+	if (err) {
+		fprintf(stderr, "failed to check kprobe: %d\n", err);
+		goto cleanup;
+	}
 	err = schedmoni_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);

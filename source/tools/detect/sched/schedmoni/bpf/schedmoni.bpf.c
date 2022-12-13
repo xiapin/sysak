@@ -164,7 +164,7 @@ static int trace_enqueue(struct task_struct *p, unsigned int runqlen)
 }
 
 SEC("kprobe/ttwu_do_wakeup")
-int BPF_KPROBE(ttwu_do_wakeup, struct rq *rq, struct task_struct *p, 
+int BPF_KPROBE(kp_ttwu_do_wakeup, struct rq *rq, struct task_struct *p, 
 		int wake_flags, struct rq_flags *rf)
 {
 	unsigned int runqlen = 0;
@@ -176,7 +176,17 @@ int BPF_KPROBE(ttwu_do_wakeup, struct rq *rq, struct task_struct *p,
 	return trace_enqueue(p, runqlen);
 }
 
-#if 1
+SEC("raw_tracepoint/sched_wakeup")
+int raw_tp__sched_wakeup(struct bpf_raw_tracepoint_args *ctx)
+{
+	unsigned int runqlen = 0;
+	struct task_struct *p = (void *)ctx->args[0];
+ 
+	runqlen = get_current_rqlen(p);
+	return trace_enqueue(p, runqlen);
+}
+
+
 SEC("kprobe/wake_up_new_task")
 int BPF_KPROBE(wake_up_new_task, struct task_struct *p)
 {
@@ -188,7 +198,6 @@ int BPF_KPROBE(wake_up_new_task, struct task_struct *p)
 	runqlen = get_current_rqlen(p);
 	return trace_enqueue(p, runqlen);
 }
-#endif
 
 SEC("tp/sched/sched_switch")
 int handle_switch(struct sched_switch_tp_args *ctx)
