@@ -5,7 +5,7 @@
  -h   帮助信息
  -t   诊断某个时间段的shmem对应的使用进程
 for example:
-shmem.py -t 5
+sysak shmem -t 5
 # 结果分析
 #sysak shmem -t 3   输出设置的时长内，存在使用量变化的共享内存所对应的进程。
 shmem key      pid            name                total size(bytes)    increase(bytes)
