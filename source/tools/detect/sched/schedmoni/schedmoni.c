@@ -29,8 +29,9 @@ char rswf[] = "/var/log/sysak/schedmoni/runslow.log";
 char nscf[] = "/var/log/sysak/schedmoni/nosched.log";
 char irqf[] = "/var/log/sysak/schedmoni/irqoff.log";
 char json_log[] = "/var/log/sysak/schedmoni/schedmoni.json";
-char *mode_name[] = {"调度延迟", "sys延迟", "irq延迟"};
-char *mode_cnt_str[] = {"调度延迟次数", "sys延迟次数", "irq延迟次数"};
+char *mode_name[] = {"SCHED DELAY", "KERNEL DELAY", "IRQOFF DELAY"};
+char *reason[] = {"delay in runqueue(may be too may task?)", "cpu takes many time in kernel", "irq disable too long"};
+char *mode_cnt_str[] = {"times of schedule delay", "times of kernel delay", "times of irqoff delya"};
 
 struct env env = {
 	.span = 0,
@@ -484,14 +485,19 @@ int main(int argc, char **argv)
 
 	if (env.mod_json) {
 		FILE *fp;
-		char *out;
+		char *out, *warn_str, warn_array[128] = {0};
 		struct summary sum[3];
 		int color, max_cnt, thresh_rate;
+		size_t left = 128, idx = 0, all = 0;
 		enum {RED = 0, BLUE, GREEN};
 		char *colors[] = {"red", "blue", "green"};
-		char *ev[] = {"异常", "告警", "正常"};
+		char *ev[] = {"emergency", "warning", "normal"};
+		char *pre[] = {"", " and ", " and "};
 		cJSON *arryItem;
 
+		warn_str = warn_array;
+		idx += snprintf(warn_str, left, "%s", "Sched jitter happend because of ");
+		left -= idx;
 		for (i = 0; i < MAX_MOD; i++) {
 			arryItem = cJSON_CreateObject();
 			sum[i] = env.summary[i];
@@ -511,12 +517,26 @@ int main(int argc, char **argv)
 				color = BLUE;
 			else
 				color = GREEN;
+			if (color != GREEN) {
+				idx += snprintf(warn_str+idx, left,
+						"%s%s", pre[all], reason[i]);
+				all++;
+			}
 			cJSON_AddStringToObject(arryItem, "key", mode_name[i]);
 			cJSON_AddStringToObject(arryItem, "value", ev[color]);
 			cJSON_AddStringToObject(arryItem, "color", colors[color]);
 			cJSON_AddItemToArray(env.json.evt_data, arryItem);
 		}
-
+		{
+			if (all > 0) {
+				idx += snprintf(warn_str+idx, left, "%s",
+					" schedule issues! Please check the [schedule details]");
+				cJSON_AddStringToObject(env.json.evt, "summary", warn_str);
+			} else {
+				cJSON_AddStringToObject(env.json.evt, "summary",
+					"There are no related SCHEUDLE issues at this time.");
+			}
+		}
 		fp = fopen(json_log, "w+");
 		if (!fp) {
 			fprintf(stdout, "%s :fopen %s\n",
