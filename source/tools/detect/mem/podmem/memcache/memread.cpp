@@ -370,6 +370,7 @@ int main(int argc, char *argv[])
 		switch (ch) {
         case 'h':
             show_usage();
+            return 0;
 		case 'm':
 			opt.podmem = true;
 			break;

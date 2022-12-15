@@ -21,6 +21,10 @@ using namespace std;
 #define KPF_RESERVED 32
 #endif
 
+#ifndef KPF_IDLE
+#define KPF_IDLE (25)
+#endif
+
 #define MAX_BIT (26)
 
 

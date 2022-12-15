@@ -58,10 +58,48 @@ struct member_attribute *get_offset(string struct_name,  string member_name)
     return att;
 }
 
+void stripWhiteSpace (string &str)
+{
+    if (str == "")
+    {
+        return;
+    }
+ 
+    string::iterator cur_it;
+    cur_it = str.begin();
+ 
+    while (cur_it != str.end())
+    {
+        if (((*cur_it) != '\t') && ((*cur_it) != ' '))
+        {
+            break;
+        }
+        else
+        {
+            cur_it = str.erase (cur_it);
+        }
+    }
+ 
+    cur_it = str.begin();
+ 
+    while (cur_it != str.end())
+    {
+        if ((*cur_it) == '\n')
+        {
+            cur_it = str.erase (cur_it);
+        }
+        else
+        {
+            cur_it++;
+        }
+    }
+}
+
 static int do_cmd(const char *cmd, char *result, int len)
 {
     FILE *res;
     char region[LEN] = {0};
+    string str;
 
     res = popen(cmd, "r");
     if (res == NULL) {
@@ -69,11 +107,15 @@ static int do_cmd(const char *cmd, char *result, int len)
         return -1;
     }
 
+    if (feof(res)) {
+        printf("cmd line end\n");
+        return 0;
+    }
     fgets(region, sizeof(region)-1, res);
-    region[LEN - 1] = '\0';
+    str = region;
+    stripWhiteSpace(str);
     /* skip \n */
-    region[strlen(region) - 1] = 0;
-    strncpy(result, region, len - 1);
+    strncpy(result, str.c_str(), len - 1);
     result[len - 1] = '\0';
     pclose(res);
     return 0;
@@ -86,7 +128,7 @@ static int download_btf(void)
     char kernel[LEN] = {0};
     char dw[LEN+LEN] = {0};
     string timeout = "-internal";
-    string cmd = "curl --connect-timeout 2 http://100.100.100.200/latest/meta-data/region-id 2>&1";
+    string cmd = "curl -s --connect-timeout 2 http://100.100.100.200/latest/meta-data/region-id 2>&1";
 
     do_cmd(cmd.c_str(), region, LEN);
     if (!strstr(region,"cn-")) {
@@ -101,7 +143,7 @@ static int download_btf(void)
     cmd = "uname -r";
     do_cmd(cmd.c_str(), kernel, LEN);
     //printf("kernel:%s\n", kernel);
-    snprintf(dw, LEN + LEN, "wget -q -O /boot/vmlinux-%s https://netinfo-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
+    snprintf(dw, LEN + LEN, "wget -T 5 -t 2 -q -O /boot/vmlinux-%s https://netinfo-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
 
     do_cmd(dw, kernel, LEN);
     return 0;
