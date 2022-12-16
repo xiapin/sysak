@@ -159,7 +159,7 @@ int handle_raw_sys_enter(struct raw_sys_enter_arg *ctx)
 		}
 	}
 
-	if (!match || (filter.sysnr != ctx->id))
+	if (!match || (filter.sysnr == ctx->id))
 		return 0;
 
 	task = (void *)bpf_get_current_task();
@@ -182,7 +182,7 @@ int handle_raw_sys_enter(struct raw_sys_enter_arg *ctx)
 SEC("tp/raw_syscalls/sys_exit")
 int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 {
-	int pid, i = 0;
+	u32 pid, i = 0;
 	bool match = false;
 	char comm[16] = {0};
 	struct arg_info *argp;
@@ -211,7 +211,7 @@ int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 		}
 	}
 
-	if (!match || (filter.sysnr != ctx->id))
+	if (!match || (filter.sysnr == ctx->id))
 		return 0;
 
 	task = (void *)bpf_get_current_task();
@@ -234,6 +234,8 @@ int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 			event.delay = delta;
 			event.sysid = ctx->id;
 			event.ret = enterp->ret;
+			event.pid = pid;
+			bpf_get_current_comm(&event.comm, sizeof(event.comm));
 			bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
 						&event, sizeof(event));
 		}

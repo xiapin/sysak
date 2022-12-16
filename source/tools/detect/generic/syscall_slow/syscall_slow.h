@@ -31,6 +31,7 @@ struct event {
 	__u64 delay, stamp;
 	__u64 nvcsw, nivcsw, icnt, vcnt;
 	__u64 realtime, stime, itime, vtime;
+	char comm[16];
 };
 
 struct ksym {

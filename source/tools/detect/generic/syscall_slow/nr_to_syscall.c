@@ -3,7 +3,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdbool.h>
-#define MAX_NR	1024
+#define MAX_NR	2048
 
 char path[] = "/usr/include/asm/unistd_64.h";
 
@@ -71,7 +71,8 @@ int nr_to_syscall(int argc, char *arry[])
 	}
 
 	if (idx > MAX_NR) {
-		printf("There are %d (>1024) syscalls, overflow\n!", idx);
+		printf("There are %d (>2048) syscalls, overflow\n!", idx);
 	}
+	fclose(fp);
 	return 0;
 }
