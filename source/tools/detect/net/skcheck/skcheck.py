@@ -3,11 +3,13 @@
 import os
 import sys
 import getopt
+import json
 
 memThres = 102400
 socketCheck = False
 socketThres = 2000
 socketLeak = 500
+socketJson = ''
 
 def os_cmd(cmd):
     ret = os.popen(cmd).read().split("\n")
@@ -56,13 +58,14 @@ def get_task(line):
 
     return proc[0] + " ip:" + local_ip
 
-def tcp_mem_check():
+def tcp_mem_check(meminfo):
     ret = os_cmd("ss -tunapm")
     tcp_mem = get_tcp_mem()
     memTask = {}
     tx_mem = 0
     rx_mem = 0
     idx = 0
+    global socketJson
 
     for idx in range(len(ret)):
         line = ret[idx]
@@ -85,15 +88,25 @@ def tcp_mem_check():
         memTask[task] += (rx + tx)
 
     total = (rx_mem + tx_mem) / 1024
+    meminfo["tx_queue"] = tx_mem/1024
+    meminfo["rx_queue"] = rx_mem/1024
+    meminfo["queue_total"] = total
+    meminfo["tcp_mem"] = tcp_mem
+    meminfo["top_task"] = ["unkonw", 0]
+    if total > 0:
+        memTask = sorted(memTask.items(), key=lambda x: x[1], reverse=True)
+        meminfo["top_task"] = []
+        meminfo["top_task"].append(memTask[0][0])
+        meminfo["top_task"].append(memTask[0][1]/1024)
+    if socketJson != '':
+        return True
     print("memory overview:")
     print("tx_queue {}K rx_queue {}K queue_total {}K tcp_mem {}K\n".format(tx_mem/1024, rx_mem/1024, total, tcp_mem))
     if total > 0:
         print("task txrx queue memory:")
-        memTask = sorted(memTask.items(), key = lambda kv:(kv[1], kv[0]),reverse=True)
         for task in memTask:
             print("task {}  tcpmem {}K".format(task[0], task[1]/1024))
     print("\n")
-    return total, tcp_mem
 
 def _socket_inode_x(inodes, protocol, idx):
     cmd = "cat /proc/net/" + protocol + " "
@@ -241,9 +254,10 @@ def get_args(argv):
     global socketCheck
     global socketThres
     global socketLeak
+    global socketJson
 
     try:
-        opts, args = getopt.getopt(argv, "hm:t:sl:")
+        opts, args = getopt.getopt(argv, "hm:t:sl:j:")
     except getopt.GetoptError:
         print('tcp memory and socket leak check, GetoptError, try again ')
         sys.exit(2)
@@ -252,6 +266,7 @@ def get_args(argv):
             print("tcp memory and socket leak check")
             print("default enable for tcp memmory check")
             print("-s:enable socket leak check")
+            print("-j:output json file")
             print("-t:threshold value for open socket ,default is 2000")
             print("-l:leak threshold for shutdown socket ,default is 500")
             sys.exit()
@@ -261,17 +276,31 @@ def get_args(argv):
             socketCheck = True
         elif opt in ("-t"):
             socketThres = int(arg)
+        elif opt in ("-j"):
+            socketJson = arg
         elif opt in ("-l"):
             socketLeak = int(arg)
         else:
             print("error args options")
+    return socketJson
+
+def dump2json(res,filename):
+    jsonStr = json.dumps(res)
+    if not os.path.exists(os.path.dirname(filename)):
+        os.popen("mkdir -p "+os.path.dirname(filename)).read()
+    with open(filename, 'w+') as jsonFile:
+        jsonFile.write(jsonStr)
 
 if __name__ == "__main__":
     inodes = []
-    get_args(sys.argv[1:])
-    tcp_mem_check()
+    filename = get_args(sys.argv[1:])
+    meminfo = {}
+    tcp_mem_check(meminfo)
     leak = socket_leak_check()
-    if len(leak) !=0:
+    if  len(filename) != 0:
+        dump2json(meminfo, filename)
+
+    if len(leak) !=0 and filename == '':
         print("socket hold info:")
-    for taskInfo in leak:
-        print("{}:{} socketNum {} socketLeakNum {}".format(taskInfo["task"], taskInfo["pid"], taskInfo["num"], taskInfo["numleak"]))
+        for taskInfo in leak:
+            print("{}:{} socketNum {} socketLeakNum {}".format(taskInfo["task"], taskInfo["pid"], taskInfo["num"], taskInfo["numleak"]))
