@@ -350,6 +350,24 @@ def memleak_check(total, kmem):
         return True
     return False
 
+def tcp_mem_check(used):
+    skcheck_bin = os.getenv("SYSAK_WORK_PATH");
+    skcheck_bin += "/tools/skcheck -j /tmp/skcheck.json > /dev/null 2>&1"
+    ret = os.popen(skcheck_bin).read()
+    if not os.path.exists("/tmp/skcheck.json"):
+        return ''
+    skcheck = {}
+    with open('/tmp/skcheck.json','r') as fp:
+        skcheck = json.load(fp)
+    if os.path.exists("/tmp/skcheck.json"):
+        os.remove("/tmp/skcheck.json")
+    if skcheck["queue_total"] > used*0.1:
+        return skcheck
+    if skcheck["tcp_mem"] > used*0.1:
+        return skcheck
+    return ''
+
+
 def oom_is_memleak(oom, oom_result):
     if 'meminfo' not in oom:
         return False
@@ -357,6 +375,8 @@ def oom_is_memleak(oom, oom_result):
         return False
     meminfo = oom['meminfo']
     res = oom['json']
+    summary = ''
+    tcp = {}
     total = meminfo['total_mem']
     used = total - meminfo['slab'] - meminfo['slabr']
     used = used - (meminfo['active_anon'] + meminfo['inactive_anon'])
@@ -366,11 +386,23 @@ def oom_is_memleak(oom, oom_result):
     if memleak_check(total, meminfo['slab']):
         res['leaktype'] = 'slab'
         res['leakusage'] = meminfo['slab']
-        return "slab memleak, usage:%dkb\n"%(meminfo['slab'])
+        tcp = tcp_mem_check(used)
+        if len(tcp) != 0:
+            res["tcp_task"] = tcp["top_task"]
+            res["tcp_mem"] = tcp["tcp_mem"]
+        summary = "slab memleak, usage:%dkb\n"%(meminfo['slab'])
     elif memleak_check(total, used):
         res['leaktype'] = 'allocpage'
         res['leakusage'] = used
-        return "allocpage memleak, usage:%dkb\n"%(used)
+        tcp = tcp_mem_check(used)
+        if len(tcp) != 0:
+            res["tcp_task"] = tcp["top_task"]
+            res["tcp_mem"] = tcp["tcp_mem"]
+        summary = "allocpage memleak, usage:%dkb\n"%(used)
+    if len(summary) != 0 and  len(tcp) != 0:
+        summary += "tcp_task:%s tcp_mem:%sKB\n"%(tcp["top_task"][0], tcp["tcp_mem"])
+    if len(summary) != 0:
+        return summary
     return False
 
 def oom_host_output(oom_result, num):
@@ -574,6 +606,8 @@ def oom_init_json(oom_result, num):
     res['leaktype'] = 'unknow'
     res['leakusage'] = 0
     res['shmem'] = 0
+    res['tcp_mem'] = 0
+    res['tcp_task'] = []
     res['cgroup_oom_num'] = 0
 
 def oom_output_msg(oom_result,num, summary):
