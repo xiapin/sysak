@@ -50,8 +50,11 @@ def get_task(line):
     task = line[start+3:end].strip().replace('\"','')
     if len(task) < 2:
         return "unknow"
+    proc = task.strip().split(',')
+    if len(proc) < 2:
+        proc = ["unkonw"]
 
-    return task + " ip:" + local_ip
+    return proc[0] + " ip:" + local_ip
 
 def tcp_mem_check():
     ret = os_cmd("ss -tunapm")
@@ -82,10 +85,13 @@ def tcp_mem_check():
         memTask[task] += (rx + tx)
 
     total = (rx_mem + tx_mem) / 1024
-    print("tx_queue {}K rx_queue {}K queue_total {}K tcp_mem {}K".format(tx_mem/1024, rx_mem/1024, total, tcp_mem))
+    print("memory overview:")
+    print("tx_queue {}K rx_queue {}K queue_total {}K tcp_mem {}K\n".format(tx_mem/1024, rx_mem/1024, total, tcp_mem))
     if total > 0:
-        for task, value in memTask.items():
-            print("task {}  mem {}K".format(task, value/1024))
+        print("task txrx queue memory:")
+        memTask = sorted(memTask.items(), key = lambda kv:(kv[1], kv[0]),reverse=True)
+        for task in memTask:
+            print("task {}  tcpmem {}K".format(task[0], task[1]/1024))
     print("\n")
     return total, tcp_mem
 
