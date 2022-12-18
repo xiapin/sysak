@@ -1,1 +1,0 @@
-rsync -avz -e "ssh -p 2204" * root@100.82.20.22:/root/1ext/code/tinyInfo/unity/
