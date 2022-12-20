@@ -27,26 +27,28 @@ static inline int var_next(char ** ppv) {
 int var_input_long(const char * line, struct var_long *p) {
     char *pv = (char *)line;
     int res;
-    int i = 0;
+    int i;
 
     p->no = 0;
     if (var_next(&pv)) {
         return 0;
     }
 
-    while (1) {
+    for (i = 0; i < VAR_INDEX_MAX; i ++) {
         res = sscanf(pv, "%lld", &p->value[i]);
         if (!res) {
-            break;
+            goto breakLoop;
         }
 
-        i ++;
         pv = strchr(pv, ' ');
         if (var_next(&pv)) {
-            break;
+            goto breakLoop;
         }
     }
     p->no = i;
+    return 0;
+    breakLoop:
+    p->no = i + 1;
     return 0;
 }
 
@@ -60,20 +62,21 @@ int var_input_string(const char * line, struct var_string *p) {
         return 0;
     }
 
-    i = 0;
-    while (1) {
-        res = sscanf(pv, "%s", &p->s[i][0]);
+    for (i = 0; i < VAR_INDEX_MAX; i ++)  {
+        res = sscanf(pv, "%31s", &p->s[i][0]);
         if (!res) {
-            break;
+            goto breakLoop;;
         }
 
-        i ++;
         pv = strchr(pv, ' ');
         if (var_next(&pv)) {
-            break;
+            goto breakLoop;
         }
     }
     p->no = i;
+    return 0;
+    breakLoop:
+    p->no = i + 1;
     return 0;
 }
 
@@ -87,7 +90,7 @@ int var_input_kvs(const char * line, struct var_kvs *p) {
         return 0;
     }
 
-    res = sscanf(pv, "%s", &p->s[0]);
+    res = sscanf(pv, "%31s", &p->s[0]);
     if (!res) {
         return -1;
     }
@@ -97,19 +100,20 @@ int var_input_kvs(const char * line, struct var_kvs *p) {
         return 0;
     }
 
-    i = 0;
-    while (1) {
+    for (i = 0; i < VAR_INDEX_MAX; i ++)  {
         res = sscanf(pv, "%lld", &p->value[i]);
         if (!res) {
-            break;
+            goto breakLoop;
         }
 
-        i ++;
         pv = strchr(pv, ' ');
         if (var_next(&pv)) {
-            break;
+            goto breakLoop;
         }
     }
     p->no = i;
+    return 0;
+    breakLoop:
+    p->no = i + 1;
     return 0;
 }

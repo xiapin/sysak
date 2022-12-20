@@ -26,7 +26,6 @@ function CkvProc:checkTitle(title)
 end
 
 function CkvProc:readKV(line)
-
     local data = self._ffi.new("var_kvs_t")
     assert(self._cffi.var_input_kvs(self._ffi.string(line), data) == 0)
     assert(data.no >= 1)

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../collector/native/
 source /etc/profile
 cd ../collector/native/
 make
