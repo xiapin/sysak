@@ -21,7 +21,7 @@ class CsockThread(Thread):
 
 if __name__ == "__main__":
     # echo hello | nc 127.0.0.1 8400
-    for i in range(1):
+    for i in range(10):
         CsockThread()
     pause()
 
