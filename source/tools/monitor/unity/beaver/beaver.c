@@ -127,9 +127,6 @@ static void * beaver_threads(void * arg) {
         fd = pmsg->sk_accept;
         pmsg->sk_accept = 0;
         printf("%d get %d\n.", tid, fd);
-        ret = pthread_cond_signal(&pmsg->pc_condp);  //wake up producer.
-        ASSERT_LOCKS(ret);
-
         ret = pthread_mutex_unlock(&pmsg->pc_mutex);
         ASSERT_LOCKS(ret);
 
@@ -321,9 +318,6 @@ static int beaver_accept(int sk_listen, struct beaver_message* pmsg) {
         ASSERT_LOCKS(ret);
 
         printf("owner waiting: %d.\n", sk_accept);
-        ret = pthread_cond_wait(&pmsg->pc_condp, &pmsg->pc_mutex);
-        ASSERT_LOCKS(ret);
-        printf("owner wait: %d ok.\n", sk_accept);
 
         ret = pthread_mutex_unlock(&pmsg->pc_mutex);
         ASSERT_LOCKS(ret);
