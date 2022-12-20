@@ -299,7 +299,7 @@ def pod_mem_run(podinfo):
         if line.find('inode=') == -1:
             continue
         item = line.strip().split()
-        if len(item)<=8:
+        if len(item)<10:
             continue
         tmp = {}
         tmp['inode'] = int(item[0].split('=')[1])
@@ -311,6 +311,7 @@ def pod_mem_run(podinfo):
         tmp['shmem'] = int(item[7].split('=')[1])
         tmp['delete'] = int(item[8].split('=')[1])
         tmp['cgcached'] = int(item[9].split('=')[1])
+        tmp['dirty'] = int(item[10].split('=')[1])
         cinode = int(item[4].split('=')[1])
         files.append(tmp)
         if not cinode in inodes.keys():
@@ -323,7 +324,7 @@ def pod_mem_run(podinfo):
             print(tmp['file'])
             res = "size: {} cached: {} ".format(tmp['size'], tmp['cached'])
             res +=  "active: {} inactive: {} ".format(tmp['active'],tmp['inactive']) 
-            res +=  "shmem: {} delete: {} ".format(tmp['shmem'], tmp['delete'])
+            res +=  "shmem: {} delete: {} dirty: {}".format(tmp['shmem'], tmp['delete'], tmp['dirty'])
             print(res)
     mode = podinfo['args']['mode']
     for cid,cinfo in podinfo['container'].items():
@@ -350,7 +351,7 @@ def pod_mem_run(podinfo):
             print(tmp['file'])
             res = "size: {} cached: {} cgcached: {} ".format(tmp['size'], tmp['cached'], tmp['cgcached'])
             res +=  "active: {} inactive: {} ".format(tmp['active'],tmp['inactive']) 
-            res +=  "shmem: {} delete: {}".format(tmp['shmem'], tmp['delete'])
+            res +=  "shmem: {} delete: {} dirty: {}".format(tmp['shmem'], tmp['delete'], tmp['dirty'])
             print(res)
 
     if cmdline['output'] != 'json':

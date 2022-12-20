@@ -39,6 +39,7 @@ struct file_info {
     unsigned long cgcached;
     unsigned long size;
     unsigned long active;
+    unsigned long dirty;
     unsigned long inactive;
     unsigned long cinode;
     int shmem;
@@ -117,7 +118,7 @@ static int get_filename(unsigned long dentry, char *filename, int len)
  * pfn: page pfn
  * cinode: cgroup inode
  */ 
-static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int shmem)
+static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int shmem, int dirty)
 {
     map<unsigned long,struct file_info*>::iterator iter;
     unsigned long page = PFN_TO_PAGE(pfn);
@@ -173,6 +174,10 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
         }else {
             info->inactive += 1;
         }
+        if (dirty) {
+            info->dirty += 1;
+        }
+
         if (info->cinode == cinode)
             info->cgcached++;
         return 0; 
@@ -255,12 +260,16 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     info->cached = cached*4;
     info->cgcached = 1;
     info->active = 0;
+    info->dirty = 0;
     info->inactive = 0;
     info->del = del;
     if (active)
         info->active = 1;
     else
         info->inactive = 1;
+    if (dirty)
+        info->dirty = 1;
+
     info->cinode = cinode;
     info->size = i_size>>10;
     strncpy(info->filename, end, sizeof(info->filename) - 2);
@@ -314,8 +323,8 @@ static int output_file_cached(unsigned int top)
             continue;
         }
         printf("inode=%lu file=%s cached=%lu size=%lu cinode=%lu active=%lu inactive=%lu shmem=%d \ 
-                delete=%d cgcached=%lu\n", info->inode, info->filename, info->cached, info->size,\ 
-                info->cinode, info->active*4, info->inactive*4, info->shmem, info->del, info->cgcached*4);    
+                delete=%d cgcached=%lu dirty=%lu\n", info->inode, info->filename, info->cached, info->size,\
+                info->cinode, info->active*4, info->inactive*4, info->shmem, info->del, info->cgcached*4, info->dirty*4);
         free(info);
         if (i >= top - 1)
             break;
@@ -329,6 +338,7 @@ int scan_pageflags(struct options *opt)
     unsigned long pfn = 0;
     unsigned long inode = 0;
     int active = 0; 
+    int dirty = 0;
     int shmem = 0;
 
     if (opt->rate != 0) {
@@ -359,10 +369,11 @@ int scan_pageflags(struct options *opt)
             continue;
  
         active = !!((1<<KPF_ACTIVE) & pageflag); 
+        dirty = !!((1<<KPF_DIRTY) & pageflag);
         shmem = !!(pageflag & (1 <<KPF_SWAPBACKED)); 
         inode = get_cgroup_inode(pfn);
         if (check_cgroup_inode(inode)) {
-            get_dentry(pfn, inode, active, shmem); 
+            get_dentry(pfn, inode, active, shmem,dirty);
         } 
     }
     output_file_cached(opt->top);
