@@ -18,6 +18,8 @@
 #include "beaver.h"
 #include "echos.h"
 
+
+#define FD_RATIO    2   // fd_num vs thread
 #define gettidv1() syscall(__NR_gettid)
 
 #define unlikely(x)     __builtin_expect((x),0)
@@ -32,44 +34,29 @@ if (unlikely(X < 0))        \
 struct beaver_message {
     pthread_mutex_t pc_mutex;
     pthread_cond_t pc_condp, pc_condc;
-    pthread_mutex_t fd_mutex;
     int sk_accept;
-    int status;  // working is 0, bad is -1;
-    int thread;
-    int fd_num;
-    int fd_count;
-    int* fds;
+    int status;     // working is 0, bad is -1;
+    int thread;     // thread num
+    int fd_num;     // fd pool number max value.
+    int fd_count;   // fd pool realtime count
+    int* fds;       // fd pool
 };
 
 static int fd_in_beaver(int fd, struct beaver_message* pmsg){
-    int ret;
-
-    ret = pthread_mutex_lock(&pmsg->fd_mutex);
-    ASSERT_LOCKS(ret);
-    if (pmsg->fd_count == pmsg->fd_num) {  //fd poll may large.
-        ret = pthread_mutex_unlock(&pmsg->fd_mutex);
-        ASSERT_LOCKS(ret);
+    if (pmsg->fd_count == pmsg->fd_num) {  //fd poll may large
         return 1;
     }
 
     for (int i = 0; i < pmsg->fd_num; ++i) {
         if (pmsg->fds[i] == fd) {
-            ret = pthread_mutex_unlock(&pmsg->fd_mutex);
-            ASSERT_LOCKS(ret);
             return 1;
         }
     }
-    ret = pthread_mutex_unlock(&pmsg->fd_mutex);
-    ASSERT_LOCKS(ret);
+
     return 0;
 }
 
 static int add_in_beaver(int fd, struct beaver_message* pmsg){
-    int ret;
-
-    printf("add: %d\n", fd);
-    ret = pthread_mutex_lock(&pmsg->fd_mutex);
-    ASSERT_LOCKS(ret);
     for (int i = 0; i < pmsg->fd_num; i ++) {
 #ifdef BEAVER_DEBUG
         if (pmsg->fds[i] == fd) {
@@ -80,8 +67,6 @@ static int add_in_beaver(int fd, struct beaver_message* pmsg){
         if (pmsg->fds[i] == -1) {
             pmsg->fds[i] = fd;
             pmsg->fd_count ++;
-            ret = pthread_mutex_unlock(&pmsg->fd_mutex);
-            ASSERT_LOCKS(ret);
             return 0;
         }
     }
@@ -93,14 +78,12 @@ static int add_in_beaver(int fd, struct beaver_message* pmsg){
     fprintf(stderr, "\n");
     exit(0);
 #endif
-    ret = pthread_mutex_unlock(&pmsg->fd_mutex);
-    ASSERT_LOCKS(ret);
     return 1;
 }
 
 static int del_in_beaver(int fd, struct beaver_message* pmsg){
     int ret;
-    ret = pthread_mutex_lock(&pmsg->fd_mutex);
+    ret = pthread_mutex_lock(&pmsg->pc_mutex);
     ASSERT_LOCKS(ret);
     for (int i = 0; i < pmsg->fd_num; ++i) {
         if (pmsg->fds[i] == fd) {
@@ -108,7 +91,7 @@ static int del_in_beaver(int fd, struct beaver_message* pmsg){
             pmsg->fd_count --;
             ret = pthread_cond_signal(&pmsg->pc_condp);
             ASSERT_LOCKS(ret);
-            ret = pthread_mutex_unlock(&pmsg->fd_mutex);
+            ret = pthread_mutex_unlock(&pmsg->pc_mutex);
             ASSERT_LOCKS(ret);
             return 0;
         }
@@ -117,11 +100,10 @@ static int del_in_beaver(int fd, struct beaver_message* pmsg){
     fprintf(stderr, "bug: fd %d is not in fds.\n", fd);
     exit(0);
 #endif
-    ret = pthread_mutex_unlock(&pmsg->fd_mutex);
+    ret = pthread_mutex_unlock(&pmsg->pc_mutex);
     ASSERT_LOCKS(ret);
     return 1;
 }
-
 
 static void * beaver_threads(void * arg) {
     int ret;
@@ -167,12 +149,6 @@ static int beaver_setup_message(struct beaver_message* pmsg) {
     pmsg->sk_accept = 0;
     pmsg->status = 0;
 
-    ret = pthread_mutex_init(&pmsg->fd_mutex, NULL);
-    if (ret < 0) {
-        perror("pc_mutex create failed.");
-        goto endMutex;
-    }
-
     ret = pthread_mutex_init(&pmsg->pc_mutex, NULL);
     if (ret < 0) {
         perror("pc_mutex create failed.");
@@ -202,11 +178,6 @@ static int beaver_setup_message(struct beaver_message* pmsg) {
         perror("destroy pc_mutex faild.");
         exit(1);
     }
-    fret = pthread_mutex_destroy(&pmsg->fd_mutex);
-    if (fret < 0){
-        perror("destroy pc_mutex faild.");
-        exit(1);
-    }
     endMutex:
     return ret;
 }
@@ -227,11 +198,6 @@ static void beaver_destroy_message(struct beaver_message* pmsg) {
     ret = pthread_mutex_destroy(&pmsg->pc_mutex);
     if (ret < 0){
         perror("destroy pc_mutex faild.");
-        exit(1);
-    }
-    ret = pthread_mutex_destroy(&pmsg->fd_mutex);
-    if (ret < 0){
-        perror("destroy fd_mutex faild.");
         exit(1);
     }
 }
@@ -300,7 +266,7 @@ static int beaver_accept(int sk_listen, struct beaver_message* pmsg) {
     int sk_accept;
     int ret;
 
-    ret = pthread_mutex_lock(&pmsg->fd_mutex);
+    ret = pthread_mutex_lock(&pmsg->pc_mutex);
     ASSERT_LOCKS(ret);
     pmsg->fds = malloc(sizeof (int) * pmsg->fd_num);
     if (pmsg->fds == NULL) {
@@ -310,7 +276,7 @@ static int beaver_accept(int sk_listen, struct beaver_message* pmsg) {
     for (int i = 0; i < pmsg->fd_num; i ++) {
         pmsg->fds[i] = -1;
     }
-    ret = pthread_mutex_unlock(&pmsg->fd_mutex);
+    ret = pthread_mutex_unlock(&pmsg->pc_mutex);
     ASSERT_LOCKS(ret);
 
     while (1) {
@@ -321,21 +287,17 @@ static int beaver_accept(int sk_listen, struct beaver_message* pmsg) {
             goto endAccept;
         }
 
-        while (fd_in_beaver(sk_accept, pmsg)){   // new fd may re
-            sched_yield();
-        }
-
-        add_in_beaver(sk_accept, pmsg);
-
         ret = pthread_mutex_lock(&pmsg->pc_mutex);
         ASSERT_LOCKS(ret);
+        while (fd_in_beaver(sk_accept, pmsg)){   // new fd may re
+            ret = pthread_cond_wait(&pmsg->pc_condp, &pmsg->pc_mutex);
+            ASSERT_LOCKS(ret);
+        }
+        add_in_beaver(sk_accept, pmsg);
 
         pmsg->sk_accept = sk_accept;
-        printf("owner send: %d\n", sk_accept);
         ret = pthread_cond_signal(&pmsg->pc_condc);
         ASSERT_LOCKS(ret);
-
-        printf("owner waiting: %d.\n", sk_accept);
 
         ret = pthread_mutex_unlock(&pmsg->pc_mutex);
         ASSERT_LOCKS(ret);
@@ -355,7 +317,7 @@ int beaver_init(int port, int thread) {
     struct beaver_message msg;
 
     msg.thread = thread;
-    msg.fd_num = thread * 2;
+    msg.fd_num = thread * FD_RATIO;
     msg.fd_count = 0;
 
     sk_listen = socket(AF_INET, SOCK_STREAM, 0);

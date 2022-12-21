@@ -12,7 +12,6 @@ class CsockThread(Thread):
         while True:
             s = socket.socket()
             s.connect(("127.0.0.1", 8400))
-            print("connect ok.")
             s.send("hello".encode())
             r = s.recv(16).decode()
             assert (r == "hello")
