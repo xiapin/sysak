@@ -1,6 +1,3 @@
-[submodule "source/lib/internal/ebpf/libbpf_latest"]
-	path = source/lib/internal/ebpf/libbpf_latest
-	url = https://gitee.com/anolis/libbpf
 [submodule "source/lib/internal/ebpf/coolbpf"]
 	path = source/lib/internal/ebpf/coolbpf
 	url = https://gitee.com/anolis/coolbpf.git

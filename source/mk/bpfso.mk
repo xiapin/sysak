@@ -4,7 +4,7 @@ BPFTOOL ?= $(SRC)/lib/internal/ebpf/tools/bpftool
 APPS_DIR := $(abspath .)
 prefix ?= /usr/local
 ARCH := $(shell uname -m | sed 's/x86_64/x86/')
-COOLBPF_OBJ += $(OBJ_LIB_PATH)/libbpf.a $(OBJ_LIB_PATH)/coolbpf.a
+COOLBPF_OBJ += $(OBJ_LIB_PATH)/libbpf.so $(OBJ_LIB_PATH)/libcoolbpf.so
 
 ifeq ($(KERNEL_DEPEND), Y)
 TARGET_PATH := $(OBJ_TOOLS_PATH)
@@ -14,8 +14,9 @@ endif
 
 DEPEND := "prev{btf}"
 
+SHARED_CFLAGS += -fPIC -fvisibility=hidden -DSHARED
 CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall
-LDFLAGS += $(EXTRA_LDFLAGS)
+LDFLAGS += $(EXTRA_LDFLAGS) -L$(OBJ_LIB_PATH) -lbpf -lcoolbpf -lelf -lz
 INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(TARGET_PATH) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi -I$(SRC)/lib/uapi/include
 
 ifeq ($(V),1)
@@ -44,12 +45,12 @@ all: $(target) target_rule
 
 $(target): $(target_cobjs) $(bpfskel) $(COOLBPF_OBJ)
 	$(call msg,BINARY,$@)
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) $^ -lelf -lz -o $(TARGET_PATH)/$@ -L$(OBJ_LIB_PATH) $(LDFLAGS)
+	$(Q)$(CC) $(CFLAGS) -shared -Wl,-soname,$(target) $(INCLUDES) $^ -o $(TARGET_PATH)/$@ $(LDFLAGS)
 $(target_cobjs): $(cobjs)
 
 $(cobjs): %.o : %.c $(bpfskel)
 	$(call msg,CC,$@) 
-	$(Q)$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $(OBJPATH)/$@
+	$(Q)$(CC) $(CFLAGS) $(SHARED_CFLAGS) $(INCLUDES) -c $< -o $(OBJPATH)/$@
 
 $(bpfskel): %.skel.h : %.bpf.o $(target_bpfobjs)
 	$(call msg,GEN-SKEL,$@)

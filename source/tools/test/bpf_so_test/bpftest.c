@@ -41,7 +41,7 @@ static int libbpf_print_fn(enum libbpf_print_level level,
             __ret;                                                             \
         })
 
-int main(int argc, char **argv)
+int test_main(int argc, char **argv)
 {
     struct bpftest1_bpf *bpftest1 = NULL;
     struct bpftest2_bpf *bpftest2 = NULL;
