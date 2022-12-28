@@ -8,6 +8,13 @@
 #define NULL ((void *)0)
 #define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
 
+struct bpf_map_def SEC("maps") args_map = {
+	.type = BPF_MAP_TYPE_HASH,
+	.key_size = sizeof(int),
+	.value_size = sizeof(struct args),
+	.max_entries = 1,
+};
+
 struct trace_event_raw_workqueue_activate_work {
         struct trace_entry ent;
         void *work;
@@ -62,12 +69,19 @@ int report_workqueue_execute_end(struct trace_event_raw_workqueue_execute_end *c
 {
 	__u64 name;
 	__s64 delta;
+	int args_key;
 	struct report_data *data;
+	struct args *argsp;
 	struct work_key key = {
 		.type = KWORK_CLASS_WORKQUEUE,
 		.cpu  = bpf_get_smp_processor_id(),
 		.id   = (__u64)_(ctx->work),
 	};
+
+	__builtin_memset(&args_key, 0, sizeof(int));
+	argsp = bpf_map_lookup_elem(&args_map, &args_key);
+	if (!argsp)
+		return 0;
 	
 	data = bpf_map_lookup_elem(&runtime_kwork_report, &key);
 	if (data) {
@@ -75,13 +89,15 @@ int report_workqueue_execute_end(struct trace_event_raw_workqueue_execute_end *c
 		delta = now - data->max_time_start;
 		if (delta < 0)
 			return -1;
-		if ((delta > data->max_time) || (data->max_time == 0)) {
-			data->max_time = delta;
-			//data->max_time_start = time_start;
-			data->max_time_end = now;
+		if (delta > _(argsp->thresh)) {
+			if ((delta > data->max_time) || (data->max_time == 0)) {
+				data->max_time = delta;
+				//data->max_time_start = time_start;
+				data->max_time_end = now;
+			}
+			data->total_time += delta;
+			data->nr++;
 		}
-		data->total_time += delta;
-		data->nr++;		
 	}
 	return 0;
 }
@@ -111,13 +127,20 @@ int latency_workqueue_execute_start(struct trace_event_raw_workqueue_execute_sta
 {
 	__u64 name;
 	__s64 delta;
+	int args_key;
 	unsigned long long func_addr;
 	struct report_data *data;
+	struct args *argsp;
 	struct work_key key = {
 		.type = KWORK_CLASS_WORKQUEUE,
 		.cpu  = bpf_get_smp_processor_id(),
 		.id   = (__u64)_(ctx->work),
 	};
+
+	__builtin_memset(&args_key, 0, sizeof(int));
+	argsp = bpf_map_lookup_elem(&args_map, &args_key);
+	if (!argsp)
+		return 0;
 
 	func_addr = (unsigned long long)_(ctx->function);
 	data = bpf_map_lookup_elem(&latency_kwork_report, &key);
@@ -126,13 +149,15 @@ int latency_workqueue_execute_start(struct trace_event_raw_workqueue_execute_sta
 		delta = now - data->max_time_start;
 		if (delta < 0)
 			return -1;
-		if ((delta > data->max_time) || (data->max_time == 0)) {
-			data->max_time = delta;
-			data->max_time_end = now;
+		if (delta > _(argsp->thresh)) {
+			if ((delta > data->max_time) || (data->max_time == 0)) {
+				data->max_time = delta;
+				data->max_time_end = now;
+			}
+			data->total_time += delta;
+			data->nr++;
+			data->name_addr = func_addr;
 		}
-		data->total_time += delta;
-		data->nr++;
-		data->name_addr = func_addr;
 	}
 	return 0;
 }

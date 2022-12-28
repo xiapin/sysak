@@ -8,12 +8,17 @@
 #define MAX_KWORKNAME	128
 #define SEC_TO_NS   (1000*1000*1000)
 #define SEC_TO_MS   (1000*1000)
+#define LAT_THRESH_NS	(10*1000*1000)
 
 enum kwork_class_type {
 	KWORK_CLASS_IRQ,
 	KWORK_CLASS_SOFTIRQ,
 	KWORK_CLASS_WORKQUEUE,
 	KWORK_CLASS_MAX,
+};
+
+struct args {
+	__u64 thresh;
 };
 
 enum trace_class_type {

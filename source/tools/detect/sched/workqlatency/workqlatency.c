@@ -16,9 +16,11 @@
 #include "workqlatency.h"
 
 __u64 period = DEF_TIME;
+__u64 g_thresh = LAT_THRESH_NS;
 bool verbose = false;
 static struct ksym syms[MAX_SYMS];
 static int sym_cnt;
+
 
 char *log_dir = "/var/log/sysak/workqlatency";
 char *runtime_data = "/var/log/sysak/workqlatency/runtime.log";
@@ -26,6 +28,7 @@ char *latency_data = "/var/log/sysak/workqlatency/latency.log";
 
 struct option longopts[] = {
     { "time", no_argument, NULL, 't' },
+	{ "threshold", no_argument, NULL, 'l' },
     { "help", no_argument, NULL, 'h' },
     { 0, 0, 0, 0},
 };
@@ -38,6 +41,7 @@ static void usage(void)
 	        "Usage: sysak workqlatency [options] [args]\n"
             "Options:\n"
             "    --time/-t		specify the monitor period(s), default=10s\n"
+			"    --threshold/-l		specify the threshold time(ms), default=10ms\n"
             "    --help/-h		help info\n"
             "example: sysak workqlatency -t 10  #trace work runtime and latency statistics\n");
 	exit(EXIT_FAILURE);
@@ -156,7 +160,7 @@ void stamp_to_date(__u64 stamp, char dt[], int len)
 	strftime(dt, len, "%F %H:%M:%S", tm);
 }
 
-static int prepare_directory(char *path)
+static int prepare_dictory(char *path)
 {
 	int ret = 0;
 
@@ -192,7 +196,7 @@ static int prepare_directory(char *path)
 static int report_data(struct workqlatency_bpf *skel, enum trace_class_type type)
 {
 	int err = 0,fd_report;
-	struct work_key prev = { .cpu = -1 }, key;
+	struct work_key prev, key;
 	struct report_data elem_rd;
 	char date_start[MAX_DATE], date_end[MAX_DATE];
 	char workname[MAX_SYMS] = {0};
@@ -252,15 +256,20 @@ out:
 int main(int argc, char *argv[])
 {
 	int opt;
-	int err = 0;
+	int err = 0, map_fd, args_key = 0;
 	struct workqlatency_bpf *skel;
+	struct args args;
 
-	while ((opt = getopt_long(argc, argv, "t:hv", longopts, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "t:l:hv", longopts, NULL)) != -1) {
 		switch (opt) {
 			case 't':
                 if (optarg)
                     period = (int)strtoul(optarg, NULL, 10);
                 break;
+			case 'l':
+                if (optarg)
+                    g_thresh = (int)strtoul(optarg, NULL, 10)*1000*1000;
+				break;
 			case 'h':
                 usage();
                 break;
@@ -277,7 +286,7 @@ int main(int argc, char *argv[])
 	libbpf_set_print(libbpf_print_fn);
 	bump_memlock_rlimit();
 
-	prepare_directory(log_dir);
+	prepare_dictory(log_dir);
 
 	err = load_kallsyms();
 	if (err) {
@@ -305,6 +314,15 @@ int main(int argc, char *argv[])
 	err = workqlatency_bpf__attach(skel);
 	if (err) {
 		fprintf(stderr, "failed to attach BPF skeleton\n");
+		goto cleanup;
+	}
+
+	map_fd = bpf_map__fd(skel->maps.args_map);
+
+	args.thresh = g_thresh;
+	err = bpf_map_update_elem(map_fd, &args_key, &args, 0);
+	if (err) {
+		fprintf(stderr, "Failed to update flag map\n");
 		goto cleanup;
 	}
 
