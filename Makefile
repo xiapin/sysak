@@ -56,7 +56,7 @@ clean_middle:
 dist_clean: clean
 	rm -rf config-host.mak
 	rm -rf source/lib/internal/kernel_module
-	rm -rf source/lib/internal/ebpf/libbpf
+	rm -rf source/lib/internal/ebpf/coolbpf
 
 $(OBJ_LIB_PATH):
 	mkdir -p $(OBJ_LIB_PATH)

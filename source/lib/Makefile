@@ -15,9 +15,12 @@ endif
 
 clean:
 ifeq ($(BUILD_KERNEL_MODULE), YES)
+ifneq ($(wildcard internal/kernel_module/Makefile),)
 	make -C internal/kernel_module clean
 endif
-ifeq ($(BUILD_LIBBPF), YES)
-	make -C internal/ebpf/libbpf/src clean
 endif
-
+ifeq ($(BUILD_LIBBPF), YES)
+ifneq ($(wildcard internal/ebpf/coolbpf/third/libbpf/src/Makefile),)
+	make -C internal/ebpf/coolbpf/third/libbpf/src/ clean
+endif
+endif
