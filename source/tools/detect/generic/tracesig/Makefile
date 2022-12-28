@@ -1,4 +1,8 @@
-target := tracesig
-DEPEND := "prev{-e modin,-p modin,-c modin,-s modin};post{-d modun}"
-include $(SRC)/mk/sh.mk
 
+newdirs := $(shell find ./ -type d)
+
+bpfsrcs := $(wildcard bpf/*.bpf.c)
+csrcs := $(wildcard *.c)
+target := tracesig
+
+include $(SRC)/mk/bpf.mk
