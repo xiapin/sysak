@@ -36,4 +36,15 @@ function system:dump(t)
     return serpent.block(t)
 end
 
+function system:tableIsIn(tbl, key)
+    if type(tbl) ~= "table" then
+        return false
+    end
+    if tbl[key] == nil then
+        return false
+    else
+        return true
+    end
+end
+
 return system

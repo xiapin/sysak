@@ -23,6 +23,7 @@ function CfoxTSDB:_del_()
     if self._man then
         self.cffi.fox_del_man(self._man)
     end
+    self._man = nil
 end
 
 function CfoxTSDB:get_us()
@@ -146,8 +147,13 @@ function CfoxTSDB:_setupRead(us)
     self._man = self.ffi.new("struct fox_manager")
     us = us or (self:get_us() - 15e6)
     local date = self:getDateFrom_us(us)
-
-    assert(self.cffi.fox_setup_read(self._man, date, us))
+    local res = self.cffi.fox_setup_read(self._man, date, us)
+    assert(res >= 0, string.format("setup read return %d.", res))
+    if res > 0 then
+        self.cffi.fox_del_man(self._man)
+        self._man = nil
+    end
+    return res
 end
 
 function CfoxTSDB:curMove(us)
@@ -199,10 +205,7 @@ function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
     local dStop = self:getDateFrom_us(stop)
 
     assert(self.cffi.check_foxdate(dStart, dStop) == 1)  -- check date
-
-    if not self._man then
-        self:_setupRead(start)
-    end
+    assert(self._man)
 
     self:curMove(start)    -- moveto position
 
@@ -243,9 +246,27 @@ end
 
 function CfoxTSDB:qlast(last, ms)
     local now = self:get_us()
+    local date = self:getDateFrom_us(now)
     local beg = now - last * 1e6;
 
-    return self:query(beg, now, ms)
+    if self._man then   -- has setup
+        if self.cffi.check_pman_date(self._man, date) then  -- at the same day
+            return self:query(beg, now, ms)
+        else
+            self:_del_()   -- destroy old manager
+            if self:_setupRead(now) ~= 0 then    -- try to create new
+                return ms
+            else
+                return self:query(beg, now, ms)
+            end
+        end
+    else
+        if self:_setupRead(now) ~= 0 then    -- try to create new
+            return ms
+        else
+            return self:query(beg, now, ms)
+        end
+    end
 end
 
 return CfoxTSDB

@@ -249,7 +249,7 @@ int check_foxdate(struct foxDate* d1, struct foxDate* d2) {
             (d1->mday == d2->mday);
 }
 
-static int check_date(struct fox_manager* pman, struct foxDate* pdate) {
+int check_pman_date(struct fox_manager* pman, struct foxDate* pdate) {
     return  (pman->year == pdate->year) && \
             (pman->mon == pdate->mon) && \
             (pman->mday == pdate->mday);
@@ -313,7 +313,7 @@ int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,
           const char* data, int len) {
     int res = 0;
 
-    if (!check_date(pman, pdate)) {  // new day?
+    if (!check_pman_date(pman, pdate)) {  // new day?
         close(pman->fd);   // close this file at first.
         res = fox_setup_write(pman, pdate, us);
         if (res < 0) {
@@ -555,9 +555,14 @@ int fox_read_resize(struct fox_manager* pman) {
 
         fox_time_t now = make_stamp(&d);
 
-        return fox_setup_read(pman, &d, now);
+        ret = fox_setup_read(pman, &d, now);
+        if (ret !=0 ) {
+            ret = -EACCES;
+            goto endSetup;
+        }
     }
     return ret;
+    endSetup:
     endSize:
     endCur:
     return ret;
@@ -570,8 +575,8 @@ int fox_setup_read(struct fox_manager* pman, struct foxDate * p, fox_time_t now)
     pack_fname(fname, p);
     pman->fd = open(fname, O_RDONLY);
     if (pman->fd < 0) {
-        fprintf(stderr, "open %s error, return %d, %s", fname, errno, strerror(errno));
-        ret = -ENOENT;
+        fprintf(stderr, "open %s failed, return %d, %s", fname, errno, strerror(errno));
+        ret = 1;
         goto endOpen;
     }
 

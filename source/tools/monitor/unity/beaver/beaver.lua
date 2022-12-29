@@ -11,6 +11,7 @@ package.path = package.path .. ";../tsdb/native/?.lua;"
 
 local Cframe = require("frame")
 local CurlApi = require("url_api")
+local CurlRpc = require("url_rpc")
 local CurlIndex = require("index")
 local Cexport = require("export")
 local CurlExportHtml = require("url_export_html")
@@ -22,6 +23,7 @@ function init(tid)
     print("hello beaver " .. tid)
     CurlIndex.new(web)
     CurlApi.new(web)
+    CurlRpc.new(web)
 
     local export = Cexport.new("12345abdc")
     CurlExportHtml.new(web, export)
