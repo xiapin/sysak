@@ -35,10 +35,6 @@ struct env {
 
 volatile sig_atomic_t exiting = 0;
 
-void print_stack(int fd, __u32 ret, struct ksym *syms);
-int load_kallsyms(struct ksym **pksyms);
-int nr_to_syscall(int argc, char *arry[]);
-
 const char *argp_program_version = "tracesig 0.1";
 const char argp_program_doc[] =
 "Catch the delay of a syscall more than threshold.\n"

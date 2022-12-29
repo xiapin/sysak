@@ -199,7 +199,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			snprintf(tmp, sizeof(tmp), "%ld", e->sysid);
 			syscall = tmp;
 		}
-		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-9s %lu(%s)\n",
+		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-9s %u(%s)\n",
 			ts, e->delay/(1000*1000), e->realtime/(1000*1000),
 			e->itime/(1000*1000), e->vtime/(1000*1000),
 			e->stime/(1000*1000), e->nvcsw, e->nivcsw, syscall, e->pid, e->comm);

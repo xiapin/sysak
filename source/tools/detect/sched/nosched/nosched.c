@@ -88,6 +88,10 @@ int load_kallsyms(void)
 	}
 	fclose(f);
 	sym_cnt = i;
+	if (sym_cnt == 0) {
+		printf("/proc/kallsyms has no valid address\n");
+		return -ENOENT;
+	}
 	qsort(syms, sym_cnt, sizeof(struct ksym), ksym_cmp);
 	return 0;
 }
@@ -151,7 +155,10 @@ static void print_ksym(__u64 addr)
 		return;
 
 	sym = ksym_search(addr);
-	fprintf(filep, "<0x%llx> %s\n", addr, sym->name);
+	if (sym)
+		fprintf(filep, "<0x%llx> %s\n", addr, sym->name);
+	else
+		fprintf(filep, "<0x%llx>: missing symbols\n", addr);
 }
 
 static void print_stack(int fd, __u32 ret)

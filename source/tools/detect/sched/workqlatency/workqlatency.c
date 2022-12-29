@@ -108,6 +108,10 @@ int load_kallsyms(void)
 	}
 	fclose(f);
 	sym_cnt = i;
+	if (sym_cnt == 0) {
+		printf("/proc/kallsyms has no valid address\n");
+		return -ENOENT;
+	}
 	qsort(syms, sym_cnt, sizeof(struct ksym), ksym_cmp);
 	return 0;
 }
@@ -150,8 +154,11 @@ static void print_ksym(__u64 addr, char work_name[])
 		return;
 
 	sym = ksym_search(addr);
-	snprintf(work_name, MAX_SYMS, "<0x%llx> %s",
-             addr, sym->name);
+	if (sym)
+		snprintf(work_name, MAX_SYMS, "<0x%llx> %s",
+             		addr, sym->name);
+	else
+		snprintf(work_name, MAX_SYMS, "<0x%llx>: missing symbols\n", addr);
 }
 
 void stamp_to_date(__u64 stamp, char dt[], int len)
