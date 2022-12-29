@@ -3,7 +3,7 @@
 #include <bpf/bpf_tracing.h>
 #include "../workqlatency.h"
 
-#define KWORK_COUNT 100
+#define KWORK_COUNT 1000
 #define MAX_KWORKNAME 128
 #define NULL ((void *)0)
 #define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
@@ -41,6 +41,18 @@ struct {
 	__uint(max_entries, KWORK_COUNT);
 } latency_kwork_report SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(key_size, sizeof(u32));
+	__uint(value_size, sizeof(u32));
+} runtime_events SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(key_size, sizeof(u32));
+	__uint(value_size, sizeof(u32));
+} latency_events SEC(".maps");
+
 
 SEC("tp/workqueue/workqueue_execute_start")
 int report_workqueue_execute_start(struct trace_event_raw_workqueue_execute_start *ctx)
@@ -61,6 +73,7 @@ int report_workqueue_execute_start(struct trace_event_raw_workqueue_execute_star
 	new.max_time_start = bpf_ktime_get_ns();
 	new.max_time_end = 0;
 	new.name_addr = func_addr;
+	new.cpuid = bpf_get_smp_processor_id();
 	return bpf_map_update_elem(&runtime_kwork_report, &key, &new, BPF_NOEXIST);
 }
 
@@ -97,7 +110,12 @@ int report_workqueue_execute_end(struct trace_event_raw_workqueue_execute_end *c
 			}
 			data->total_time += delta;
 			data->nr++;
+			struct report_data event_data = {0};
+			__builtin_memcpy(&event_data,data,sizeof(struct report_data));
+			bpf_perf_event_output(ctx, &runtime_events, BPF_F_CURRENT_CPU,
+				&event_data, sizeof(event_data));
 		}
+		bpf_map_delete_elem(&runtime_kwork_report, &key);
 	}
 	return 0;
 }
@@ -119,6 +137,7 @@ int latency_workqueue_activate_work(struct trace_event_raw_workqueue_activate_wo
 	new.max_time_start = bpf_ktime_get_ns();
 	new.max_time_end = 0;
 	new.name_addr = 0;
+	new.cpuid = bpf_get_smp_processor_id();
 	return bpf_map_update_elem(&latency_kwork_report, &key, &new, BPF_NOEXIST);
 }
 
@@ -157,7 +176,12 @@ int latency_workqueue_execute_start(struct trace_event_raw_workqueue_execute_sta
 			data->total_time += delta;
 			data->nr++;
 			data->name_addr = func_addr;
+			struct report_data event_data = {0};
+			__builtin_memcpy(&event_data,data,sizeof(struct report_data));
+			bpf_perf_event_output(ctx, &latency_events, BPF_F_CURRENT_CPU,
+				&event_data, sizeof(event_data));
 		}
+		bpf_map_delete_elem(&latency_kwork_report, &key);
 	}
 	return 0;
 }

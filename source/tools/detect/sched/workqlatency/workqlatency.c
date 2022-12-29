@@ -6,20 +6,24 @@
 #include <time.h>
 #include <string.h>
 #include <errno.h>
+#include <pthread.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <bpf/libbpf.h>
-#include <bpf/bpf.h>	/* bpf_obj_pin */
+#include <bpf/bpf.h>
 #include <getopt.h>
 #include "bpf/workqlatency.skel.h"
 #include "workqlatency.h"
 
-__u64 period = DEF_TIME;
+//__u64 period = DEF_TIME;
 __u64 g_thresh = LAT_THRESH_NS;
 bool verbose = false;
+FILE *latency_fd = NULL;
+FILE *runtime_fd = NULL;
 static struct ksym syms[MAX_SYMS];
 static int sym_cnt;
+static volatile sig_atomic_t exiting;
 
 
 char *log_dir = "/var/log/sysak/workqlatency";
@@ -27,22 +31,19 @@ char *runtime_data = "/var/log/sysak/workqlatency/runtime.log";
 char *latency_data = "/var/log/sysak/workqlatency/latency.log";
 
 struct option longopts[] = {
-    { "time", no_argument, NULL, 't' },
+    //{ "time", no_argument, NULL, 't' },
 	{ "threshold", no_argument, NULL, 'l' },
     { "help", no_argument, NULL, 'h' },
     { 0, 0, 0, 0},
 };
-
-static void sig_int(int signo) { }
 
 static void usage(void)
 {
 	fprintf(stdout,
 	        "Usage: sysak workqlatency [options] [args]\n"
             "Options:\n"
-            "    --time/-t		specify the monitor period(s), default=10s\n"
 			"    --threshold/-l		specify the threshold time(ms), default=10ms\n"
-            "    --help/-h		help info\n"
+            "    --help/-h			help info\n"
             "example: sysak workqlatency -t 10  #trace work runtime and latency statistics\n");
 	exit(EXIT_FAILURE);
 }
@@ -53,6 +54,16 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 		return vfprintf(stderr, format, args);
 	else
 		return 0;
+}
+
+static void sig_int(int signo)
+{
+	exiting = 1;
+}
+
+static void sig_alarm(int signo)
+{
+	exiting = 1;
 }
 
 static void bump_memlock_rlimit(void)
@@ -193,79 +204,125 @@ static int prepare_dictory(char *path)
 	return 0;
 }*/
 
-static int report_data(struct workqlatency_bpf *skel, enum trace_class_type type)
+void handle_latency_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
-	int err = 0,fd_report;
-	struct work_key prev, key;
-	struct report_data elem_rd;
+	const struct report_data *dp = data;
 	char date_start[MAX_DATE], date_end[MAX_DATE];
 	char workname[MAX_SYMS] = {0};
-	FILE *fp_data;
 
-	if (type == TRACE_RUNTIME){
-		fd_report = bpf_map__fd(skel->maps.runtime_kwork_report);
-    	printf("%-48s\t%-10s\t%-10s\t%-10s\t%-12s\t%-16s\t%-16s\n", "Kwork Name", "Cpu",
-				"Avg runtime(ns)", "Count", "Max runtime(ns)", "Max runtime start(s)", "Max runtime end(s)");
-	
-		if (access(runtime_data,0) != 0){
-			fp_data = fopen(runtime_data, "a+");
-			fprintf(fp_data, "%-42s\t%-10s\t%-10s\t%-12s\t%-12s\t%-32s\t%-16s\n", "Kwork Name", "Cpu",
-					"Avg runtime(ns)", "Count", "Max runtime(ns)", "Max runtime start(s)", "Max runtime end(s)");
-		} else {
-			fp_data = fopen(runtime_data, "a+");
-		}
-	} else {
-		fd_report = bpf_map__fd(skel->maps.latency_kwork_report);
-    	printf("%-48s\t%-10s\t%-10s\t%-10s\t%-12s\t%-16s\t%-16s\n", "Kwork Name", "Cpu",
-				"Avg delay(ns)", "Count", "Max delay(ns)", "Max delay start(s)", "Max delay end(s)");
-	
-		if (access(latency_data,0) != 0){
-			fp_data = fopen(latency_data, "a+");
-			fprintf(fp_data, "%-48s\t%-10s\t%-10s\t%-12s\t%-12s\t%-32s\t%-16s\n", "Kwork Name", "Cpu",
-					"Avg delay(ns)", "Count", "Max delay(ns)", "Max delay start(s)", "Max delay end(s)");
-		} else {
-			fp_data = fopen(latency_data, "a+");
-		}
+	stamp_to_date(dp->max_time_start, date_start,MAX_DATE);
+	stamp_to_date(dp->max_time_end, date_end, MAX_DATE);
+	print_ksym(dp->name_addr,workname);
+	fprintf(latency_fd, "%-48s\t%-10llu\t%-10llu\t%-12llu\t%-12llu\t%s(%-16llu)\t%s(%-16llu)\n", workname, dp->cpuid,
+		dp->total_time/dp->nr, dp->nr, dp->max_time, date_start, dp->max_time_start, date_end, dp->max_time_end);
+}
 
+void handle_runtime_event(void *ctx, int cpu, void *data, __u32 data_sz)
+{
+	const struct report_data *dp = data;
+	char date_start[MAX_DATE], date_end[MAX_DATE];
+	char workname[MAX_SYMS] = {0};
+
+	stamp_to_date(dp->max_time_start, date_start,MAX_DATE);
+	stamp_to_date(dp->max_time_end, date_end, MAX_DATE);
+	print_ksym(dp->name_addr,workname);
+	fprintf(runtime_fd, "%-48s\t%-10llu\t%-10llu\t%-12llu\t%-12llu\t%s(%-16llu)\t%s(%-16llu)\n", workname, dp->cpuid,
+		dp->total_time/dp->nr, dp->nr, dp->max_time, date_start, dp->max_time_start, date_end, dp->max_time_end);
+}
+
+void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
+{
+	printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+}
+
+int report_handler(int poll_fd, struct workqlatency_bpf *skel, FILE *filep, enum trace_class_type type)
+{
+	int err = 0;
+	struct perf_buffer *pb = NULL;
+	struct perf_buffer_opts pb_opts = {};
+
+	if (type == TRACE_RUNTIME)
+		pb_opts.sample_cb = handle_runtime_event;
+	else
+		pb_opts.sample_cb = handle_latency_event;
+	pb_opts.lost_cb = handle_lost_events;
+	pb = perf_buffer__new(poll_fd, 64, &pb_opts);
+	if (!pb) {
+		err = -errno;
+		fprintf(stderr, "failed to open perf buffer: %d\n", err);
+		goto clean_nosched;
 	}
 
-	while (!bpf_map_get_next_key(fd_report, &prev, &key)) {
-		err = bpf_map_lookup_elem(fd_report, &key, &elem_rd);
-		if (err < 0) {
-			fprintf(stderr, "failed to lookup elem: %d\n", err);
-			goto out;
+	while (!exiting) {
+		err = perf_buffer__poll(pb, 100);
+		if (err < 0 && err != -EINTR) {
+			fprintf(stderr, "error polling perf buffer: %s\n", strerror(-err));
+			goto clean_nosched;
 		}
-		
-		stamp_to_date(elem_rd.max_time_start, date_start,MAX_DATE);
-		stamp_to_date(elem_rd.max_time_end, date_end, MAX_DATE);
-		print_ksym(elem_rd.name_addr,workname);
-		if (elem_rd.nr > 0){
-			printf("%-48s\t%-10d\t%-10llu\t%-12llu\t%-12llu\t%s\t%s\n", workname, key.cpu,
-				elem_rd.total_time/elem_rd.nr, elem_rd.nr, elem_rd.max_time, date_start, date_end);
-			fprintf(fp_data, "%-48s\t%-10d\t%-10llu\t%-12llu\t%-12llu\t%s(%-16llu)\t%s(%-16llu)\n", workname, key.cpu,
-				elem_rd.total_time/elem_rd.nr, elem_rd.nr, elem_rd.max_time, date_start, elem_rd.max_time_start,
-				date_end, elem_rd.max_time_end);
-		}
-		prev = key;
+		/* reset err to return 0 if exiting */
+		err = 0;
 	}
-out:
-	fclose(fp_data);
+clean_nosched:
+	perf_buffer__free(pb);
 	return err;
+}
+
+//static int report_data(struct workqlatency_bpf *skel, enum trace_class_type type)
+static void *report_data(void *arg)
+{
+	int map_fd;
+	struct thread_args *arg_info;
+	struct workqlatency_bpf *skel;
+	enum trace_class_type type;
+
+	arg_info = (struct thread_args *)arg;
+	type = arg_info->type;
+	skel = (struct workqlatency_bpf *)arg_info->skel;
+	if (type == TRACE_RUNTIME){
+		if (access(runtime_data,0) != 0){
+			runtime_fd = fopen(runtime_data, "a+");
+			fprintf(runtime_fd, "%-48s\t%-10s\t%-10s\t%-12s\t%-12s\t%-32s\t%-16s\n", "Kwork Name", "Cpu",
+				"Avg runtime(ns)", "Count", "Max runtime(ns)", "Max runtime start(s)", "Max runtime end(s)");			
+		} else {
+			runtime_fd = fopen(runtime_data, "a+");
+		}
+
+		map_fd = bpf_map__fd(skel->maps.runtime_events);
+		report_handler(map_fd, skel, runtime_fd, type);
+		fclose(runtime_fd);
+	}else{
+		if (access(latency_data,0) != 0){
+			latency_fd = fopen(latency_data, "a+");
+			fprintf(latency_fd, "%-48s\t%-10s\t%-10s\t%-12s\t%-12s\t%-32s\t%-16s\n", "Kwork Name", "Cpu",
+				"Avg delay(ns)", "Count", "Max delay(ns)", "Max delay start(s)", "Max delay end(s)");
+		} else {
+			latency_fd = fopen(latency_data, "a+");
+		}
+
+		map_fd = bpf_map__fd(skel->maps.latency_events);
+		report_handler(map_fd, skel, latency_fd, type);
+		fclose(latency_fd);
+
+	}
+	return 0;
 }
 
 int main(int argc, char *argv[])
 {
-	int opt;
+	int opt, i;
 	int err = 0, map_fd, args_key = 0;
+	pthread_t tid[NR_THREADS];
 	struct workqlatency_bpf *skel;
 	struct args args;
+	struct thread_args *targs[NR_THREADS];
 
 	while ((opt = getopt_long(argc, argv, "t:l:hv", longopts, NULL)) != -1) {
 		switch (opt) {
-			case 't':
+			/*case 't':
                 if (optarg)
                     period = (int)strtoul(optarg, NULL, 10);
                 break;
+			*/
 			case 'l':
                 if (optarg)
                     g_thresh = (int)strtoul(optarg, NULL, 10)*1000*1000;
@@ -305,20 +362,13 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Failed to load BPF skeleton, errno:%d\n",err);
 		return 1;
 	}
-	if (signal(SIGINT, sig_int) == SIG_ERR) {
+	if (signal(SIGINT, sig_int) == SIG_ERR ||
+		signal(SIGALRM, sig_alarm) == SIG_ERR) {
 		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
-		err = 1;
-		goto cleanup;
-	}
-
-	err = workqlatency_bpf__attach(skel);
-	if (err) {
-		fprintf(stderr, "failed to attach BPF skeleton\n");
 		goto cleanup;
 	}
 
 	map_fd = bpf_map__fd(skel->maps.args_map);
-
 	args.thresh = g_thresh;
 	err = bpf_map_update_elem(map_fd, &args_key, &args, 0);
 	if (err) {
@@ -327,9 +377,21 @@ int main(int argc, char *argv[])
 	}
 
 	printf("Starting trace, Can hit <Ctrl+C> to abort and report\n");
-	sleep(period);
-	err = report_data(skel,	TRACE_LATENCY);
-	err = report_data(skel, TRACE_RUNTIME);
+	for (i = 0; i < NR_THREADS; i++){
+		targs[i] = (struct thread_args *)malloc(sizeof(struct thread_args));
+		targs[i]->type = i;
+		targs[i]->skel = skel;
+		//err = report_data(skel,	TRACE_LATENCY);
+		pthread_create(&tid[i],NULL,report_data,(void *)targs[i]);
+	}
+
+	/* Attach tracepoint handler */
+	err = workqlatency_bpf__attach(skel);
+	if (err) {
+		fprintf(stderr, "Failed to attach BPF skeleton\n");
+		return err;
+	}
+	pthread_exit(NULL);
 
 cleanup:
 	workqlatency_bpf__destroy(skel);
