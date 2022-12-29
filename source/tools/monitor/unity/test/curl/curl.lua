@@ -5,7 +5,7 @@
 ---
 
 package.path = package.path .. ";../../common/?.lua;"
-package.path = package.path .. ";../../cli/?.lua;"
+package.path = package.path .. ";../../httplib/?.lua;"
 local serpent = require("serpent")
 
 local ChttpCli = require("httpCli")
@@ -16,12 +16,13 @@ print(serpent.block(res.head))
 print(res.code)
 assert(res.code == 200)
 
-local url = "http://127.0.0.1:8400/api/su"
+local url = "http://127.0.0.1:8400/api/sum"
 local req = {num1 = 101, num2 = 2}
 local res = cli:postTable(url, req)
 print(res.code)
 assert(res.code == 200)
-print(serpent.block(res.head))
+print(serpent.block(res))
 print(#res.body)
+print(res.body)
 local tRes = cli:jdecode(res.body)
 assert(tRes.sum == 103.0)

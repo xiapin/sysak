@@ -16,8 +16,8 @@ local CprocDiskstats = require("proc_diskstats")
 
 local Cloop = class("loop")
 
-function Cloop:_init_()
-    self._proto = CprotoData.new()
+function Cloop:_init_(que)
+    self._proto = CprotoData.new(que)
     self._procs = {
         CprocStat.new(self._proto, procffi),
         CprocMeminfo.new(self._proto, procffi),
@@ -28,13 +28,12 @@ function Cloop:_init_()
 end
 
 function Cloop:work(t)
-    local lines = {}
+    local lines = self._proto:protoTable()
     for k, obj in pairs(self._procs) do
-        local res = obj:proc(t)
-        table.insert(lines, res)
+        lines = obj:proc(t, lines)
     end
-    print(#lines, #lines[4], #lines[5])
-    print(collectgarbage("count"))
+    local bytes = self._proto:encode(lines)
+    self._proto:que(bytes)
 end
 
 return Cloop

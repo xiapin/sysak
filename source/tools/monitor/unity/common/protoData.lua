@@ -11,8 +11,9 @@ local serpent = require("serpent")
 
 local CprotoData = class("CprotoData")
 
-function CprotoData:_init_()
+function CprotoData:_init_(que)
     self._pc = protoc:new()
+    self._que = que
     assert(self._pc:load[[
             message labels {
                 required string name   = 1;
@@ -38,9 +39,9 @@ function CprotoData:_init_()
             ]])
 end
 
-function CprotoData:encode(data)
+function CprotoData:encode(lines)
     --print(serpent.block(data))
-    return assert(pb.encode("dataLines", data))
+    return assert(pb.encode("dataLines", lines))
 end
 
 function CprotoData:decode(bytes)
@@ -54,6 +55,10 @@ end
 
 function CprotoData:protoTable()
     return {lines = {}}
+end
+
+function CprotoData:que(bytes)
+    collector_qout(self._que, bytes, #bytes)
 end
 
 return CprotoData

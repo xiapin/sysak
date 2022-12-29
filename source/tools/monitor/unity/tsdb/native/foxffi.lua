@@ -45,6 +45,7 @@ int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,
              const char* data, int len);
 int fox_setup_read(struct fox_manager* pman, struct foxDate * p, fox_time_t now);
 int fox_cur_move(struct fox_manager* pman, fox_time_t now);
+int fox_read_resize(struct fox_manager* pman);
 int fox_read(struct fox_manager* pman, fox_time_t stop, char **pp, fox_time_t *us);
 void fox_free_buffer(char **pp);
 void fox_del_man(struct fox_manager* pman);

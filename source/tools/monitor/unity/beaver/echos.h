@@ -4,9 +4,10 @@
 
 #ifndef UNITY_ECHOS_H
 #define UNITY_ECHOS_H
+#include <lua.h>
 
 #define BEAVER_DEBUG
-int echos_init(void);
-int echos(int fd);
+lua_State * echos_init(int tid);
+int echos(lua_State *L, int fd);
 
 #endif //UNITY_ECHOS_H

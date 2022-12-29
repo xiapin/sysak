@@ -5,6 +5,7 @@
 ---
 
 require("class")
+local system = require("system")
 local CvProc = require("vproc")
 
 local CprocDiskstats = class("proc_diskstats", CvProc)
@@ -57,7 +58,7 @@ end
 function CprocDiskstats:_calcDiff(disk_name, now, last, elapsed)
     local protoTable = {
         line = "disks",
-        ls = {name = "disk_name", index = disk_name},
+        ls = {{name = "disk_name", index = disk_name}},
         vs = {}
     }
     local index = self:_diffIndex()
@@ -120,13 +121,13 @@ function CprocDiskstats:_proc(line, elapsed)
     self:_calcDisk(disk_name, data, elapsed)
 end
 
-function CprocDiskstats:proc(elapsed)
+function CprocDiskstats:proc(elapsed, lines)
     CvProc.proc(self)
     for line in io.lines(self.pFile) do
         self:_proc(line, elapsed)
     end
     self:checkLastDisks()
-    return self:push()
+    return self:push(lines)
 end
 
 return CprocDiskstats

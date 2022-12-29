@@ -5,6 +5,7 @@
 ---
 
 require("class")
+local system = require("system")
 
 local CvProc = class("vproc")
 
@@ -24,10 +25,16 @@ function CvProc:appendLine(line)
     table.insert(self._lines["lines"], line)
 end
 
-function CvProc:push()
-    local bytes = self._proto:encode(self._lines)
+function CvProc:copyLine(line)
+    self:appendLine(system:deepcopy(line))
+end
+
+function CvProc:push(lines)
+    for _, v in ipairs(self._lines["lines"]) do
+        table.insert(lines["lines"], v)
+    end
     self._lines = nil
-    return bytes
+    return lines
 end
 
 function CvProc:_packProto(head, labels, vs, log)

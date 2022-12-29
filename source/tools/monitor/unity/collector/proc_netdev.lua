@@ -6,6 +6,7 @@
 
 require("class")
 local CvProc = require("vproc")
+local system = require("system")
 
 local CprocNetdev = class("proc_netdev", CvProc)
 
@@ -37,7 +38,7 @@ function CprocNetdev:_calcIf(ifName, data, res, elapsed)
     local index = self:_netdevIndex()
     local protoTable = {
         line = "networks",
-        ls = {name = "network_name", index = ifName},
+        ls = {{name = "network_name", index = ifName}},
         vs = {}
     }
     for i, index in ipairs(index) do
@@ -80,7 +81,7 @@ function CprocNetdev:checkLastIfNames()
     self._lastIfNames = {}
 end
 
-function CprocNetdev:proc(elapsed)
+function CprocNetdev:proc(elapsed, lines)
     CvProc.proc(self)
     local i = 1
     for line in io.lines(self.pFile) do
@@ -90,7 +91,7 @@ function CprocNetdev:proc(elapsed)
         i = i + 1
     end
     self:checkLastIfNames()
-    return self:push()
+    return self:push(lines)
 end
 
 return CprocNetdev
