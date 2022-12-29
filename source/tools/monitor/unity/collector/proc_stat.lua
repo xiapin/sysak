@@ -16,15 +16,6 @@ function CprocStat:_init_(proto, pffi, pFile)
     self._cpuArr = {}
 end
 
-function CprocStat:setupTable()
-    return {
-        ctxt = function(s) self:ctxt(s)  end,
-        btime = function(s) self:btime(s)  end,
-        processes = function(s) self:processes(s)  end,
-        procs_running = function(s) self:procs_running(s)  end,
-    }
-end
-
 function CprocStat:_cpuHead()
     return {"user", "nice", "sys", "idle", "iowait",
             "hardirq", "softirq", "steal", "guest", "guestnice"}
@@ -46,7 +37,7 @@ function CprocStat:_procCpu(now, last)
             local total = tonumber(sum)
             for i = 1, #vs do
                 local v = tonumber(vs[i])
-                local cell = {name=index[i], value=tonumber(v / total)}
+                local cell = {name=index[i], value=tonumber(v * 100.0 / total)}
                 table.insert(res, cell)
             end
             return res
@@ -68,7 +59,7 @@ function CprocStat:_pperCpu(data, vcpu)
     self._cpuArr[vcpu] = data
 
     if res then
-        local label = {name = "cpu_name", index = "cpu" .. vcpu}
+        local label = {{name = "cpu_name", index = "cpu" .. vcpu}}
         self:appendLine( self:_packProto("cpus", label, res))
     end
 end
@@ -121,58 +112,63 @@ function CprocStat:_fsirq(line)
     self._lastSirq = data
 
     if res then
-        self:appendLine(
-                self:_packProto("sirq", nil, res)
-        )
+        self:appendLine(self:_packProto("sirq", nil, res))
     end
 end
 
-function CprocStat:_packCounter(head, value)
+function CprocStat:setupTable()
     return {
-        line = "stat_counters",
-        ls = nil,
-        vs = {
-            name = head,
-            value = value
-        }
+        ctxt = function(s) return self:ctxt(s)  end,
+        btime = function(s) return self:btime(s)  end,
+        processes = function(s) return self:processes(s)  end,
+        procs_running = function(s) return self:procs_running(s)  end,
+        procs_blocked = function(s) return self:procs_blocked(s)  end,
     }
 end
 
-function CprocStat:ctxt(line)
-    local v = tonumber(line)
+function CprocStat:ctxt(s)
+    local v = tonumber(s)
+    local tValue
     if self._lastCtxt then
         local res = v - self._lastCtxt
-        self:appendLine(self:_packCounter("ctxt", res))
+        tValue = {name="ctxt", value=res}
     end
     self._lastCtxt = v
+    return tValue
 end
 
 function CprocStat:btime(s)
     local res = tonumber(s)
-    self:appendLine(self:_packCounter("btime", res))
+    local tValue = {name="btime", value=res}
+    return tValue
 end
 
 function CprocStat:processes(s)
     local now = tonumber(s)
+    local tValue
     if self._lastProcesses then
         local res = now - self._lastProcesses
-        self:appendLine(self:_packCounter("processes_forks", res))
+        tValue = {name="processes_forks", value=res}
     end
     self._lastProcesses = now
+    return tValue
 end
 
 function CprocStat:procs_running(s)
     local res = tonumber(s)
-    self:appendLine(self:_packCounter("procs_running", res))
+    local tValue = {name="procs_running", value=res}
+    return tValue
 end
 
 function CprocStat:procs_blocked(s)
     local res = tonumber(s)
-    self:appendLine(self:_packCounter("procs_blocked", res))
+    local tValue = {name="procs_blocked", value=res}
+    return tValue
 end
 
-function CprocStat:proc(elapsed)
+function CprocStat:proc(elapsed, lines)
     CvProc.proc(self)
+    local counter = {}
     for line in io.lines(self.pFile) do
         if pystring:startswith(line, "cpu") then
             self:_fcpu(line)
@@ -181,11 +177,15 @@ function CprocStat:proc(elapsed)
         else
             local res = pystring:split(line, ' ', 1)
             if self._funs[res[1]] then
-                self._funs[res[1]](res[2])
+                local tValue = self._funs[res[1]](res[2])
+                if tValue then
+                    table.insert(counter, tValue)
+                end
             end
         end
     end
-    return self:push()
+    self:appendLine(self:_packProto("stat_counters", nil, counter, nil))
+    return self:push(lines)
 end
 
 return CprocStat

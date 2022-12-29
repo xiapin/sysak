@@ -5,6 +5,7 @@
 ---
 
 require("class")
+local system = require("system")
 local snappy = require("snappy")
 local pystring = require("pystring")
 local CprotoData = require("protoData")
@@ -15,7 +16,7 @@ local CfoxTSDB = class("CfoxTSDB")
 function CfoxTSDB:_init_()
     self.ffi = foxFFI.ffi
     self.cffi = foxFFI.cffi
-    self._proto = CprotoData.new()
+    self._proto = CprotoData.new(nil)
 end
 
 function CfoxTSDB:_del_()
@@ -131,26 +132,38 @@ function CfoxTSDB:setupWrite()
 end
 
 function CfoxTSDB:write(buff)
+    assert(self._man ~= nil, "this fox object show setup for read or write, you should call setupWrite after new")
     local now = self:get_us()
     local date = self:getDateFrom_us(now)
     local stream = snappy.compress(buff)
+    print("write for time: ", now)
     assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(stream, #stream), #stream) == 0)
     --assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(buff), #buff) == 0)
 end
 
-function CfoxTSDB:_setupRead(date, us)
+function CfoxTSDB:_setupRead(us)
+    assert(self._man == nil, "one fox object should have only one manager.")
     self._man = self.ffi.new("struct fox_manager")
+    us = us or (self:get_us() - 15e6)
+    local date = self:getDateFrom_us(us)
+
     assert(self.cffi.fox_setup_read(self._man, date, us))
 end
 
 function CfoxTSDB:curMove(us)
     assert(self._man)
-    assert(self.cffi.fox_cur_move(self._man, us) == 0)
+    local ret = self.cffi.fox_cur_move(self._man, us)
+    assert(ret >= 0, string.format("cur move bad ret: %d", ret))
     return self._man.pos
 end
 
+function CfoxTSDB:resize()
+    assert(self._man)
+    local ret = self.cffi.fox_read_resize(self._man)
+    assert(ret >= 0, string.format("resize bad ret: %d", ret))
+end
+
 function CfoxTSDB:loadData(stop_us)
-    local curPos = self._man.pos
     local stop = false
 
     local function fLoad()
@@ -168,11 +181,11 @@ function CfoxTSDB:loadData(stop_us)
             local line = self._proto:decode(ustr)
             self.cffi.fox_free_buffer(data)
 
-            if curPos == self._man.pos then  -- this means cursor is at the end of file.
+            if self._man.fsize == self._man.pos then  -- this means cursor is at the end of file.
+                print("end of file.")
                 stop = true
             end
-
-            line['time'] = us[0]
+            line['time'] = tonumber(us[0])
             return line
         end
         return nil
@@ -188,14 +201,51 @@ function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
     assert(self.cffi.check_foxdate(dStart, dStop) == 1)  -- check date
 
     if not self._man then
-        self:_setupRead(dStart, start)
+        self:_setupRead(start)
     end
 
     self:curMove(start)    -- moveto position
 
     for line in self:loadData(stop) do
-        print(line.time / 1000000, line.lines[2].vs[2].value)
+        local time = line.time
+        for _, v in ipairs(line.lines) do
+            local tCell = {time = time, title = v.line}
+
+            local labels = {}
+            if v.ls then
+                for _, vlabel in ipairs(v.ls) do
+                    labels[vlabel.name] = vlabel.index
+                end
+            end
+            tCell.labels = labels
+
+            local values = {}
+            if v.vs then
+                for _, vvalue in ipairs(v.vs) do
+                    values[vvalue.name] = vvalue.value
+                end
+            end
+            tCell.values = values
+
+            local logs = {}
+            if v.vlog then
+                for _, vlog in ipairs(v.log) do
+                    logs[vlog.name] = vlog.log
+                end
+            end
+            tCell.logs = logs
+
+            table.insert(ms, tCell)
+        end
     end
+    return ms
+end
+
+function CfoxTSDB:qlast(last, ms)
+    local now = self:get_us()
+    local beg = now - last * 1e6;
+
+    return self:query(beg, now, ms)
 end
 
 return CfoxTSDB

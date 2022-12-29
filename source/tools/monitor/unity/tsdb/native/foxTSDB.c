@@ -86,6 +86,28 @@ fox_time_t make_stamp(struct foxDate * p) {
     return t * MICRO_UNIT;
 }
 
+static fox_time_t fox_read_init_now(struct fox_manager* pman) {
+    struct foxDate date;
+
+    date.year = pman->year;
+    date.mon = pman->mon;
+    date.mday = pman->mday;
+    date.hour = date.min = date.sec = 0;
+
+    return make_stamp(&date);
+}
+
+static fox_time_t fox_read_day_max(struct fox_manager* pman) {
+    struct foxDate date;
+
+    date.year = pman->year;
+    date.mon = pman->mon;
+    date.mday = pman->mday;
+    date.hour = date.min = date.sec = 0;
+
+    return make_stamp(&date) + 24 * 60 * 60 * MICRO_UNIT;
+}
+
 static size_t fd_size(int fd) {
     int ret;
     struct stat file_info;
@@ -309,16 +331,17 @@ int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,
     return res;
 }
 
-struct fox_arg_cursor {
-    int fd;
-    struct fox_manager* pman;
-    fox_time_t now;
-};
-
 static int fox_cursor_left(int fd, struct fox_manager* pman, fox_time_t now) {
     int ret;
-    off_t pos = pman->pos;
+    off_t pos;
     struct fox_head head;
+    fox_time_t last_t_us = pman->now;
+
+    if (pman->pos == pman->fsize) {
+        pos = pman->last_pos;
+    } else {
+        pos = pman->pos;
+    }
 
     while (1) {
         ret = lseek(fd, pos, SEEK_SET);
@@ -333,15 +356,19 @@ static int fox_cursor_left(int fd, struct fox_manager* pman, fox_time_t now) {
             goto endRead;
         }
 
-        if (head.t_us < now) {  //
+        if (head.t_us < now) {
             pman->pos = head.next;
+            pman->now = last_t_us;
+            pman->last_pos = pos;
             break;
-        } else if (head.t_us == now) {
-            pman->pos = pos;
         }
+
+        last_t_us = head.t_us;
         pos = head.prev;
         if (pos == 0) {     //begin of file
             pman->pos = pos;
+            pman->now = last_t_us;
+            pman->last_pos = pos;
             break;
         }
     }
@@ -354,16 +381,20 @@ static int fox_cursor_left(int fd, struct fox_manager* pman, fox_time_t now) {
 
 static int fox_cursor_right(int fd, struct fox_manager* pman, fox_time_t now) {
     int ret;
+    off_t last_pos = pman->last_pos;
     off_t pos = pman->pos;
     struct fox_head head;
 
-    head.next = 0;
-    head.prev = 0;
-
     while (1) {
-        if (pos >= pman->fsize) {
-            pman->pos = head.prev;
-            break;
+        if (pos == pman->fsize) {
+            pman->last_pos = last_pos;
+            pman->pos = pos;
+            pman->now = fox_read_day_max(pman);
+            ret = 1;
+            goto endRange;
+        } else if (pos > pman->fsize) {
+            ret = -ERANGE;
+            goto endRange;
         }
 
         ret = lseek(fd, pos, SEEK_SET);
@@ -378,15 +409,18 @@ static int fox_cursor_right(int fd, struct fox_manager* pman, fox_time_t now) {
             goto endRead;
         }
 
-        if (head.t_us > now) {  // just >
-            pman->pos = head.next;
-            break;
-        } else if (head.t_us == now) { // begin from here
+        if (head.t_us >= now) {  // just >
             pman->pos = pos;
+            pman->now = head.t_us;
+            pman->last_pos = last_pos;
+            break;
         }
+        last_pos = pos;
         pos = head.next;
     }
     ret = 0;
+    return ret;
+    endRange:  //out of file range.
     return ret;
     endSeek:
     endRead:
@@ -409,7 +443,6 @@ static int fox_cursor_work(int fd, struct fox_manager* pman, fox_time_t now) {
         }
     }
 
-    pman->now = now;
     return ret;
     endCursor:
     return ret;
@@ -436,6 +469,100 @@ int fox_cur_move(struct fox_manager* pman, fox_time_t now) {
     return fox_cursor(fd, pman, now);
 }
 
+static int fox_cur_next(struct fox_manager* pman, struct fox_head* phead) {
+    int ret = 0;
+    off_t pos = phead->next;
+    struct fox_head head;
+    int fd = pman->fd;
+
+    pman->pos = pos;
+    if (pos < pman->fsize) {
+        ret = lseek(fd, pos, SEEK_SET);
+        if (ret < 0) {
+            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
+            goto endSeek;
+        }
+
+        ret = fox_read_head(fd, &head);;
+        if (ret < 0) {
+            goto endRead;
+        }
+        pman->now = head.t_us;
+    } else {
+        pman->now = fox_read_day_max(pman);
+    }
+
+    return ret;
+    endSeek:
+    endRead:
+    return ret;
+}
+
+static int fox_cur_back(struct fox_manager* pman) {
+    int ret = 0;
+    off_t pos = pman->last_pos;
+    struct fox_head head;
+    int fd = pman->fd;
+
+    pman->pos = pos;
+    if (pos > 0) {
+        ret = lseek(fd, pos, SEEK_SET);
+        if (ret < 0) {
+            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
+            goto endSeek;
+        }
+
+        ret = fox_read_head(fd, &head);;
+        if (ret < 0) {
+            goto endRead;
+        }
+        pman->now = head.t_us;
+    } else {
+        pman->now = fox_read_init_now(pman);
+    }
+
+    return ret;
+    endSeek:
+    endRead:
+    return ret;
+}
+
+int fox_read_resize(struct fox_manager* pman) {
+    int ret = 0;
+
+    size_t fsize = fd_size(pman->fd);
+    if (fsize < 0) {
+        ret = fsize;
+        goto endSize;
+    }
+
+    if (fsize > pman->fsize) {
+        if (pman->pos == pman->fsize) {  // at the end of file.
+            ret = fox_cur_back(pman);
+            if (ret < 0) {
+                goto endCur;
+            }
+        }
+        pman->fsize = fsize;
+    } else {
+        struct foxDate d;
+        d.year = pman->year;
+        d.mon  = pman->mon;
+        d.mday = pman->mday;
+        d.hour = 0;
+        d.min  = 0;
+        d.sec  = 0;
+
+        fox_time_t now = make_stamp(&d);
+
+        return fox_setup_read(pman, &d, now);
+    }
+    return ret;
+    endSize:
+    endCur:
+    return ret;
+}
+
 int fox_setup_read(struct fox_manager* pman, struct foxDate * p, fox_time_t now) {
     char fname[FNAME_SIZE];
     int ret = 0;
@@ -448,6 +575,12 @@ int fox_setup_read(struct fox_manager* pman, struct foxDate * p, fox_time_t now)
         goto endOpen;
     }
 
+    pman->year = p->year;
+    pman->mon = p->mon;
+    pman->mday = p->mday;
+    pman->now = fox_read_init_now(pman);
+    pman->pos = 0;
+    pman->last_pos = 0;
     pman->fsize = fd_size(pman->fd);
     if (pman->fsize < 0) {
         ret = -EACCES;
@@ -459,6 +592,8 @@ int fox_setup_read(struct fox_manager* pman, struct foxDate * p, fox_time_t now)
         goto endCursor;
     }
 
+//    printf("setup %s, fd: %d, size: %ld, pos: %lld, pnow: %ld, now:%ld\n",
+//           fname, pman->fd, pman->fsize, pman->pos, pman->now, now);
     return ret;
     endSize:
     endCursor:
@@ -478,34 +613,6 @@ static int fox_read_stream(int fd, char* stream, int size) {
     }
     return ret;
 
-    endRead:
-    return ret;
-}
-
-static int fox_cur_next(struct fox_manager* pman, struct fox_head* phead) {
-    int ret = 0;
-    off_t pos = phead->next;
-    struct fox_head head;
-    int fd = pman->fd;
-
-    if (pos < pman->fsize) {
-        ret = lseek(fd, pos, SEEK_SET);
-        if (ret < 0) {
-            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
-            goto endSeek;
-        }
-
-        ret = fox_read_head(fd, &head);;
-        if (ret < 0) {
-            goto endRead;
-        }
-
-        pman->pos = pos;
-        pman->now = head.t_us;
-    }
-
-    return ret;
-    endSeek:
     endRead:
     return ret;
 }
@@ -533,6 +640,9 @@ static int fox_read_work(int fd, struct fox_manager* pman, fox_time_t stop,
         }
 
         size = head.next - pos - sizeof (struct fox_head);
+        if (size < 0) {
+            goto endSize;
+        }
         p = malloc(size);
         if (p == NULL) {
             fprintf(stderr, "malloc %d failed. %d, %s\n", size, errno, strerror(errno));
@@ -563,6 +673,7 @@ static int fox_read_work(int fd, struct fox_manager* pman, fox_time_t stop,
 
     endNext:
     endRead2:
+    endSize:
     endMalloc:
     endRead:
     endSeek:
@@ -580,7 +691,6 @@ int fox_read(struct fox_manager* pman, fox_time_t stop, char **pp, fox_time_t *u
     if (ret < 0) {
         goto endWork;
     }
-
     return len;
 
     endWork:

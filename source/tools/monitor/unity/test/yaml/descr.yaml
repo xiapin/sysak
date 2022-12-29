@@ -1,0 +1,14 @@
+metrics:
+  -
+    title: proc_cpu_total
+    from: cpu_total
+    index: []
+    field: [user, nice, sys, idle, iowait, hardirq, softirq, steal, guest, guestnice]
+    help: "cpu usage info for total."
+    type: "gauge"
+  - title: proc_cpus
+    from: cpus
+    index: []
+    field: [user, nice, sys, idle, iowait, hardirq, softirq, steal, guest, guestnice]
+    help: "cpu usage info for per-cpu."
+    type: "gauge"

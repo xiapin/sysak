@@ -1,10 +1,10 @@
 CC := gcc
+AR := ar
 CFLAG := -g
-LDFLAG := -g -lm -ldl -lpthread -lluajit-5.1
-OBJS := beaver.o main.o echos.o
-EXEC := beaver
+OBJS := beaver.o echos.o
+LIB := libbeaver.a
 
-all: $(EXEC)
+all: $(LIB)
 
 echos.o: echos.c beaver.h echos.h
 	$(CC) -c $< -o $@ $(CFLAG)
@@ -12,11 +12,8 @@ echos.o: echos.c beaver.h echos.h
 beaver.o: beaver.c beaver.h echos.h
 	$(CC) -c $< -o $@ $(CFLAG)
 
-main.o: main.c beaver.h
-	$(CC) -c $< -o $@ $(CFLAG)
-
-$(EXEC): $(OBJS)
-	$(CC) -o $@ $(OBJS) $(LDFLAG)
+$(LIB): $(OBJS)
+	$(AR) cr $@ $(OBJS)
 
 clean:
 	rm -f $(EXEC) $(OBJS)

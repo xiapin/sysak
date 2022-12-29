@@ -42,7 +42,23 @@ struct beaver_message {
     int* fds;       // fd pool
 };
 
+static int beaver_broad_stop(struct beaver_message* pmsg) {
+    int ret = 0;
+    pmsg->status = -1;
+
+    ret = pthread_cond_broadcast(&pmsg->pc_condc);
+    ASSERT_LOCKS(ret);
+    ret = pthread_cond_broadcast(&pmsg->pc_condp);
+    ASSERT_LOCKS(ret);
+
+    return ret;
+}
+
 static int fd_in_beaver(int fd, struct beaver_message* pmsg){
+    if (pmsg->status) {  // bad status should exit.
+        return 0;
+    }
+
     if (pmsg->fd_count == pmsg->fd_num) {  //fd poll may large
         return 1;
     }
@@ -110,10 +126,13 @@ static void * beaver_threads(void * arg) {
     int fd;
     int tid = (int)gettidv1();
     struct beaver_message * pmsg = (struct beaver_message *)arg;
+    lua_State *L;
 
     // init is here.
-    ret = echos_init();
-    ASSERT_LOCKS(ret);
+    L = echos_init(tid);
+    if (L == NULL) {
+        exit(1);
+    }
 
     while (1) {
         ret = pthread_mutex_lock(&pmsg->pc_mutex);
@@ -132,13 +151,20 @@ static void * beaver_threads(void * arg) {
         ASSERT_LOCKS(ret);
 
         //work here
-        echos(fd);
+        ret = echos(L, fd);
         close(fd);
         del_in_beaver(fd, pmsg);
+
+        if (ret) {
+            goto endThread;
+        }
     }
     endStatus:
     ret = pthread_mutex_unlock(&pmsg->pc_mutex);
     ASSERT_LOCKS(ret);
+    endThread:
+    lua_close(L);
+    beaver_broad_stop(pmsg);
     pthread_exit(NULL);
 }
 
@@ -200,16 +226,6 @@ static void beaver_destroy_message(struct beaver_message* pmsg) {
         perror("destroy pc_mutex faild.");
         exit(1);
     }
-}
-
-static int beaver_broad_stop(struct beaver_message* pmsg) {
-    int ret = 0;
-    pmsg->status = -1;
-
-    ret = pthread_cond_broadcast(&pmsg->pc_condc);
-    ASSERT_LOCKS(ret);
-
-    return ret;
 }
 
 static int beaver_threads_start(int thread, pthread_t ** tid_arr, struct beaver_message* pmsg) {
@@ -293,6 +309,11 @@ static int beaver_accept(int sk_listen, struct beaver_message* pmsg) {
             ret = pthread_cond_wait(&pmsg->pc_condp, &pmsg->pc_mutex);
             ASSERT_LOCKS(ret);
         }
+        if (pmsg->status) {
+            ret = pthread_mutex_unlock(&pmsg->pc_mutex);
+            ASSERT_LOCKS(ret);
+            goto endStatus;
+        }
         add_in_beaver(sk_accept, pmsg);
 
         pmsg->sk_accept = sk_accept;
@@ -302,6 +323,7 @@ static int beaver_accept(int sk_listen, struct beaver_message* pmsg) {
         ret = pthread_mutex_unlock(&pmsg->pc_mutex);
         ASSERT_LOCKS(ret);
     }
+    endStatus:
     endAccept:
     free(pmsg->fds);
     endMem:

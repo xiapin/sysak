@@ -4,6 +4,7 @@
 --- DateTime: 2022/12/16 11:30 PM
 ---
 
+local system = require("system")
 require("class")
 local CvProc = require("vproc")
 
@@ -38,15 +39,14 @@ function CkvProc:readKV(line)
     table.insert(self._protoTable["vs"], cell)
 end
 
-function CkvProc:proc(elapsed)
+function CkvProc:proc(elapsed, lines)
+    self._protoTable.vs = {}
     CvProc.proc(self)
     for line in io.lines(self.pFile) do
         self:readKV(line)
     end
     self:appendLine(self._protoTable)
-    local res = self:push()
-    self._protoTable.vs = {}
-    return res
+    return self:push(lines)
 end
 
 return CkvProc
