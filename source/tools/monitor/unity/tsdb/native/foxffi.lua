@@ -39,6 +39,7 @@ int get_date_from_us(fox_time_t us, struct foxDate * p);
 int get_date(struct foxDate * p);
 fox_time_t make_stamp(struct foxDate  * p);
 int check_foxdate(struct foxDate* d1, struct foxDate* d2);
+int check_pman_date(struct fox_manager* pman, struct foxDate* pdate);
 
 int fox_setup_write(struct fox_manager* pman, struct foxDate * p, fox_time_t now);
 int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,

@@ -17,13 +17,21 @@ function CurlApi:_init_(frame)
 end
 
 function CurlApi:sum(tReq)
-    local tJson = self:getJson(tReq)
-    return {sum=tJson.num1 + tJson.num2}
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat then
+        return {sum=tJson.num1 + tJson.num2}
+    else
+        return {}
+    end
 end
 
 function CurlApi:sub(tReq)
-    local tJson = self:getJson(tReq)
-    return {sub=tJson.num1 - tJson.num2}
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat then
+        return {sum=tJson.num1 - tJson.num2}
+    else
+        return {}
+    end
 end
 
 return CurlApi
