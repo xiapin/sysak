@@ -75,6 +75,7 @@ int attach_prog_to_perf(struct schedmoni_bpf *obj, struct bpf_link **sw_mlinks, 
 			ret = ret | 1<<PERF_TYPE_SOFTWARE;
 
 	} else {
+		printf("This machine does not support PERF_TYPE_HARDWARE event, switch to PERF_TYPE_SOFTWARE\n");
 		if (!open_and_attach_perf_event(&attr_sw, obj->progs.sw_irqoff_event2, sw_mlinks))
 			ret = 1<<PERF_TYPE_SOFTWARE;
 	}

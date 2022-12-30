@@ -19,21 +19,10 @@
 #define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
 #define BITS_PER_LONG	64
 
-#define get_current_rqlen(p) ({			\
-	int len = 0;				\
-	struct cfs_rq *cfs;			\
-	struct sched_entity *se, *parent;	\
-	se = &p->se;				\
-	for (int i = 0; i < 10; i++) {		\
-		parent = _(se->parent);		\
-		if (parent)			\
-			se = parent;		\
-		else				\
-			break;			\
-	}					\
-	cfs = BPF_CORE_READ(se, cfs_rq);	\
-	len = _(cfs->nr_running);		\
-	len;					\
+#define get_task_rqlen(p) ({					\
+	int len = 0;						\
+	len = BPF_CORE_READ(p, se.cfs_rq, rq, nr_running);	\
+	len;							\
 })
 
 struct {

@@ -172,7 +172,7 @@ int BPF_KPROBE(kp_ttwu_do_wakeup, struct rq *rq, struct task_struct *p,
 	if (!program_ready())
 		return 0;
 
-	runqlen = get_current_rqlen(p);
+	runqlen = get_task_rqlen(p);
 	return trace_enqueue(p, runqlen);
 }
 
@@ -182,7 +182,7 @@ int raw_tp__sched_wakeup(struct bpf_raw_tracepoint_args *ctx)
 	unsigned int runqlen = 0;
 	struct task_struct *p = (void *)ctx->args[0];
  
-	runqlen = get_current_rqlen(p);
+	runqlen = get_task_rqlen(p);
 	return trace_enqueue(p, runqlen);
 }
 
@@ -195,7 +195,7 @@ int BPF_KPROBE(wake_up_new_task, struct task_struct *p)
 	if (!program_ready())
 		return 0;
 
-	runqlen = get_current_rqlen(p);
+	runqlen = get_task_rqlen(p);
 	return trace_enqueue(p, runqlen);
 }
 
@@ -252,7 +252,7 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 	if (prev_state == TASK_RUNNING) {
 		unsigned int runqlen = 0;
 
-		runqlen = get_current_rqlen(prev);
+		runqlen = get_task_rqlen(prev);
 		return trace_enqueue(prev, runqlen);
 	}
 	/* fetch timestamp and calculate delta */
