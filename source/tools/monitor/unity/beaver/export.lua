@@ -4,7 +4,6 @@
 --- DateTime: 2022/12/25 11:20 AM
 ---
 
-local serpent = require("serpent")
 local system = require("system")
 local pystring = require("pystring")
 local CfoxTSDB = require("foxTSDB")

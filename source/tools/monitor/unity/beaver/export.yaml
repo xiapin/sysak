@@ -40,3 +40,13 @@ metrics:
     head: counter
     help: "disk info from /proc/diskstats."
     type: "gauge"
+  - title: sysak_sample_tbl1
+    from: sample_tbl1
+    head: value
+    help: "example1 for develop."
+    type: "gauge"
+  - title: sysak_sample_tbl2
+    from: sample_tbl2
+    head: value
+    help: "example2 for develop."
+    type: "gauge"

@@ -217,6 +217,7 @@ int fox_setup_write(struct fox_manager* pman, struct foxDate * p, fox_time_t now
     int ret = 0;
 
     pack_fname(fname, p);
+    pman->fd = 0;
 
     pman->fd = open(fname, O_RDWR|O_APPEND|O_CREAT);
     if (pman->fd < 0) {
@@ -712,6 +713,6 @@ void fox_free_buffer(char **pp) {
 void fox_del_man(struct fox_manager* pman) {
     if (pman->fd > 0) {
         close(pman->fd);
-        pman->fd = -1;
     }
+    memset(pman, 0, sizeof (struct fox_manager));
 }

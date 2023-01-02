@@ -10,10 +10,15 @@ package.path = package.path .. ";../collector/native/?.lua;"
 local Cloop = require("loop")
 local system = require("system")
 
-function run(que, t)
+workLoop = nil
+
+function init(que, t)
     local work = Cloop.new(que)
-    while true do
-        work:work(t)
-        system:sleep(t)
-    end
+    workLoop = work
+    return 0
+end
+
+function work(t)
+    workLoop:work(t)
+    return 0
 end
