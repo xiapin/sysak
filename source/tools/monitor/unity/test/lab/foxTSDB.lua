@@ -17,6 +17,7 @@ function CfoxTSDB:_init_()
     self.ffi = foxFFI.ffi
     self.cffi = foxFFI.cffi
     self._proto = CprotoData.new(nil)
+    print("this is a test module.")
 end
 
 function CfoxTSDB:_del_()
@@ -188,6 +189,7 @@ function CfoxTSDB:loadData(stop_us)
             self.cffi.fox_free_buffer(data)
 
             if self._man.fsize == self._man.pos then  -- this means cursor is at the end of file.
+                print("end of file.")
                 stop = true
             end
             line['time'] = tonumber(us[0])
@@ -249,7 +251,7 @@ function CfoxTSDB:qlast(last, ms)
     local beg = now - last * 1e6;
 
     if self._man then   -- has setup
-        if self.cffi.check_pman_date(self._man, date) == 1 then  -- at the same day
+        if self.cffi.check_pman_date(self._man, date) then  -- at the same day
             return self:query(beg, now, ms)
         else
             self:_del_()   -- destroy old manager

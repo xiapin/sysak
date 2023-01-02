@@ -14,6 +14,8 @@ local CprocVmstat = require("proc_vmstat")
 local CprocNetdev = require("proc_netdev")
 local CprocDiskstats = require("proc_diskstats")
 
+local Cplugin = require("plugin")
+
 local Cloop = class("loop")
 
 function Cloop:_init_(que)
@@ -25,6 +27,7 @@ function Cloop:_init_(que)
         CprocNetdev.new(self._proto, procffi),
         CprocDiskstats.new(self._proto, procffi),
     }
+    self._plugin = Cplugin.new(self._proto)
 end
 
 function Cloop:work(t)
@@ -32,6 +35,8 @@ function Cloop:work(t)
     for k, obj in pairs(self._procs) do
         lines = obj:proc(t, lines)
     end
+    lines = self._plugin:proc(t, lines)
+    print(#lines.lines)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 end

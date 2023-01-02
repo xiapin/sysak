@@ -1,0 +1,4 @@
+plugins:
+  -
+    so: sample
+    description: "just a example."

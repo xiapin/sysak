@@ -18,6 +18,7 @@
 #include "beaver.h"
 #include "echos.h"
 
+extern volatile int sighup_counter;
 
 #define FD_RATIO    2   // fd_num vs thread
 #define gettidv1() syscall(__NR_gettid)
@@ -127,6 +128,7 @@ static void * beaver_threads(void * arg) {
     int tid = (int)gettidv1();
     struct beaver_message * pmsg = (struct beaver_message *)arg;
     lua_State *L;
+    int count = sighup_counter;
 
     // init is here.
     L = echos_init(tid);
@@ -149,6 +151,17 @@ static void * beaver_threads(void * arg) {
         pmsg->sk_accept = 0;
         ret = pthread_mutex_unlock(&pmsg->pc_mutex);
         ASSERT_LOCKS(ret);
+
+        if (count != sighup_counter) {   // need to reload ?
+            lua_close(L);
+            L = NULL;
+
+            L = echos_init(tid);
+            if (L == NULL) {
+                exit(1);
+            }
+            count = sighup_counter;
+        }
 
         //work here
         ret = echos(L, fd);

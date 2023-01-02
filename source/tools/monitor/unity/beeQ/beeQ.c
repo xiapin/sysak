@@ -112,8 +112,7 @@ static void * beeQ_proc(void * arg) {
             q->msgs[q->recv] = NULL;
 
             pthread_mutex_unlock(&q->mtx);  // Processing messages can be very time consuming
-            q->cb(msg, q->arg);
-            free(msg);
+            q->cb(msg, q->arg);     // the call back function should
             pthread_mutex_lock(&q->mtx);
         }
     }
