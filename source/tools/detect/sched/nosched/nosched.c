@@ -52,7 +52,7 @@ static void usage(char *prog)
 	"  -t THRESH_TIME       specify the threshold time(ms), default=10ms\n"
 	"  -f result.log        result file, default is /var/log/sysak/nosched.log\n"
 	"  -s TIME              specify how long to run \n"
-	"  -S shmkey            record the result as summary mod\n"
+	"  -S shmkey            record summary log to share memory\n"
 	;
 
 	fprintf(stderr, str, prog);
