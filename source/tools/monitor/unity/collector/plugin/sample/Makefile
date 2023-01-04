@@ -4,7 +4,7 @@ LDFLAG := -g -fpic -shared
 OBJS := sample.o
 SO := libsample.so
 
-all: $(SO)
+all: $(SO) install
 
 %.o: %.c
 	$(CC) -c $< -o $@ $(CFLAG)
