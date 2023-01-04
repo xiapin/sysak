@@ -7,7 +7,8 @@ RUN yum install -y http://mirrors.tuna.tsinghua.edu.cn/centos/7/extras/x86_64/Pa
     yum install -y make wget readline-devel unzip git && \
     mkdir /root/build && \
     cd /root/build && \
-    wget https://github.com/LuaJIT/LuaJIT/archive/refs/tags/v2.0.5.zip --no-check-certificate && \
+    git clone https://gitee.com/chuyansz/sysak.git && \
+    cd sysak/source/tools/monitor/unity/third/ && \
     unzip v2.0.5.zip && \
     cd LuaJIT-2.0.5 && \
     make && make install && \
@@ -29,6 +30,5 @@ RUN yum install -y http://mirrors.tuna.tsinghua.edu.cn/centos/7/extras/x86_64/Pa
     luarocks install lua-protobuf && \
     luarocks install luaposix && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ && \
-    git clone https://gitee.com/chuyansz/sysak.git && \
-    cd sysak/source/tools/monitor/unity/beeQ/ && \
+    cd ../beeQ/ && \
     make
