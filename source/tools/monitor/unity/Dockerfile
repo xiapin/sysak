@@ -7,8 +7,8 @@ RUN yum install -y http://mirrors.tuna.tsinghua.edu.cn/centos/7/extras/x86_64/Pa
     yum install -y make wget readline-devel unzip git && \
     mkdir /root/build && \
     cd /root/build && \
-    wget https://luajit.org/download/LuaJIT-2.0.5.tar.gz --no-check-certificate && \
-    tar zxvf LuaJIT-2.0.5.tar.gz && \
+    wget https://github.com/LuaJIT/LuaJIT/archive/refs/tags/v2.0.5.zip --no-check-certificate && \
+    unzip v2.0.5.zip && \
     cd LuaJIT-2.0.5 && \
     make && make install && \
     cd ../ && \
