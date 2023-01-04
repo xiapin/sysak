@@ -226,9 +226,9 @@ static int down_install_ext_tools(const char *tool)
     char rule[LINE_BUFF_LEN];
     char *pstr;
 
-    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s",
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s 1&>/dev/null",
            sysak_components_server, machine, tool, tools_path);
-    printf("%s ... \n", download_cmd);
+    //printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
     if (ret < 0)
         return ret;
@@ -260,9 +260,9 @@ static int down_install_ext_tools(const char *tool)
         return -1;
     }
 
-    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s",
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s 1&>/dev/null",
             sysak_components_server, machine, tool, filename, tools_path);
-    printf("%s ... \n", download_cmd);
+    //printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
     if (ret < 0)
         return ret;
@@ -270,13 +270,13 @@ static int down_install_ext_tools(const char *tool)
     /* extract files, only for zip and tar now*/
     if (strstr(filename, ".zip")) {
         sprintf(buf, "unzip %s/%s -d %s\n", tools_path, filename, tools_path);
-        printf("%s ... \n", buf);
+        //printf("%s ... \n", buf);
         ret = system(buf);
         if (ret < 0)
             return ret;
     } else if (strstr(filename, ".tar")) {
         sprintf(buf, "tar xf %s/%s -C %s\n", tools_path, filename, tools_path);
-        printf("%s ... \n", buf);
+        //printf("%s ... \n", buf);
         ret = system(buf);
         if (ret < 0)
             return ret;
@@ -294,6 +294,9 @@ static int down_install_ext_tools(const char *tool)
 static int down_install(const char *component_name)
 {
     char ko_path[MAX_WORK_PATH_LEN];
+    char ko_file[MAX_WORK_PATH_LEN];
+    char btf_file[MAX_WORK_PATH_LEN];
+    int ret = 0;
 
     if (!get_server_addr())
         return -1;
@@ -302,23 +305,31 @@ static int down_install(const char *component_name)
         if (!get_module_tag())
             return -1;
 
-	sprintf(ko_path, "%s/%s", module_path, kern_version);
+        sprintf(ko_path, "%s/%s", module_path, kern_version);
+        sprintf(ko_file, "%s/%s/%s", module_path, kern_version, "sysak.ko");
+        sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
         if (access(ko_path,0) != 0)
             mkdir(ko_path, 0755 );
 
-        //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s",
+        //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s 1&>/dev/null",
         //        sysak_components_server, machine, module_tag, module_path, kern_version);
-        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko",
+        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko 1&>/dev/null",
                 sysak_components_server, machine, kern_version, module_path, kern_version);
-        printf("%s ... \n", download_cmd);
-        return system(download_cmd);
+        //printf("%s ... \n", download_cmd);
+        ret = system(download_cmd);
+        if (access(ko_file,0) == 0)
+            ret = 0;
+        return ret;
     } else if (strcmp(component_name, "btf") == 0) {
-	//sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s",
+	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
-	sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s",
+	    sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s 1&>/dev/null",
                sysak_components_server, machine, kern_version, tools_path);
-	printf("%s ... \n", download_cmd);
-        return system(download_cmd);
+        //printf("%s ... \n", download_cmd);
+        ret = system(download_cmd);
+        if (access(btf_file,0) == 0)
+            ret = 0;
+        return ret;
     } else {
         return down_install_ext_tools(component_name);
     }
@@ -341,7 +352,7 @@ static int check_or_install_components(const char *name)
 
     if (access(compents_path, 0) != 0) {
         if (auto_get_components) {
-            printf("auto_get_components is %d", auto_get_components);
+            //printf("auto_get_components is %d", auto_get_components);
             download = true;
         } else {
             printf("%s %s", name, promt);
