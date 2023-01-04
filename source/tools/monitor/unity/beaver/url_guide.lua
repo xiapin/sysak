@@ -14,6 +14,7 @@ function CurlGuide:_init_(frame)
     self._urlCb["/guide"] = function(tReq) return self:guide(tReq)  end
     self._urlCb["/guide/hotplugin"] = function(tReq) return self:hotplugin(tReq)  end
     self._urlCb["/guide/oop"] = function(tReq) return self:oop(tReq)  end
+    self._urlCb["/guide/pystring"] = function(tReq) return self:pystring(tReq)  end
     self:_install(frame)
 end
 
@@ -36,6 +37,10 @@ end
 
 function CurlGuide:oop(tReq)
     return {title="oop", content=self:markdown(loadFile("oop.md"))}
+end
+
+function CurlGuide:pystring(tReq)
+    return {title="pystring", content=self:markdown(loadFile("pystring.md"))}
 end
 
 return CurlGuide

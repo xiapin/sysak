@@ -7,9 +7,9 @@ unity监控采用[yaml](http://yaml.org/)对插件进行管理，当前插件分
 在collector/plugin.yaml 文件中，示例文件：
 
 	plugins:
-  	-  # 数组成员标志
+	-  # 数组成员标志
 	    so: sample     # so名，对应 collector/native 目录下应当存在 libsample.so
-	    description: "just a example."   # 插件描述，当前监控系统未使用
+	   description: "just a example."   # 插件描述，当前监控系统未使用
 	  
 ## 采集侧示例代码
 
