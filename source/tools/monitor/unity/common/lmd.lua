@@ -380,7 +380,7 @@ function Clmd:toHtml(md)
         elseif string.find(line, ">%s") then   -- for block quote
             local j = i + 1
             local quotes = {line}
-            while j < len and string.find(mds[j], ">+%s") do
+            while j <= len and string.find(mds[j], ">+%s") do
                 table.insert(quotes, mds[j])
                 j = j + 1
             end
@@ -389,7 +389,7 @@ function Clmd:toHtml(md)
         elseif string.find(line, "^%d%.%s") then
             local j = i + 1
             local ols = {line}
-            while j < len and string.find(mds[j], "[\t%s]*%d%.%s") do
+            while j <= len and string.find(mds[j], "[\t%s]*%d%.%s") do
                 table.insert(ols, mds[j])
                 j = j + 1
             end
@@ -398,7 +398,7 @@ function Clmd:toHtml(md)
         elseif string.find(line, "^[%-%*%+]%s") then
             local j = i + 1
             local uls = {line}
-            while j < len and string.find(mds[j], "[\t%s]*[%-%*%+]%s") do
+            while j <= len and string.find(mds[j], "[\t%s]*[%-%*%+]%s") do
                 table.insert(uls, mds[j])
                 j = j + 1
             end
@@ -407,7 +407,7 @@ function Clmd:toHtml(md)
         elseif string.find(line, "^\t") then
             local j = i + 1
             local codes = {line}
-            while j < len and string.find(mds[j], "^\t") do
+            while j <= len and string.find(mds[j], "^\t") do
                 table.insert(codes, mds[j])
                 j = j + 1
             end
@@ -416,7 +416,7 @@ function Clmd:toHtml(md)
         elseif string.find(line, "^%s%s%s%s") then
             local j = i + 1
             local codes = {line}
-            while j < len and string.find(mds[j], "^%s%s%s%s") do
+            while j <= len and string.find(mds[j], "^%s%s%s%s") do
                 table.insert(codes, mds[j])
                 j = j + 1
             end
@@ -425,7 +425,7 @@ function Clmd:toHtml(md)
         elseif string.find(line, "^```") then
             local j = i + 1
             local codes = {}
-            while j < len and not string.find(mds[j], "^```") do
+            while j <= len and not string.find(mds[j], "^```") do
                 table.insert(codes, mds[j])
                 j = j + 1
             end
@@ -434,7 +434,7 @@ function Clmd:toHtml(md)
         elseif string.find(line, "^|") then
             local j = i + 1
             local codes = {line}
-            while j < len and string.find(mds[j], "^|") do
+            while j <= len and string.find(mds[j], "^|") do
                 table.insert(codes, mds[j])
                 j = j + 1
             end

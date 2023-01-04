@@ -15,12 +15,12 @@ function CurlGuide:_init_(frame)
     self._urlCb["/guide/hotplugin"] = function(tReq) return self:hotplugin(tReq)  end
     self._urlCb["/guide/oop"] = function(tReq) return self:oop(tReq)  end
     self._urlCb["/guide/pystring"] = function(tReq) return self:pystring(tReq)  end
+    self._urlCb["/guide/webdevel"] = function(tReq) return self:webdevel(tReq)  end
     self:_install(frame)
 end
 
 local function loadFile(fPpath)
     local path = "../beaver/guide/" .. fPpath
-    print(path)
     local f = io.open(path,"r")
     local s = f:read("*all")
     f:close()
@@ -41,6 +41,10 @@ end
 
 function CurlGuide:pystring(tReq)
     return {title="pystring", content=self:markdown(loadFile("pystring.md"))}
+end
+
+function CurlGuide:webdevel(tReq)
+    return {title="webdevel", content=self:markdown(loadFile("webdevel.md"))}
 end
 
 return CurlGuide
