@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../tsdb/native/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../collector/native/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../beaver/
@@ -12,4 +13,4 @@ if [ $? -ne 0 ];then
 	exit 0
 fi
 
-./bees
+./unity-mon
