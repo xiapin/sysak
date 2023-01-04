@@ -41,7 +41,10 @@ local function newStack()
 end
 
 local function checkDelimiter(ch)
-    local s = "().%+-*?[^$"
+    local s = "().%+-*?[]^$"
+    if ch == " " then
+        return "%s"
+    end
     for c in string.gmatch(s, ".") do
         if c == ch then
             return "%" .. ch
@@ -58,19 +61,14 @@ local function setupDelimiter(delimiter)
     return table.concat(rt)
 end
 
-local function checkChar(ch)
-    if ch == " " then
-        return "%s"
+local function setupPatten(s)
+    local patten
+    if s == nil then
+        patten = "[%s\t\n]"
+    else
+        patten = setupDelimiter(s)
     end
-    return checkDelimiter(ch)
-end
-
-local function setupPatten(str)
-    local rt = {}
-    for c in string.gmatch(str, ".") do
-        table.insert(rt, checkChar(c))
-    end
-    return '[' .. table.concat(rt) .. ']'
+    return patten
 end
 
 function pystring:split(s, delimiter, n)
@@ -107,12 +105,11 @@ end
 
 function pystring:rsplit(s, delimiter, n)
     local result = {}
-    local delimiter = setupDelimiter(delimiter or " ")
     local n = n or 2 ^ 63 - 1
-
     local len = string.len(s) + 1
     local rs = string.reverse(s)
-    local rDel = string.reverse(delimiter)
+    local rDel = string.reverse(delimiter or " ")
+    rDel = setupDelimiter(rDel)
     local nums = 0
     local beg = 1
 
@@ -137,8 +134,6 @@ function pystring:rsplit(s, delimiter, n)
 end
 
 function pystring:lstrip(s, chars)
-    chars = chars or " "
-
     local patten = "^" .. setupPatten(chars) .. "+"
     local _, ends = string.find(s, patten)
     if ends then
@@ -149,8 +144,6 @@ function pystring:lstrip(s, chars)
 end
 
 function pystring:rstrip(s, chars)
-    chars = chars or " "
-
     local patten = setupPatten(chars) .. "+$"
     local last = string.find(s, patten)
     if last then
@@ -161,7 +154,6 @@ function pystring:rstrip(s, chars)
 end
 
 function pystring:strip(s, chars)
-    chars = chars or " \n\t"
     local res = pystring:lstrip(s, chars)
     return pystring:rstrip(res, chars)
 end
@@ -176,6 +168,10 @@ end
 
 function pystring:endswith(s1, s2)
     return s2=='' or string.sub(s1,-string.len(s2)) == s2
+end
+
+function pystring:find(s1, s2)
+    return string.find(s1, s2, 1, false)
 end
 
 return pystring

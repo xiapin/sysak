@@ -4,9 +4,9 @@ CC=gcc
 CFLAG := -g -I../beaver
 LDFLAG := -g -lm -ldl -lrt -lpthread -lluajit-5.1 -L../beaver -lbeaver
 
-PRG=bees
+PRG=unity-mon
 OBJ=apps.o bees.o beeQ.o
-DEPMOD=../beaver ../collector/native ../tsdb/native
+DEPMOD=../beaver ../collector/native ../collector/plugin ../tsdb/native
 
 $(PRG): $(DEPMOD) $(OBJ)
 	$(CC) $(LIB) -o $@ $(OBJ) $(LDFLAG)

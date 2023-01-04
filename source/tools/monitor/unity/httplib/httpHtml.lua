@@ -14,10 +14,9 @@ function ChttpHtml:_init_(frame)
     ChttpBase._init_(self)
 end
 
-
 function ChttpHtml:markdown(text)
-    local md = require("markdown")
-    return md(text)
+    local md = require("lmd")
+    return md:toHtml(text)
 end
 
 local function htmlPack(title, content)
