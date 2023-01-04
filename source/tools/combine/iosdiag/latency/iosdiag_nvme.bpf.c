@@ -14,7 +14,7 @@ int kprobe_nvme_queue_rq(struct pt_regs *ctx)
 
 	bpf_probe_read(&req, sizeof(struct request *), &bd->rq);
 	if (!req) {
-		bpf_printk("kprobe_nvme_queue_rq: con't get request");
+		//bpf_printk("kprobe_nvme_queue_rq: con't get request");
 		return 0;
 	}
 	return trace_io_driver_route(ctx, req, IO_ISSUE_DRIVER_POINT);
@@ -26,7 +26,7 @@ int kprobe_blk_mq_complete_request(struct pt_regs *ctx)
 	struct request *req = (struct request *)PT_REGS_PARM1(ctx);
 
 	if (!req) {
-		bpf_printk("kprobe_blk_mq_complete_request: con't get request");
+		//bpf_printk("kprobe_blk_mq_complete_request: con't get request");
 		return 0;
 	}
 	return trace_io_driver_route(ctx, req, IO_RESPONCE_DRIVER_POINT);

@@ -28,12 +28,12 @@ struct bpf_map_def SEC("maps") iosdiag_maps_notify = {
 	.value_size = sizeof(int),
 };
 
-static inline int iosdiag_pkg_check(void *data, unsigned int len)
+inline int iosdiag_pkg_check(void *data, unsigned int len)
 {
 	return 1;
 }
 
-static unsigned int get_target_devt(void)
+inline int get_target_devt(void)
 {
 	unsigned int key = 0;
 	unsigned int *devt;
@@ -45,13 +45,13 @@ static unsigned int get_target_devt(void)
 	return 0;
 }
 
-static void
+inline void
 init_iosdiag_key(unsigned long sector, struct iosdiag_key *key)
 {
 	key->sector = sector;
 }
 
-static inline int
+inline int
 trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_type type)
 {
 	struct iosdiag_req *ioreq;
@@ -89,7 +89,7 @@ struct block_getrq_args {
 };
 
 SEC("tracepoint/block/block_getrq")
-static int tracepoint_block_getrq(struct block_getrq_args *args)
+int tracepoint_block_getrq(struct block_getrq_args *args)
 {
 	struct iosdiag_req new_ioreq = {0};
 	struct iosdiag_key key = {0};
@@ -126,7 +126,7 @@ struct block_rq_issue_args {
 };
 
 SEC("tracepoint/block/block_rq_issue")
-static int tracepoint_block_rq_issue(struct block_rq_issue_args *args)
+int tracepoint_block_rq_issue(struct block_rq_issue_args *args)
 {
 	struct iosdiag_req *ioreq;
 	struct iosdiag_key key = {0};
@@ -166,7 +166,7 @@ struct block_rq_complete_args {
 };
 
 SEC("tracepoint/block/block_rq_complete")
-static int tracepoint_block_rq_complete(struct block_rq_complete_args *args)
+int tracepoint_block_rq_complete(struct block_rq_complete_args *args)
 {
 	struct iosdiag_req *ioreq;
 	struct iosdiag_req data = {0};
