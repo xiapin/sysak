@@ -29,7 +29,6 @@ RUN yum install -y http://mirrors.tuna.tsinghua.edu.cn/centos/7/extras/x86_64/Pa
     luarocks install lua-csnappy && \
     luarocks install lua-protobuf && \
     luarocks install luaposix && \
-    luarocks install serpent && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ && \
     cd ../beeQ/ && \
     make
