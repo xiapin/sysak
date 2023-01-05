@@ -5,8 +5,8 @@
 ```
 sysak syscall_slow [--help] [-t THRESH(ms)] [-n sys_NR] <[-c COMM]|[-p tid]> [-f LOGFILE][duration(s)]
    -t  门限：       系统调用超过该门限时就记录，单位ms; 可选，默认10ms；
-   -n 系统调用号：  监控该系统调用(syscall号参考/usr/include/asm/unistd_64.h);可选，默认所有系统调用
-   -c name/-p tid： 只检测指定任务名字/线程ID; 必选其中之一
+   -n 系统调用号：  过滤该系统调用(syscall号参考/usr/include/asm/unistd_64.h);可选，默认所有系统调用
+   -c name/-p tid： 只检测指定任务名字/线程ID; 可选, 不选的话监控所有的系统调用
    -f log文件：     将log记录到指定文件; 可选，默认记录在/var/log/sysak/syscall_slow/syscall_slow.log
    durations：      设置该程序运行多长时间，单位秒; 可选，默认永远运行
 ```
