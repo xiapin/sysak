@@ -1,6 +1,6 @@
 LDFLAGS += -l:liblog4cpp.a -lncurses -lz -pthread -ltinfo -ldl
 CFLAGS += -std=c++11 -static
-INCLUDES += -Isrc/ -Isrc/bpf -I$(SRC)/lib/internal/ebpf/libbpf/src
+INCLUDES += -Isrc/ -Isrc/bpf -I$(SRC)/lib/internal/ebpf/coolbpf/third/libbpf/src
 
 newdirs := $(shell find src/ -type d)
 cppsrcs := $(shell find ./src -name "*.cc")
