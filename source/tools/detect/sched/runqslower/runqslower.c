@@ -47,21 +47,21 @@ const char argp_program_doc[] =
 "USAGE: runqslower [-h] [-s SPAN] [-t TID] [-S SUM] [-f LOG] [-P] [threshold]\n"
 "\n"
 "EXAMPLES:\n"
-"    runqslower          # trace latency higher than 50ms (default)\n"
-"    runqslower -f a.log # record result to a.log (default ~/sysak/runqslow/runqslow.log)\n"
-"    runqslower 12       # trace latency higher than 12 ms\n"
-"    runqslower -p 123   # trace pid 123\n"
-"    runqslower -t 123   # trace tid 123 (use for threads only)\n"
-"    schedmoni -s 10     # monitor for 10 seconds\n"
-"    schedmoni -S shm_f  # log summary info to sharememory shm_f\n"
-"    runqslower -P       # also show previous task name and TID\n";
+"    runqslower           # trace latency higher than 50ms (default)\n"
+"    runqslower -f a.log  # record result to a.log (default ~/sysak/runqslow/runqslow.log)\n"
+"    runqslower 12        # trace latency higher than 12 ms\n"
+"    runqslower -p 123    # trace pid 123\n"
+"    runqslower -t 123    # trace tid 123 (use for threads only)\n"
+"    runqslower -s 10     # monitor for 10 seconds\n"
+"    runqslower -S shmkey # Record summary log to share memory shmkey\n"
+"    runqslower -P        # also show previous task name and TID\n";
 
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace"},
 	{ "tid", 't', "TID", 0, "Thread TID to trace"},
 	{ "span", 's', "SPAN", 0, "How long to run"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ "summary", 'S', "SUM", 0, "Output the summary info" },
+	{ "summary", 'S', "SHMKEY", 0, "record summary log to share memory" },
 	{ "previous", 'P', NULL, 0, "also show previous task name and TID" },
 	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },

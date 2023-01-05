@@ -56,16 +56,16 @@ const char argp_program_doc[] =
 "\n"
 "EXAMPLES:\n"
 "    irqoff                # run forever, and detect irqoff more than 10ms(default)\n"
-"    irqoff -S SHM         # record the summary results to share memory\n"
+"    irqoff -S shmkey      # record summary log to share memory shmkey\n"
 "    irqoff -t 15          # detect irqoff with threshold 15ms (default 10ms)\n"
 "    irqoff -f a.log       # record result to a.log (default to ~sysak/irqoff/irqoff.log)\n";
 
 static const struct argp_option opts[] = {
 	{ "threshold", 't', "THRESH", 0, "Threshold to detect, default 10ms"},
 	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
-	{ "summary", 'S', "SHM", 0, "Summary the output" },
-	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
-	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
+	{ "summary", 'S', "SHMKEY", 0, "Record summary log to share memory"},
+	{ "verbose", 'v', NULL, 0, "Verbose debug output"},
+	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
 	{},
 };
 
