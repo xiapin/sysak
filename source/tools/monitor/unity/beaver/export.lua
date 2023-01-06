@@ -13,7 +13,7 @@ local Cexport = class("Cexport")
 
 function Cexport:_init_(instance, fYaml)
     self._instance = instance
-    fYaml = fYaml or "../beaver/export.yaml"
+    fYaml = fYaml or "../collector/plugin.yaml"
     local ms = self:_load(fYaml)
     self._tDescr = ms.metrics
     self._fox = CfoxTSDB.new()
