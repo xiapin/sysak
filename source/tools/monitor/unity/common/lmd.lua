@@ -301,7 +301,7 @@ function Clmd:pTable(codes, res)
     end
 
     local aligns = tableAligns(codes[2])
-    table.insert(res, "<table>")
+    table.insert(res, '<table border="1">')
 
     local heads = pystring:split(codes[1], "|")
     table.insert(res, "<tr>")

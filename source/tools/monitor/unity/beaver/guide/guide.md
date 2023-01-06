@@ -4,3 +4,4 @@
 2. [面向对象设计](/guide/oop)
 3. [字符串处理](/guide/pystring)
 4. [页面开发](/guide/webdevel)
+5. [proc和probe记录表](/guide/proc_probe)

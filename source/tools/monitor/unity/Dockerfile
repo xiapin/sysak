@@ -1,9 +1,7 @@
-FROM centos:7
+FROM registry.cn-hangzhou.aliyuncs.com/sysom/lcc
 MAINTAINER "liaozhaoyan <zhaoyan.lzy@alibaba-inc.com>"
 WORKDIR /root/
-RUN yum install -y http://mirrors.tuna.tsinghua.edu.cn/centos/7/extras/x86_64/Packages/centos-release-scl-rh-2-3.el7.centos.noarch.rpm && \
-    yum install -y devtoolset-9-gcc-c++ && \
-    source /opt/rh/devtoolset-9/enable && \
+RUN source /opt/rh/devtoolset-9/enable && \
     yum install -y make wget readline-devel lua-devel unzip git && \
     mkdir /root/build && \
     cd /root/build && \

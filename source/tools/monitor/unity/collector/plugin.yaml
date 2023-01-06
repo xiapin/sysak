@@ -2,3 +2,56 @@ plugins:
   -
     so: sample
     description: "just a example."
+
+metrics:
+  -
+    title: sysak_proc_cpu_total
+    from: cpu_total
+    head: mode
+    help: "cpu usage info for total."
+    type: "gauge"
+  - title: sysak_proc_cpus
+    from: cpus
+    head: mode
+    help: "cpu usage info for per-cpu."
+    type: "gauge"
+  - title: sysak_proc_sirq
+    from: sirq
+    head: type
+    help: "system soft irq times."
+    type: "gauge"
+  - title: sysak_proc_stat_counters
+    from: stat_counters
+    head: counter
+    help: "system state counter."
+    type: "gauge"
+  - title: sysak_proc_meminfo
+    from: meminfo
+    head: value
+    help: "meminfo from /proc/meminfo."
+    type: "gauge"
+  - title: sysak_proc_vmstat
+    from: vmstat
+    head: value
+    help: "vmstat info from /proc/vmstat."
+    type: "gauge"
+  - title: sysak_proc_networks
+    from: networks
+    head: counter
+    help: "networks info from /proc/net/dev."
+    type: "gauge"
+  - title: sysak_proc_disks
+    from: disks
+    head: counter
+    help: "disk info from /proc/diskstats."
+    type: "gauge"
+  - title: sysak_sample_tbl1
+    from: sample_tbl1
+    head: value
+    help: "example1 for develop."
+    type: "gauge"
+  - title: sysak_sample_tbl2
+    from: sample_tbl2
+    head: value
+    help: "example2 for develop."
+    type: "gauge"

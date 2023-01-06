@@ -13,7 +13,7 @@ int call(int t, struct unity_lines* lines) {
     static double value = 0.0;
     struct unity_line* line;
 
-    unity_alloc_lines(lines, 2);
+    unity_alloc_lines(lines, 3);    // 预分配好
     line = unity_get_line(lines, 0);
     unity_set_table(line, "sample_tbl1");
     unity_set_index(line, 0, "mode", "sample1");
@@ -21,6 +21,12 @@ int call(int t, struct unity_lines* lines) {
     unity_set_value(line, 1, "value2", 2.0 + value);
 
     line = unity_get_line(lines, 1);
+    unity_set_table(line, "sample_tbl1");
+    unity_set_index(line, 0, "mode", "sample2");
+    unity_set_value(line, 0, "value1", 1.2 + value);
+    unity_set_value(line, 1, "value2", 2.2 + value);
+
+    line = unity_get_line(lines, 2);
     unity_set_table(line, "sample_tbl2");
     unity_set_value(line, 0, "value1", 3.0 + value);
     unity_set_value(line, 1, "value2", 4.0 + value);
