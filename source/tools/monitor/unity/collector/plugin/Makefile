@@ -1,7 +1,1 @@
-DEPMOD=sample
-
-$(DEPMOD):ECHO
-	make -C $@
-
-ECHO:
-	@echo $(SUBDIRS)
+include $(SRC)/mk/sub.mk

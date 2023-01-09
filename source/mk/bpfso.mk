@@ -17,7 +17,7 @@ DEPEND := "prev{btf}"
 SHARED_CFLAGS += -fPIC -fvisibility=hidden -DSHARED
 CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall
 LDFLAGS += $(EXTRA_LDFLAGS) -L$(OBJ_LIB_PATH) -lbpf -lcoolbpf -lelf -lz
-INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(TARGET_PATH) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi -I$(SRC)/lib/uapi/include
+INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(TARGET_PATH) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/coolbpf/third/libbpf/include/uapi -I$(SRC)/lib/uapi/include
 
 ifeq ($(V),1)
 	Q =
