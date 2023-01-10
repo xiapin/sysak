@@ -381,11 +381,13 @@ static int do_prev_depend(void)
 {
     if (pre_module) {
         if (!check_or_install_components("sysak_modules"))
-            return mod_ctrl(true);
+            goto install;
         printf("sysak_modules not installed, exit ...\n");
         return -1;
     }
 
+install:
+    mod_ctrl(true);
     if (btf_depend)
         return check_or_install_components("btf");
 
@@ -646,6 +648,10 @@ static bool tool_rule_parse(char *path, char *tool)
         pstr = strstr(buf, ":python-dep{");
         if (pstr)
             sscanf(pstr, ":python-dep{%[^}]}", run_depend);
+
+        pstr = strstr(buf, "btf");
+        if (pstr)
+            btf_depend = true;
 
         fclose(fp);
         return true;
