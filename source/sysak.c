@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #define KVERSION 64
 #define MAX_SUBCMD_ARGS 512
@@ -70,6 +72,7 @@ bool pre_module = false;
 bool post_module = false;
 bool btf_depend = false;
 bool auto_get_components = false;
+pid_t child_pid;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
     {"sysak tools for user self-help analysis", NULL},
@@ -407,6 +410,53 @@ static void add_python_depend(char *depend,char *cmd)
     }
 }
 
+static void sig_handler(int sig, siginfo_t *info, void *act)
+{
+    if (child_pid > 0 )
+        kill(-child_pid, sig);
+    if (post_module)
+        mod_ctrl(false);
+}
+
+static int register_sig_handler(pid_t pid)
+{
+    struct sigaction act;
+    int ret = -1;
+
+    sigemptyset(&act.sa_mask);
+    act.sa_flags=SA_SIGINFO;
+    act.sa_sigaction=sig_handler;
+
+    if (sigaction(SIGINT, &act, NULL) == 0)
+        ret = 0;
+    if (sigaction(SIGQUIT, &act, NULL) == 0)
+        ret = 0;
+    if (sigaction(SIGTERM, &act, NULL) == 0)
+        ret = 0;
+    if (!ret)
+        child_pid = pid;
+
+    return 0;
+}
+
+static int my_system(char *cmd)
+{
+    pid_t pid;
+    int status;
+
+    pid = fork();
+    if (pid < 0) {
+        return -1;
+    } else if (pid == 0) {
+        execl("/usr/bin/sh", "sh", "-c", cmd, NULL);
+        exit(0);
+    }
+
+    register_sig_handler(pid);
+    waitpid(pid, &status, 0);
+    return pid;
+}
+
 static int exectue(int argc, char *argv[])
 {
     char subcmd_name[MAX_NAME_LEN+MAX_SUBCMD_ARGS];
@@ -434,7 +484,9 @@ static int exectue(int argc, char *argv[])
         strncpy(tools_exec, subcmd_name, strlen(subcmd_name));
 
     snprintf(subcmd_exec_final, sizeof(subcmd_exec_final), "%s;%s", sysak_work_path, tools_exec);
-    ret = system(subcmd_exec_final);
+    ret = my_system(subcmd_exec_final);
+    if (ret < 0)
+       return ret;
 
     if (post_module)
         mod_ctrl(false);
