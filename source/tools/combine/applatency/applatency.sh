@@ -19,14 +19,14 @@ usage() {
 
 
 log_dir=/var/log/sysak/applatency/
-irqlog=${loadtask_dir}irqoff-`date "+%Y-%m-%d-%H-%M-%S"`.log
-noschedlog=${loadtask_dir}nosched-`date "+%Y-%m-%d-%H-%M-%S"`.log
-sslowlog=${loadtask_dir}sslow-`date "+%Y-%m-%d-%H-%M-%S"`.log
-rqlog=${loadtask_dir}rq-`date "+%Y-%m-%d-%H-%M-%S"`.log
+irqlog=${log_dir}irqoff-`date "+%Y-%m-%d-%H-%M-%S"`.log
+noschedlog=${log_dir}nosched-`date "+%Y-%m-%d-%H-%M-%S"`.log
+sslowlog=${log_dir}sslow-`date "+%Y-%m-%d-%H-%M-%S"`.log
+rqlog=${log_dir}rq-`date "+%Y-%m-%d-%H-%M-%S"`.log
 
 lat_thresh=10
 
-while getopts 't:l:c:ph' OPT; do
+while getopts 't:l:c:p:h' OPT; do
 	case $OPT in
 		"h")
 			usage
@@ -58,23 +58,26 @@ mkdir -p $log_dir
 
 $TOOLS_ROOT/irqoff -f $irqlog -t $lat_thresh &
 irqoff_pid=$!
-echo "irqoff trace started($irqoff_pid)"
 $TOOLS_ROOT/nosched -f $noschedlog -t $lat_thresh &
 nosched_pid=$!
-echo "nosched trace started($nosched_pid)"
 if [ -n "$cmdname" ]; then
-	process_arg="-c $cmdname"
+	$TOOLS_ROOT/runqslower -f $rqlog -P $lat_thresh &
+	rqslow_pid=$!
+	$TOOLS_ROOT/syscall_slow -t $lat_thresh -f $sslowlog -c $cmdname &
+	sslow_pid=$!
 else
 	if [ -n "$pid" ]; then
-		process_arg="-p $pid"
-		$TOOLS_ROOT/runqslower -f $rqlog -P $process_arg $lat_thresh &
+		$TOOLS_ROOT/runqslower -f $rqlog -P -p $pid $lat_thresh &
 		rqslow_pid=$!
-		echo "runq slow trace started($rqslow_pid)"
+		$TOOLS_ROOT/syscall_slow -t $lat_thresh -f $sslowlog -p $pid &
+		sslow_pid=$!
+	else
+		$TOOLS_ROOT/runqslower -f $rqlog -P $lat_thresh &
+		rqslow_pid=$!
+		$TOOLS_ROOT/syscall_slow -t $lat_thresh -f $sslowlog &
+		sslow_pid=$!
 	fi
 fi
-$TOOLS_ROOT/syscall_slow -t $lat_thresh -f sslowlog $process_arg &
-sslow_pid=$!
-echo "syscall slow trace started($sslow_pid)"
 
 cleanup() {
 	kill $irqoff_pid
