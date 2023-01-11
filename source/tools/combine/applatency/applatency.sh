@@ -25,6 +25,7 @@ sslowlog=${log_dir}sslow-`date "+%Y-%m-%d-%H-%M-%S"`.log
 rqlog=${log_dir}rq-`date "+%Y-%m-%d-%H-%M-%S"`.log
 
 lat_thresh=10
+system_wide="true"
 
 while getopts 't:l:c:p:h' OPT; do
 	case $OPT in
@@ -43,9 +44,13 @@ while getopts 't:l:c:p:h' OPT; do
 			;;
 		"c")
 			cmdname="$OPTARG"
+			app_name=$cmdname
+			system_wide="false"
 			;;
 		"p")
 			pid=$OPTARG
+			app_name=`head -n 1 /proc/$pid/status  | awk {'printf $2'}`
+			system_wide="false"
 			;;
 		*)
 			usage
@@ -91,3 +96,62 @@ wait $irqoff_pid
 wait $nosched_pid
 wait $sslow_pid
 wait $rqslow_pid
+
+check_irqoff() {
+	irqoff_cnt=0
+	if [ $system_wide == "true" ]; then
+		irqoff_cnt=`grep -nr "20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]" $irqlog | wc -l`
+	else
+		irqoff_cnt=`grep -nrw $app_name $irqlog | wc -l`
+	fi
+
+	if [ "$irqoff_cnt" -gt 0 ]; then
+		echo "$irqoff_cnt irqoff events may delay $app_name running, see more $irqlog"
+	fi
+}
+
+check_nosched() {
+	nosched_cnt=0
+	if [ $system_wide == "true" ]; then
+		nosched_cnt=`grep -nr "20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]" $noschedlog | wc -l`
+	else
+		nosched_cnt=`grep -nrw $app_name $noschedlog | wc -l`
+	fi
+
+	if [ "$nosched_cnt" -gt 0 ]; then
+		echo "$nosched_cnt nosched events may delay $app_name running, see more $noschedlog"
+	fi
+}
+
+check_rqslow() {
+	rqslow_cnt=0
+	if [ $system_wide == "true" ]; then
+		rqslow_cnt=`grep -nr "20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]" $rqlog | wc -l`
+	else
+		rqslow_cnt=`grep -nrw $app_name $rqlog | wc -l`
+	fi
+
+	if [ "$rqslow_cnt" -gt 0 ]; then
+		echo "$rqslow_cnt runq slow events may delay $app_name running, see more $rqlog"
+	fi
+
+}
+
+check_syscall() {
+	slowsys_cnt=0
+	if [ $system_wide == "true" ]; then
+		slowsys_cnt=`grep -nr "20[0-9][0-9]-[0-1][0-9]-[0-3][0-9]" $sslowlog | wc -l`
+	else
+		slowsys_cnt=`grep -nrw \($app_name\) $sslowlog | wc -l`
+	fi
+
+	if [ "$slowsys_cnt" -gt 0 ]; then
+		echo "$slowsys_cnt slow syscall events may delay $app_name running, see more $sslowlog"
+	fi
+
+}
+
+check_irqoff
+check_nosched
+check_rqslow
+check_syscall
