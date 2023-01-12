@@ -36,7 +36,7 @@ function system:dump(t)
     return serpent.block(t)
 end
 
-function system:tableIsIn(tbl, key)
+function system:keyIsIn(tbl, key)
     if type(tbl) ~= "table" then
         return false
     end
@@ -45,6 +45,18 @@ function system:tableIsIn(tbl, key)
     else
         return true
     end
+end
+
+function system:valueIsIn(tbl, value)
+    if type(tbl) ~= "table" then
+        return false
+    end
+    for _, v in ipairs(tbl) do
+        if v == value then
+            return true
+        end
+    end
+    return false
 end
 
 return system

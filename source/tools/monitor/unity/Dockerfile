@@ -2,7 +2,7 @@ FROM registry.cn-hangzhou.aliyuncs.com/sysom/lcc
 MAINTAINER "liaozhaoyan <zhaoyan.lzy@alibaba-inc.com>"
 WORKDIR /root/
 RUN source /opt/rh/devtoolset-9/enable && \
-    yum install -y make wget readline-devel lua-devel unzip git && \
+    yum install -y make wget  * unzip git && \
     mkdir /root/build && \
     cd /root/build && \
     git clone https://gitee.com/chuyansz/sysak.git && \

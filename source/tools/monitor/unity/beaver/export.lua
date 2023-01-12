@@ -31,10 +31,17 @@ end
 
 local function qFormData(from, tData)
     local res = {}
-
-    for _, line in ipairs(tData) do
+    local len = #tData
+    local last = 0
+    for i = len, 1, -1 do
+        local line = tData[i]
         if from == line.title then
-            table.insert(res, line)
+            if last == 0 or last == line.time then
+                table.insert(res, line)
+                last = line.time
+            else
+                break
+            end
         end
     end
     return res

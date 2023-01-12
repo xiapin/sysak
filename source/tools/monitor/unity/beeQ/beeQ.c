@@ -258,7 +258,7 @@ static void * beeQ_send_run(void * args) {
     return NULL;
 }
 
-int beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, void* arg)) {
+pthread_t beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, void* arg)) {
     pthread_t tid;
     int res;
     struct beeMsg* msg;
@@ -282,8 +282,7 @@ int beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, void* 
         res = -ENOENT;
         goto failThread;
     }
-    res = 0;
-    return res;
+    return tid;
 
     failThread:
     free(msg);

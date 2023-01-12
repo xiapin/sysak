@@ -12,8 +12,8 @@ local system = require("system")
 
 workLoop = nil
 
-function init(que, t)
-    local work = Cloop.new(que)
+function init(que, proto_q, t)
+    local work = Cloop.new(que, proto_q)
     workLoop = work
     return 0
 end

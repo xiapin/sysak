@@ -67,7 +67,7 @@ local function checkMember(tJson)
     local heads = {"jsonrpc", "method", "params", "id"}
 
     for _, v in ipairs(heads) do
-        if not system:tableIsIn(tJson, v) then
+        if not system:keyIsIn(tJson, v) then
             return false
         end
     end
@@ -76,7 +76,7 @@ end
 
 function CurlRpc:methodProc(tJson)
     local method = tJson.method
-    if system:tableIsIn(self._method, method) then
+    if system:keyIsIn(self._method, method) then
         return self._method[method](tJson)
     else
         return methodError(tJson.id)
@@ -85,7 +85,7 @@ end
 
 function CurlRpc:check(tJson)
     if tJson then
-        if system:tableIsIn(tJson, "id") then  -- check id is in.
+        if system:keyIsIn(tJson, "id") then  -- check id is in.
             if checkMember(tJson) then
                 if type(tJson.params) == "table" then
                     return self:methodProc(tJson)

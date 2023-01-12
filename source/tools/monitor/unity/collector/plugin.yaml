@@ -2,6 +2,9 @@ plugins:
   -
     so: sample
     description: "just a example."
+  -
+    so: sample_threads
+    description: "threads example."
 
 metrics:
   -

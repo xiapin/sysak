@@ -18,7 +18,7 @@ local Cplugin = require("plugin")
 
 local Cloop = class("loop")
 
-function Cloop:_init_(que)
+function Cloop:_init_(que, proto_q)
     self._proto = CprotoData.new(que)
     self._procs = {
         CprocStat.new(self._proto, procffi),
@@ -27,7 +27,7 @@ function Cloop:_init_(que)
         CprocNetdev.new(self._proto, procffi),
         CprocDiskstats.new(self._proto, procffi),
     }
-    self._plugin = Cplugin.new(self._proto)
+    self._plugin = Cplugin.new(self._proto, que, proto_q)
 end
 
 function Cloop:work(t)

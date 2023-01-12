@@ -14,7 +14,6 @@ function CvProc:_init_(proto, pffi, pFile)
     self._cffi = pffi["cffi"]
     self._ffi = pffi["ffi"]
     self.pFile = pFile
-    print(pFile)
 end
 
 function CvProc:proc(elapsed)

@@ -5,15 +5,18 @@
 ---
 
 require("class")
+local system = require("system")
 local ChttpApp = require("httpApp")
-
+local CfoxTSDB = require("foxTSDB")
 local CurlApi = class("urlApi", ChttpApp)
 
 function CurlApi:_init_(frame)
     ChttpApp._init_(self)
     self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
     self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
+    self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
     self:_install(frame)
+    self:_setupQs()
 end
 
 function CurlApi:sum(tReq)
@@ -29,6 +32,88 @@ function CurlApi:sub(tReq)
     local stat, tJson = pcall(self.getJson, self, tReq)
     if stat then
         return {sum=tJson.num1 - tJson.num2}
+    else
+        return {}
+    end
+end
+
+function CurlApi:qlast(tJson)
+    local ts = tJson["time"]
+    local secs = 0
+    if string.find(ts, "%d+[hms]$") then
+        local unit = string.sub(ts, -1)
+        local num = tonumber(string.sub(ts, 1, -2))
+        if unit == "h" then
+            secs = num * 60 * 60
+        elseif unit == "m" then
+            secs = num * 60
+        else
+            secs = num
+        end
+    else
+        secs = tonumber(ts)
+    end
+    local tbls = nil
+    if system:keyIsIn(tJson, "table") and type(tJson["table"]) == "table" then
+        tbls = tJson["table"]
+    end
+    return self.fox:qNow(secs, tbls)
+end
+
+function CurlApi:qdate(tJson)
+    local start = tJson["start"]
+    local stop  = tJson["stop"]
+
+    local dStart = self.fox:str2date(start)
+    local dStop  = self.fox:str2date(stop)
+
+    if system:keyIsIn(tJson, "tz") then
+        dStart = self.fox:moveSec(dStart, -tJson["tz"] * 60 * 60)
+        dStop  = self.fox:moveSec(dStop,  -tJson["tz"] * 60 * 60)
+    end
+
+    local tbls = nil
+    if system:keyIsIn(tJson, "table") and type(tJson["table"]) == "table" then
+        tbls = tJson["table"]
+    end
+    return self.fox:qDate(dStart, dStop, tbls)
+end
+
+function CurlApi:qtable(tJson)
+    local secs = 0
+    if system:keyIsIn(tJson, "duration") then
+        secs = tJson["duration"] * 60 * 60
+    else
+        secs = 2 * 60 * 60
+    end
+    return self.fox:qTabelNow(secs)
+end
+
+function CurlApi:_setupQs()
+    self.fox = CfoxTSDB.new()
+    self._q = {}
+    self._q["last"] = function(tJson) return self:qlast(tJson) end
+    self._q["table"] = function(tJson) return self:qtable(tJson) end
+    self._q["date"] = function(tJson) return self:qdate(tJson) end
+end
+
+function CurlApi:lquery(tJson)
+    if system:keyIsIn(self._q, tJson["mode"]) then
+        return self._q[tJson["mode"]](tJson)
+    else
+        return {}
+    end
+end
+
+function CurlApi:query(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat then
+        local cStat, ms = pcall(self.lquery, self, tJson)
+        if cStat then
+            return ms
+        else
+            return {}
+        end
     else
         return {}
     end

@@ -9,7 +9,7 @@
 
 执行以下命令构建
 ```
-docker build -c 2 -t sysak-unity-devel:v1.0 .
+docker build -c 2 -t sysom:v1.1 .
 ```
 
 大约10+分钟后即可构建完毕
@@ -19,15 +19,15 @@ docker build -c 2 -t sysak-unity-devel:v1.0 .
 如果在本地构建完毕，可以采用以下命令拉起刚才构建好的镜像
 
 ```bash
-docker run -itd --net=host --name unity-devel :v1.0
+docker run -itd --net=host --name sysom-devel sysom:v1.1
 docker exec -it unity-devel bash
 ```
 
 如果采用已经好的镜像
 
 ```bash
-docker run -itd --net=host --name unity-devel registry.cn-hangzhou.aliyuncs.com/sysom/unity:v1.0
-docker exec -it unity-devel bash
+docker run -itd --net=host --name sysom-devel registry.cn-hangzhou.aliyuncs.com/sysom/sysom
+docker exec -it sysom-devel bash
 ```
 
 进入到容器后，进入到代码路径，执行启动脚本即可拉起监控服务

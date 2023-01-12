@@ -36,6 +36,8 @@ struct unity_lines {
 #include <string.h>   // for memset
 #include <stdio.h>
 #include <errno.h>
+#include "../../beeQ/beeQ.h"
+
 inline int unity_alloc_lines(struct unity_lines * lines, unsigned int num) __attribute__((always_inline));
 inline struct unity_line * unity_get_line(struct unity_lines * lines, unsigned int i) __attribute__((always_inline));
 inline int unity_set_table(struct unity_line * line, const char * table) __attribute__((always_inline));
@@ -84,6 +86,13 @@ inline int unity_set_value(struct unity_line * line,
     }
     strncpy(line->values[i].name, name, 16);
     line->values[i].value = value;
+    return 0;
+}
+
+inline int unity_set_log(struct unity_line * line,
+                        const char * name, const char * log) {
+    strncpy(line->log.name, name, 16);
+    line->log.log = strdup(log);
     return 0;
 }
 

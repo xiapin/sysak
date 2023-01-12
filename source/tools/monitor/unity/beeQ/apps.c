@@ -152,7 +152,7 @@ int app_recv_proc(void* msg, void * arg) {
     return ret;
 }
 
-static int collector_qout(lua_State *L) {
+int collector_qout(lua_State *L) {
     int ret;
     struct beeQ* q = (struct beeQ*) lua_topointer(L, 1);
     const char *body = lua_tostring(L, 2);
@@ -169,10 +169,10 @@ static int collector_qout(lua_State *L) {
 
     ret = beeQ_send(q, pMsg);
     lua_pushnumber(L, ret);
-    return 1;
+    return 1;   // return a value.
 }
 
-static lua_State * app_collector_init(void* q, int delta) {
+static lua_State * app_collector_init(void* q, void* proto_q, int delta) {
     int ret;
     lua_Number lret;
 
@@ -200,8 +200,9 @@ static lua_State * app_collector_init(void* q, int delta) {
     // call init.
     lua_getglobal(L, "init");
     lua_pushlightuserdata(L, q);
+    lua_pushlightuserdata(L, proto_q);
     lua_pushinteger(L, delta);
-    ret = lua_pcall(L, 2, 1, 0);
+    ret = lua_pcall(L, 3, 1, 0);
     if (ret) {
         perror("luaL_call init func error");
         report_lua_failed(L);
@@ -231,7 +232,7 @@ static lua_State * app_collector_init(void* q, int delta) {
     return NULL;
 }
 
-static int app_collector_work(lua_State **pL, void* q, int delta) {
+static int app_collector_work(lua_State **pL, void* q, void* proto_q, int delta) {
     int ret;
     lua_Number lret;
     static int counter = 0;
@@ -241,7 +242,7 @@ static int app_collector_work(lua_State **pL, void* q, int delta) {
     if (counter != sighup_counter) {    // check counter for signal.
         lua_close(L);
 
-        L = app_collector_init(q, delta);
+        L = app_collector_init(q, proto_q, delta);
         if (L == NULL) {
             exit(1);
         }
@@ -296,12 +297,15 @@ static bee_time_t local_time(void) {
     }
 }
 
+extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int app_collector_run(struct beeQ* q, void* arg) {
     int ret = 0;
     lua_State *L;
     lua_State **pL;
+    struct beeQ* proto_que;
 
-    L = app_collector_init(q, APP_LOOP_PERIOD);
+    proto_que = proto_sender_init(q);
+    L = app_collector_init(q, proto_que, APP_LOOP_PERIOD);
     if (L == NULL) {
         ret = -1;
         goto endInit;
@@ -311,7 +315,7 @@ int app_collector_run(struct beeQ* q, void* arg) {
     while (1) {
         bee_time_t t1, t2, delta;
         t1 = local_time();
-        ret = app_collector_work(pL, q, APP_LOOP_PERIOD);
+        ret = app_collector_work(pL, q, proto_que, APP_LOOP_PERIOD);
         if (ret < 0) {
             goto endLoop;
         }

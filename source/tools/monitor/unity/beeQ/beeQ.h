@@ -29,7 +29,7 @@ struct beeQ {
 };
 
 int beeQ_send(struct beeQ *q, void *msg);
-int beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, void* arg));
+pthread_t beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, void* arg));
 struct beeQ* beeQ_init(int size, int (*cb)(void *msg, void* arg), void *arg);
 int beeQ_stop(struct beeQ *q);
 

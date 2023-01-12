@@ -8,13 +8,13 @@ require("class")
 
 local Cplugin = class("plugin")
 
-function Cplugin:_init_(proto, fYaml)
+function Cplugin:_init_(proto, que, proto_q, fYaml)
     self._proto = proto
     fYaml = fYaml or "../collector/plugin.yaml"
     self._ffi = require("plugincffi")
 
     local res = self:loadYaml(fYaml)
-    self:setup(res.plugins)
+    self:setup(res.plugins, proto_q)
 end
 
 function Cplugin:_del_()
@@ -33,7 +33,7 @@ function Cplugin:loadYaml(fYaml)
     return lyaml.load(s)
 end
 
-function Cplugin:setup(plugins)
+function Cplugin:setup(plugins, proto_q)
     self._plugins = {}
     for _, plugin in ipairs(plugins) do
         local so = plugin.so
@@ -43,7 +43,7 @@ function Cplugin:setup(plugins)
                 so = plugin.so,
                 cffi = cffi
             }
-            cffi.init(nil);
+            cffi.init(proto_q);
             table.insert(self._plugins, plugin)
         end
     end
@@ -75,6 +75,15 @@ function Cplugin:load_value(unity_line, line)
     end
 end
 
+function Cplugin:load_log(unity_line, line)
+    local name = self._ffi.string(unity_line.log.name)
+    if #name > 0 then
+        local log = self._ffi.string(unity_line.log.log)
+        self._ffi.C.free(unity_line.log.log)   -- should free from strdup
+        table.insert(line.log, {name = name, log = log})
+    end
+end
+
 function Cplugin:_proc(unity_lines, lines)
     for i=0, unity_lines.num - 1 do
         local unity_line = unity_lines.line[i]
@@ -85,6 +94,7 @@ function Cplugin:_proc(unity_lines, lines)
 
         self:load_label(unity_line, line)
         self:load_value(unity_line, line)
+        self:load_log(unity_line, line)
         table.insert(lines["lines"], line)
     end
 end

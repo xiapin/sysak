@@ -17,6 +17,7 @@ function CfoxTSDB:_init_()
     self.ffi = foxFFI.ffi
     self.cffi = foxFFI.cffi
     self._proto = CprotoData.new(nil)
+    self._qBudget = 200
 end
 
 function CfoxTSDB:_del_()
@@ -229,14 +230,6 @@ function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
             end
             tCell.values = values
 
-            local logs = {}
-            if v.vlog then
-                for _, vlog in ipairs(v.log) do
-                    logs[vlog.name] = vlog.log
-                end
-            end
-            tCell.logs = logs
-
             table.insert(ms, tCell)
         end
     end
@@ -266,6 +259,165 @@ function CfoxTSDB:qlast(last, ms)
             return self:query(beg, now, ms)
         end
     end
+end
+
+function CfoxTSDB:qDay(start, stop, ms, tbls, budget)
+    if self._man then
+        self:_del_()
+    end
+
+    if self:_setupRead(start) ~= 0 then
+        return {}
+    end
+
+    budget = budget or self._qBudget
+    self:curMove(start)
+    local inc = false
+    for line in self:loadData(stop) do
+        inc = false
+        local time = line.time
+        for _, v in ipairs(line.lines) do
+            local title = v.line
+            if not tbls or system:valueIsIn(tbls, title) then
+                local tCell = {time = string.format("%d", time), title = title}
+
+                local labels = {}
+                if v.ls then
+                    for _, vlabel in ipairs(v.ls) do
+                        labels[vlabel.name] = vlabel.index
+                    end
+                end
+                tCell.labels = labels
+
+                local values = {}
+                if v.vs then
+                    for _, vvalue in ipairs(v.vs) do
+                        values[vvalue.name] = vvalue.value
+                    end
+                end
+                tCell.values = values
+
+                local logs = {}
+                if v.vlog then
+                    for _, vlog in ipairs(v.log) do
+                        logs[vlog.name] = vlog.log
+                    end
+                end
+                tCell.logs = logs
+
+                table.insert(ms, tCell)
+                inc = true
+            end
+        end
+
+        if inc then
+            budget = budget - 1
+        end
+        if budget == 0 then   -- max len
+            break
+        end
+    end
+    return ms
+end
+
+function CfoxTSDB:qDayTables(start, stop, tbls)
+    if self._man then
+        self:_del_()
+    end
+
+    if self:_setupRead(start) ~= 0 then
+        return {}
+    end
+
+    self:curMove(start)
+    for line in self:loadData(stop) do
+        for _, v in ipairs(line.lines) do
+            local title = v.line
+            if not system:valueIsIn(tbls, title) then
+                table.insert(tbls, title)
+            end
+        end
+    end
+    return tbls
+end
+
+function CfoxTSDB:qDate(dStart, dStop, tbls)
+    local now = self:makeStamp(dStop)
+    local beg = self:makeStamp(dStart)
+
+    if now - beg > 24 * 60 * 60 * 1e6 then
+        return {}
+    end
+
+    local ms = {}
+    if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
+        self:qDay(beg, now, ms, tbls)
+    else
+        local beg1 = beg
+        local beg2 = self.cffi.make_stamp(dStop)
+        local now1 = beg2 - 1
+        local now2 = now
+
+        self:qDay(beg1, now1, ms, tbls)
+        local budget = self._qBudget - #ms
+        if budget > 0 then
+            self:qDay(beg2, now2, ms, tbls, budget)
+        end
+    end
+    return ms
+end
+
+function CfoxTSDB:qNow(sec, tbls)
+    if sec > 24 * 60 * 60 then
+        return {}
+    end
+    local now = self:get_us()
+    local beg = now - sec * 1e6 + 1
+
+    local dStart = self:getDateFrom_us(beg)
+    local dStop = self:getDateFrom_us(now)
+
+    local ms = {}
+    if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
+        self:qDay(beg, now, ms, tbls)
+    else
+        local beg1 = beg
+        local beg2 = self.cffi.make_stamp(dStop)
+        local now1 = beg2 - 1
+        local now2 = now
+
+        self:qDay(beg1, now1, ms, tbls)
+        local budget = self._qBudget - #ms
+        if budget > 0 then
+            self:qDay(beg2, now2, ms, tbls, budget)
+        end
+    end
+    return ms
+end
+
+function CfoxTSDB:qTabelNow(sec)
+    if sec > 24 * 60 * 60 then
+        return {}
+    end
+    local now = self:get_us()
+    local beg = now - sec * 1e6 + 1
+
+    local dStart = self:getDateFrom_us(beg)
+    local dStop = self:getDateFrom_us(now)
+
+    local tbls = {}
+    if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
+        self:qDayTables(beg, now, tbls)
+    else
+        local beg1 = beg
+        local beg2 = self.cffi.make_stamp(dStop)
+        local now1 = beg2 - 1
+        local now2 = now
+
+        self:qDayTables(beg1, now1, tbls)
+        self:qDayTables(beg2, now2, tbls)
+    end
+    return tbls
 end
 
 return CfoxTSDB
