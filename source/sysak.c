@@ -324,6 +324,7 @@ static int down_install(const char *component_name)
             ret = 0;
         return ret;
     } else if (strcmp(component_name, "btf") == 0) {
+        sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
 	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
 	    sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s 1&>/dev/null",
@@ -338,56 +339,99 @@ static int down_install(const char *component_name)
     }
 }
 
+static int pre_down_install(const char *module, const char *btf, const char *compents)
+{
+    bool download = false;
+    int ret = 0;
+    char user_input = ' ';
+    char *btf_name = "btf";
+    char *module_name = "sysak_modules";
+    const char *promt = "has not been installed, do you want to auto download and install ? Enter Y/N:";
+
+    if (auto_get_components){
+        download = true;
+    }else{
+        if (module && btf)
+            printf("%s and %s %s", module_name, btf_name, promt);
+        else if (module)
+            printf("%s %s", module_name, promt);
+        else if (btf)
+            printf("%s %s", btf_name, promt);
+        else
+            printf("%s %s", compents, promt);
+        scanf("%c", &user_input);
+
+        if (user_input == 'y' || user_input == 'Y')
+            download = true;
+    }
+
+    if (download) {
+        if (module)
+            ret = down_install(module_name);
+        if (btf)
+            ret = down_install(btf_name);
+        if (compents)
+            ret = down_install(compents);
+        if (ret < 0)
+            ret = -EEXIST;
+    } else {
+            ret = -EEXIST;
+    }
+    return ret;
+}
+
 static int check_or_install_components(const char *name)
 {
     char compents_path[MAX_WORK_PATH_LEN];
-    const char *promt = "has not been installed, do you want to auto download and install ? Enter Y/N:";
-    char user_input = ' ';
+    char ko_path[MAX_WORK_PATH_LEN];
+    char btf_path[MAX_WORK_PATH_LEN];
+    char *need_module = NULL, *need_btf = NULL;
+    bool need_compents = false;
     int ret = 0;
     bool download = false;
 
-    if (strcmp(name, "sysak_modules") == 0)
-        sprintf(compents_path, "%s%s%s", module_path, kern_version, module);
-    else if (strcmp(name, "btf") == 0)
-        sprintf(compents_path, "%s/vmlinux-%s", tools_path, kern_version);
-    else
+    need_module = strstr(name, "sysak_modules");
+    need_btf = strstr(name, "btf");
+
+    if (need_module || need_btf) {
+        if (need_module)
+            sprintf(ko_path, "%s%s%s", module_path, kern_version, module);
+        if (need_btf)
+            sprintf(btf_path, "%s/vmlinux-%s", tools_path, kern_version);
+    } else {
         sprintf(compents_path, "%s%s", tools_path, name);
-
-    if (access(compents_path, 0) != 0) {
-        if (auto_get_components) {
-            //printf("auto_get_components is %d", auto_get_components);
-            download = true;
-        } else {
-            printf("%s %s", name, promt);
-            scanf("%c", &user_input);
-
-            if (user_input == 'y' || user_input == 'Y')
-                download = true;
-        }
-
-        if (download) {
-            ret = down_install(name);
-            if (ret < 0 || access(compents_path, 0) != 0)
-               ret = -EEXIST;
-        } else {
-            ret = -EEXIST;
-        }
+        need_compents = true;
     }
 
+    if (access(ko_path, 0) == 0)
+        need_module = NULL;
+    if (access(btf_path, 0) == 0)
+        need_btf = NULL;
+
+    if (need_module && need_btf){
+        ret = pre_down_install(need_module, need_btf, NULL);
+    } else if (need_module) {
+        ret = pre_down_install(need_module, NULL, NULL);
+    } else if (need_btf){
+        ret = pre_down_install(NULL, need_btf, NULL);
+    } else if (need_compents){
+        ret = pre_down_install(NULL, NULL, name);
+    }
     return ret;
 }
 
 static int do_prev_depend(void)
 {
+    if (pre_module && btf_depend)
+        return check_or_install_components("sysak_modules and btf");
+
     if (pre_module) {
         if (!check_or_install_components("sysak_modules"))
-            goto install;
+            return mod_ctrl(true);
         printf("sysak_modules not installed, exit ...\n");
         return -1;
     }
 
-install:
-    mod_ctrl(true);
     if (btf_depend)
         return check_or_install_components("btf");
 
@@ -636,9 +680,14 @@ static bool tool_rule_parse(char *path, char *tool)
     while(fgets(buf, sizeof(buf), fp))
     {
         char tools_name[MAX_NAME_LEN];
+        char class_name[MAX_NAME_LEN];
 
         pstr = buf;
-        sscanf(buf,"%*[^:]:%[^:]",tools_name);
+        sscanf(buf,"%[^:]:%[^:]", class_name, tools_name);
+    if (strstr(class_name,"combine"))
+        if (strstr(class_name,"/"))
+            continue;
+
         if (strcmp(tools_name, tool)) {
             continue;
         }
@@ -649,7 +698,7 @@ static bool tool_rule_parse(char *path, char *tool)
         if (pstr)
             sscanf(pstr, ":python-dep{%[^}]}", run_depend);
 
-        pstr = strstr(buf, "btf");
+        pstr = strstr(buf, "bpf");
         if (pstr)
             btf_depend = true;
 
