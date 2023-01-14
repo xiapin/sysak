@@ -58,6 +58,10 @@ int load_kallsyms(struct ksym **pksyms)
 	}
 	fclose(f);
 	sym_cnt = i;
+	if (sym_cnt == 0) {
+		printf("/proc/kallsyms has no valid address\n");
+		return -ENOENT;
+	}
 	qsort(syms, sym_cnt, sizeof(struct ksym), ksym_cmp);
 	*pksyms = syms;
 	return 0;
@@ -102,11 +106,17 @@ static int print_ksym(__u64 addr, struct ksym *psym, void *filep, int mod, int p
 		return 0;
 
 	sym = ksym_search(addr, psym);
-	if (mod == MOD_FILE)
-		fprintf((FILE *)filep, "<0x%llx> %s\n", addr, sym->name);
-	else if (mod == MOD_STRING)
-		cnt = sprintf((char*)filep + pos, "<0x%llx> %s,", addr, sym->name);
-
+	if (sym) {
+		if (mod == MOD_FILE)
+			fprintf((FILE *)filep, "<0x%llx> %s\n", addr, sym->name);
+		else if (mod == MOD_STRING)
+			cnt = sprintf((char*)filep + pos, "<0x%llx> %s,", addr, sym->name);
+	} else {
+		if (mod == MOD_FILE)
+			fprintf((FILE *)filep, "<0x%llx>: missing symbols\n", addr);
+		else if (mod == MOD_STRING)
+			cnt = sprintf((char*)filep + pos, "<0x%llx>: missing symbols,", addr);
+	}
 	return cnt;
 }
 

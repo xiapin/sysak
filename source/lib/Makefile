@@ -10,17 +10,17 @@ else
 endif
 	make -C uapi
 ifeq ($(BUILD_LIBBPF), YES)
-	make -C internal/ebpf/libbpf/src BUILD_STATIC_ONLY=1 	\
-		OBJDIR=$(OBJ_LIB_PATH)/libbpf DESTDIR=$(OBJ_LIB_PATH) 		\
-		INCLUDEDIR= LIBDIR= UAPIDIR=						\
-		install
+	OBJDIR=$(OBJ_LIB_PATH)/coolbpf DESTDIR=$(OBJ_LIB_PATH) sh internal/ebpf/coolbpf/build.sh
 endif
 
 clean:
 ifeq ($(BUILD_KERNEL_MODULE), YES)
+ifneq ($(wildcard internal/kernel_module/Makefile),)
 	make -C internal/kernel_module clean
 endif
-ifeq ($(BUILD_LIBBPF), YES)
-	make -C internal/ebpf/libbpf/src clean
 endif
-
+ifeq ($(BUILD_LIBBPF), YES)
+ifneq ($(wildcard internal/ebpf/coolbpf/third/libbpf/src/Makefile),)
+	make -C internal/ebpf/coolbpf/third/libbpf/src/ clean
+endif
+endif

@@ -3,7 +3,7 @@ LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= $(SRC)/lib/internal/ebpf/tools/bpftool
 prefix ?= /usr/local
 ARCH := $(shell uname -m | sed 's/x86_64/x86/')
-LIBBPF_OBJ := $(OBJ_LIB_PATH)/libbpf.a
+COOLBPF_OBJ := $(OBJ_LIB_PATH)/libbpf.a $(OBJ_LIB_PATH)/coolbpf.a
 CXX ?= g++
 
 # source/mk/target.inc use $(TARGET_PATH)
@@ -19,7 +19,7 @@ DEPEND := "prev{btf}"
 
 CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall
 LDFLAGS += $(EXTRA_LDFLAGS) -lelf -lz
-INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(OUTPUT) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/libbpf/include/uapi -I$(OBJPATH)/src
+INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(OUTPUT) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/coolbpf/third/libbpf/include/uapi -I$(OBJPATH)/src
 
 ifeq ($(V),1)
 	Q =
@@ -44,7 +44,7 @@ bpfskel := $(patsubst %.bpf.o, %.skel.h, $(target_bpfobjs))
 
 all: $(target) target_rule
 
-$(target): $(target_cppobjs) $(bpfskel) $(LIBBPF_OBJ)
+$(target): $(target_cppobjs) $(bpfskel) $(COOLBPF_OBJ)
 	$(call msg,BINARY,$@)
 	$(Q)$(CXX) $(CFLAGS) $(INCLUDES) $^ -o $(OUTPUT)/$@ $(LDFLAGS)
 

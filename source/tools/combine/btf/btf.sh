@@ -5,7 +5,7 @@
 zip_path=${SYSAK_WORK_PATH}/tools/BTF/btf.7z
 btf_dir=${SYSAK_WORK_PATH}/tools/`uname -r`
 tool_dir=${SYSAK_WORK_PATH}/tools
-btf_path=${btf_dir}/vmlinux-$(uname -r)
+btf_path=${tool_dir}/vmlinux-$(uname -r)
 vmlinux_path=""
 
 usage() {

@@ -22,7 +22,7 @@ int kprobe_virtio_queue_rq(struct pt_regs *ctx)
 
 	bpf_probe_read(&req_addr, sizeof(struct request *), &bd->rq);
 	if (!req_addr) {
-		bpf_printk("kprobe_virtio_queue_rq: con't get request");
+		//bpf_printk("kprobe_virtio_queue_rq: con't get request");
 		return 0;
 	}
 	bpf_map_update_elem(&iosdiag_virtblk_maps, &pid, &req_addr, BPF_ANY);
@@ -52,7 +52,7 @@ int kprobe_blk_mq_complete_request(struct pt_regs *ctx)
 	struct request *req = (struct request *)PT_REGS_PARM1(ctx);
 
 	if (!req) {
-		bpf_printk("kprobe_blk_mq_complete_request: con't get request");
+		//bpf_printk("kprobe_blk_mq_complete_request: con't get request");
 		return 0;
 	}
 	return trace_io_driver_route(ctx, req, IO_RESPONCE_DRIVER_POINT);

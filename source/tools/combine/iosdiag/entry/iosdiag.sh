@@ -15,7 +15,7 @@ fi
 TOOLS_PATH=$WORK_PATH/tools/`uname -r`
 LIB_PATH=$WORK_PATH/lib/`uname -r`
 latency_bin=$WORK_PATH/tools/latency
-hangdetect_bin=$TOOLS_PATH/hangdetect
+hangdetect_bin=$WORK_PATH/tools/hangdetect
 data_analysis=$WORK_PATH/tools/iosdiag_data_analysis
 logfile="/var/log/sysak/iosdiag/$1/result.log.seq"
 threshold_arg="-t 1000"

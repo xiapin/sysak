@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #define KVERSION 64
 #define MAX_SUBCMD_ARGS 512
@@ -70,6 +72,7 @@ bool pre_module = false;
 bool post_module = false;
 bool btf_depend = false;
 bool auto_get_components = false;
+pid_t child_pid;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
     {"sysak tools for user self-help analysis", NULL},
@@ -226,9 +229,9 @@ static int down_install_ext_tools(const char *tool)
     char rule[LINE_BUFF_LEN];
     char *pstr;
 
-    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s",
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s 1&>/dev/null",
            sysak_components_server, machine, tool, tools_path);
-    printf("%s ... \n", download_cmd);
+    //printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
     if (ret < 0)
         return ret;
@@ -260,9 +263,9 @@ static int down_install_ext_tools(const char *tool)
         return -1;
     }
 
-    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s",
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s 1&>/dev/null",
             sysak_components_server, machine, tool, filename, tools_path);
-    printf("%s ... \n", download_cmd);
+    //printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
     if (ret < 0)
         return ret;
@@ -270,13 +273,13 @@ static int down_install_ext_tools(const char *tool)
     /* extract files, only for zip and tar now*/
     if (strstr(filename, ".zip")) {
         sprintf(buf, "unzip %s/%s -d %s\n", tools_path, filename, tools_path);
-        printf("%s ... \n", buf);
+        //printf("%s ... \n", buf);
         ret = system(buf);
         if (ret < 0)
             return ret;
     } else if (strstr(filename, ".tar")) {
         sprintf(buf, "tar xf %s/%s -C %s\n", tools_path, filename, tools_path);
-        printf("%s ... \n", buf);
+        //printf("%s ... \n", buf);
         ret = system(buf);
         if (ret < 0)
             return ret;
@@ -294,6 +297,9 @@ static int down_install_ext_tools(const char *tool)
 static int down_install(const char *component_name)
 {
     char ko_path[MAX_WORK_PATH_LEN];
+    char ko_file[MAX_WORK_PATH_LEN];
+    char btf_file[MAX_WORK_PATH_LEN];
+    int ret = 0;
 
     if (!get_server_addr())
         return -1;
@@ -302,69 +308,123 @@ static int down_install(const char *component_name)
         if (!get_module_tag())
             return -1;
 
-	sprintf(ko_path, "%s/%s", module_path, kern_version);
+        sprintf(ko_path, "%s/%s", module_path, kern_version);
+        sprintf(ko_file, "%s/%s/%s", module_path, kern_version, "sysak.ko");
+        sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
         if (access(ko_path,0) != 0)
             mkdir(ko_path, 0755 );
 
-        //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s",
+        //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s 1&>/dev/null",
         //        sysak_components_server, machine, module_tag, module_path, kern_version);
-        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko",
+        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko 1&>/dev/null",
                 sysak_components_server, machine, kern_version, module_path, kern_version);
-        printf("%s ... \n", download_cmd);
-        return system(download_cmd);
+        //printf("%s ... \n", download_cmd);
+        ret = system(download_cmd);
+        if (access(ko_file,0) == 0)
+            ret = 0;
+        return ret;
     } else if (strcmp(component_name, "btf") == 0) {
-	//sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s",
+        sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
+	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
-	sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s",
+	    sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s 1&>/dev/null",
                sysak_components_server, machine, kern_version, tools_path);
-	printf("%s ... \n", download_cmd);
-        return system(download_cmd);
+        //printf("%s ... \n", download_cmd);
+        ret = system(download_cmd);
+        if (access(btf_file,0) == 0)
+            ret = 0;
+        return ret;
     } else {
         return down_install_ext_tools(component_name);
     }
 }
 
+static int pre_down_install(const char *module, const char *btf, const char *compents)
+{
+    bool download = false;
+    int ret = 0;
+    char user_input = ' ';
+    char *btf_name = "btf";
+    char *module_name = "sysak_modules";
+    const char *promt = "has not been installed, do you want to auto download and install ? Enter Y/N:";
+
+    if (auto_get_components){
+        download = true;
+    }else{
+        if (module && btf)
+            printf("%s and %s %s", module_name, btf_name, promt);
+        else if (module)
+            printf("%s %s", module_name, promt);
+        else if (btf)
+            printf("%s %s", btf_name, promt);
+        else
+            printf("%s %s", compents, promt);
+        scanf("%c", &user_input);
+
+        if (user_input == 'y' || user_input == 'Y')
+            download = true;
+    }
+
+    if (download) {
+        if (module)
+            ret = down_install(module_name);
+        if (btf)
+            ret = down_install(btf_name);
+        if (compents)
+            ret = down_install(compents);
+        if (ret < 0)
+            ret = -EEXIST;
+    } else {
+            ret = -EEXIST;
+    }
+    return ret;
+}
+
 static int check_or_install_components(const char *name)
 {
     char compents_path[MAX_WORK_PATH_LEN];
-    const char *promt = "has not been installed, do you want to auto download and install ? Enter Y/N:";
-    char user_input = ' ';
+    char ko_path[MAX_WORK_PATH_LEN];
+    char btf_path[MAX_WORK_PATH_LEN];
+    char *need_module = NULL, *need_btf = NULL;
+    bool need_compents = false;
     int ret = 0;
     bool download = false;
 
-    if (strcmp(name, "sysak_modules") == 0)
-        sprintf(compents_path, "%s%s%s", module_path, kern_version, module);
-    else if (strcmp(name, "btf") == 0)
-        sprintf(compents_path, "%s/vmlinux-%s", tools_path, kern_version);
-    else
+    need_module = strstr(name, "sysak_modules");
+    need_btf = strstr(name, "btf");
+
+    if (need_module || need_btf) {
+        if (need_module)
+            sprintf(ko_path, "%s%s%s", module_path, kern_version, module);
+        if (need_btf)
+            sprintf(btf_path, "%s/vmlinux-%s", tools_path, kern_version);
+    } else {
         sprintf(compents_path, "%s%s", tools_path, name);
-
-    if (access(compents_path, 0) != 0) {
-        if (auto_get_components) {
-            printf("auto_get_components is %d", auto_get_components);
-            download = true;
-        } else {
-            printf("%s %s", name, promt);
-            scanf("%c", &user_input);
-
-            if (user_input == 'y' || user_input == 'Y')
-                download = true;
-        }
-
-        if (download) {
-            ret = down_install(name);
-            if (ret < 0 || access(compents_path, 0) != 0)
-               ret = -EEXIST;
-        } else {
-            ret = -EEXIST;
-        }
+        need_compents = true;
     }
 
+    if (access(ko_path, 0) == 0)
+        need_module = NULL;
+    if (access(btf_path, 0) == 0)
+        need_btf = NULL;
+
+    if (need_module && need_btf){
+        ret = pre_down_install(need_module, need_btf, NULL);
+    } else if (need_module) {
+        ret = pre_down_install(need_module, NULL, NULL);
+    } else if (need_btf){
+        ret = pre_down_install(NULL, need_btf, NULL);
+    } else if (need_compents){
+        ret = pre_down_install(NULL, NULL, name);
+    }
     return ret;
 }
 
 static int do_prev_depend(void)
 {
+    if (pre_module && btf_depend)
+        return check_or_install_components("sysak_modules and btf");
+
     if (pre_module) {
         if (!check_or_install_components("sysak_modules"))
             return mod_ctrl(true);
@@ -396,6 +456,53 @@ static void add_python_depend(char *depend,char *cmd)
     }
 }
 
+static void sig_handler(int sig, siginfo_t *info, void *act)
+{
+    if (child_pid > 0 )
+        kill(-child_pid, sig);
+    if (post_module)
+        mod_ctrl(false);
+}
+
+static int register_sig_handler(pid_t pid)
+{
+    struct sigaction act;
+    int ret = -1;
+
+    sigemptyset(&act.sa_mask);
+    act.sa_flags=SA_SIGINFO;
+    act.sa_sigaction=sig_handler;
+
+    if (sigaction(SIGINT, &act, NULL) == 0)
+        ret = 0;
+    if (sigaction(SIGQUIT, &act, NULL) == 0)
+        ret = 0;
+    if (sigaction(SIGTERM, &act, NULL) == 0)
+        ret = 0;
+    if (!ret)
+        child_pid = pid;
+
+    return 0;
+}
+
+static int my_system(char *cmd)
+{
+    pid_t pid;
+    int status;
+
+    pid = fork();
+    if (pid < 0) {
+        return -1;
+    } else if (pid == 0) {
+        execl("/usr/bin/sh", "sh", "-c", cmd, NULL);
+        exit(0);
+    }
+
+    register_sig_handler(pid);
+    waitpid(pid, &status, 0);
+    return pid;
+}
+
 static int exectue(int argc, char *argv[])
 {
     char subcmd_name[MAX_NAME_LEN+MAX_SUBCMD_ARGS];
@@ -423,7 +530,9 @@ static int exectue(int argc, char *argv[])
         strncpy(tools_exec, subcmd_name, strlen(subcmd_name));
 
     snprintf(subcmd_exec_final, sizeof(subcmd_exec_final), "%s;%s", sysak_work_path, tools_exec);
-    ret = system(subcmd_exec_final);
+    ret = my_system(subcmd_exec_final);
+    if (ret < 0)
+       return ret;
 
     if (post_module)
         mod_ctrl(false);
@@ -571,9 +680,14 @@ static bool tool_rule_parse(char *path, char *tool)
     while(fgets(buf, sizeof(buf), fp))
     {
         char tools_name[MAX_NAME_LEN];
+        char class_name[MAX_NAME_LEN];
 
         pstr = buf;
-        sscanf(buf,"%*[^:]:%[^:]",tools_name);
+        sscanf(buf,"%[^:]:%[^:]", class_name, tools_name);
+    if (strstr(class_name,"combine"))
+        if (strstr(class_name,"/"))
+            continue;
+
         if (strcmp(tools_name, tool)) {
             continue;
         }
@@ -583,6 +697,10 @@ static bool tool_rule_parse(char *path, char *tool)
         pstr = strstr(buf, ":python-dep{");
         if (pstr)
             sscanf(pstr, ":python-dep{%[^}]}", run_depend);
+
+        pstr = strstr(buf, "bpf");
+        if (pstr)
+            btf_depend = true;
 
         fclose(fp);
         return true;

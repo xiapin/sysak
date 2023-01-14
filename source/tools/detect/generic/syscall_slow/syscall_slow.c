@@ -20,11 +20,11 @@ struct env {
 	time_t duration;
 	bool verbose;
 	__u64 threshold;
-	__u32 tid, sysnr;
+	__u32 tid;
+	__u32 sysnr[128];
 	struct filter filter;
 } env = {
 	.tid = -1,
-	.sysnr = -1,
 	.duration = 0,
 	.threshold = 10*1000*1000,	/* 10ms */
 };
@@ -53,14 +53,14 @@ const char argp_program_doc[] =
 "    syscall_slow -t 15      # detect with threshold 15ms (default 10ms)\n"
 "    syscall_slow -p 1100    # detect tid 1100 (use for threads only)\n"
 "    syscall_slow -c bash    # trace aplication who's name is bash\n"
-"    syscall_slow -n sysnr   # trace syscall sysnr\n"
+"    syscall_slow -n 101,102 # Exclude syscall 123 from tracing.\n"
 "    syscall_slow -f a.log   # log to a.log (default to ~sysak/syscall_slow.log)\n";
 
 static const struct argp_option opts[] = {
 	{ "threshold", 't', "THRESH", 0, "Threshold to detect, default 10ms"},
 	{ "comm", 'c', "COMM", 0, "Name of the application"},
 	{ "pid", 'p', "TID", 0, "Thread TID to detect"},
-	{ "sysnr", 'n', "SYSNR", 0, "Syscall ID to detect"},
+	{ "sysnr", 'n', "SYSNR", 0, "Exclude the syscall ID from tracing"},
 	{ "logfile", 'f', "LOGFILE", 0, "logfile for result"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
@@ -70,8 +70,9 @@ static const struct argp_option opts[] = {
 static error_t parse_arg(int key, char *arg, struct argp_state *state)
 {
 	__u32 sysnr, pid;
-	int ret = errno;
+	int i = 0, ret = errno;
 	static int pos_args;
+	char *tmp, *endptr;
 
 	switch (key) {
 	case 'h':
@@ -106,12 +107,25 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'n':
 		errno = 0;
-		sysnr = strtol(arg, NULL, 10);
-		if (errno || sysnr < 0) {
+		tmp = arg;
+		do {
+			sysnr = strtoul(tmp, &endptr, 10);
+			ret = errno;
+			if ((ret == ERANGE && (sysnr == LONG_MAX || sysnr == LONG_MIN))
+				|| (ret != 0 && sysnr == 0)) {
+				continue;
+			}
+			tmp = endptr+1;
+			env.sysnr[i++] = sysnr;
+			printf("i=%d, sysnr=%d\n", i-1, sysnr);
+			if (*endptr != ',')
+				break;
+		} while(sysnr && i < 128);
+
+		if (i == -1) {
 			fprintf(stderr, "Invalid syscall num: %s\n", arg);
 			argp_usage(state);
 		}
-		env.sysnr = sysnr;
 		break;
 	case 'p':
 		errno = 0;
@@ -199,7 +213,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 			snprintf(tmp, sizeof(tmp), "%ld", e->sysid);
 			syscall = tmp;
 		}
-		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-9s %lu(%s)\n",
+		fprintf(filep, "%-21s %-8lld %-6lld %-6lld %-6lld %-6lld %-6lld %-6lld %-9s %u(%s)\n",
 			ts, e->delay/(1000*1000), e->realtime/(1000*1000),
 			e->itime/(1000*1000), e->vtime/(1000*1000),
 			e->stime/(1000*1000), e->nvcsw, e->nivcsw, syscall, e->pid, e->comm);
@@ -210,6 +224,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 void syscall_slow_handler(int poll_fd, int map_fd, struct syscall_slow_bpf *obj)
 {
+	int i = 0, sysnr_fd;
 	int arg_key = 0, err = 0;
 	struct arg_info arg_info = {};
 	struct perf_buffer *pb = NULL;
@@ -230,11 +245,20 @@ void syscall_slow_handler(int poll_fd, int map_fd, struct syscall_slow_bpf *obj)
 	arg_info.thresh = env.threshold;
 	arg_info.filter = env.filter;
 	arg_info.pid = env.tid;
-	arg_info.sysnr = env.sysnr;
 	err = bpf_map_update_elem(map_fd, &arg_key, &arg_info, 0);
 	if (err) {
 		fprintf(stderr, "Failed to update arg_map\n");
 		goto clean_syscall_slow;
+	}
+
+	sysnr_fd = bpf_map__fd(obj->maps.sysnr_map);
+	while (i < 128) {
+		err = bpf_map_update_elem(sysnr_fd, &env.sysnr[i], &env.sysnr[i], 0);
+		if (err) {
+			fprintf(stderr, "Failed to update arg_map\n");
+			goto clean_syscall_slow;
+		}
+		i++;
 	}
 
 	err = syscall_slow_bpf__attach(obj);
@@ -297,7 +321,8 @@ int main(int argc, char **argv)
 	}
 	ksyms = NULL;
 
-	memset(&env.filter, 0, sizeof(struct filter));
+	memset(env.sysnr, -1, sizeof(env.sysnr));
+	memset(&env.filter, 0, sizeof(env.filter));
 	err = argp_parse(&argp, argc, argv, 0, NULL, NULL);
 	if (err) {
 		fprintf(stderr, "argp_parse fail\n");

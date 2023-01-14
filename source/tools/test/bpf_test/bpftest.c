@@ -1,5 +1,6 @@
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <coolbpf.h>
 #include "bpftest.h"
 #include "bpf/bpftest1.skel.h"
 #include "bpf/bpftest2.skel.h"
@@ -46,6 +47,8 @@ int main(int argc, char **argv)
     struct bpftest2_bpf *bpftest2 = NULL;
     int err = 0;
     libbpf_set_print(libbpf_print_fn);
+
+    printf("coolbpf version is: %s\n", coolbpf_version_string());
 
     err = LOAD_BPF_SKEL(bpftest1);
     if (err)

@@ -55,12 +55,9 @@ check_bpf_kernel() {
 }
 
 check_bpf_depend() {
-	if [ ! -d "source/lib/internal/ebpf/libbpf" ];then
-		echo "download libbpf ... "
-		wget https://gitee.com/anolis/libbpf/repository/archive/master.zip -O libbpf.zip
-		echo "extract libbpf"
-		unzip libbpf.zip -d source/lib/internal/ebpf/
-		mv source/lib/internal/ebpf/libbpf-master source/lib/internal/ebpf/libbpf
+	if [ ! -d "source/lib/internal/ebpf/coolbpf/build.sh" ];then
+		echo "Cloning coolbpf"
+		git submodule update --init
 	fi
 
 	check_bpf_kernel

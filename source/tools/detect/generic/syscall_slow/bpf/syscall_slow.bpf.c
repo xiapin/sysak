@@ -13,18 +13,30 @@
 	val;						\
 })
 
-#define name_n_equal(src, dst, dstn, MAXn) ({		\
-	bool ret = true;				\
-	int i;						\
-	for (int i = 0; i < MAXn; i++) {		\
-		if (i >= dstn)				\
-			break;				\
-		if (src[i] != dst[i]) {			\
-			ret = false;			\
-			break;}				\
-	}						\
-	ret;						\
-})
+static inline int strequal(const char *src, const char *dst)
+{
+	bool ret = true;
+	int i;
+	unsigned char c1, c2;
+
+	#pragma clang loop unroll(full)
+	for (int i = 0; i < 16; i++) {
+		c1 = *src++;
+		c2 = *dst++;
+		if (!c1 || !c2) {
+			if (c1 != c2)
+				ret = false;
+			else
+				ret = true;
+			break;
+		}
+		if (c1 != c2) {
+			ret = false;
+			break;
+		}
+	}
+	return ret;
+}
 
 /*
  * struct trace_event_raw_sys_enter/exit may not defined in
@@ -85,11 +97,27 @@ struct {
 } enter_map SEC(".maps");
 
 struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 128);
+	__type(key, int);
+	__type(value, int);
+} sysnr_map SEC(".maps");
+
+struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, sizeof(u32));
 } events SEC(".maps");
 
+inline bool syscall_exclude(int id)
+{
+	int value, *vp;
+	
+	vp = bpf_map_lookup_elem(&sysnr_map, &id);
+	if (vp && (*vp != -1))
+		return true;
+	return false;
+}
 
 SEC("tp/sched/sched_switch")
 int handle__sched_switch(struct sched_sched_switch_args *ctx)
@@ -132,7 +160,7 @@ int handle_raw_sys_enter(struct raw_sys_enter_arg *ctx)
 {
 	u64 now;
 	int pid, i = 0;
-	bool match;
+	int match = 0;
 	char comm[16] = {0};
 	struct task_struct *task;
 	struct arg_info *argp;
@@ -148,18 +176,16 @@ int handle_raw_sys_enter(struct raw_sys_enter_arg *ctx)
 	else
 		return 0;
 
-	if (filter.size && filter.size != -1) {
-		unsigned long size = filter.size;
-		match = name_n_equal(comm, filter.comm, size, 16);
-		if (!match && filter.pid != -1) {
-			if (filter.pid == pid)
-				match = true;
-		} else {
-			match = true;
-		}
+	if (filter.pid || filter.size) {
+		if (filter.pid == pid)
+			match += 1;
+		if (strequal(comm, filter.comm))
+			match += 1;
+		if (match == 0)
+			return 0;
 	}
-
-	if (!match || (filter.sysnr == ctx->id))
+	/* we come here means that no comm or pid to filter */
+	if (syscall_exclude(ctx->id))
 		return 0;
 
 	task = (void *)bpf_get_current_task();
@@ -183,7 +209,7 @@ SEC("tp/raw_syscalls/sys_exit")
 int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 {
 	u32 pid, i = 0;
-	bool match = false;
+	int match = 0;
 	char comm[16] = {0};
 	struct arg_info *argp;
 	struct task_struct *task;
@@ -193,25 +219,23 @@ int handle_raw_sys_exit(struct raw_sys_exit_arg *ctx)
 
 	__builtin_memset(&filter, 0, sizeof(filter));
 	bpf_get_current_comm(&comm, sizeof(comm));
-	argp = bpf_map_lookup_elem(&arg_map, &i);
 	pid = bpf_get_current_pid_tgid();
+	argp = bpf_map_lookup_elem(&arg_map, &i);
 	if (argp)
 		filter = _(argp->filter);
 	else
 		return 0;
 
-	if (filter.size && filter.size != -1) {
-		unsigned long size = filter.size;
-		match = name_n_equal(comm, filter.comm, size, 16);
-		if (!match && filter.pid != -1) {
-			if (filter.pid == pid)
-				match = true;
-		} else {
-			match = true;
-		}
+	if (filter.pid || filter.size) {
+		if (filter.pid == pid)
+			match += 1;
+		if (strequal(comm, filter.comm))
+			match += 1;
+		if (match == 0)
+			return 0;
 	}
 
-	if (!match || (filter.sysnr == ctx->id))
+	if (syscall_exclude(ctx->id))
 		return 0;
 
 	task = (void *)bpf_get_current_task();

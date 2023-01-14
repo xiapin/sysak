@@ -196,7 +196,10 @@ int http_server(void)
 	}
 
 	srvaddr.sin_family = AF_INET;
-	srvaddr.sin_port = htons(SERVER_PORT);
+	if (conf.server_port != '\0')
+		srvaddr.sin_port = htons(conf.server_port);
+	else
+		srvaddr.sin_port = htons(SERVER_PORT);
 	srvaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	setsockopt(sk, SOL_SOCKET, SO_REUSEADDR, &sockopt, sizeof(int));
