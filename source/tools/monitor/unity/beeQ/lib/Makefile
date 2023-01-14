@@ -1,16 +1,16 @@
 CC := gcc
 CFLAG := -g -fpic
 LDFLAG := -g -fpic -shared
-OBJS := procffi.o
-SO := libprocffi.so
+OBJS := beeQ.o
+SO := libbeeQ.so
 
 all: $(SO)
 
-procffi.o: procffi.c
+%.o: %.c
 	$(CC) -c $< -o $@ $(CFLAG)
 
 $(SO): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAG)
 
 clean:
-	rm -f *.so $(OBJS)
+	rm -f $(SO) $(OBJS)

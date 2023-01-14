@@ -23,5 +23,7 @@ function que()
 end
 
 function send(num, pline)
-    return workLoop:send(num, pline)
+    local ret = workLoop:send(num, pline)
+    collectgarbage("collect")
+    return ret
 end

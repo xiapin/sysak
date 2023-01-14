@@ -13,8 +13,8 @@ struct beeMsg {
     char body[];
 };
 
-lua_State * app_recv_init(void);
-int app_recv_proc(void* msg, void * arg);
+int app_recv_setup(struct beeQ* q);
+int app_recv_proc(void* msg, struct beeQ* q);
 int app_collector_run(struct beeQ* q, void* arg);
 
 #endif //UNITY_APPS_H

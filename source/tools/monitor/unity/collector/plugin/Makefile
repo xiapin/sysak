@@ -19,3 +19,7 @@ $(DEPMOD):ECHO
 
 ECHO:
 	@echo $(DEPMOD)
+
+clean:
+	$(foreach N, $(DEPMOD),make clean -C $(N);)
+	rm -rf *.o *.a

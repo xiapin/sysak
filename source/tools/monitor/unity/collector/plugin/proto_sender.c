@@ -43,7 +43,6 @@ static int call_init(lua_State *L, struct beeQ* pushQ) {
         perror("proto_send.lua init failed.");
         goto endReturn;
     }
-
     return ret;
     endReturn:
     endCall:
@@ -116,11 +115,10 @@ struct beeQ* proto_que(lua_State *L) {
     endReturn:
     endCall:
     return NULL;
-
 }
 
 extern volatile int sighup_counter;
-int proto_send_proc(void* msg, void * arg) {
+int proto_send_proc(void* msg, struct beeQ* q) {
     int ret = 0;
     struct unity_lines *lines = (struct unity_lines *)msg;
     int num = lines->num;
@@ -128,20 +126,17 @@ int proto_send_proc(void* msg, void * arg) {
     static int counter = 0;
 
     int lret;
-    lua_State **pL = (lua_State **)arg;
-    lua_State *L = *pL;
-
-    free(lines);  // free message head at first
+    lua_State *L = (lua_State *)(q->qarg);
 
     if (counter != sighup_counter) {    // check counter for signal.
-        struct beeQ* que = proto_que(L);
+        struct beeQ* proto_q = proto_que(L);
         lua_close(L);
 
-        L = proto_sender_lua(que);
+        L = proto_sender_lua(proto_q);
         if (L == NULL) {
             exit(1);
         }
-        *pL = L;
+        q->qarg = L;
         counter = sighup_counter;
     }
 
@@ -168,25 +163,35 @@ int proto_send_proc(void* msg, void * arg) {
         perror("bees.lua proc failed.");
         goto endReturn;
     }
+    free(msg);
     return ret;
     endMem:
     endReturn:
     endCall:
+    free(msg);
     return ret;
+}
+
+static int proto_recv_setup(struct beeQ* q) {
+    lua_State *L;
+    struct beeQ* pushQ = (struct beeQ*)(q->qarg);
+
+    L = proto_sender_lua(pushQ);
+    if (L == NULL) {
+        return -1;
+    }
+
+    q->qarg = (void *)L;
+    return 0;
 }
 
 struct beeQ* proto_sender_init(struct beeQ* pushQ) {
     struct beeQ* recvQ;
-    lua_State *L;
-    lua_State **pL;
 
-    L = proto_sender_lua(pushQ);
-    if (L == NULL) {
-        exit(1);
-    }
-
-    pL = &L;
-    recvQ = beeQ_init(PROTO_QUEUE_SIZE, proto_send_proc, (void *)pL);
+    recvQ = beeQ_init(PROTO_QUEUE_SIZE,
+                      proto_recv_setup,
+                      proto_send_proc,
+                      pushQ);
     if (recvQ == NULL) {
         perror("setup proto queue failed.");
         exit(1);

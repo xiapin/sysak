@@ -23,5 +23,6 @@ end
 
 function proc(stream)
     fox:write(stream)
+    collectgarbage("collect")
     return 0
 end

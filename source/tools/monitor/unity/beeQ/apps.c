@@ -52,7 +52,7 @@ static int call_init(lua_State *L) {
     return ret;
 }
 
-lua_State * app_recv_init(void)  {
+static lua_State * app_recv_init(void)  {
     int ret;
 
     /* create a state and load standard library. */
@@ -88,8 +88,19 @@ lua_State * app_recv_init(void)  {
     return NULL;
 }
 
+int app_recv_setup(struct beeQ* q) {
+    lua_State *L;
+
+    L = app_recv_init();
+    if (L == NULL) {
+        return -1;
+    }
+    q->qarg = L;
+    return 0;
+}
+
 extern volatile int sighup_counter;
-int app_recv_proc(void* msg, void * arg) {
+int app_recv_proc(void* msg, struct beeQ* q) {
     int ret = 0;
     struct beeMsg *pMsg = (struct beeMsg *)msg;
     int len = pMsg->size;
@@ -97,8 +108,7 @@ int app_recv_proc(void* msg, void * arg) {
 
     if (len > 0) {
         int lret;
-        lua_State **pL = (lua_State **)arg;
-        lua_State *L = *pL;
+        lua_State *L = (lua_State *)(q->qarg);
         char *body;
 
         if (counter != sighup_counter) {    // check counter for signal.
@@ -108,7 +118,7 @@ int app_recv_proc(void* msg, void * arg) {
             if (L == NULL) {
                 exit(1);
             }
-            *pL = L;
+            q->qarg = L;
             counter = sighup_counter;
         }
 
@@ -125,6 +135,7 @@ int app_recv_proc(void* msg, void * arg) {
         lua_getglobal(L, "proc");
         lua_pushlstring(L, body, len);
         ret = lua_pcall(L, 1, 1, 0);
+        free(body);
         if (ret) {
             perror("lua call error");
             report_lua_failed(L);
@@ -145,10 +156,13 @@ int app_recv_proc(void* msg, void * arg) {
             goto endReturn;
         }
     }
+    endTest:
+    free(msg);
     return ret;
     endMem:
     endReturn:
     endCall:
+    free(msg);
     return ret;
 }
 
@@ -297,14 +311,12 @@ static bee_time_t local_time(void) {
     }
 }
 
-extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int app_collector_run(struct beeQ* q, void* arg) {
     int ret = 0;
     lua_State *L;
     lua_State **pL;
-    struct beeQ* proto_que;
+    struct beeQ* proto_que = (struct beeQ* )arg;
 
-    proto_que = proto_sender_init(q);
     L = app_collector_init(q, proto_que, APP_LOOP_PERIOD);
     if (L == NULL) {
         ret = -1;

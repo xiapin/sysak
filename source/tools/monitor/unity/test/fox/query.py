@@ -34,7 +34,7 @@ def q_by_date():
 
 
 if __name__ == "__main__":
-    # post_test({"mode": "last", "time": "4m"})
+    post_test({"mode": "last", "time": "4m"})
     # q_table()
-    q_by_table()
-    q_by_date()
+    # q_by_table()
+    # q_by_date()

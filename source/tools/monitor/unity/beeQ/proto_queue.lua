@@ -8,10 +8,12 @@ require("class")
 
 local CprotoData = require("protoData")
 local CprotoQueue = class("loop")
+local system = require("system")
 
 function CprotoQueue:_init_(que)
     self._proto = CprotoData.new(que)
     self._ffi = require("plugincffi")
+    self._que = que
 end
 
 function CprotoQueue:que()
@@ -45,10 +47,10 @@ function CprotoQueue:load_value(unity_line, line)
 end
 
 function CprotoQueue:load_log(unity_line, line)
-    local name = self._ffi.string(unity_line.log.name)
+    local name = self._ffi.string(unity_line.logs[0].name)
     if #name > 0 then
-        local log = self._ffi.string(unity_line.log.log)
-        self._ffi.C.free(unity_line.log.log)   -- should free from strdup
+        local log = self._ffi.string(unity_line.logs[0].log)
+        self._ffi.C.free(unity_line.logs[0].log)   -- should free from strdup
         table.insert(line.log, {name = name, log = log})
     end
 end
@@ -69,10 +71,14 @@ function CprotoQueue:_proc(unity_lines, lines)
 end
 
 function CprotoQueue:send(num, pline)
-    local unity_lines = self._ffi.cast("struct unity_lines", {num, pline})
+    print(string.format("proto que send a %d message.", num))
+    local unity_lines = self._ffi.new("struct unity_lines")
     local lines = self._proto:protoTable()
+    unity_lines.num = num
+    unity_lines.line = pline
     self:_proc(unity_lines, lines)
-    local stream = self._proto.encode(lines)
+    self._ffi.C.free(unity_lines.line)
+    local stream = self._proto:encode(lines)
     return collector_qout(self._que, stream, #stream)
 end
 

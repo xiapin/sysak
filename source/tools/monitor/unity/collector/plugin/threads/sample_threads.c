@@ -18,7 +18,17 @@ int init(void * arg) {
 
 static int sample_thread_func(struct beeQ* q, void * arg) {
     while (working) {
-        printf("sample thread.\n");
+        static double value = 1.0;
+        struct unity_line* line;
+        struct unity_lines * lines = unity_new_lines();
+
+        unity_alloc_lines(lines, 1);
+        line = unity_get_line(lines, 0);
+        unity_set_table(line, "sample_tbl3");
+        unity_set_value(line, 0, "value1", 1.0 + value);
+        unity_set_value(line, 1, "value2", 2.0 + value);
+        unity_set_log(line, "log", "hello world.");
+        beeQ_send(q, lines);
         sleep(1);
     }
     return 0;

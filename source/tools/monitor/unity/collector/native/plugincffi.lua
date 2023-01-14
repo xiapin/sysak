@@ -25,7 +25,7 @@ struct unity_line {
     char table[32];
     struct unity_index indexs[4];
     struct unity_value values[32];
-    struct unity_log log;
+    struct unity_log logs[1];
 };
 
 struct unity_lines {

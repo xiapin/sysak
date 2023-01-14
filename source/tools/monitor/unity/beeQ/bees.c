@@ -24,33 +24,32 @@ void sig_handler(int num)
     }
 }
 
-static int beeQ_collectors(struct beeQ* q) {
-    beeQ_send_thread(q, NULL, app_collector_run);
-}
-
+extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int main(int argc, char *argv[]) {
-    lua_State *L;
-    lua_State **pL;
+
     struct beeQ* q;
+    struct beeQ* proto_que;
 
     signal(SIGHUP, sig_handler);
     signal(SIGINT, sig_handler);
 
-    L = app_recv_init();
-    if (L == NULL) {
-        exit(1);
-    }
-
-    pL = &L;
-    q = beeQ_init(RUN_QUEUE_SIZE, app_recv_proc, (void *)pL);
+    q = beeQ_init(RUN_QUEUE_SIZE,
+                  app_recv_setup,
+                  app_recv_proc, NULL);
     if (q == NULL) {
         exit(1);
     }
-    beeQ_send_thread(q, NULL, app_collector_run);
+
+    proto_que = proto_sender_init(q);
+    if (proto_que == NULL) {
+        exit(1);
+    }
+    beeQ_send_thread(q, proto_que, app_collector_run);
 
     beaver_init(8400, 3);
     pause();
     fprintf(stderr, "test exit.");
     beeQ_stop(q);
+    beeQ_stop(proto_que);
     return 0;
 }

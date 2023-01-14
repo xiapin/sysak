@@ -298,9 +298,9 @@ function CfoxTSDB:qDay(start, stop, ms, tbls, budget)
                 tCell.values = values
 
                 local logs = {}
-                if v.vlog then
-                    for _, vlog in ipairs(v.log) do
-                        logs[vlog.name] = vlog.log
+                if v.log then
+                    for _, log in ipairs(v.log) do
+                        logs[log.name] = log.log
                     end
                 end
                 tCell.logs = logs

@@ -2,7 +2,7 @@
 // Created by 廖肇燕 on 2022/12/7.
 //
 
-#include "beeQ.h"
+#include "../beeQ.h"
 #include <errno.h>
 #include <unistd.h>
 
@@ -24,15 +24,15 @@ do{}while(0)
 
 struct beeMsg {
     struct beeQ *q;
-    void *arg;
+    void *sarg;
     int (*cb)(struct beeQ *q, void* arg);
 };
 
-inline int isfull(struct beeQ* q) {
+static int isfull(struct beeQ* q) {
     return (q->send + 1) % q->size == q->recv;
 }
 
-inline int isempty(struct beeQ* q) {
+static int isempty(struct beeQ* q) {
     return q->send == q->recv;
 }
 
@@ -93,13 +93,19 @@ static int beeQ_join(struct beeQ *q) {
 }
 
 static void * beeQ_proc(void * arg) {
+    int res;
     struct beeQ* q = (struct beeQ*)arg;
 
     if (beeQ_register(q)) {
         return NULL;
     }
+    if (q->init != NULL) {
+        res = q->init(q);
+        if (res < 0) {
+            goto endProc;
+        }
+    }
 
-    BEEQ_DEBUG("start proc thread.\n");
     pthread_mutex_lock(&q->mtx);
     pthread_cond_signal(&q->cond);
     while (q->stop == 0) {
@@ -112,17 +118,21 @@ static void * beeQ_proc(void * arg) {
             q->msgs[q->recv] = NULL;
 
             pthread_mutex_unlock(&q->mtx);  // Processing messages can be very time consuming
-            q->cb(msg, q->arg);     // the call back function should
+            q->cb(msg, q);     // the call back function should
             pthread_mutex_lock(&q->mtx);
         }
     }
     pthread_mutex_unlock(&q->mtx);
 
+    endProc:
     beeQ_thread_exit(q);
     return NULL;
 }
 
-struct beeQ* beeQ_init(int size, int (*cb)(void *msg, void* arg), void *arg) {
+struct beeQ* beeQ_init(int size,
+        int (*init)(struct beeQ* q),
+        int (*cb)(void *msg, struct beeQ* q),
+        void *arg) {
     int res;
     struct beeQ* q;
     pthread_t tid;
@@ -150,8 +160,9 @@ struct beeQ* beeQ_init(int size, int (*cb)(void *msg, void* arg), void *arg) {
     for (i = 0; i < size; i ++) {
         q->msgs[i] = NULL;
     }
-    q->cb = cb;
-    q->arg = arg;
+    q->init = init;
+    q->cb   = cb;
+    q->qarg = arg;
 
     q->tid_count = 0;
     for (i = 0; i < BEEQ_TIDS; i ++) {
@@ -243,8 +254,8 @@ int beeQ_send(struct beeQ *q, void *msg) {
 static void * beeQ_send_run(void * args) {
     struct beeMsg* msg = (struct beeMsg*)args;
     struct beeQ *q = msg->q;
-    void *arg = msg->arg;
-    int (*cb)(struct beeQ *q, void* arg) = msg->cb;
+    void *sarg = msg->sarg;
+    int (*cb)(struct beeQ *q, void* sarg) = msg->cb;
 
     free(args);
 
@@ -252,13 +263,13 @@ static void * beeQ_send_run(void * args) {
         return NULL;
     }
 
-    BEEQ_DEBUG("SEND QUEUE IS WORKING.\n");
-    cb(q, arg);
+//    BEEQ_DEBUG("SEND QUEUE IS WORKING.\n");
+    cb(q, sarg);
     beeQ_thread_exit(q);
     return NULL;
 }
 
-pthread_t beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, void* arg)) {
+pthread_t beeQ_send_thread(struct beeQ *q, void *sarg, int (*cb)(struct beeQ *q, void* arg)) {
     pthread_t tid;
     int res;
     struct beeMsg* msg;
@@ -274,7 +285,7 @@ pthread_t beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, 
     }
 
     msg->q = q;
-    msg->arg = arg;
+    msg->sarg = sarg;
     msg->cb = cb;
 
     res = pthread_create(&tid, NULL, beeQ_send_run, (void *)msg);

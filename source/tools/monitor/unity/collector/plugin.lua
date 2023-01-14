@@ -76,10 +76,10 @@ function Cplugin:load_value(unity_line, line)
 end
 
 function Cplugin:load_log(unity_line, line)
-    local name = self._ffi.string(unity_line.log.name)
+    local name = self._ffi.string(unity_line.logs[0].name)
     if #name > 0 then
-        local log = self._ffi.string(unity_line.log.log)
-        self._ffi.C.free(unity_line.log.log)   -- should free from strdup
+        local log = self._ffi.string(unity_line.logs[0].log)
+        self._ffi.C.free(unity_line.logs[0].log)   -- should free from strdup
         table.insert(line.log, {name = name, log = log})
     end
 end

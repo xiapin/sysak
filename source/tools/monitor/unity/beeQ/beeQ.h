@@ -21,8 +21,9 @@ struct beeQ {
     int size;
 
     void **msgs;
-    void *arg;
-    int (*cb)(void *msg, void *arg);  // callback for message.
+    void *qarg;
+    int (*init)(struct beeQ* q);
+    int (*cb)(void *msg, struct beeQ* q);  // callback for message.
 
     int tid_count;
     pthread_t tids[BEEQ_TIDS];
@@ -30,7 +31,7 @@ struct beeQ {
 
 int beeQ_send(struct beeQ *q, void *msg);
 pthread_t beeQ_send_thread(struct beeQ *q, void *arg, int (*cb)(struct beeQ *q, void* arg));
-struct beeQ* beeQ_init(int size, int (*cb)(void *msg, void* arg), void *arg);
+struct beeQ* beeQ_init(int size, int (*init)(struct beeQ* q), int (*cb)(void *msg, struct beeQ* q), void *arg);
 int beeQ_stop(struct beeQ *q);
 
 #endif //TINYINFO_BEEQ_H

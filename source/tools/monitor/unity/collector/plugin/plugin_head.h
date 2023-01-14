@@ -24,7 +24,7 @@ struct unity_line {
     char table[32];
     struct unity_index indexs[4];
     struct unity_value values[32];
-    struct unity_log log;
+    struct unity_log logs[1];
 };
 
 struct unity_lines {
@@ -38,11 +38,17 @@ struct unity_lines {
 #include <errno.h>
 #include "../../beeQ/beeQ.h"
 
+inline struct unity_lines *unity_new_lines(void) __attribute__((always_inline));
 inline int unity_alloc_lines(struct unity_lines * lines, unsigned int num) __attribute__((always_inline));
 inline struct unity_line * unity_get_line(struct unity_lines * lines, unsigned int i) __attribute__((always_inline));
 inline int unity_set_table(struct unity_line * line, const char * table) __attribute__((always_inline));
 inline int unity_set_index(struct unity_line * line, unsigned int i, const char * name, const char * index) __attribute__((always_inline));
 inline int unity_set_value(struct unity_line * line, unsigned int i, const char * name, double value) __attribute__((always_inline));
+inline int unity_set_log(struct unity_line * line, const char * name, const char * log) __attribute__((always_inline));
+
+inline struct unity_lines *unity_new_lines(void) {
+    return malloc(sizeof (struct unity_lines));
+}
 
 inline int unity_alloc_lines(struct unity_lines * lines, unsigned int num) {
     size_t size = num * sizeof (struct unity_line);
@@ -91,8 +97,8 @@ inline int unity_set_value(struct unity_line * line,
 
 inline int unity_set_log(struct unity_line * line,
                         const char * name, const char * log) {
-    strncpy(line->log.name, name, 16);
-    line->log.log = strdup(log);
+    strncpy(line->logs[0].name, name, 16);
+    line->logs[0].log = strdup(log);
     return 0;
 }
 
