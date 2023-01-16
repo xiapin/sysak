@@ -20,6 +20,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
     struct event *e = (struct event *)data;
     struct unity_line *line;
     struct unity_lines *lines;
+    struct beeQ *q = (struct beeQ *)ctx;
 
     unity_alloc_lines(lines, 1);
     line = unity_get_line(lines, 0);
@@ -27,6 +28,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
     unity_set_index(line, 0, "index", "value");
     unity_set_value(line, 0, "ns", e->ns);
     unity_set_value(line, 1, "cpu", e->cpu);
+    beeQ_send(q, lines);
 }
 
 #define LOAD_BPF_SKEL(name)                                                    \
@@ -80,6 +82,7 @@ int init(void *arg)
     perf_args.mapfd = bpf_map__fd(bpfsample2->maps.perf);
     perf_args.sample_cb = handle_event;
     perf_args.lost_cb = handle_lost_events;
+    perf_args.ctx = arg;
 
     beeQ_send_thread(arg, &perf_args, thread_worker);
 
