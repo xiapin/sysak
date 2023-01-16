@@ -17,6 +17,7 @@ function CurlGuide:_init_(frame)
     self._urlCb["/guide/pystring"] = function(tReq) return self:pystring(tReq)  end
     self._urlCb["/guide/webdevel"] = function(tReq) return self:webdevel(tReq)  end
     self._urlCb["/guide/proc_probe"] = function(tReq) return self:proc_probe(tReq)  end
+    self._urlCb["/guide/dev_proc"] = function(tReq) return self:dev_proc(tReq)  end
     self:_install(frame)
 end
 
@@ -50,6 +51,10 @@ end
 
 function CurlGuide:proc_probe(tReq)
     return {title="proc and probes", content=self:markdown(loadFile("proc_probe.md"))}
+end
+
+function CurlGuide:dev_proc(tReq)
+    return {title="develop proc interface.", content=self:markdown(loadFile("dev_proc.md"))}
 end
 
 return CurlGuide

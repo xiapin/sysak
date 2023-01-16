@@ -48,6 +48,11 @@ metrics:
     head: counter
     help: "disk info from /proc/diskstats."
     type: "gauge"
+  - title: sysak_sock_stat
+    from: sock_stat
+    head: value
+    help: "sock stat counters from /proc/net/sockstat"
+    type: "gauge"
   - title: sysak_sample_tbl1
     from: sample_tbl1
     head: value
