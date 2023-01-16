@@ -77,12 +77,14 @@ int init(void *arg)
         return err;
 
     printf("bpfsample program load done.\n");
-    struct perf_thread_arguments perf_args = {};
+    struct perf_thread_arguments *perf_args = malloc(sizeof(struct perf_thread_arguments));
+    if (!perf_args)
+        return -ENOMEM;
 
-    perf_args.mapfd = bpf_map__fd(bpfsample2->maps.perf);
-    perf_args.sample_cb = handle_event;
-    perf_args.lost_cb = handle_lost_events;
-    perf_args.ctx = arg;
+    perf_args->mapfd = bpf_map__fd(bpfsample2->maps.perf);
+    perf_args->sample_cb = handle_event;
+    perf_args->lost_cb = handle_lost_events;
+    perf_args->ctx = arg;
 
     beeQ_send_thread(arg, &perf_args, thread_worker);
 
