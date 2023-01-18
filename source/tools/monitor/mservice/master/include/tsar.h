@@ -50,12 +50,14 @@
 
 struct statistic {
     int    total_mod_num;
+    int    total_mod_subs;
     time_t cur_time;
 };
 
 
 extern struct configure conf;
 extern struct module    *mods[MAX_MOD_NUM];
+extern struct module_sub *mod_subs[MAX_MODSUB_NUM];
 extern struct statistic statis;
 extern pthread_mutex_t module_record_mutex;
 extern pthread_mutex_t module_warn_mutex;
