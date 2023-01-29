@@ -26,6 +26,10 @@ typedef struct var_kvs {
 int var_input_long(const char * line, struct var_long *p);
 int var_input_string(const char * line, struct var_string *p);
 int var_input_kvs(const char * line, struct var_kvs *p);
+
+int  plugin_is_working(void);
+void plugin_stop(void);
+void plugin_init(void);
 ]]
 
 return {ffi = ffi, cffi=cffi}

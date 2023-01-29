@@ -4,20 +4,20 @@
 
 #include "sample_threads.h"
 #include <unistd.h>
-#include <stdbool.h>
+#include <signal.h>
 
-static volatile bool working = true;
-static volatile pthread_t sample_thread_id = -1;
+static volatile pthread_t sample_thread_id = 0;
 
 static int sample_thread_func(struct beeQ* q, void * arg);
 int init(void * arg) {
     struct beeQ* q = (struct beeQ *)arg;
     sample_thread_id = beeQ_send_thread(q, NULL, sample_thread_func);
+    printf("start sample_thread_id: %lu\n", sample_thread_id);
     return 0;
 }
 
 static int sample_thread_func(struct beeQ* q, void * arg) {
-    while (working) {
+    while (plugin_is_working()) {
         static double value = 1.0;
         struct unity_line* line;
         struct unity_lines * lines = unity_new_lines();
@@ -50,9 +50,6 @@ int call(int t, struct unity_lines* lines) {
 }
 
 void deinit(void) {
-    working = false;
-    if (sample_thread_id > 0) {
-        pthread_join(sample_thread_id, NULL);
-    }
+    plugin_thread_stop(sample_thread_id);
     printf("thread plugin uninstall\n");
 }

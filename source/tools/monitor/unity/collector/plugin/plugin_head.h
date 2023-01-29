@@ -37,6 +37,7 @@ struct unity_lines {
 #include <stdio.h>
 #include <errno.h>
 #include "../../beeQ/beeQ.h"
+#include "../native/sig_stop.h"
 
 inline struct unity_lines *unity_new_lines(void) __attribute__((always_inline));
 inline int unity_alloc_lines(struct unity_lines * lines, unsigned int num) __attribute__((always_inline));
