@@ -26,6 +26,7 @@ struct fox_manager {
     off_t last_pos;     // last pos
     size_t fsize;        // file size.
     int fd;
+    int new_day;
 
     short year;
     char mon;

@@ -5,6 +5,7 @@
 ---
 
 require("class")
+
 local system = require("system")
 local snappy = require("snappy")
 local pystring = require("pystring")
@@ -123,6 +124,34 @@ function CfoxTSDB:packLine(lines)
     return self._proto:encode(lines)
 end
 
+function CfoxTSDB:rotateDb()
+    local dirent = require("posix.dirent")
+    local unistd = require("posix.unistd")
+
+    local usec = self._man.now
+    local sec = 7 * 24 * 60 * 60
+
+    local foxTime = self:getDateFrom_us(usec - sec * 1e6)
+    local level = foxTime.year * 10000 + foxTime.mon * 100 + foxTime.mday
+
+    local ok, files = pcall(dirent.files, './')
+    if not ok then
+        return
+    end
+
+    for f in files do
+        if string.match(f,"^%d%d%d%d%d%d%d%d%.fox$") then
+            local sf = string.sub(f, 1, 8)
+            local num = tonumber(sf)
+            if num < level then
+                print("delete " .. "./" .. f)
+                pcall(unistd.unlink, "./" .. f)
+            end
+            --pcall(unistd.unlink, "../" .. f)
+        end
+    end
+end
+
 function CfoxTSDB:setupWrite()
     assert(self._man == nil, "one fox object should have only one manager.")
     self._man = self.ffi.new("struct fox_manager")
@@ -140,6 +169,9 @@ function CfoxTSDB:write(buff)
     local stream = snappy.compress(buff)
     print("write for time: ", now)
     assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(stream, #stream), #stream) == 0)
+    if self._man.new_day > 0 then
+        self:rotateDb()
+    end
     --assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(buff), #buff) == 0)
 end
 

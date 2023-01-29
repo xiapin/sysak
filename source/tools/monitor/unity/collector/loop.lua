@@ -14,6 +14,7 @@ local CprocVmstat = require("proc_vmstat")
 local CprocNetdev = require("proc_netdev")
 local CprocDiskstats = require("proc_diskstats")
 local CprocSockStat = require("proc_sockstat")
+local CprocSnmpStat = require("proc_snmp_stat")
 
 local Cplugin = require("plugin")
 
@@ -28,8 +29,9 @@ function Cloop:_init_(que, proto_q)
         CprocNetdev.new(self._proto, procffi),
         CprocDiskstats.new(self._proto, procffi),
         CprocSockStat.new(self._proto, procffi),
+        CprocSnmpStat.new(self._proto, procffi),
     }
-    self._plugin = Cplugin.new(self._proto, que, proto_q)
+    self._plugin = Cplugin.new(self._proto, procffi, que, proto_q)
 end
 
 function Cloop:work(t)

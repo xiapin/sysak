@@ -2,7 +2,7 @@ LIB= -lpthread -ldl
 
 CC=gcc
 CFLAG := -g -I../beaver
-LDFLAG := -g -lm -ldl -lrt -lpthread -lluajit-5.1 -L./lib/ -lbeeQ -L../beaver -lbeaver -L../collector/plugin/ -lproto_sender
+LDFLAG := -g -lm -ldl -lrt -lpthread -lluajit-5.1 -L./lib/ -lbeeQ -L../beaver -lbeaver -L../collector/plugin/ -lproto_sender -L../collector/native/ -lprocffi
 
 PRG=unity-mon
 OBJ=apps.o bees.o

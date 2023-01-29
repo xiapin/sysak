@@ -1,10 +1,10 @@
 CC := gcc
 CFLAG := -g -fpic
 LDFLAG := -g -fpic -shared
-OBJS := procffi.o sig_stop.o
-SO := libprocffi.so
+OBJS := kmsg.o
+SO := libkmsg.so
 
-all: $(SO)
+all: $(SO) install
 
 %.o: %.c
 	$(CC) -c $< -o $@ $(CFLAG)
@@ -12,5 +12,8 @@ all: $(SO)
 $(SO): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAG)
 
+install: $(SO)
+	cp $(SO) ../../native/
+
 clean:
-	rm -f *.so $(OBJS)
+	rm -f $(SO) $(OBJS)

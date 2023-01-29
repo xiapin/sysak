@@ -320,6 +320,9 @@ int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,
             fprintf(stderr, "create new file failed.\n");
             goto endCreateFile;
         }
+        pman->new_day = 1;
+    } else {
+        pman->new_day = 0;
     }
 
     if (pman->now <= us) {  // time should monotonically increasing
