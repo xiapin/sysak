@@ -226,7 +226,7 @@ class fsstatClass(diskstatClass):
         if int(version[0]) > 3:
             commArgs = 'comm=$comm'
 
-        arch = execCmd('lscpu | grep Architecture').split(":", 1)[1].strip()
+        arch = execCmd('lscpu | grep -E \"Architecture|架构\"').split(":", 1)[1].strip()
         regs = {
             "arm":['(%r0)','(%r1)'],
             "x86":['(%di)', '(%si)'],
