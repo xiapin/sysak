@@ -89,6 +89,48 @@ struct {
     __uint(map_flags, BPF_F_NO_PREALLOC);
 } wait_thread_info SEC(".maps");
 
+struct my_trace_event_raw_sys_enter {
+	struct trace_entry ent;
+	long int id;
+	long unsigned int args[6];
+	char __data[0];
+};
+
+struct my_trace_event_raw_sys_exit {
+	struct trace_entry ent;
+	long int id;
+	long int ret;
+	char __data[0];
+};
+
+struct my_trace_event_raw_irq_handler_entry {
+	struct trace_entry ent;
+	int irq;
+	u32 __data_loc_name;
+	char __data[0];
+};
+
+struct my_trace_event_raw_irq_handler_exit {
+	struct trace_entry ent;
+	int irq;
+	int ret;
+	char __data[0];
+};
+
+struct my_trace_event_raw_softirq {
+	struct trace_entry ent;
+	unsigned int vec;
+	char __data[0];
+};
+
+struct my_trace_event_raw_nmi_handler {
+	struct trace_entry ent;
+	void *handler;
+	s64 delta_ns;
+	int handled;
+	char __data[0];
+};
+
 static __always_inline u64 log2(u32 v)
 {
 	u32 shift, r;
@@ -103,7 +145,7 @@ static __always_inline u64 log2(u32 v)
 }
 
 SEC("tp/irq/irq_handler_entry")
-int handle_irq_entry(struct trace_event_raw_irq_handler_entry *ctx)
+int handle_irq_entry(struct my_trace_event_raw_irq_handler_entry *ctx)
 {
     u64 ts;
     u32 start_key = 0,key = 0,irq_key;
@@ -136,7 +178,7 @@ int handle_irq_entry(struct trace_event_raw_irq_handler_entry *ctx)
 }
 
 SEC("tp/irq/irq_handler_exit")
-int handle_irq_exit(struct trace_event_raw_irq_handler_exit *ctx)
+int handle_irq_exit(struct my_trace_event_raw_irq_handler_exit *ctx)
 {
     u32 irq_key,key = 0,hist_key = hist_irq, start_key = 0;
     u64 duration,slot = 0;
@@ -183,7 +225,7 @@ int handle_irq_exit(struct trace_event_raw_irq_handler_exit *ctx)
 }
 
 SEC("tp/irq/softirq_entry")
-int handler_softirq_entry(struct trace_event_raw_softirq *ctx)
+int handler_softirq_entry(struct my_trace_event_raw_softirq *ctx)
 {
     u32 key = 0,start_key = 1;
     u64 ts;
@@ -206,7 +248,7 @@ int handler_softirq_entry(struct trace_event_raw_softirq *ctx)
 }
 
 SEC("tp/irq/softirq_exit")
-int handler_softirq_exit(struct trace_event_raw_softirq *ctx)
+int handler_softirq_exit(struct my_trace_event_raw_softirq *ctx)
 {
     u32 key = 0,softirq_key,slot,hist_key = hist_softirq,start_key = 1;
     u64 duration;
@@ -251,7 +293,7 @@ int handler_softirq_exit(struct trace_event_raw_softirq *ctx)
 }
 
 SEC("tp/nmi/nmi_handler")
-int handler_nmi(struct trace_event_raw_nmi_handler *ctx)
+int handler_nmi(struct my_trace_event_raw_nmi_handler *ctx)
 {
     u32 key = 0 , slot, hist_key = hist_nmi;
     s64 duration;
@@ -446,7 +488,7 @@ int handler_sched_stat_iowait(struct bpf_raw_tracepoint_args *ctx)
 }
 
 SEC("tp/raw_syscalls/sys_enter")
-int handler_sys_enter(struct trace_event_raw_sys_enter *ctx)
+int handler_sys_enter(struct my_trace_event_raw_sys_enter *ctx)
 {
     u64 ts;
     u32 key = 0,hist_key = hist_syscall;
@@ -469,7 +511,7 @@ int handler_sys_enter(struct trace_event_raw_sys_enter *ctx)
 }
 
 SEC("tp/raw_syscalls/sys_exit")
-int handler_sys_exit(struct trace_event_raw_sys_exit *ctx)
+int handler_sys_exit(struct my_trace_event_raw_sys_exit *ctx)
 {
     u64 duration,tszero = 0,slot;
     u64 *tsp;

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/utsname.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
 #include "syscall_helpers.h"
@@ -98,10 +99,12 @@ struct env{
     time_t interval;
     int times;
     int top;
+	bool verbose;
 } env = {
 	.interval = 99999999,
 	.times = 99999999,
-    .top = 10,
+	.top = 10,
+	.verbose = false,
 };
 
 struct numa_info{
@@ -126,6 +129,50 @@ struct softirq_info{
 
 static bool (*print_func[OT_NR])(int);
 static int map[OT_NR];
+
+static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
+{
+	if (env.verbose)
+		return vfprintf(stderr, format, args);
+	else
+		return 0;
+}
+
+int check_and_fix_autoload(struct appnoise_bpf *obj)
+{
+	int i, ret = 0;
+	char *str, *endptr;
+	unsigned long ver[3];
+	struct utsname ut;
+
+	ret = uname(&ut);
+	if (ret < 0)
+		return -errno;
+
+	str = ut.release;
+	for (i = 0; i < 3; i++) {
+		ver[i] = strtoul(str, &endptr, 10);
+		if ((errno == ERANGE && (ver[i] == LONG_MAX || ver[i] == LONG_MIN))
+			|| (errno != 0 && ver[i] == 0)) {
+			perror("strtol");
+			return -errno;
+		}
+		errno = 0;
+		str = endptr+1;
+	}
+
+	if (ver[0] < 4 || ver[1] < 19) {
+		bpf_program__set_autoload(obj->progs.handler_nmi, false);
+		bpf_program__set_autoload(obj->progs.handler_sched_stat_wait, false);
+		bpf_program__set_autoload(obj->progs.handler_sched_stat_sleep, false);
+		bpf_program__set_autoload(obj->progs.handler_sched_stat_blocked, false);
+		bpf_program__set_autoload(obj->progs.handler_sched_stat_iowait, false);
+	}
+
+	return 0;
+}
+
+void handle_event(void *ctx, int cpu, void *data, __u32 data_sz);
 
 #define min(x, y) ({				\
 	typeof(x) _min1 = (x);			\
@@ -625,6 +672,7 @@ int main(int argc, char *argv[])
     if(err)
         return err;
 
+	libbpf_set_print(libbpf_print_fn);
     bump_memlock_rlimit();
     obj = appnoise_bpf__open();
     if(!obj)
@@ -632,7 +680,7 @@ int main(int argc, char *argv[])
         printf("failed to open BPF object\n");
         return 1;
     }
-
+	check_and_fix_autoload(obj);
     err = appnoise_bpf__load(obj);
     if(err)
     {
