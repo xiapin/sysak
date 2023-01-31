@@ -59,4 +59,21 @@ function system:valueIsIn(tbl, value)
     return false
 end
 
+function system:hex2ups(hex)
+    return (string.gsub(hex, ".", function (c)
+        return string.format("%02X", string.byte(c))
+    end))
+end
+
+function system:hex2lows(hex)
+    return (string.gsub(hex, ".", function (c)
+        return string.format("%02x", string.byte(c))
+    end))
+end
+
+function system:timeRfc1123(t)
+    t = t or os.time()
+    return os.date("!%a, %d %b %Y %H:%M:%S GMT", t)
+end
+
 return system

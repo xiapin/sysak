@@ -27,6 +27,8 @@ RUN source /opt/rh/devtoolset-9/enable && \
     luarocks install lua-csnappy && \
     luarocks install lua-protobuf && \
     luarocks install luaposix && \
+    luarocks install sha1 && \
+    luarocks install md5 && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ && \
     cd ../beeQ/ && \
     make

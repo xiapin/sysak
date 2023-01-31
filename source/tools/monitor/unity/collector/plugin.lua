@@ -8,16 +8,19 @@ require("class")
 
 local Cplugin = class("plugin")
 
-function Cplugin:_init_(proto, que, proto_q, fYaml)
+function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
     self._proto = proto
     fYaml = fYaml or "../collector/plugin.yaml"
     self._ffi = require("plugincffi")
+    self._sig_cffi = procffi["cffi"]
 
     local res = self:loadYaml(fYaml)
+    self._sig_cffi.plugin_init()
     self:setup(res.plugins, proto_q)
 end
 
 function Cplugin:_del_()
+    self._sig_cffi.plugin_stop()
     for _, plugin in ipairs(self._plugins) do
         local cffi = plugin.cffi
         cffi.deinit()
