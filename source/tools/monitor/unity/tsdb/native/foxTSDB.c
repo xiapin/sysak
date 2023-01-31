@@ -63,7 +63,7 @@ int get_date_from_us(fox_time_t us, struct foxDate * p) {
     struct tm * ptm;
 
     time_t t = us / MICRO_UNIT;
-    ptm = localtime(&t);
+    ptm = gmtime(&t);
     tm2date(ptm, p);
     return 0;
 }
@@ -71,7 +71,7 @@ int get_date_from_us(fox_time_t us, struct foxDate * p) {
 int get_date(struct foxDate * p) {
     struct timeval tv;
     if (gettimeofday(&tv, NULL) == 0) {
-        struct tm * ptm = localtime(&tv.tv_sec);
+        struct tm * ptm = gmtime(&tv.tv_sec);
         tm2date(ptm, p);
         return 0;
     }
