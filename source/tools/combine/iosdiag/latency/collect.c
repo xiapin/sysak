@@ -281,6 +281,6 @@ void iosdiag_exit(char *module_name)
 	if (iosdiag_scsi_bpf_load)
 		iosdiag_scsi_bpf__destroy(iosdiag_scsi);
 	if (iosdiag_scsi_mq_bpf_load)
-		iosdiag_scsi_bpf__destroy(iosdiag_scsi_mq);
+		iosdiag_scsi_mq_bpf__destroy(iosdiag_scsi_mq);
 }
 
