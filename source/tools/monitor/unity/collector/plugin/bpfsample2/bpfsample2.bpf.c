@@ -9,8 +9,8 @@
 BPF_PERF_OUTPUT(perf, 1024);
 
 
-SEC("kprobe/tcp_sendmsg")
-int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
+SEC("kprobe/netstat_seq_show")
+int BPF_KPROBE(netstat_seq_show, struct sock *sk, struct msghdr *msg, size_t size)
 {
     struct event e = {};
 
@@ -22,3 +22,7 @@ int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
     bpf_perf_event_output(ctx, &perf, BPF_F_CURRENT_CPU, &e, sizeof(struct event));
     return 0;
 }
+
+char _license[] SEC("license") = "GPL";
+
+
