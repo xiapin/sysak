@@ -5,4 +5,5 @@
 #include "iosdiag_virtblk.skel.h"
 #include "iosdiag_nvme.skel.h"
 #include "iosdiag_scsi.skel.h"
+#include "iosdiag_scsi_mq.skel.h"
 #endif
