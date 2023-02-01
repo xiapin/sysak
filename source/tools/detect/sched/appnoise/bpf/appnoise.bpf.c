@@ -181,7 +181,8 @@ SEC("tp/irq/irq_handler_exit")
 int handle_irq_exit(struct my_trace_event_raw_irq_handler_exit *ctx)
 {
     u32 irq_key,key = 0,hist_key = hist_irq, start_key = 0;
-    u64 duration,slot = 0;
+    s64 duration;
+	u64 slot = 0;
     u64 *tsp;
     pid_t pid,tgid;
     struct args *args;
@@ -202,7 +203,10 @@ int handle_irq_exit(struct my_trace_event_raw_irq_handler_exit *ctx)
     if(!tsp || !*tsp)
         return 0;
 
-    duration = (bpf_ktime_get_ns() - *tsp)/NS_TO_US; 
+    duration = (bpf_ktime_get_ns() - *tsp);
+	if (duration < 0)
+		return 0;
+	duration = duration / NS_TO_US; 
 
     /* hist map data update */
     histinfo = bpf_map_lookup_elem(&histmap,&hist_key);
@@ -251,7 +255,7 @@ SEC("tp/irq/softirq_exit")
 int handler_softirq_exit(struct my_trace_event_raw_softirq *ctx)
 {
     u32 key = 0,softirq_key,slot,hist_key = hist_softirq,start_key = 1;
-    u64 duration;
+    s64 duration;
     u64 *tsp;
     pid_t pid,tgid;
     struct args *args;
@@ -271,7 +275,11 @@ int handler_softirq_exit(struct my_trace_event_raw_softirq *ctx)
     tsp = bpf_map_lookup_elem(&start,&start_key);
     if(!tsp || !*tsp)
         return 0;
-    duration = (bpf_ktime_get_ns() - *tsp)/NS_TO_US; 
+
+    duration = (bpf_ktime_get_ns() - *tsp);
+	if (duration < 0)
+		return 0;
+	duration = duration / NS_TO_US; 
 
     histinfo = bpf_map_lookup_elem(&histmap,&hist_key);
     if(!histinfo)
@@ -513,7 +521,8 @@ int handler_sys_enter(struct my_trace_event_raw_sys_enter *ctx)
 SEC("tp/raw_syscalls/sys_exit")
 int handler_sys_exit(struct my_trace_event_raw_sys_exit *ctx)
 {
-    u64 duration,tszero = 0,slot;
+    s64 duration;
+    u64 tszero = 0,slot;
     u64 *tsp;
     u32 key = 0,hist_key = hist_syscall,id;
     pid_t pid,tgid;
@@ -536,8 +545,10 @@ int handler_sys_exit(struct my_trace_event_raw_sys_exit *ctx)
     if(!tsp || !*tsp)
         return 0;
 
-    duration = (bpf_ktime_get_ns() - *tsp)/NS_TO_US;
-
+    duration = (bpf_ktime_get_ns() - *tsp);
+	if (duration < 0)
+		return 0;
+	duration = duration / NS_TO_US;
     histinfo = bpf_map_lookup_elem(&histmap,&hist_key);
     if(!histinfo)
         return 0;

@@ -18,10 +18,11 @@ const char *argp_program_version = "appnoise 1.0";
 const char argp_program_doc[] =
 "Trace app noise.\n"
 "\n"
-"USAGE: appnoise [-h] [-t TID] [-p PID] \n"
+"USAGE: appnoise [-h] [-t TID] [-p PID] [-s time]\n"
 "\n"
 "EXAMPLES:\n"
 "   appnoise -p 123         # trace pid 123\n"
+"   appnoise -p 123 -s 10   # trace pid 123 and run 10s\n"
 "   appnoise -t 123         # trace tid 123 (use for threads only)\n"
 "   appnoise -t 123 -T      # trace tid 123 and print only the top events (default 10)\n"
 "   appnoise -p 123 1 10    # trace pid 123 and print 1 second summaries, 10 times\n";
@@ -30,6 +31,7 @@ const char argp_program_doc[] =
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Process PID to trace"},
 	{ "tid", 't', "TID", 0, "Thread TID to trace"},
+	{ "span", 's', "SPAN", 0, "How long to run"},
 	{ "top", 'T', "TOP", 0, "Print only the top events (default 10)" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
 	{},
@@ -100,11 +102,13 @@ struct env{
     int times;
     int top;
 	bool verbose;
+	unsigned long duration;
 } env = {
-	.interval = 99999999,
-	.times = 99999999,
+	.interval = 1,
+	.times = 0,
 	.top = 10,
 	.verbose = false,
+	.duration = 0,
 };
 
 struct numa_info{
@@ -284,10 +288,19 @@ static error_t parse_arg(int key,char *arg,struct argp_state *state)
             errno = 0;
             top = strtol(arg, NULL, 10);
             if (errno || top <= 0) {
-                fprintf(stderr, "Invalid PID: %s\n", arg);
+                fprintf(stderr, "Invalid top number: %s\n", arg);
                 argp_usage(state);
             }
             env.top = top;
+            break;
+        case 's':
+            errno = 0;
+            env.duration = strtol(arg, NULL, 10);
+            if (errno) {
+                fprintf(stderr, "Invalid duration time: %s\n", arg);
+                argp_usage(state);
+		env.duration = 0;
+            }
             break;
         case ARGP_KEY_ARG:
             errno = 0;
@@ -665,12 +678,13 @@ int main(int argc, char *argv[])
 	struct tm *tm;
 	char ts[32];
 	time_t t;
+	bool res = true;
 
     init_syscall_names();
 
     err = argp_parse(&argp,argc,argv,0,NULL,NULL);
-    if(err)
-        return err;
+	if(err)
+		return err;
 
 	libbpf_set_print(libbpf_print_fn);
     bump_memlock_rlimit();
@@ -699,43 +713,56 @@ int main(int argc, char *argv[])
         goto cleanup;
     }
 
-    err = appnoise_bpf__attach(obj);
-    if(err)
-    {
-        printf("failed to attach BPF programs\n");
-        goto cleanup;
-    }
+	if (signal(SIGINT, sig_handler) == SIG_ERR ||
+		signal(SIGALRM, sig_handler) == SIG_ERR) {
+		fprintf(stderr, "can't set signal handler: %s\n", strerror(errno));
+		err = 1;
+		goto cleanup;
+	}
+	if (env.duration)
+		alarm(env.duration);
+	else
+		printf("Tracing... Hit Ctrl-C to end.\n");
 
-    signal(SIGINT, sig_handler);
+	init_output(obj);
 
-    printf("Tracing... Hit Ctrl-C to end.\n");
+	err = appnoise_bpf__attach(obj);
+	if(err) {
+		printf("failed to attach BPF programs\n");
+		goto cleanup;
+	}
 
-    init_output(obj);
-
-    while(1){
+    while(1) {
 	int i;
-        bool res = true;
-        sleep(env.interval);
-        
-        time(&t);
-        tm = localtime(&t);
-        strftime(ts, sizeof(ts), "%H:%M:%S", tm);
-        printf("%-8s\n", ts);
 
-        for(i = 0 ; i < OT_NR;i++)
-        {
-            res = print_func[i](map[i]);
-            if(!res)
-            {
-                printf("output erro!\n");
-                break;
-            }
-        }
+	sleep(env.interval);
+	if (env.times) {
+		time(&t);
+		tm = localtime(&t);
+		strftime(ts, sizeof(ts), "%H:%M:%S", tm);
+		printf("%-8s\n", ts);
 
-        printf("\n");
-		if (exiting || --env.times == 0)
+		for(i = 0 ; i < OT_NR;i++) {
+			res = print_func[i](map[i]);
+			if(!res) {
+				printf("output erro!\n");
+				break;
+			}
+		}
+		printf("\n");
+		if (--env.times == 0)
 			break;
+	}
+	if (exiting)
+		break;
     }
+	for(i = 0 ; i < OT_NR;i++) {
+		res = print_func[i](map[i]);
+		if(!res) {
+			printf("output erro!\n");
+			break;
+		}
+	}
 
 cleanup:
     appnoise_bpf__destroy(obj);
