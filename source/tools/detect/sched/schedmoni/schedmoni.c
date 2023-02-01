@@ -256,6 +256,7 @@ int check_kprobe(struct schedmoni_bpf *obj)
 
 	str = ut.release;
 	for (i = 0; i < 3; i++) {
+		errno = 0;
 		ver[i] = strtoul(str, &endptr, 10);
 		if ((errno == ERANGE && (ver[i] == LONG_MAX || ver[i] == LONG_MIN))
 			|| (errno != 0 && ver[i] == 0)) {
