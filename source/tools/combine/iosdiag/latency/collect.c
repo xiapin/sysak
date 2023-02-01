@@ -227,13 +227,13 @@ int iosdiag_init(char *devname)
 				}
 			} else {
 				if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 0)) {
-					LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 0)
+					LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 0);
 				}
 			}
 		} else {
 			LOAD_IOSDIAG_BPF(iosdiag_nvme, 0);
 			if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 0)) {
-				LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 0)
+				LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 0);
 			}
 		}
 	}
