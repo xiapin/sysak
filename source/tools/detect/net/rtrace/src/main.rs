@@ -50,7 +50,7 @@ fn main() -> Result<()> {
         if let Ok(sysak) = std::env::var("SYSAK_WORK_PATH") {
             if let Ok(info) = uname::uname() {
                 btf = Some(format!("{}/tools/vmlinux-{}", sysak, info.release));
-                println!("{:?}", btf);
+                log::debug!("{:?}", btf);
             }
         }
     }
