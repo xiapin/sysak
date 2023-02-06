@@ -7,9 +7,9 @@ plugins:
   -
     so: sample_threads
     description: "threads example."
-#  -
-#    so: bpfsample2
-#    description: "bpf example."
+  -
+    so: bpfsample2
+    description: "bpf threads example."
 
 metrics:
   -
@@ -83,3 +83,9 @@ metrics:
     head: value
     help: "example2 for develop."
     type: "gauge"
+  - title: sysak_sample_bpfsample2
+    from: bpfsample2
+    head: value
+    help: "example for bpfsample2"
+    type: "gauge"
+

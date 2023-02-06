@@ -155,11 +155,11 @@ pub fn run_drop(cmd: &DropCommand, debug: bool, btf: &Option<String>) {
             }
         }
 
-        if current_monotime() - start_ns >= duration {
+        if cmd.json && current_monotime() - start_ns >= duration {
             break;
         }
 
-        if event_count >= cmd.count {
+        if cmd.json && event_count >= cmd.count {
             break;
         }
     }

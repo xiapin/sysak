@@ -23,6 +23,7 @@
 struct statistic statis;
 struct configure conf;
 struct module   *mods[MAX_MOD_NUM];
+struct module_sub *mod_subs[MAX_MODSUB_NUM];
 
 pthread_mutex_t module_record_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t module_warn_mutex = PTHREAD_MUTEX_INITIALIZER;

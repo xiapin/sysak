@@ -70,6 +70,9 @@ struct module {
     void (*mod_register) (struct module *);
 };
 
+struct module_sub {
+    char    name[LEN_32];
+};
 
 void register_mod_fields(struct module *mod, const char *opt, const char *usage,
         struct mod_info *info, int n_col, void *data_collect, void *set_st_record);

@@ -500,7 +500,7 @@ static int my_system(char *cmd)
 
     register_sig_handler(pid);
     waitpid(pid, &status, 0);
-    return pid;
+    return 0;
 }
 
 static int exectue(int argc, char *argv[])

@@ -26,6 +26,7 @@
 DECLEAR_BPF_OBJ(iosdiag_virtblk);
 DECLEAR_BPF_OBJ(iosdiag_nvme);
 DECLEAR_BPF_OBJ(iosdiag_scsi);
+DECLEAR_BPF_OBJ(iosdiag_scsi_mq);
 static int iosdiag_map;
 static int iosdiag_virtblk_map;
 static int iosdiag_maps_targetdevt;
@@ -213,19 +214,27 @@ int iosdiag_init(char *devname)
 		if (LOAD_IOSDIAG_BPF(iosdiag_nvme, 1))
 			return -1;
 	} else if (!strcmp(module_name, "scsi")) {
-		if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 1))
-			return -1;
+		if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 1)) {
+			if (LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 1))
+				return -1;
+		}
 	} else {
 		if (LOAD_IOSDIAG_BPF(iosdiag_virtblk, 1)) {
 			if (LOAD_IOSDIAG_BPF(iosdiag_nvme, 1)) {
-				if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 1))
-					return -1;
+				if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 1)) {
+					if (LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 1))
+						return -1;
+				}
 			} else {
-				LOAD_IOSDIAG_BPF(iosdiag_scsi, 0);
+				if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 0)) {
+					LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 0);
+				}
 			}
 		} else {
 			LOAD_IOSDIAG_BPF(iosdiag_nvme, 0);
-			LOAD_IOSDIAG_BPF(iosdiag_scsi, 0);
+			if (LOAD_IOSDIAG_BPF(iosdiag_scsi, 0)) {
+				LOAD_IOSDIAG_BPF(iosdiag_scsi_mq, 0);
+			}
 		}
 	}
 	if (iosdiag_virtblk_bpf_load)
@@ -271,5 +280,7 @@ void iosdiag_exit(char *module_name)
 		iosdiag_nvme_bpf__destroy(iosdiag_nvme);
 	if (iosdiag_scsi_bpf_load)
 		iosdiag_scsi_bpf__destroy(iosdiag_scsi);
+	if (iosdiag_scsi_mq_bpf_load)
+		iosdiag_scsi_mq_bpf__destroy(iosdiag_scsi_mq);
 }
 

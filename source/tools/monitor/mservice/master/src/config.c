@@ -108,6 +108,44 @@ special_mod(const char *spec_mod)
 }
 
 void
+parse_mod_sub(const char *sub_name)
+{
+    int     i;
+    struct module_sub *mod_sub;
+    char   *token;
+    char name[LEN_32], parent[LEN_32];
+
+    token = strtok(NULL, W_SPACE);
+    if (token && strcasecmp(token, "on") && strcasecmp(token, "enable")) {
+        return;
+    }
+
+    /* check if the mod load already */
+    for ( i = 0; i < statis.total_mod_subs; i++ )
+    {
+        mod_sub = mod_subs[i];
+        if (!strcmp(mod_sub->name, sub_name)) {
+            return;
+        }
+    }
+
+    if (statis.total_mod_subs >= MAX_MODSUB_NUM) {
+        do_debug(LOG_ERR, "Max mod sub umber is %d ignore %s\n", MAX_MODSUB_NUM, sub_name);
+        return;
+    }
+
+    mod_sub = mod_subs[statis.total_mod_subs] = malloc(sizeof(struct module_sub));
+    if (mod_sub == NULL) {
+        do_debug(LOG_ERR, "Failed to alloc memory for mod %s\n", sub_name);
+        return;
+    }
+    memset(mod_sub, '\0', sizeof(struct module_sub));
+
+    strncpy(mod_sub->name, sub_name, LEN_32);
+    statis.total_mod_subs++;
+}
+
+void
 parse_int(int *var)
 {
     char   *token = strtok(NULL, W_SPACE);
@@ -188,6 +226,9 @@ parse_line(char *buff)
 
     } else if (strstr(token, "spec_")) {
         special_mod(token);
+
+    } else if (strstr(token, "sub_")) {
+        parse_mod_sub(token);
 
     } else if (!strcmp(token, "output_interface")) {
         parse_string(conf.output_interface);

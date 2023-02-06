@@ -173,13 +173,15 @@ struct jitter_shm {
 };
 static struct jitter_shm *jitshm = NULL;
 
-static struct mod_info cg_info[] = {
+static struct mod_info cg_load[] = {
 	/* load info 0-4 */
 	{" load1", HIDE_BIT,  0,  STATS_NULL},
 	{" load5", HIDE_BIT,  0,  STATS_NULL},
 	{"load15", HIDE_BIT,  0,  STATS_NULL},
 	{"  nrun", HIDE_BIT,  0,  STATS_NULL},
 	{"nunint", HIDE_BIT,  0,  STATS_NULL},
+};
+static struct mod_info cg_cpu[] = {
 	/* cpu info 5-15 */
 	{"  user", DETAIL_BIT,  0,  STATS_NULL},
 	{"  nice", HIDE_BIT,  0,  STATS_NULL},
@@ -192,6 +194,9 @@ static struct mod_info cg_info[] = {
 	{" guest", HIDE_BIT,  0,  STATS_NULL},
         {"nr_throttled", DETAIL_BIT,  0,  STATS_NULL},
         {"throttled_time", DETAIL_BIT,  0,  STATS_NULL},
+};
+
+static struct mod_info cg_mem[] = {
 	/* mem info 16-50*/
 	{"  cach", DETAIL_BIT,  0,  STATS_NULL},
 	{"  used", DETAIL_BIT,  0,  STATS_NULL},
@@ -228,6 +233,9 @@ static struct mod_info cg_info[] = {
 	{"dcl1se", HIDE_BIT,  0,  STATS_NULL},
 	{"dclcnt", HIDE_BIT,  0,  STATS_NULL},
 	{"dcltime", HIDE_BIT,  0,  STATS_NULL},
+};
+
+static struct mod_info cg_io[] = {
 	/* io info 51-64*/
 	{" riops", DETAIL_BIT,  MERGE_SUM,  STATS_NULL},
 	{" wiops", DETAIL_BIT,  MERGE_SUM,  STATS_NULL},
@@ -243,6 +251,9 @@ static struct mod_info cg_info[] = {
 	{"wioqsz", HIDE_BIT,  MERGE_AVG,  STATS_NULL},
 	{"rarqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
 	{"warqsz", DETAIL_BIT,  MERGE_AVG,  STATS_NULL},
+};
+
+static struct mod_info cg_hw[] = {
 	/* hw_events info 65-70 */
 	{"cycle", HIDE_BIT,  0,  STATS_NULL},
 	{"instr", HIDE_BIT,  0,  STATS_NULL},
@@ -250,6 +261,9 @@ static struct mod_info cg_info[] = {
 	{"llcmis", HIDE_BIT,  0,  STATS_NULL},
 	{"CPI", HIDE_BIT,  0,  STATS_NULL},
 	{"dltCPI", HIDE_BIT,  0,  STATS_NULL},
+};
+
+static struct mod_info cg_jitter[] = {
 	/* jitter info 71-76 */
 	{"numrsw", DETAIL_BIT,  0,  STATS_NULL},	/* total numbers of runqslow jitter */
 	{" tmrsw", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of runqslow delay */
@@ -259,7 +273,17 @@ static struct mod_info cg_info[] = {
 	{" tmirq", DETAIL_BIT,  0,  STATS_NULL},	/* the sum-time of irqoff delay */
 };
 
+static struct mod_info *cg_info;
+static int nr_cg_info;
+
 #define NR_CGROUP_INFO sizeof(cg_info)/sizeof(struct mod_info)
+
+static bool cg_load_enable = false;
+static bool cg_cpu_enable = false;
+static bool cg_mem_enable = false;
+static bool cg_io_enable = false;
+static bool cg_hw_enable = false;
+static bool cg_jitter_enable = false;
 
 static inline long get_con_pid(const char *con)
 {
@@ -672,7 +696,14 @@ static int get_load_and_enhanced_cpu_stats(int cg_idx)
 {
 	char filepath[LEN_1024];
 	FILE *file;
-	int items = 0, ret = 0;
+	int items = 0, item_expect = 0, ret = 0;
+
+	if (cg_load_enable)
+		item_expect += 5;
+	if (cg_cpu_enable)
+		item_expect += 9;
+	if (!item_expect)
+		return 0;
 
 	if (!get_cgroup_path(cgroups[cg_idx].name, "cpuacct", filepath, sizeof(filepath)))
 		return 0;
@@ -684,74 +715,81 @@ static int get_load_and_enhanced_cpu_stats(int cg_idx)
 
 	while (fgets(buffer, sizeof(buffer), file)) {
 		items += ret;
-		if (items == 14)
+		if (items == item_expect)
 			break;
-		ret = sscanf(buffer, "user %llu", &cgroups[cg_idx].cpu.cpu_user);
-		if (ret != 0) {
-			continue;
+
+		if (cg_cpu_enable) {
+			printf("get cpu info");
+			ret = sscanf(buffer, "user %llu", &cgroups[cg_idx].cpu.cpu_user);
+			if (ret != 0) {
+				printf("cpu user is %d\n", cgroups[cg_idx].cpu.cpu_user);
+				continue;
+			}
+			ret = sscanf(buffer, "nice %llu", &cgroups[cg_idx].cpu.cpu_nice);
+			if (ret != 0) {
+				cg_info[6].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "system %llu", &cgroups[cg_idx].cpu.cpu_sys);
+			if (ret != 0) {
+				continue;
+			}
+			ret = sscanf(buffer, "idle %llu", &cgroups[cg_idx].cpu.cpu_idle);
+			if (ret != 0) {
+				cg_info[8].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "iowait %llu", &cgroups[cg_idx].cpu.cpu_iowait);
+			if (ret != 0) {
+				cg_info[9].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "irq %llu", &cgroups[cg_idx].cpu.cpu_hirq);
+			if (ret != 0) {
+				cg_info[10].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "softirq %llu", &cgroups[cg_idx].cpu.cpu_sirq);
+			if (ret != 0) {
+				cg_info[11].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "steal %llu", &cgroups[cg_idx].cpu.cpu_steal);
+			if (ret != 0) {
+				cg_info[12].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "guest %llu", &cgroups[cg_idx].cpu.cpu_guest);
+			if (ret != 0) {
+				continue;
+			}
 		}
-		ret = sscanf(buffer, "nice %llu", &cgroups[cg_idx].cpu.cpu_nice);
-		if (ret != 0) {
-			cg_info[6].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "system %llu", &cgroups[cg_idx].cpu.cpu_sys);
-		if (ret != 0) {
-			continue;
-		}
-		ret = sscanf(buffer, "idle %llu", &cgroups[cg_idx].cpu.cpu_idle);
-		if (ret != 0) {
-			cg_info[8].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "iowait %llu", &cgroups[cg_idx].cpu.cpu_iowait);
-		if (ret != 0) {
-			cg_info[9].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "irq %llu", &cgroups[cg_idx].cpu.cpu_hirq);
-		if (ret != 0) {
-			cg_info[10].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "softirq %llu", &cgroups[cg_idx].cpu.cpu_sirq);
-		if (ret != 0) {
-			cg_info[11].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "steal %llu", &cgroups[cg_idx].cpu.cpu_steal);
-		if (ret != 0) {
-			cg_info[12].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "guest %llu", &cgroups[cg_idx].cpu.cpu_guest);
-		if (ret != 0) {
-			continue;
-		}
-		ret = sscanf(buffer, "load average(1min) %d", &cgroups[cg_idx].load.load_avg_1);
-		if (ret != 0) {
-			cg_info[0].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "load average(5min) %d", &cgroups[cg_idx].load.load_avg_5);
-		if (ret != 0) {
-			cg_info[1].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "load average(15min) %d", &cgroups[cg_idx].load.load_avg_15);
-		if (ret != 0) {
-			cg_info[2].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "nr_running %d", &cgroups[cg_idx].load.nr_running);
-		if (ret != 0) {
-			cg_info[3].summary_bit = DETAIL_BIT;
-			continue;
-		}
-		ret = sscanf(buffer, "nr_uninterruptible %d", &cgroups[cg_idx].load.nr_uninterrupt);
-		if (ret != 0) {
-			cg_info[4].summary_bit = DETAIL_BIT;
-			continue;
+		if (cg_load_enable) {
+			ret = sscanf(buffer, "load average(1min) %d", &cgroups[cg_idx].load.load_avg_1);
+			if (ret != 0) {
+				cg_info[0].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "load average(5min) %d", &cgroups[cg_idx].load.load_avg_5);
+			if (ret != 0) {
+				cg_info[1].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "load average(15min) %d", &cgroups[cg_idx].load.load_avg_15);
+			if (ret != 0) {
+				cg_info[2].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "nr_running %d", &cgroups[cg_idx].load.nr_running);
+			if (ret != 0) {
+				cg_info[3].summary_bit = DETAIL_BIT;
+				continue;
+			}
+			ret = sscanf(buffer, "nr_uninterruptible %d", &cgroups[cg_idx].load.nr_uninterrupt);
+			if (ret != 0) {
+				cg_info[4].summary_bit = DETAIL_BIT;
+				continue;
+			}
 		}
 	}
 
@@ -764,6 +802,9 @@ static int get_cpu_stats(int cg_idx)
 	char filepath[LEN_1024];
 	FILE *file;
 	int items = 0, ret = 0;
+
+	if (!cg_cpu_enable)
+		return 0;
 
 	if (!get_cgroup_path(cgroups[cg_idx].name, "cpu", filepath, sizeof(filepath)))
 		return 0;
@@ -858,6 +899,9 @@ static int get_memory_stats(int cg_idx)
 	FILE *file;
 	int items = 0, ret = 0;
 	unsigned long long active_file, inactive_file, usage_in_bytes;
+
+	if (!cg_mem_enable)
+		return 0;
 
 	if (!get_cgroup_path(cgroups[cg_idx].name, "memory", filepath, sizeof(filepath)))
 		return 0;
@@ -1000,6 +1044,9 @@ static int get_blkinfo_stats(int cg_idx)
 	char *path_end = filepath;
 	int items = 0, ret = 0;
 
+	if (!cg_io_enable)
+		return 0;
+
 	if (!get_cgroup_path(cgroups[cg_idx].name, "blkio", filepath, sizeof(filepath)))
 		return 0;
 
@@ -1053,6 +1100,9 @@ static int get_hwres_stats(int cg_idx)
 	int i, j, nr;
 	struct cg_hwres_info *hwres;
 
+	if (!cg_hw_enable)
+		return 0;
+
 	hwres = &cgroups[cg_idx].hwres;
 	if (!hwres->hw_fds || !hwres->hw_counters)
 		return 0;	//todo
@@ -1097,6 +1147,9 @@ static int get_jitter_stats(int cg_idx)
 	struct jit_lastN *lasti;
 	struct sched_jit_summary *jitsum[JITTER_NTYPE];
 
+	if (!cg_jitter_enable)
+		return 0;
+
 	jitsum[0] = &jitshm->nosched;
 	jitsum[1] = &jitshm->irqoff;
 	jitsum[2] = &jitshm->rqslow;
@@ -1139,6 +1192,9 @@ void get_cgroup_stats(void)
 
 static int print_cgroup_load(char *buf, int len, struct cg_load_info *info)
 {
+	if (!cg_load_enable)
+		return 0;
+
 	return snprintf(buf, len, "%d,%d,%d,%d,%d,",
 			info->load_avg_1,
 			info->load_avg_5,
@@ -1149,6 +1205,9 @@ static int print_cgroup_load(char *buf, int len, struct cg_load_info *info)
 
 static int print_cgroup_cpu(char *buf, int len, struct cg_cpu_info *info)
 {
+	if (!cg_cpu_enable)
+		return 0;
+
 	return snprintf(buf, len, "%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,",
 			info->cpu_user,
 			info->cpu_nice,
@@ -1175,6 +1234,9 @@ static int print_cgroup_memory(char *buf, int len, struct cg_mem_info *info)
 {
 	int ret;
 
+	if (!cg_mem_enable)
+		return 0;
+
 	ret = snprintf(buf, len, "%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,",
 			info->cache, info->used, info->limit, info->free,
 			info->util, info->pgfault, info->pgmjfault,
@@ -1189,6 +1251,9 @@ static int print_cgroup_memory(char *buf, int len, struct cg_mem_info *info)
 
 static int print_cgroup_blkio(char *buf, int len, struct cg_blkio_info *info)
 {
+	if (!cg_io_enable)
+		return 0;
+
 	return snprintf(buf, len, "%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu,",
 			info->rd_ios, info->wr_ios,
 			info->rd_bytes, info->wr_bytes,
@@ -1202,6 +1267,9 @@ static int print_cgroup_hwres(char *buf, int len, struct cg_hwres_info *info)
 {
 	int i, pos = 0;
 
+	if (!cg_hw_enable)
+		return 0;
+
 	for (i = 0; i < NCONF_HW; i++)
 		pos += snprintf(buf + pos, len - pos, "%lld,", info->hw_sum[i]);
 	pos += snprintf(buf + pos, len - pos, "%lld,", info->CPI);
@@ -1213,6 +1281,9 @@ static int print_cgroup_jitter(char *buf, int len, struct cg_jitter_info *infos)
 {
 	int i, pos = 0;
 	struct jitter_info *info;
+
+	if (!cg_jitter_enable)
+		return 0;
 
 	for (i = 0; i <  JITTER_NTYPE - 1; i++) {
 		info = &infos->info[i];
@@ -1262,6 +1333,10 @@ static void
 set_load_record(double st_array[], U_64 cur_array[])
 {
 	int i;
+
+	if (!cg_load_enable)
+		return;
+
 	for (i = 0; i < 3; i++) {
 		st_array[i] = cur_array[i] / 100.0;
 	}
@@ -1275,6 +1350,9 @@ set_cpu_record(double st_array[],
 {
 	int    i, j;
 	U_64   pre_total, cur_total;
+
+	if (!cg_cpu_enable)
+		return;
 
 	pre_total = cur_total = 0;
 
@@ -1312,6 +1390,9 @@ set_memory_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 	int i;
 	int lat_cnt = sizeof(struct cg_memlat_info) / sizeof(unsigned long long) * 3;
 
+	if (!cg_mem_enable)
+		return;
+
 	for (i = 0; i < 4; i++) {
 		st_array[i] = cur_array[i];
 	}
@@ -1327,6 +1408,9 @@ static void
 set_blkio_record(double st_array[], U_64 pre_array[], U_64 cur_array[], int inter)
 {
 	int i, data_valid = 1;
+
+	if (!cg_io_enable)
+		return;
 
 	for(i = 0; i < 11; i++){
 		if(cur_array[i] < pre_array[i]) {
@@ -1387,6 +1471,9 @@ set_blkio_record(double st_array[], U_64 pre_array[], U_64 cur_array[], int inte
 static void
 set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 {
+	if (!cg_hw_enable)
+		return;
+
 	/*
  	 * cpu_cycles  :        65
  	 * instructions:        66
@@ -1415,6 +1502,9 @@ set_hwres_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 static void
 set_cg_jit_record(double st_array[], U_64 pre_array[], U_64 cur_array[])
 {
+	if (!cg_jitter_enable)
+		return;
+
 	/*
  	 * numrqs: numbers of runqueue-slower jitter	71
  	 * tmrqs:  time of runqeueue-slower jitter	72
@@ -1444,9 +1534,73 @@ set_cgroup_record(struct module *mod, double st_array[],
 
 char *cg_lable = "cgroup";
 
+static void check_sub_enable(void)
+{
+    void *cg_info_ptr;
+    struct module_sub *mod_sub;
+    int i;
+
+    for ( i = 0; i < statis.total_mod_subs; i++ )
+    {
+        mod_sub = mod_subs[i];
+        if (!strcmp(mod_sub->name, "sub_cgroup_load")) {
+            cg_load_enable = true;
+            nr_cg_info += sizeof(cg_load)/sizeof(struct mod_info);
+        } else if (!strcmp(mod_sub->name, "sub_cgroup_cpu")) {
+            cg_cpu_enable = true;
+            nr_cg_info += sizeof(cg_cpu)/sizeof(struct mod_info);
+        } else if (!strcmp(mod_sub->name, "sub_cgroup_mem")) {
+            cg_mem_enable = true;
+            nr_cg_info += sizeof(cg_mem)/sizeof(struct mod_info);
+        } else if (!strcmp(mod_sub->name, "sub_cgroup_io")) {
+            cg_io_enable = true;
+            nr_cg_info += sizeof(cg_io)/sizeof(struct mod_info);
+        } else if (!strcmp(mod_sub->name, "sub_cgroup_hw")) {
+            cg_hw_enable = true;
+            nr_cg_info += sizeof(cg_hw)/sizeof(struct mod_info);
+        } else if (!strcmp(mod_sub->name, "sub_cgroup_jitter")) {
+            cg_jitter_enable = true;
+            nr_cg_info += sizeof(cg_jitter)/sizeof(struct mod_info);
+        }
+    }
+
+    cg_info = cg_info_ptr = malloc(nr_cg_info * sizeof(struct mod_info));
+    if (!cg_info_ptr) {
+        nr_cg_info = 0;
+        return;
+    }
+
+    if (cg_load_enable) {
+        memcpy(cg_info_ptr, cg_load, sizeof(cg_load));
+        cg_info_ptr += sizeof(cg_load);
+    }
+    if (cg_cpu_enable) {
+        memcpy(cg_info_ptr, cg_cpu, sizeof(cg_cpu));
+        cg_info_ptr += sizeof(cg_cpu);
+    }
+    if (cg_mem_enable) {
+        memcpy(cg_info_ptr, cg_mem, sizeof(cg_mem));
+        cg_info_ptr += sizeof(cg_mem);
+    }
+    if (cg_io_enable) {
+        memcpy(cg_info_ptr, cg_io, sizeof(cg_io));
+        cg_info_ptr += sizeof(cg_io);
+    }
+    if (cg_hw_enable) {
+        memcpy(cg_info_ptr, cg_hw, sizeof(cg_hw));
+        cg_info_ptr += sizeof(cg_hw);
+    }
+    if (cg_jitter_enable) {
+        memcpy(cg_info_ptr, cg_jitter, sizeof(cg_jitter));
+        cg_info_ptr += sizeof(cg_jitter);
+    }
+}
+
 void
 mod_register(struct module *mod)
 {
 	mod->lable = cg_lable;
-    register_mod_fields(mod, "--cg", cg_usage, cg_info, NR_CGROUP_INFO, read_cgroup_stat, set_cgroup_record);
+	check_sub_enable();
+	if (nr_cg_info > 0)
+		register_mod_fields(mod, "--cg", cg_usage, cg_info, nr_cg_info, read_cgroup_stat, set_cgroup_record);
 }

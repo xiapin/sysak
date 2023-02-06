@@ -8,11 +8,10 @@ mod drop;
 use crate::drop::drop::{run_drop, DropCommand};
 
 mod retran;
-use crate::retran::{RetranCommand, run_retran};
+use crate::retran::{run_retran, RetranCommand};
 
 use anyhow::{bail, Result};
 use structopt::StructOpt;
-
 
 mod message;
 use std::path::Path;
@@ -47,6 +46,14 @@ fn main() -> Result<()> {
     let opts = Command::from_args();
 
     let mut btf = opts.btf.clone();
+    if btf.is_none() {
+        if let Ok(sysak) = std::env::var("SYSAK_WORK_PATH") {
+            if let Ok(info) = uname::uname() {
+                btf = Some(format!("{}/tools/vmlinux-{}", sysak, info.release));
+                log::debug!("{:?}", btf);
+            }
+        }
+    }
     eutils_rs::helpers::bump_memlock_rlimit()?;
 
     match opts.subcommand {
