@@ -28,8 +28,8 @@ function CprocSockStat:proc(elapsed, lines)
             for i = 1, len do
                 local title = string.format("%s_%s", head, bodies[2 * i - 1])
                 local v = {
-                    name=title,
-                    value=tonumber(bodies[2 * i])
+                    name = title,
+                    value = tonumber(bodies[2 * i])
                 }
                 table.insert(vs, v)
             end

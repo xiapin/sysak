@@ -71,6 +71,16 @@ function system:hex2lows(hex)
     end))
 end
 
+function system:hexdump(buf)
+    for byte=1, #buf, 16 do
+        local chunk = buf:sub(byte, byte+15)
+        io.write(string.format('%08X  ',byte-1))
+        chunk:gsub('.', function (c) io.write(string.format('%02X ',string.byte(c))) end)
+        io.write(string.rep(' ',3*(16-#chunk)))
+        io.write(' ',chunk:gsub('%c','.'),"\n")
+    end
+end
+
 function system:timeRfc1123(t)
     t = t or os.time()
     return os.date("!%a, %d %b %Y %H:%M:%S GMT", t)

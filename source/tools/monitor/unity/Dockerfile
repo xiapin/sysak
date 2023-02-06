@@ -2,7 +2,7 @@ FROM registry.cn-hangzhou.aliyuncs.com/sysom/lcc
 MAINTAINER "liaozhaoyan <zhaoyan.lzy@alibaba-inc.com>"
 WORKDIR /root/
 RUN source /opt/rh/devtoolset-9/enable && \
-    yum install -y make wget  * unzip git && \
+    yum install -y make wget lua-devel unzip git && \
     mkdir /root/build && \
     cd /root/build && \
     git clone https://gitee.com/chuyansz/sysak.git && \
@@ -19,6 +19,10 @@ RUN source /opt/rh/devtoolset-9/enable && \
     cd yaml-0.2.5 && \
     ./configure && make && make install && \
     cd ../ && \
+    tar curl-7.87.0.tar.gz && \
+    cd curl-7.87.0 && \
+    ./configure --with-openssl && make && make install && \
+    cd ../ && \
     luarocks install luasec && \
     luarocks install lua-cjson && \
     luarocks install luasocket && \
@@ -26,9 +30,9 @@ RUN source /opt/rh/devtoolset-9/enable && \
     luarocks install lbase64 && \
     luarocks install lua-csnappy && \
     luarocks install lua-protobuf && \
-    luarocks install luaposix && \
     luarocks install sha1 && \
     luarocks install md5 && \
+    luarocks install luaposix 35.1-1 && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ && \
     cd ../beeQ/ && \
     make

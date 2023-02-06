@@ -41,6 +41,7 @@ function Cplugin:setup(plugins, proto_q)
     for _, plugin in ipairs(plugins) do
         local so = plugin.so
         if so then
+            print(so)
             local cffi = self._ffi.load(so)
             local plugin = {
                 so = plugin.so,

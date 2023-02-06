@@ -7,6 +7,9 @@ plugins:
   -
     so: sample_threads
     description: "threads example."
+#  -
+#    so: bpfsample2
+#    description: "bpf example."
 
 metrics:
   -
