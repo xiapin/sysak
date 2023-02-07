@@ -89,7 +89,7 @@ impl Kallsyms {
 
         if start == end && self.syms[start].1 <= addr {
             let mut name = self.syms[start].0.clone();
-            name.push_str(&format!("+{}", addr - self.syms[start].1 - 1));
+            name.push_str(&format!("+{}", addr - self.syms[start].1));
             return name;
         }
 

@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use drop::{Drop, DropEvent, DropFilter};
 use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
-use utils::timestamp::{current_monotime, current_realtime};
+use utils::{timestamp::{current_monotime, current_realtime}, delta_netstat::DeltaNetstat, delta_snmp::DeltaSnmp};
 
 #[derive(Debug, StructOpt)]
 pub struct DropCommand {
@@ -40,6 +40,8 @@ pub struct DropCommand {
     #[structopt(long, default_value = "600", help = "program running time in seconds")]
     duration: usize,
 
+    #[structopt(long, help = "trace kernel drop counters")]
+    delta: bool,
     #[structopt(long, help = "output in json format")]
     json: bool,
 }
@@ -136,6 +138,13 @@ pub fn run_drop(cmd: &DropCommand, debug: bool, btf: &Option<String>) {
         .expect("failed to update filter map");
 
     drop.skel.attach().expect("failed to attach bpf program");
+    
+    let mut netstat = None;
+    let mut snmp = None;
+    if cmd.delta {
+        netstat = Some(DeltaNetstat::new("/proc/net/netstat").unwrap());
+        snmp = Some(DeltaSnmp::new("/proc/net/snmp").unwrap());
+    }
 
     let mut event_count = 0;
     let duration = (cmd.duration * 1_000_000_000) as u64;
@@ -152,6 +161,16 @@ pub fn run_drop(cmd: &DropCommand, debug: bool, btf: &Option<String>) {
                 drop_json.add_drop(&event);
             } else {
                 println!("{}", event);
+            }
+
+            if let Some(x) = &mut netstat {
+                x.update().unwrap();
+                println!("netstat: {}", x);
+            }
+    
+            if let Some(x) = &mut snmp {
+                x.update().unwrap();
+                println!("snmp: {}", x);
             }
         }
 

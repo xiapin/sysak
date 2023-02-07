@@ -15,6 +15,7 @@ enum {
     IPTABLES,
     KFREE_SKB,
     TCP_DROP,
+    TP_KFREE_SKB,
 };
 
 struct drop_filter
@@ -48,6 +49,8 @@ struct drop_event
     u8 name[32];
     // iptables hook chain name
     u32 hook;
+
+    u64 location;
 };
 
 #endif

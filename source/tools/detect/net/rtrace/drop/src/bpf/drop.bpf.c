@@ -71,17 +71,13 @@ __always_inline void fill_sk_skb(struct drop_event *event, struct sock *sk, stru
 		event->skbap.daddr = ih.daddr;
 		event->skb_protocol = ih.protocol;
 		
-		protocol = protocol == 0 ? ih.protocol : protocol;
+		protocol = ih.protocol;
 		transport_header = network_header + (ih.ihl << 2);
 	}
 	else
 	{
 		bpf_probe_read(&transport_header, sizeof(transport_header), &skb->transport_header);
 	}
-
-	if (protocol == 0)
-		return;
-
 	switch (protocol)
 	{
 	case IPPROTO_ICMP:
@@ -90,17 +86,14 @@ __always_inline void fill_sk_skb(struct drop_event *event, struct sock *sk, stru
 		if (transport_header != 0 && transport_header != 0xffff)
 		{
 			bpf_probe_read(&uh, sizeof(uh), head + transport_header);
-			event->skbap.sport = bpf_ntohl(uh.source);
-			event->skbap.dport = bpf_ntohl(uh.dest);
+			event->skbap.sport = bpf_ntohs(uh.source);
+			event->skbap.dport = bpf_ntohs(uh.dest);
 		}
 		break;
 	case IPPROTO_TCP:
-		if (transport_header != 0 && transport_header != 0xffff)
-		{
-			bpf_probe_read(&th, sizeof(th), head + transport_header);
-			event->skbap.sport = bpf_ntohl(th.source);
-			event->skbap.dport = bpf_ntohl(th.dest);
-		}
+		bpf_probe_read(&th, sizeof(th), head + transport_header);
+		event->skbap.sport = bpf_ntohs(th.source);
+		event->skbap.dport = bpf_ntohs(th.dest);
 		break;
 	default:
 		break;
@@ -123,15 +116,15 @@ __always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb, u32
 
 		if (filter->protocol)
 		{
-			if (event.skb_protocol && filter->protocol != event.skb_protocol)
-				return;
-		
-			if (event.sk_protocol && filter->protocol != event.sk_protocol)
+			if (filter->protocol != event.skb_protocol && filter->protocol != event.sk_protocol)
 				return;
 		}
 		
 		if (sk)
 		{
+			// skip Close state
+			if (event.sk_state == 7)
+				return;
 			// sock addrpair
 			if (filter->ap.daddr && event.skap.daddr != filter->ap.daddr)
 				return;
@@ -166,6 +159,34 @@ SEC("kprobe/tcp_drop")
 int BPF_KPROBE(tcp_drop, struct sock *sk, struct sk_buff *skb)
 {
 	handle(ctx, sk, skb, TCP_DROP);
+	return 0;
+}
+
+struct kfree_skb_tp_args
+{
+    u32 pad[2];
+    struct sk_buff *skbaddr;
+	u64 location;
+	u16 protocol;
+};
+
+SEC("tracepoint/skb/kfree_skb")
+int tp_kfree_skb(struct kfree_skb_tp_args *ctx) 
+{
+	u32 key = 0;
+	struct drop_filter *filter = NULL;
+	struct drop_event event = {};
+
+	event.type = TP_KFREE_SKB;
+	filter = bpf_map_lookup_elem(&filter_map, &key);
+	if (filter) {
+		if ( filter->protocol !=0 && filter->protocol != ctx->protocol )
+			return 0;
+	}
+
+	event.skb_protocol = ctx->protocol;
+	event.location = ctx->location;
+
 	return 0;
 }
 
