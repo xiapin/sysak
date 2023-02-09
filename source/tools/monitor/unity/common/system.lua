@@ -51,12 +51,20 @@ function system:valueIsIn(tbl, value)
     if type(tbl) ~= "table" then
         return false
     end
-    for _, v in ipairs(tbl) do
+    for _, v in pairs(tbl) do
         if v == value then
             return true
         end
     end
     return false
+end
+
+function system:keyCount(tbl)
+    local count = 0
+    for _, _ in pairs(tbl) do
+        count = count + 1
+    end
+    return count
 end
 
 function system:hex2ups(hex)
