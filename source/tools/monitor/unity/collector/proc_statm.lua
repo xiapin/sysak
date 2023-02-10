@@ -4,8 +4,8 @@
 --- DateTime: 2023/1/29 6:07 PM
 ---
 
-require("class")
-local CvProc = require("vproc")
+require("common.class")
+local CvProc = require("collector.vproc")
 
 local CprocStatm = class("procStatm", CvProc)
 

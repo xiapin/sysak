@@ -4,29 +4,20 @@
 --- DateTime: 2022/12/25 11:20 AM
 ---
 
-local system = require("system")
-local pystring = require("pystring")
-local CfoxTSDB = require("foxTSDB")
-require("class")
+local system = require("common.system")
+local pystring = require("common.pystring")
+local CfoxTSDB = require("tsdb.foxTSDB")
+require("common.class")
 
 local Cexport = class("Cexport")
 
 function Cexport:_init_(instance, fYaml)
     self._instance = instance
     fYaml = fYaml or "../collector/plugin.yaml"
-    local ms = self:_load(fYaml)
+    local ms = system:parseYaml(fYaml)
     self._tDescr = ms.metrics
     self._fox = CfoxTSDB.new()
     self._fox:_setupRead()
-end
-
-function Cexport:_load(fYaml)
-    local lyaml = require("lyaml")
-    local f = io.open(fYaml,"r")
-    local s = f:read("*all")
-    f:close()
-
-    return lyaml.load(s)
 end
 
 local function qFormData(from, tData)

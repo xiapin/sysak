@@ -4,10 +4,9 @@
 --- DateTime: 2023/1/12 2:53 PM
 ---
 
-package.path = package.path .. ";../common/?.lua;"
-package.path = package.path .. ";../collector/native/?.lua;"
+package.path = package.path .. ";../?.lua;"
 
-local CprotoQueue = require("proto_queue")
+local CprotoQueue = require("beeQ.proto_queue")
 
 local workLoop = nil
 

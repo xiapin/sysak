@@ -4,19 +4,16 @@
 --- DateTime: 2022/12/21 11:44 AM
 ---
 
-package.path = package.path .. ";../common/?.lua;"
-package.path = package.path .. ";../httplib/?.lua;"
-package.path = package.path .. ";../tsdb/?.lua;"
-package.path = package.path .. ";../tsdb/native/?.lua;"
+package.path = package.path .. ";../?.lua;"
 
-local Cframe = require("frame")
-local CurlApi = require("url_api")
-local CurlRpc = require("url_rpc")
-local CurlIndex = require("index")
-local Cexport = require("export")
-local CurlGuide = require("url_guide")
-local CurlExportHtml = require("url_export_html")
-local CurlExportRaw = require("url_export_raw")
+local Cframe = require("beaver.frame")
+local CurlApi = require("beaver.url_api")
+local CurlRpc = require("beaver.url_rpc")
+local CurlIndex = require("beaver.index")
+local Cexport = require("beaver.export")
+local CurlGuide = require("beaver.url_guide")
+local CurlExportHtml = require("beaver.url_export_html")
+local CurlExportRaw = require("beaver.url_export_raw")
 
 local web = Cframe.new()
 

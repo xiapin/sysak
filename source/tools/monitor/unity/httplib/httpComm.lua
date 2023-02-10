@@ -4,11 +4,11 @@
 --- DateTime: 2022/12/19 10:46 PM
 ---
 
-require("class")
-local pystring = require("pystring")
+require("common.class")
+local pystring = require("common.pystring")
 local sockerUrl = require("socket.url")
 
-local ChttpComm = class("httpComm")
+local ChttpComm = class("httplib.httpComm")
 
 local cjson = require("cjson")
 local json = cjson.new()

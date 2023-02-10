@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/23 11:53 PM
 ---
 
-require("class")
-local pystring = require("pystring")
-local ChttpBase = require("httpBase")
+require("common.class")
+local pystring = require("common.pystring")
+local ChttpBase = require("httplib.httpBase")
 
 local ChttpHtml = class("ChttpHtml", ChttpBase)
 
@@ -15,7 +15,7 @@ function ChttpHtml:_init_(frame)
 end
 
 function ChttpHtml:markdown(text)
-    local md = require("lmd")
+    local md = require("common.lmd")
     return md:toHtml(text)
 end
 

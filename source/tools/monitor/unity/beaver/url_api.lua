@@ -4,10 +4,10 @@
 --- DateTime: 2022/12/22 12:08 PM
 ---
 
-require("class")
-local system = require("system")
-local ChttpApp = require("httpApp")
-local CfoxTSDB = require("foxTSDB")
+require("common.class")
+local system = require("common.system")
+local ChttpApp = require("httplib.httpApp")
+local CfoxTSDB = require("tsdb.foxTSDB")
 local CurlApi = class("urlApi", ChttpApp)
 
 function CurlApi:_init_(frame)

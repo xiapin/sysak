@@ -4,8 +4,8 @@
 --- DateTime: 2023/2/3 2:14 PM
 ---
 
-require("class")
-local system = require("system")
+require("common.class")
+local system = require("common.system")
 
 local CslsProto = class("CslsProto")
 

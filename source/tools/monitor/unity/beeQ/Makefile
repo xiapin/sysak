@@ -25,3 +25,6 @@ clean:
 	@echo "Removing linked and compiled files......"
 	$(foreach N, $(DEPMOD),make clean -C $(N);)
 	rm -f $(OBJ) $(PRG)
+
+dist:$(PRG)
+	./pack.sh

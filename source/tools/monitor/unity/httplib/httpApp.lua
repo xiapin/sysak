@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/22 12:14 PM
 ---
 
-require("class")
-local ChttpBase = require("httpBase")
-local pystring = require("pystring")
+require("common.class")
+local ChttpBase = require("httplib.httpBase")
+local pystring = require("common.pystring")
 
 local ChttpApp = class("ChttpApp", ChttpBase)
 

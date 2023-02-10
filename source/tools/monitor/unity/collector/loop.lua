@@ -4,20 +4,20 @@
 --- DateTime: 2022/12/16 10:39 PM
 ---
 
-require("class")
-local CprotoData = require("protoData")
-local procffi = require("procffi")
+require("common.class")
+local CprotoData = require("common.protoData")
+local procffi = require("collector.native.procffi")
 
-local CprocStat = require("proc_stat")
-local CprocMeminfo = require("proc_meminfo")
-local CprocVmstat = require("proc_vmstat")
-local CprocNetdev = require("proc_netdev")
-local CprocDiskstats = require("proc_diskstats")
-local CprocSockStat = require("proc_sockstat")
-local CprocSnmpStat = require("proc_snmp_stat")
-local CprocMounts = require("proc_mounts")
-local CprocStatm = require("proc_statm")
-local Cplugin = require("plugin")
+local CprocStat = require("collector.proc_stat")
+local CprocMeminfo = require("collector.proc_meminfo")
+local CprocVmstat = require("collector.proc_vmstat")
+local CprocNetdev = require("collector.proc_netdev")
+local CprocDiskstats = require("collector.proc_diskstats")
+local CprocSockStat = require("collector.proc_sockstat")
+local CprocSnmpStat = require("collector.proc_snmp_stat")
+local CprocMounts = require("collector.proc_mounts")
+local CprocStatm = require("collector.proc_statm")
+local Cplugin = require("collector.plugin")
 
 local Cloop = class("loop")
 

@@ -9,10 +9,9 @@
 local unistd = require("posix.unistd")
 local poll = require("posix.poll")
 
-require("class")
-local ChttpComm = require("httpComm")
-local pystring = require("pystring")
-local serpent = require("serpent")
+require("common.class")
+local ChttpComm = require("httplib.httpComm")
+local pystring = require("common.pystring")
 local Cframe = class("frame", ChttpComm)
 
 function Cframe:_init_()

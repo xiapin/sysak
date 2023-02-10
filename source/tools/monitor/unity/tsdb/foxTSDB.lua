@@ -4,13 +4,13 @@
 --- DateTime: 2022/12/17 11:04 AM
 ---
 
-require("class")
+require("common.class")
 
-local system = require("system")
+local system = require("common.system")
 local snappy = require("snappy")
-local pystring = require("pystring")
-local CprotoData = require("protoData")
-local foxFFI = require("foxffi")
+local pystring = require("common.pystring")
+local CprotoData = require("common.protoData")
+local foxFFI = require("tsdb.native.foxffi")
 
 local CfoxTSDB = class("CfoxTSDB")
 

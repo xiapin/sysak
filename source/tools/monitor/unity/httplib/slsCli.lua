@@ -4,17 +4,17 @@
 --- DateTime: 2023/1/30 3:06 PM
 ---
 
-require("class")
+require("common.class")
 
 local sha1 = require("sha1")
 local lz4 = require("lz4")
 local md5 = require("md5")
 local base64 = require("base64")
-local system = require("system")
-local pystring = require("pystring")
+local system = require("common.system")
+local pystring = require("common.pystring")
 
-local ChttpCli = require("httpCli")
-local CslsProto = require("slsProto")
+local ChttpCli = require("httplib.httpCli")
+local CslsProto = require("protobuf.slsProto")
 local CslsCli = class("slsCli", ChttpCli)
 
 function CslsCli:_init_(endPoint, project, store, key, pswd, proxy)

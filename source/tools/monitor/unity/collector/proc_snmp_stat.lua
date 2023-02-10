@@ -4,10 +4,10 @@
 --- DateTime: 2023/1/19 11:19 PM
 ---
 
-require("class")
-local CvProc = require("vproc")
-local system = require("system")
-local pystring = require("pystring")
+require("common.class")
+local CvProc = require("collector.vproc")
+local system = require("common.system")
+local pystring = require("common.pystring")
 
 local CprocSnmpStat = class("proc_snmp_stat", CvProc)
 

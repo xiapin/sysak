@@ -4,8 +4,8 @@
 --- DateTime: 2022/12/16 11:40 PM
 ---
 
-require("class")
-local CkvProc = require("kvProc")
+require("common.class")
+local CkvProc = require("collector.kvProc")
 
 local CprocVmstat = class("proc_vmstat", CkvProc)
 

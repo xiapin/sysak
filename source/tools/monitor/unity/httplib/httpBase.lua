@@ -4,8 +4,8 @@
 --- DateTime: 2022/12/24 9:52 AM
 ---
 
-require("class")
-local ChttpComm = require("httpComm")
+require("common.class")
+local ChttpComm = require("httplib.httpComm")
 
 local ChttpBase = class("ChttpBase", ChttpComm)
 

@@ -1,3 +1,8 @@
+config:
+  freq: 20   # unit second
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify
+    mode: hostip
+
 plugins:
   - so: kmsg
     description: "collect dmesg info."
@@ -7,9 +12,9 @@ plugins:
   -
     so: sample_threads
     description: "threads example."
-  -
-    so: bpfsample2
-    description: "bpf threads example."
+#  -
+#    so: bpfsample2
+#    description: "bpf threads example."
 
 metrics:
   -

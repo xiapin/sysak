@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/16 11:57 PM
 ---
 
-require("class")
-local CvProc = require("vproc")
-local system = require("system")
+require("common.class")
+local CvProc = require("collector.vproc")
+local system = require("common.system")
 
 local CprocNetdev = class("proc_netdev", CvProc)
 

@@ -4,11 +4,11 @@
 --- DateTime: 2023/1/29 5:18 PM
 ---
 
-require("class")
+require("common.class")
 local statvfs = require "posix.sys.statvfs".statvfs
-local pystring = require("pystring")
-local system = require("system")
-local CvProc = require("vproc")
+local pystring = require("common.pystring")
+local system = require("common.system")
+local CvProc = require("collector.vproc")
 
 local CprocMounts = class("proc_mounts", CvProc)
 

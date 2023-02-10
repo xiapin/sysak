@@ -4,8 +4,8 @@
 --- DateTime: 2022/12/19 4:40 PM
 ---
 
-require("class")
-local ChttpComm = require("httpComm")
+require("common.class")
+local ChttpComm = require("httplib.httpComm")
 local ChttpCli = class("httpCli", ChttpComm)
 
 function ChttpCli:_init_(proxy)

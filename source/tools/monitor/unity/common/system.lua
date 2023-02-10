@@ -5,7 +5,7 @@
 ---
 
 local socket = require("socket")
-local serpent = require("serpent")
+local serpent = require("common.serpent")
 
 local system = {}
 
@@ -92,6 +92,15 @@ end
 function system:timeRfc1123(t)
     t = t or os.time()
     return os.date("!%a, %d %b %Y %H:%M:%S GMT", t)
+end
+
+function system:parseYaml(fYaml)
+    local lyaml = require("lyaml")
+    local f = io.open(fYaml,"r")
+    local s = f:read("*all")
+    f:close()
+
+    return lyaml.load(s)
 end
 
 return system

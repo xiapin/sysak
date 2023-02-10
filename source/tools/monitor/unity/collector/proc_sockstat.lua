@@ -4,9 +4,9 @@
 --- DateTime: 2023/1/17 12:27 AM
 ---
 
-require("class")
-local pystring = require("pystring")
-local CvProc = require("vproc")
+require("common.class")
+local pystring = require("common.pystring")
+local CvProc = require("collector.vproc")
 
 local CprocSockStat = class("procsockstat", CvProc)
 
