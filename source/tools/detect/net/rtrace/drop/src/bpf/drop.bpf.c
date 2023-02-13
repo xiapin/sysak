@@ -35,7 +35,7 @@ __always_inline void fill_pid(struct drop_event *event)
 	comm(event->comm);
 }
 
-__always_inline void fill_sk_skb(struct drop_event *event, struct sock *sk, struct sk_buff *skb)
+__always_inline int fill_sk_skb(struct drop_event *event, struct sock *sk, struct sk_buff *skb)
 {
 	struct net *net = NULL;
 	struct iphdr ih = {};
@@ -96,8 +96,10 @@ __always_inline void fill_sk_skb(struct drop_event *event, struct sock *sk, stru
 		event->skbap.dport = bpf_ntohs(th.dest);
 		break;
 	default:
+		return -1;
 		break;
 	}
+	return 0;
 }
 
 __always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb, u32 type)
@@ -107,7 +109,8 @@ __always_inline void handle(void *ctx, struct sock *sk, struct sk_buff *skb, u32
 	struct drop_event event = {};
 
 	event.type = type;
-	fill_sk_skb(&event, sk, skb);
+	if (fill_sk_skb(&event, sk, skb) < 0)
+		return;
 	filter = bpf_map_lookup_elem(&filter_map, &key);
 	if (filter)
 	{
