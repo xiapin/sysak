@@ -19,7 +19,7 @@ def signal_exit_handler(signum, frame):
 
 def main():
     if os.geteuid() != 0:
-        print "This program must be run as root. Aborting."
+        print("%s" % ("This program must be run as root. Aborting."))
         sys.exit(0)
     examples = """e.g.
   ./iofsstat.py -d vda -c 1
