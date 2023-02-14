@@ -11,6 +11,7 @@
 | proc/vmstat | /collector/proc\_vmstat.lua |
 | /proc/diskstats | /collector/proc\_diskstats.lua |
 | /proc/net/dev | /collector/proc\_netdev.lua |
+| /proc/schedstat | /collector/plugin/proc\_schedstat.c |
 
 ## libbpf probes
 
