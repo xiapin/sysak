@@ -229,7 +229,7 @@ static int down_install_ext_tools(const char *tool)
     char rule[LINE_BUFF_LEN];
     char *pstr;
 
-    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s 1&>/dev/null",
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s &>/dev/null",
            sysak_components_server, machine, tool, tools_path);
     //printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
@@ -263,7 +263,7 @@ static int down_install_ext_tools(const char *tool)
         return -1;
     }
 
-    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s 1&>/dev/null",
+    sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/%s -P %s &>/dev/null",
             sysak_components_server, machine, tool, filename, tools_path);
     //printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
@@ -316,7 +316,7 @@ static int down_install(const char *component_name)
 
         //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s 1&>/dev/null",
         //        sysak_components_server, machine, module_tag, module_path, kern_version);
-        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko 1&>/dev/null",
+        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
                 sysak_components_server, machine, kern_version, module_path, kern_version);
         //printf("%s ... \n", download_cmd);
         ret = system(download_cmd);
@@ -327,7 +327,7 @@ static int down_install(const char *component_name)
         sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
 	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
-	    sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s 1&>/dev/null",
+	    sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
                sysak_components_server, machine, kern_version, tools_path);
         //printf("%s ... \n", download_cmd);
         ret = system(download_cmd);
