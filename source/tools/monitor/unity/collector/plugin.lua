@@ -10,7 +10,6 @@ local Cplugin = class("plugin")
 
 function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
     self._proto = proto
-    fYaml = fYaml or "../collector/plugin.yaml"
     local res = system:parseYaml(fYaml)
 
     self._ffi = require("collector.native.plugincffi")

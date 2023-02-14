@@ -9,8 +9,8 @@ local CkvProc = require("collector.kvProc")
 
 local CprocMeminfo = class("proc_meminfo", CkvProc)
 
-function CprocMeminfo:_init_(proto, pffi, pFile)
-    CkvProc._init_(self, proto, pffi, pFile or "/proc/meminfo", "meminfo")
+function CprocMeminfo:_init_(proto, pffi, mnt, pFile)
+    CkvProc._init_(self, proto, pffi, mnt,pFile or "proc/meminfo", "meminfo")
 end
 
 return CprocMeminfo

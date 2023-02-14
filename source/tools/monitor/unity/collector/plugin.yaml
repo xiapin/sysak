@@ -1,7 +1,11 @@
 config:
   freq: 20   # unit second
-  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify
-    mode: hostip
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+    mode: specify
+    name: test_specify
+#    mode: hostip
+  proc_path: /mnt/home/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+#  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 
 plugins:
   - so: kmsg

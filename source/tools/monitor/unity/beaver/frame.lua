@@ -157,7 +157,6 @@ function Cframe:proc(fd)
             unistd.write(fd, self:echo404())
         end
     end
-    collectgarbage("collect")
 end
 
 function Cframe:register(path, obj)

@@ -15,6 +15,7 @@ function Cexport:_init_(instance, fYaml)
     self._instance = instance
     fYaml = fYaml or "../collector/plugin.yaml"
     local ms = system:parseYaml(fYaml)
+    self._freq = ms.config.freq
     self._tDescr = ms.metrics
     self._fox = CfoxTSDB.new()
     self._fox:_setupRead()
@@ -54,7 +55,7 @@ end
 function Cexport:export()
     local qs = {}
     self._fox:resize()
-    self._fox:qlast(15, qs)
+    self._fox:qlast(self._freq, qs)
     local res = {}
     for _, line in ipairs(self._tDescr) do
         local from = line.from

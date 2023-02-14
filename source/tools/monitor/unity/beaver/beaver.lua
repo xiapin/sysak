@@ -24,7 +24,9 @@ function init(tid)
     CurlRpc.new(web)
     CurlGuide.new(web)
 
-    local export = Cexport.new("12345abdc")
+    local Cidentity = require("beaver.identity")
+    local inst = Cidentity.new()
+    local export = Cexport.new(inst:id())
     CurlExportHtml.new(web, export)
     CurlExportRaw.new(web, export)
     return 0

@@ -4,7 +4,7 @@
 --- DateTime: 2023/2/9 11:24 PM
 ---
 
-local cjson = require("cjson")
+local cjson = require("cjson.safe")
 local pystring = require("common.pystring")
 local system = require("common.system")
 local module = {}

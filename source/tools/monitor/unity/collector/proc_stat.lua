@@ -10,8 +10,8 @@ local CvProc = require("collector.vproc")
 
 local CprocStat = class("procstat", CvProc)
 
-function CprocStat:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or "/proc/stat")
+function CprocStat:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt,pFile or "proc/stat")
     self._funs = self:setupTable()
     self._cpuArr = {}
 end

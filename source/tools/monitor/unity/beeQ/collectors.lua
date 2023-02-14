@@ -11,7 +11,6 @@ local system = require("common.system")
 workLoop = nil
 
 local function setupFreq(fYaml)
-    fYaml = fYaml or "../collector/plugin.yaml"
     local conf = system:parseYaml(fYaml)
     if conf then
         local ret = tonumber(conf.config.freq)
@@ -27,9 +26,10 @@ local function setupFreq(fYaml)
 end
 
 function init(que, proto_q, t)
-    local work = Cloop.new(que, proto_q)
+    local fYaml = "../collector/plugin.yaml"
+    local work = Cloop.new(que, proto_q, fYaml)
     workLoop = work
-    return setupFreq()
+    return setupFreq(fYaml)
 end
 
 function work(t)

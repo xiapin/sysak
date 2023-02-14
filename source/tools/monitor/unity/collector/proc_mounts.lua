@@ -12,8 +12,8 @@ local CvProc = require("collector.vproc")
 
 local CprocMounts = class("proc_mounts", CvProc)
 
-function CprocMounts:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or "/proc/mounts")
+function CprocMounts:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt, pFile or "proc/mounts")
     self._counter = 0
     self._mpoints = {}
 end

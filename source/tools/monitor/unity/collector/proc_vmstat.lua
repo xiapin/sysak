@@ -9,8 +9,8 @@ local CkvProc = require("collector.kvProc")
 
 local CprocVmstat = class("proc_vmstat", CkvProc)
 
-function CprocVmstat:_init_(proto, pffi, pFile)
-    CkvProc._init_(self, proto, pffi, pFile or "/proc/vmstat", "vmstat")
+function CprocVmstat:_init_(proto, pffi, mnt, pFile)
+    CkvProc._init_(self, proto, pffi, mnt,pFile or "proc/vmstat","vmstat")
 end
 
 return CprocVmstat

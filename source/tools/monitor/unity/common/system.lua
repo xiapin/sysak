@@ -59,12 +59,34 @@ function system:valueIsIn(tbl, value)
     return false
 end
 
+function system:valueIndex(tbl, value)
+    if type(tbl) ~= "table" then
+        return 0
+    end
+    for i, v in ipairs(tbl) do
+        if v == value then
+            return i
+        end
+    end
+    return 0
+end
+
 function system:keyCount(tbl)
     local count = 0
     for _, _ in pairs(tbl) do
         count = count + 1
     end
     return count
+end
+
+function system:dictCopy(tbl)
+    local cp = {}
+    assert(type(tbl) == "table")
+
+    for k, v in pairs(tbl) do
+        cp[k] = v
+    end
+    return cp
 end
 
 function system:hex2ups(hex)

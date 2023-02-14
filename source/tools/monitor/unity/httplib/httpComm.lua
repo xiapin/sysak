@@ -10,7 +10,7 @@ local sockerUrl = require("socket.url")
 
 local ChttpComm = class("httplib.httpComm")
 
-local cjson = require("cjson")
+local cjson = require("cjson.safe")
 local json = cjson.new()
 
 local function codeTable()

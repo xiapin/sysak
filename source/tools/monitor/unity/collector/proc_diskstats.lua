@@ -10,8 +10,8 @@ local CvProc = require("collector.vproc")
 
 local CprocDiskstats = class("proc_diskstats", CvProc)
 
-function CprocDiskstats:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or "/proc/diskstats")
+function CprocDiskstats:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt, pFile or "proc/diskstats")
     self._lastData = {}
     self._lastDisk = {}
     self._diskVNum = 11
