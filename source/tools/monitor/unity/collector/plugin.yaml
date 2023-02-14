@@ -20,6 +20,10 @@ plugins:
 #    so: bpfsample2
 #    description: "bpf threads example."
 
+  -
+    so: proc_schedstat
+    description: "collect schedule stat info of percpu"
+
 metrics:
   -
     title: sysak_proc_cpu_total
@@ -97,4 +101,8 @@ metrics:
     head: value
     help: "example for bpfsample2"
     type: "gauge"
-
+  - title: sysak_proc_schedstat
+    from: proc_schedstat
+    head: value
+    help: "schedule state of percpu."
+    type: "gauge"

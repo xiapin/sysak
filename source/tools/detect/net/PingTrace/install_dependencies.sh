@@ -1,6 +1,6 @@
 #!/bin/bash
 
-yum install -y cmake3 \
+yum install -y cmake3 wget \
                ncurses-devel zlib-devel \
                zlib-static glibc-static libstdc++-static
 

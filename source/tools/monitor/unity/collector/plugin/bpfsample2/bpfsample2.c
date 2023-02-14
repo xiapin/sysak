@@ -29,17 +29,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 
 DEFINE_SEKL_OBJECT(bpfsample2);
 
-void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt)
-{
-    printf("Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
-}
-
-int thread_worker(struct beeQ *q, void *arg)
-{
-    perf_thread_worker(arg);
-    return 0;
-}
-
 int init(void *arg)
 {
     printf("bpfsample2 plugin install.\n");
@@ -53,5 +42,6 @@ int call(int t, struct unity_lines *lines)
 
 void deinit(void)
 {
+    printf("bpfsample2 plugin uninstall.\n");
     DESTORY_SKEL_BOJECT(bpfsample2);
 }
