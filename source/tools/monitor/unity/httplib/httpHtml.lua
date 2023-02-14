@@ -41,10 +41,11 @@ local function htmlPack(title, content)
     return pystring:join("", bodies)
 end
 
-function ChttpHtml:echo(tRet)
+function ChttpHtml:echo(tRet, keep)
     local stat = self:packStat(200)
     local tHead = {
         ["Content-Type"] = "text/html",
+        ["Connection"] = (keep and "keep-alive") or "close"
     }
     local body = htmlPack(tRet.title, tRet.content)
     local headers = self:packHeaders(tHead, #body)

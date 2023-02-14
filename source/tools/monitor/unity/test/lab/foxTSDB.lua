@@ -138,7 +138,6 @@ function CfoxTSDB:write(buff)
     local now = self:get_us()
     local date = self:getDateFrom_us(now)
     local stream = snappy.compress(buff)
-    print("write for time: ", now)
     assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(stream, #stream), #stream) == 0)
     --assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(buff), #buff) == 0)
 end

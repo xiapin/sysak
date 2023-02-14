@@ -75,8 +75,7 @@ end
 
 local function originHeader()
     return {
-        connection = "close",
-        server = "beaver/0.0.1",
+        server = "beaver/0.0.2",
         date = os.date("%a, %d %b %Y %H:%M:%S %Z", os.time()),
     }
 end

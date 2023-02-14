@@ -19,27 +19,23 @@ function Cframe:_init_()
     self._objs = {}
 end
 
-local function waitDataRest(fd, rest, tReq, tmo)
-    tmo = tmo or 100  -- max wait 100ms, other wise
+local function waitDataRest(fread, rest, tReq)
     local len = 0
-    local tStream = {}
+    local tStream = {tReq.data}
     while len < rest do
-        local r = poll.rpoll(fd, tmo)
-        if r == 0 then   -- wait time out
-            return -1
-        elseif r == 1 then
-            local s = unistd.read(fd, 4096)
-            table.insert(tStream, s)
+        local s = fread()
+        if s then
             len = len + #s
-        else        -- bad socket
-            return -2
+            table.insert(tStream, s)
+        else
+            return -1
         end
     end
-    tReq.data = tReq.data .. pystring:join("", tStream)
+    tReq.data = pystring:join("", tStream)
     return 0
 end
 
-local function waitHttpRest(fd, tReq)
+local function waitHttpRest(fread, tReq)
     if tReq.header["content-length"] then
         local lenData = #tReq.data
         local lenInfo = tonumber(tReq.header["content-length"])
@@ -49,39 +45,29 @@ local function waitHttpRest(fd, tReq)
             return -1
         end
 
-        if waitDataRest(fd, rest, tReq) < 0 then
+        if waitDataRest(fread, rest, tReq) < 0 then
             return -2
         end
     end
     return 0
 end
 
-local function waitHttpHead(fd, tmo, maxLen)
-    tmo = tmo or 100  -- max wait 100ms,
-    maxLen = maxLen or 8192
-    local use = 0
+local function waitHttpHead(fread)
     local stream = ""
-    while tmo > 0 do
-        local r = poll.rpoll(fd, tmo)
-        if r == 0 then
-            return nil
-        elseif r == 1 then
-            local s = unistd.read(fd, maxLen - use)
-            if type(s) == "string" then
-                stream = stream .. s
-                use = use + #stream
-                if string.find(stream, "\r\n\r\n") then -- http head end with \r\n\r\n
-                    return stream
-                end
+    while true do
+        local s = fread()
+        if s then
+            stream = stream .. s
+            if string.find(stream, "\r\n\r\n") then
+                return stream
             end
-            tmo = tmo - 1    -- time quota weill
-        else   -- bad socket
+        else
             return nil
         end
     end
 end
 
-function Cframe:parse(fd, stream)
+function Cframe:parse(fread, stream)
     local tStatus = pystring:split(stream, "\r\n", 1)
     if #tStatus < 2 then
         print("bad stream format.")
@@ -120,7 +106,7 @@ function Cframe:parse(fd, stream)
     end
     tReq.header = header
     tReq.data = data
-    if waitHttpRest(fd, tReq) < 0 then
+    if waitHttpRest(fread, tReq) < 0 then
         return nil
     end
     return tReq
@@ -137,24 +123,24 @@ function Cframe:echo404()
     return pystring:join("\r\n", tHttp)
 end
 
-function Cframe:proc(fd)
-    local stream = waitHttpHead(fd)
-    if type(stream) ~= "string" then   -- read return stream or error code or nil
-        return stream
+function Cframe:proc(fread)
+    local stream = waitHttpHead(fread)
+    if stream == nil then   -- read return stream or error code or nil
+        return nil
     end
 
-    local tReq = self:parse(fd, stream)
+    local tReq = self:parse(fread, stream)
     if tReq then
         if self._objs[tReq.path] then
             local obj = self._objs[tReq.path]
-            local res = obj:call(tReq)
-            unistd.write(fd, res)
+            local res, keep = obj:call(tReq)
+            return res, keep
         else
             print("show all path.")
             for k, _ in pairs(self._objs) do
                 print("path:",  k)
             end
-            unistd.write(fd, self:echo404())
+            return self:echo404(), false
         end
     end
 end

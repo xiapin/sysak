@@ -31,7 +31,7 @@ end
 function CurlApi:sub(tReq)
     local stat, tJson = pcall(self.getJson, self, tReq)
     if stat then
-        return {sum=tJson.num1 - tJson.num2}
+        return {sub=tJson.num1 - tJson.num2}
     else
         return {}
     end

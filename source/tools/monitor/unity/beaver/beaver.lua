@@ -14,11 +14,13 @@ local Cexport = require("beaver.export")
 local CurlGuide = require("beaver.url_guide")
 local CurlExportHtml = require("beaver.url_export_html")
 local CurlExportRaw = require("beaver.url_export_raw")
+local CLocalBeaver = require("beaver.localBeaver")
 
-local web = Cframe.new()
+local lb = nil
 
-function init(tid)
-    print("hello beaver " .. tid)
+function init(port, backlog)
+    local web = Cframe.new()
+
     CurlIndex.new(web)
     CurlApi.new(web)
     CurlRpc.new(web)
@@ -29,10 +31,12 @@ function init(tid)
     local export = Cexport.new(inst:id())
     CurlExportHtml.new(web, export)
     CurlExportRaw.new(web, export)
+
+    lb = CLocalBeaver.new(web, port, nil, backlog)
     return 0
 end
 
-function echo(fd)
-    web:proc(fd)
+function echo()
+    lb:poll()
     return 0
 end

@@ -8,12 +8,12 @@ def randomNum():
     return random.randint(0, 1000) / 100.0
 
 
-def post_test():
+def post_test(session):
     url = "http://127.0.0.1:8400/api/"
     mod = random.choice(("sum", "sub"))
     url += mod
     d = {"num1": randomNum(), "num2": randomNum()}
-    res = requests.post(url, json=d)
+    res = session.post(url, json=d)
     ret = res.content.decode()
     if mod == "sum":
         vLocal = d["num1"] + d["num2"]
@@ -25,6 +25,7 @@ def post_test():
 
 
 if __name__ == "__main__":
+    session = requests.session()
     while True:
-        post_test()
+        post_test(session)
         time.sleep(random.randint(1, 100)/100.0)
