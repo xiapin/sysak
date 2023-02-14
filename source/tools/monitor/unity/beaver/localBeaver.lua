@@ -153,6 +153,7 @@ function CLocalBeaver:write(fd, stream)
             res = self._cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
             assert(res == 0)
         end
+        return 1
     else
         posixError("socket send error.", err, errno)
         return nil
@@ -164,9 +165,9 @@ function CLocalBeaver:_proc(fd)
     while true do
         local res, alive = self._frame:proc(fread)
         if res then
-            self:write(fd, res)
+            local stat = self:write(fd, res)
 
-            if not alive then
+            if not alive or not stat then
                 self:co_exit(fd)
                 break
             end
