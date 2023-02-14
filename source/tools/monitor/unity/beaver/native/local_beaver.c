@@ -94,6 +94,20 @@ int add_fd(int efd, int fd) {
     return res;
 }
 
+int mod_fd(int efd, int fd, int wr) {
+    struct epoll_event event;
+    int res;
+
+    event.events  =  wr ? EPOLLIN | EPOLLOUT : EPOLLIN;
+    event.data.fd = fd;
+
+    res = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &event);
+    if (res < 0) {
+        perror("error : can not add event to epoll!\n");
+    }
+    return res;
+}
+
 int del_fd(int efd, int fd) {
     int res;
     res = epoll_del(efd, fd);
@@ -116,12 +130,14 @@ int poll_fds(int efd, int tmo, native_events_t* nes) {
         nes->evs[i].fd = events[i].data.fd;
 
         if ( (events[i].events & EPOLLERR) ||
-             (events[i].events & EPOLLHUP) ||
-             !(events[i].events & EPOLLIN) ) {
+             (events[i].events & EPOLLHUP) ) {
             nes->evs[i].ev_close = 1;
         }
         if (events[i].events & EPOLLIN) {
             nes->evs[i].ev_in = 1;
+        }
+        if (events[i].events & EPOLLOUT) {
+            nes->evs[i].ev_out = 1;
         }
     }
     return 0;

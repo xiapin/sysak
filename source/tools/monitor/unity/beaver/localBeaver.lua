@@ -124,12 +124,47 @@ function CLocalBeaver:read(fd, maxLen)
     return readFd
 end
 
+function CLocalBeaver:write(fd, stream)
+    local sent, err, errno
+    local res
+
+    sent, err, errno = socket.send(fd, stream)
+    if sent then
+        if sent < #stream then  -- send buffer may full
+            print("need to send buffer for " .. (#stream - sent))
+            res = self._cffi.mod_fd(self._efd, fd, 1)  -- epoll write ev
+            assert(res == 0)
+
+            while sent < #stream do
+                local e = coroutine.yield()
+                if e.ev_close > 0 then
+                    return nil
+                elseif e.ev_out then
+                    stream = string.sub(stream, sent + 1)
+                    sent, err, errno = socket.send(fd, stream)
+                    if sent == nil then
+                        posixError("socket send error.", err, errno)
+                        return nil
+                    end
+                else  -- need to read ? may something error or closed.
+                    return nil
+                end
+            end
+            res = self._cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
+            assert(res == 0)
+        end
+    else
+        posixError("socket send error.", err, errno)
+        return nil
+    end
+end
+
 function CLocalBeaver:_proc(fd)
     local fread = self:read(fd)
     while true do
         local res, alive = self._frame:proc(fread)
         if res then
-            socket.send(fd, res)
+            self:write(fd, res)
 
             if not alive then
                 self:co_exit(fd)
