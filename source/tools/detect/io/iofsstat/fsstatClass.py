@@ -174,6 +174,9 @@ class fsstatClass(diskstatClass):
             fstype = entry.split()[2]
             self._kprobeReadWrite(fstype, kprobeArgs)
             self._kprobeMmap(fstype, mmapKprobeArgs)
+        if len(self.kprobe) <= 0:
+            print("%s" % ("error: not available kprobe"))
+            sys.exit(-1)
         self.outlogFormatBase = 10
 
     def _kprobeReadWrite(self, fstype, kprobeArgs):
@@ -189,8 +192,8 @@ class fsstatClass(diskstatClass):
                     kprobe = k
                     break
             if not kprobe:
-                print("not available %s kprobe" % op)
-                sys.exit(0)
+                print("warnning: not available %s kprobe" % op)
+                continue
             pointKprobe = 'p '+kprobe+' '+kprobeArgs
             self.kprobe.append(kprobe)
             self.expression.append(pointKprobe)
