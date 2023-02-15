@@ -4,36 +4,39 @@
 --- DateTime: 2022/12/21 11:44 AM
 ---
 
-package.path = package.path .. ";../common/?.lua;"
-package.path = package.path .. ";../httplib/?.lua;"
-package.path = package.path .. ";../tsdb/?.lua;"
-package.path = package.path .. ";../tsdb/native/?.lua;"
+package.path = package.path .. ";../?.lua;"
 
-local Cframe = require("frame")
-local CurlApi = require("url_api")
-local CurlRpc = require("url_rpc")
-local CurlIndex = require("index")
-local Cexport = require("export")
-local CurlGuide = require("url_guide")
-local CurlExportHtml = require("url_export_html")
-local CurlExportRaw = require("url_export_raw")
+local Cframe = require("beaver.frame")
+local CurlApi = require("beaver.url_api")
+local CurlRpc = require("beaver.url_rpc")
+local CurlIndex = require("beaver.index")
+local Cexport = require("beaver.export")
+local CurlGuide = require("beaver.url_guide")
+local CurlExportHtml = require("beaver.url_export_html")
+local CurlExportRaw = require("beaver.url_export_raw")
+local CLocalBeaver = require("beaver.localBeaver")
 
-local web = Cframe.new()
+local lb = nil
 
-function init(tid)
-    print("hello beaver " .. tid)
+function init(port, backlog)
+    local web = Cframe.new()
+
     CurlIndex.new(web)
     CurlApi.new(web)
     CurlRpc.new(web)
     CurlGuide.new(web)
 
-    local export = Cexport.new("12345abdc")
+    local Cidentity = require("beaver.identity")
+    local inst = Cidentity.new()
+    local export = Cexport.new(inst:id())
     CurlExportHtml.new(web, export)
     CurlExportRaw.new(web, export)
+
+    lb = CLocalBeaver.new(web, port, nil, backlog)
     return 0
 end
 
-function echo(fd)
-    web:proc(fd)
+function echo()
+    lb:poll()
     return 0
 end

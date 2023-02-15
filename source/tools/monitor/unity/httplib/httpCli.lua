@@ -4,12 +4,13 @@
 --- DateTime: 2022/12/19 4:40 PM
 ---
 
-require("class")
-local ChttpComm = require("httpComm")
+require("common.class")
+local ChttpComm = require("httplib.httpComm")
 local ChttpCli = class("httpCli", ChttpComm)
 
-function ChttpCli:_init_()
+function ChttpCli:_init_(proxy)
     ChttpComm._init_(self)
+    self._proxy = proxy
     self._http = require("socket.http")
     self._ltn12 = require("ltn12")
 end
@@ -18,6 +19,7 @@ function ChttpCli:get(Url)
     local t = {}
     local res, code, head= self._http.request{
         url=Url,
+        proxy = self._proxy,
         sink = self._ltn12.sink.table(t)
     }
     local body = table.concat(t)
@@ -38,6 +40,7 @@ function ChttpCli:post(Url, reqs, header)
         method = "POST",
         headers = headers,
         source = source,
+        proxy = self._proxy,
         sink = self._ltn12.sink.table(t)
     }
     local body = table.concat(t)

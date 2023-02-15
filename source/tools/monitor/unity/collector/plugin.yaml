@@ -1,3 +1,12 @@
+config:
+  freq: 20   # unit second
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+    mode: specify
+    name: test_specify
+#    mode: hostip
+  proc_path: /mnt/home/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+#  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+
 plugins:
   - so: kmsg
     description: "collect dmesg info."
@@ -7,10 +16,13 @@ plugins:
   -
     so: sample_threads
     description: "threads example."
-  
+#  -
+#    so: bpfsample2
+#    description: "bpf threads example."
+
   -
-    so: bpfsample2
-    description: "bpf threads example."
+    so: proc_schedstat
+    description: "collect schedule stat info of percpu"
 
 metrics:
   -
@@ -88,4 +100,9 @@ metrics:
     from: bpfsample2
     head: value
     help: "example for bpfsample2"
+    type: "gauge"
+  - title: sysak_proc_schedstat
+    from: proc_schedstat
+    head: value
+    help: "schedule state of percpu."
     type: "gauge"

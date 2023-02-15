@@ -4,13 +4,13 @@
 --- DateTime: 2022/12/19 10:46 PM
 ---
 
-require("class")
-local pystring = require("pystring")
+require("common.class")
+local pystring = require("common.pystring")
 local sockerUrl = require("socket.url")
 
-local ChttpComm = class("httpComm")
+local ChttpComm = class("httplib.httpComm")
 
-local cjson = require("cjson")
+local cjson = require("cjson.safe")
 local json = cjson.new()
 
 local function codeTable()
@@ -75,8 +75,7 @@ end
 
 local function originHeader()
     return {
-        connection = "close",
-        server = "beaver/0.0.1",
+        server = "beaver/0.0.2",
         date = os.date("%a, %d %b %Y %H:%M:%S %Z", os.time()),
     }
 end

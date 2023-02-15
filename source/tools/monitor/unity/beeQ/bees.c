@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
     }
     beeQ_send_thread(q, proto_que, app_collector_run);
 
-    beaver_init(8400, 3);
+    beaver_init(8400, 64);
     pause();
     fprintf(stderr, "test exit.");
     beeQ_stop(q);

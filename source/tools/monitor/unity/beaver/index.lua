@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/24 9:06 PM
 ---
 
-require("class")
+require("common.class")
 local unistd = require("posix.unistd")
-local ChttpHtml = require("httpHtml")
+local ChttpHtml = require("httplib.httpHtml")
 
 local CurlIndex = class("CurlIndex", ChttpHtml)
 

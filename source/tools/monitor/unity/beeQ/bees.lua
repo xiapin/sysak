@@ -4,11 +4,9 @@
 --- DateTime: 2022/12/26 4:02 PM
 ---
 
-package.path = package.path .. ";../common/?.lua;"
-package.path = package.path .. ";../tsdb/?.lua;"
-package.path = package.path .. ";../tsdb/native/?.lua;"
+package.path = package.path .. ";../?.lua;"
 
-local CfoxRecv = require("foxRecv")
+local CfoxRecv = require("beeQ.foxRecv")
 local unistd = require("posix.unistd")
 --local proto = require("protoData")
 --local system = require("system")

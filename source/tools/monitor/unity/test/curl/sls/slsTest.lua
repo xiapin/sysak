@@ -7,10 +7,10 @@
 package.path = package.path .. ";../../../common/?.lua;"
 package.path = package.path .. ";../../../httplib/?.lua;"
 
+package.path = package.path .. ";../../../protobuf/?.lua;"
+
 local CslsCli = require("slsCli")
 
-local cli = CslsCli.new("cn-heyuan.log.aliyuncs.com",
-        "netinfo-heyuan", "moon",
-        "key", "pswd")
+local cli = CslsCli.new("xxx")
 
 cli:putLog("abc", "hello.")

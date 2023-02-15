@@ -4,8 +4,8 @@
 --- DateTime: 2023/1/2 12:05 PM
 ---
 
-require("class")
-local ChttpHtml = require("httpHtml")
+require("common.class")
+local ChttpHtml = require("httplib.httpHtml")
 
 local CurlGuide = class("CurlIndex", ChttpHtml)
 

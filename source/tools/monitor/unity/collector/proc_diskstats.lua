@@ -4,14 +4,14 @@
 --- DateTime: 2022/12/16 11:49 PM
 ---
 
-require("class")
-local system = require("system")
-local CvProc = require("vproc")
+require("common.class")
+local system = require("common.system")
+local CvProc = require("collector.vproc")
 
 local CprocDiskstats = class("proc_diskstats", CvProc)
 
-function CprocDiskstats:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or "/proc/diskstats")
+function CprocDiskstats:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt, pFile or "proc/diskstats")
     self._lastData = {}
     self._lastDisk = {}
     self._diskVNum = 11

@@ -4,16 +4,18 @@
 --- DateTime: 2022/12/16 10:12 PM
 ---
 
-require("class")
-local system = require("system")
+require("common.class")
+local system = require("common.system")
 
-local CvProc = class("vproc")
+local CvProc = class("collector.vproc")
 
-function CvProc:_init_(proto, pffi, pFile)
+function CvProc:_init_(proto, pffi, mnt, pFile)
     self._proto = proto
     self._cffi = pffi["cffi"]
     self._ffi = pffi["ffi"]
-    self.pFile = pFile
+    mnt = mnt or "/"
+    pFile = pFile or ""
+    self.pFile = mnt .. pFile
 end
 
 function CvProc:proc(elapsed)

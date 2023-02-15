@@ -4,13 +4,13 @@
 --- DateTime: 2022/12/17 11:04 AM
 ---
 
-require("class")
+require("common.class")
 
-local system = require("system")
+local system = require("common.system")
 local snappy = require("snappy")
-local pystring = require("pystring")
-local CprotoData = require("protoData")
-local foxFFI = require("foxffi")
+local pystring = require("common.pystring")
+local CprotoData = require("common.protoData")
+local foxFFI = require("tsdb.native.foxffi")
 
 local CfoxTSDB = class("CfoxTSDB")
 
@@ -167,7 +167,6 @@ function CfoxTSDB:write(buff)
     local now = self:get_us()
     local date = self:getDateFrom_us(now)
     local stream = snappy.compress(buff)
-    print("write for time: ", now)
     assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(stream, #stream), #stream) == 0)
     if self._man.new_day > 0 then
         self:rotateDb()

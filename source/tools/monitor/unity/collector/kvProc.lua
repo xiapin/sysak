@@ -4,14 +4,14 @@
 --- DateTime: 2022/12/16 11:30 PM
 ---
 
-local system = require("system")
-require("class")
-local CvProc = require("vproc")
+local system = require("common.system")
+require("common.class")
+local CvProc = require("collector.vproc")
 
 local CkvProc = class("kvProc", CvProc)
 
-function CkvProc:_init_(proto, pffi, pFile, tName)
-    CvProc._init_(self, proto, pffi, pFile)
+function CkvProc:_init_(proto, pffi, mnt, pFile, tName)
+    CvProc._init_(self, proto, pffi, mnt, pFile)
     self._protoTable = {
         line = tName,
         ls = nil,

@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/26 3:57 PM
 ---
 
-require("class")
+require("common.class")
 
-local CfoxTSDB = require("foxTSDB")
+local CfoxTSDB = require("tsdb.foxTSDB")
 
 local CfoxRecv = class("CfoxRecv")
 
