@@ -26,7 +26,7 @@ docker exec -it unity-devel bash
 如果采用已经好的镜像
 
 ```bash
-docker run -itd --net=host --name unity-devel registry.cn-hangzhou.aliyuncs.com/sysom/unity:v1.0
+docker run -itd --net=host --name unity-devel registry.cn-hangzhou.aliyuncs.com/sysom/unity:v1.1
 docker exec -it unity-devel bash
 ```
 

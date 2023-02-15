@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/25 11:19 AM
 ---
 
-local pystring = require("pystring")
-require("class")
-local ChttpHtml = require("httpHtml")
+local pystring = require("common.pystring")
+require("common.class")
+local ChttpHtml = require("httplib.httpHtml")
 
 local CurlExportHtml = class("CurlExportHtml", ChttpHtml)
 

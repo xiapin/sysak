@@ -4,14 +4,14 @@
 --- DateTime: 2023/1/17 12:27 AM
 ---
 
-require("class")
-local pystring = require("pystring")
-local CvProc = require("vproc")
+require("common.class")
+local pystring = require("common.pystring")
+local CvProc = require("collector.vproc")
 
 local CprocSockStat = class("procsockstat", CvProc)
 
-function CprocSockStat:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or "/proc/net/sockstat")
+function CprocSockStat:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt, pFile or "proc/net/sockstat")
 end
 
 function CprocSockStat:proc(elapsed, lines)
@@ -28,8 +28,8 @@ function CprocSockStat:proc(elapsed, lines)
             for i = 1, len do
                 local title = string.format("%s_%s", head, bodies[2 * i - 1])
                 local v = {
-                    name=title,
-                    value=tonumber(bodies[2 * i])
+                    name = title,
+                    value = tonumber(bodies[2 * i])
                 }
                 table.insert(vs, v)
             end

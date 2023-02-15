@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/23 11:53 PM
 ---
 
-require("class")
-local pystring = require("pystring")
-local ChttpBase = require("httpBase")
+require("common.class")
+local pystring = require("common.pystring")
+local ChttpBase = require("httplib.httpBase")
 
 local ChttpHtml = class("ChttpHtml", ChttpBase)
 
@@ -15,7 +15,7 @@ function ChttpHtml:_init_(frame)
 end
 
 function ChttpHtml:markdown(text)
-    local md = require("lmd")
+    local md = require("common.lmd")
     return md:toHtml(text)
 end
 
@@ -41,10 +41,11 @@ local function htmlPack(title, content)
     return pystring:join("", bodies)
 end
 
-function ChttpHtml:echo(tRet)
+function ChttpHtml:echo(tRet, keep)
     local stat = self:packStat(200)
     local tHead = {
         ["Content-Type"] = "text/html",
+        ["Connection"] = (keep and "keep-alive") or "close"
     }
     local body = htmlPack(tRet.title, tRet.content)
     local headers = self:packHeaders(tHead, #body)

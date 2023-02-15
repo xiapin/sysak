@@ -4,14 +4,14 @@
 --- DateTime: 2022/12/16 10:27 PM
 ---
 
-require("class")
-local pystring = require("pystring")
-local CvProc = require("vproc")
+require("common.class")
+local pystring = require("common.pystring")
+local CvProc = require("collector.vproc")
 
 local CprocStat = class("procstat", CvProc)
 
-function CprocStat:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or "/proc/stat")
+function CprocStat:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt,pFile or "proc/stat")
     self._funs = self:setupTable()
     self._cpuArr = {}
 end

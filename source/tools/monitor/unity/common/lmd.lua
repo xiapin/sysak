@@ -6,8 +6,8 @@
 
 -- for markdown trans
 
-require("class")
-local pystring = require("pystring")
+require("common.class")
+local pystring = require("common.pystring")
 
 local Clmd = class("lmd")
 

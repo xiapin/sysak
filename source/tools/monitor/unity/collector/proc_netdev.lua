@@ -4,14 +4,14 @@
 --- DateTime: 2022/12/16 11:57 PM
 ---
 
-require("class")
-local CvProc = require("vproc")
-local system = require("system")
+require("common.class")
+local CvProc = require("collector.vproc")
+local system = require("common.system")
 
 local CprocNetdev = class("proc_netdev", CvProc)
 
-function CprocNetdev:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or "/proc/net/dev")
+function CprocNetdev:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt, pFile or "proc/net/dev")
     self._lastData = {}
     self._lastIfNames = {}
 end

@@ -4,17 +4,17 @@
 --- DateTime: 2022/12/30 10:20 AM
 ---
 
-require("class")
-
+require("common.class")
+local system = require("common.system")
 local Cplugin = class("plugin")
 
 function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
     self._proto = proto
-    fYaml = fYaml or "../collector/plugin.yaml"
-    self._ffi = require("plugincffi")
+    local res = system:parseYaml(fYaml)
+
+    self._ffi = require("collector.native.plugincffi")
     self._sig_cffi = procffi["cffi"]
 
-    local res = self:loadYaml(fYaml)
     self._sig_cffi.plugin_init()
     self:setup(res.plugins, proto_q)
 end
@@ -27,20 +27,12 @@ function Cplugin:_del_()
     end
 end
 
-function Cplugin:loadYaml(fYaml)
-    local lyaml = require("lyaml")
-    local f = io.open(fYaml,"r")
-    local s = f:read("*all")
-    f:close()
-
-    return lyaml.load(s)
-end
-
 function Cplugin:setup(plugins, proto_q)
     self._plugins = {}
     for _, plugin in ipairs(plugins) do
         local so = plugin.so
         if so then
+            print(so)
             local cffi = self._ffi.load(so)
             local plugin = {
                 so = plugin.so,

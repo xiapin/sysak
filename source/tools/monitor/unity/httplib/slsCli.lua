@@ -4,28 +4,27 @@
 --- DateTime: 2023/1/30 3:06 PM
 ---
 
-require("class")
+require("common.class")
 
 local sha1 = require("sha1")
 local lz4 = require("lz4")
 local md5 = require("md5")
 local base64 = require("base64")
-local system = require("system")
-local pystring = require("pystring")
-local pb = require("pb")
-local protoc = require("protoc")
+local system = require("common.system")
+local pystring = require("common.pystring")
 
-local ChttpCli = require("httpCli")
+local ChttpCli = require("httplib.httpCli")
+local CslsProto = require("protobuf.slsProto")
 local CslsCli = class("slsCli", ChttpCli)
 
-function CslsCli:_init_(endPoint, project, store, key, pswd)
-    ChttpCli._init_(self)
+function CslsCli:_init_(endPoint, project, store, key, pswd, proxy)
+    ChttpCli._init_(self, proxy)
     self._endPoint = endPoint
     self._project = project
     self._store = store
     self._key = key
     self._pswd = pswd
-    self._pc = self:_setupPb()
+    self._proto = CslsProto.new()
 end
 
 local function packLog(vm, log)
@@ -42,25 +41,30 @@ local function packLog(vm, log)
             },
         },
     }
+    local Tag = {
+        Key = "log",
+        Value = log,
+    }
     local LogGroup = {
         Logs = {Log, },
         Source = "sysak mon.",
+        LogTags = {Tag,},
     }
     return {
         logGroupList = {LogGroup,},
     }
 end
 
-local function packHead(data, rawSize, project, endPoint)
+local function packHead(data, project, endPoint)
     return {
         ["Content-Type"] = "application/x-protobuf",
         ["Content-Length"] = #data,
         ["Content-MD5"] = system:hex2ups(md5.sum(data)),
         ["Date"] = system:timeRfc1123(),
         ["Host"] = project .. "." .. endPoint,
+        --["Host"] = project .. "." .. "cn-heyuan-share.log.aliyuncs.com",
         ["x-log-apiversion"] = "0.6.0",
-        ["x-log-bodyrawsize"] = rawSize,
-        ["x-log-compresstype"] = "lz4",
+        ["x-log-bodyrawsize"] = #data,
         ["x-log-signaturemethod"] = "hmac-sha1",
     }
 end
@@ -82,54 +86,18 @@ function CslsCli:signature(heads, uri, msg)
 end
 
 function CslsCli:putLog(vm, log)
-    local uri = "/logstores/" .. self._store
+    local uri = "/logstores/" .. self._store .. "/shards/lb"
     local logList = packLog(vm, log)
-    local msg = assert(pb.encode("LogGroupList", logList))
-    local body = lz4.compress(msg)
-    local heads = packHead(body, #msg, self._project, self._endPoint)
+    print(self:jencode(logList))
+    local msg = self._proto:pack(logList)
+    local heads = packHead(msg, self._project, self._endPoint)
     self:signature(heads, uri, msg)
-    local url = string.format("http://%s", self._endPoint)
+    local url = string.format("http://%s%s", self._endPoint, uri)
+    print(url)
+    print(system:hexdump(msg))
     print(system:dump(heads))
-    local res = self:post(url, body, heads)
+    local res = self:post(url, msg, heads)
     print(system:dump(res))
-end
-
-function CslsCli:_setupPb()
-    local pc = protoc:new()
-    local format = [[
-message Log
-{
-    required uint32 Time = 1;
-    message Content
-    {
-        required string Key = 1;
-        required string Value = 2;
-    }
-    repeated Content Contents = 2;
-}
-
-message LogTag
-{
-    required string Key = 1;
-    required string Value = 2;
-}
-
-message LogGroup
-{
-    repeated Log Logs= 1;
-    optional string Reserved = 2;
-    optional string Topic = 3;
-    optional string Source = 4;
-    repeated LogTag LogTags = 6;
-}
-
-message LogGroupList
-{
-    repeated LogGroup logGroupList = 1;
-}
-]]
-    assert(pc:load(format))
-    return pc
 end
 
 return CslsCli

@@ -4,9 +4,9 @@
 --- DateTime: 2022/12/29 10:17 PM
 ---
 -- refer to https://www.cnblogs.com/cielosun/p/6762550.html
-require("class")
-local ChttpApp = require("httpApp")
-local system = require("system")
+require("common.class")
+local ChttpApp = require("httplib.httpApp")
+local system = require("common.system")
 
 local CurlRpc = class("urlRpc", ChttpApp)
 

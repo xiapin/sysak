@@ -3,17 +3,22 @@ AR := ar
 CFLAG := -g
 OBJS := beaver.o echos.o
 LIB := libbeaver.a
+DEPMOD = native
 
-all: $(LIB)
+all: $(DEPMOD) $(LIB)
 
-echos.o: echos.c beaver.h echos.h
-	$(CC) -c $< -o $@ $(CFLAG)
 
-beaver.o: beaver.c beaver.h echos.h
+beaver.o: beaver.c beaver.h
 	$(CC) -c $< -o $@ $(CFLAG)
 
 $(LIB): $(OBJS)
 	$(AR) cr $@ $(OBJS)
+
+$(DEPMOD):ECHO
+	make -C $@
+
+ECHO:
+	@echo $(SUBDIRS)
 
 clean:
 	rm -f $(EXEC) $(OBJS)

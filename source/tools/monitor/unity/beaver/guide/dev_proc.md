@@ -251,7 +251,7 @@ Active(file):     522084 kB
 Inactive(file):   522000 kB
 ……
 ```
-对应处理代码说明，重点需要关注** readKV**函数实现。
+对应处理代码说明，重点需要关注**readKV**函数实现。
 
 ```
 local system = require("system")

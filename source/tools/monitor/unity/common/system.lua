@@ -5,7 +5,7 @@
 ---
 
 local socket = require("socket")
-local serpent = require("serpent")
+local serpent = require("common.serpent")
 
 local system = {}
 
@@ -51,12 +51,42 @@ function system:valueIsIn(tbl, value)
     if type(tbl) ~= "table" then
         return false
     end
-    for _, v in ipairs(tbl) do
+    for _, v in pairs(tbl) do
         if v == value then
             return true
         end
     end
     return false
+end
+
+function system:valueIndex(tbl, value)
+    if type(tbl) ~= "table" then
+        return 0
+    end
+    for i, v in ipairs(tbl) do
+        if v == value then
+            return i
+        end
+    end
+    return 0
+end
+
+function system:keyCount(tbl)
+    local count = 0
+    for _, _ in pairs(tbl) do
+        count = count + 1
+    end
+    return count
+end
+
+function system:dictCopy(tbl)
+    local cp = {}
+    assert(type(tbl) == "table")
+
+    for k, v in pairs(tbl) do
+        cp[k] = v
+    end
+    return cp
 end
 
 function system:hex2ups(hex)
@@ -71,9 +101,28 @@ function system:hex2lows(hex)
     end))
 end
 
+function system:hexdump(buf)
+    for byte=1, #buf, 16 do
+        local chunk = buf:sub(byte, byte+15)
+        io.write(string.format('%08X  ',byte-1))
+        chunk:gsub('.', function (c) io.write(string.format('%02X ',string.byte(c))) end)
+        io.write(string.rep(' ',3*(16-#chunk)))
+        io.write(' ',chunk:gsub('%c','.'),"\n")
+    end
+end
+
 function system:timeRfc1123(t)
     t = t or os.time()
     return os.date("!%a, %d %b %Y %H:%M:%S GMT", t)
+end
+
+function system:parseYaml(fYaml)
+    local lyaml = require("lyaml")
+    local f = io.open(fYaml,"r")
+    local s = f:read("*all")
+    f:close()
+
+    return lyaml.load(s)
 end
 
 return system

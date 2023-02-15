@@ -4,15 +4,15 @@
 --- DateTime: 2023/1/19 11:19 PM
 ---
 
-require("class")
-local CvProc = require("vproc")
-local system = require("system")
-local pystring = require("pystring")
+require("common.class")
+local CvProc = require("collector.vproc")
+local system = require("common.system")
+local pystring = require("common.pystring")
 
 local CprocSnmpStat = class("proc_snmp_stat", CvProc)
 
-function CprocSnmpStat:_init_(proto, pffi, pFile)
-    CvProc._init_(self, proto, pffi, pFile or nil)
+function CprocSnmpStat:_init_(proto, pffi, mnt, pFile)
+    CvProc._init_(self, proto, pffi, mnt, pFile or nil)
     self._cellsMon = {'retrans', 'abort', 'paws', 'err', 'fail', 'drop', 'overflow'}
     self._rec = nil
 end
@@ -102,8 +102,8 @@ end
 function CprocSnmpStat:proc(elapsed, lines)
     CvProc.proc(self)
     local now = {}
-    self:_proc("/proc/net/snmp", now)
-    self:_proc("/proc/net/netstat", now)
+    self:_proc(self.pFile .. "proc/net/snmp", now)
+    self:_proc(self.pFile .. "proc/net/netstat", now)
     self:check(now)
     return self:push(lines)
 end

@@ -4,37 +4,41 @@
 --- DateTime: 2022/12/16 10:39 PM
 ---
 
-require("class")
-local CprotoData = require("protoData")
-local procffi = require("procffi")
+require("common.class")
+local CprotoData = require("common.protoData")
+local procffi = require("collector.native.procffi")
 
-local CprocStat = require("proc_stat")
-local CprocMeminfo = require("proc_meminfo")
-local CprocVmstat = require("proc_vmstat")
-local CprocNetdev = require("proc_netdev")
-local CprocDiskstats = require("proc_diskstats")
-local CprocSockStat = require("proc_sockstat")
-local CprocSnmpStat = require("proc_snmp_stat")
-local CprocMounts = require("proc_mounts")
-local CprocStatm = require("proc_statm")
-local Cplugin = require("plugin")
+local CprocStat = require("collector.proc_stat")
+local CprocMeminfo = require("collector.proc_meminfo")
+local CprocVmstat = require("collector.proc_vmstat")
+local CprocNetdev = require("collector.proc_netdev")
+local CprocDiskstats = require("collector.proc_diskstats")
+local CprocSockStat = require("collector.proc_sockstat")
+local CprocSnmpStat = require("collector.proc_snmp_stat")
+local CprocMounts = require("collector.proc_mounts")
+local CprocStatm = require("collector.proc_statm")
+local Cplugin = require("collector.plugin")
+
+local system = require("common.system")
 
 local Cloop = class("loop")
 
-function Cloop:_init_(que, proto_q)
+function Cloop:_init_(que, proto_q, fYaml)
+    local res = system:parseYaml(fYaml)
     self._proto = CprotoData.new(que)
     self._procs = {
-        CprocStat.new(self._proto, procffi),
-        CprocMeminfo.new(self._proto, procffi),
-        CprocVmstat.new(self._proto, procffi),
-        CprocNetdev.new(self._proto, procffi),
-        CprocDiskstats.new(self._proto, procffi),
-        CprocSockStat.new(self._proto, procffi),
-        CprocSnmpStat.new(self._proto, procffi),
-        CprocMounts.new(self._proto, procffi),
-        CprocStatm.new(self._proto, procffi),
+        CprocStat.new(self._proto, procffi, res.config.proc_path),
+        CprocMeminfo.new(self._proto, procffi, res.config.proc_path),
+        CprocVmstat.new(self._proto, procffi, res.config.proc_path),
+        CprocNetdev.new(self._proto, procffi, res.config.proc_path),
+        CprocDiskstats.new(self._proto, procffi, res.config.proc_path),
+        CprocSockStat.new(self._proto, procffi, res.config.proc_path),
+        CprocSnmpStat.new(self._proto, procffi, res.config.proc_path),
+        CprocMounts.new(self._proto, procffi, res.config.proc_path),
+        CprocStatm.new(self._proto, procffi, res.config.proc_path),
     }
-    self._plugin = Cplugin.new(self._proto, procffi, que, proto_q)
+    print("proc new stop.")
+    self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
 end
 
 function Cloop:work(t)

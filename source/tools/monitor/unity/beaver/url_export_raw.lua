@@ -4,8 +4,8 @@
 --- DateTime: 2022/12/25 11:20 AM
 ---
 
-require("class")
-local ChttpPlain = require("httpPlain")
+require("common.class")
+local ChttpPlain = require("httplib.httpPlain")
 
 local CurlExportRaw = class("CurlExportRaw", ChttpPlain)
 

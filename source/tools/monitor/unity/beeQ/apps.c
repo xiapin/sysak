@@ -12,6 +12,7 @@
 #include <sys/syscall.h>
 
 #define gettidv1() syscall(__NR_gettid)
+static int sample_period = 0;
 
 LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1, const char *msg, int level);
 
@@ -217,7 +218,7 @@ static lua_State * app_collector_init(void* q, void* proto_q, int delta) {
     lua_pushlightuserdata(L, proto_q);
     lua_pushinteger(L, delta);
     ret = lua_pcall(L, 3, 1, 0);
-    if (ret) {
+    if (ret < 0) {
         perror("luaL_call init func error");
         report_lua_failed(L);
         goto endCall;
@@ -236,6 +237,8 @@ static lua_State * app_collector_init(void* q, void* proto_q, int delta) {
         perror("collectors.lua init failed.");
         goto endReturn;
     }
+    sample_period = lret;
+    printf("setup sample period %ds\n", sample_period);
     return L;
 
     endReturn:
@@ -265,7 +268,7 @@ static int app_collector_work(lua_State **pL, void* q, void* proto_q, int delta)
     }
 
     lua_getglobal(L, "work");
-    lua_pushinteger(L, 15);
+    lua_pushinteger(L, sample_period);
     ret = lua_pcall(L, 1, 1, 0);
     if (ret) {
         perror("luaL_call init func error");
@@ -296,7 +299,6 @@ static int app_collector_work(lua_State **pL, void* q, void* proto_q, int delta)
 #include <unistd.h>
 #include <time.h>
 typedef long bee_time_t;
-#define APP_LOOP_PERIOD 15
 static bee_time_t local_time(void) {
     int ret;
     struct timespec tp;
@@ -317,7 +319,7 @@ int app_collector_run(struct beeQ* q, void* arg) {
     lua_State **pL;
     struct beeQ* proto_que = (struct beeQ* )arg;
 
-    L = app_collector_init(q, proto_que, APP_LOOP_PERIOD);
+    L = app_collector_init(q, proto_que, sample_period);
     if (L == NULL) {
         ret = -1;
         goto endInit;
@@ -327,13 +329,13 @@ int app_collector_run(struct beeQ* q, void* arg) {
     while (1) {
         bee_time_t t1, t2, delta;
         t1 = local_time();
-        ret = app_collector_work(pL, q, proto_que, APP_LOOP_PERIOD);
+        ret = app_collector_work(pL, q, proto_que, sample_period);
         if (ret < 0) {
             goto endLoop;
         }
         t2 = local_time();
 
-        delta = t1 + APP_LOOP_PERIOD * 1000000 - t2;
+        delta = t1 + sample_period * 1000000 - t2;
 
         if (delta > 0) {
             usleep(delta);

@@ -4,15 +4,15 @@
 --- DateTime: 2023/1/12 3:28 PM
 ---
 
-require("class")
+require("common.class")
 
-local CprotoData = require("protoData")
+local CprotoData = require("common.protoData")
 local CprotoQueue = class("loop")
-local system = require("system")
+local system = require("common.system")
 
 function CprotoQueue:_init_(que)
     self._proto = CprotoData.new(que)
-    self._ffi = require("plugincffi")
+    self._ffi = require("collector.native.plugincffi")
     self._que = que
 end
 

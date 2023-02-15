@@ -4,7 +4,7 @@
 --- DateTime: 2022/12/16 6:05 PM
 ---
 
-require("class")
+require("common.class")
 local pb = require("pb")
 local protoc = require("protoc")
 local serpent = require("serpent")
