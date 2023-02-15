@@ -1,7 +1,7 @@
 CC := gcc
 AR := ar
 CFLAG := -g
-OBJS := beaver.o echos.o
+OBJS := beaver.o
 LIB := libbeaver.a
 DEPMOD = native
 

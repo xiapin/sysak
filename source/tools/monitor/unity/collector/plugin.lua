@@ -10,12 +10,14 @@ local Cplugin = class("plugin")
 
 function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
     self._proto = proto
+
     local res = system:parseYaml(fYaml)
+    self:setProcSys(procffi, res.config)
+
+    self._sig_cffi = procffi["cffi"]
+    self._sig_cffi.plugin_init()
 
     self._ffi = require("collector.native.plugincffi")
-    self._sig_cffi = procffi["cffi"]
-
-    self._sig_cffi.plugin_init()
     self:setup(res.plugins, proto_q)
 end
 
@@ -25,6 +27,14 @@ function Cplugin:_del_()
         local cffi = plugin.cffi
         cffi.deinit()
     end
+end
+
+function Cplugin:setProcSys(procFFI, config)
+    local proc = config["proc_path"] or "/"
+    local sys = config["sys_path"] or "/"
+
+    procFFI.cffi.set_unity_proc(procFFI.ffi.string(proc))
+    procFFI.cffi.set_unity_sys(procFFI.ffi.string(sys))
 end
 
 function Cplugin:setup(plugins, proto_q)

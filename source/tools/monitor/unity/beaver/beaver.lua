@@ -18,7 +18,9 @@ local CLocalBeaver = require("beaver.localBeaver")
 
 local lb = nil
 
-function init(port, backlog)
+function init(fYaml)
+    fYaml = fYaml or "../collector/plugin.yaml"
+    print(fYaml)
     local web = Cframe.new()
 
     CurlIndex.new(web)
@@ -27,12 +29,12 @@ function init(port, backlog)
     CurlGuide.new(web)
 
     local Cidentity = require("beaver.identity")
-    local inst = Cidentity.new()
-    local export = Cexport.new(inst:id())
+    local inst = Cidentity.new(fYaml)
+    local export = Cexport.new(inst:id(), fYaml)
     CurlExportHtml.new(web, export)
     CurlExportRaw.new(web, export)
 
-    lb = CLocalBeaver.new(web, port, nil, backlog)
+    lb = CLocalBeaver.new(web, fYaml)
     return 0
 end
 

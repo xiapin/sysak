@@ -5,7 +5,7 @@
 #include "sample.h"
 
 int init(void * arg) {
-    printf("sample plugin install.\n");
+    printf("sample plugin install, proc: %s\n", get_unity_proc());
     return 0;
 }
 

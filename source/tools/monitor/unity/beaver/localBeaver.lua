@@ -11,9 +11,17 @@ require("common.class")
 
 local CLocalBeaver = class("poBeaver")
 
-function CLocalBeaver:_init_(frame, port, ip, backlog)
-    port = port or 8400
+local function setupServer(fYaml)
+    local res = system:parseYaml(fYaml)
+    local config = res.config
+    local port = config["port"] or 8400
+    local ip = config["bind_addr"] or "0.0.0.0"
+    local backlog = config["backlog"] or 32
+    return port, ip, backlog
+end
 
+function CLocalBeaver:_init_(frame, fYaml)
+    local port, ip, backlog = setupServer(fYaml)
     self._bfd = self:_install_fd(port, ip, backlog)
     self._efd = self:_installFFI()
 
@@ -74,9 +82,6 @@ function CLocalBeaver:_installFFI()
 end
 
 function CLocalBeaver:_install_fd(port, ip, backlog)
-    ip = ip or "0.0.0.0"
-    backlog = backlog or 100
-
     local fd, res, err, errno
     fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     if fd then  -- for socket

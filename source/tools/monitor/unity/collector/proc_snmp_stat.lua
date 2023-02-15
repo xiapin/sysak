@@ -83,7 +83,7 @@ function CprocSnmpStat:check(now)
     local logs = {}
     if self._rec then
         for k, v in pairs(now) do
-            if self._rec[k] < v then
+            if self._rec[k] and self._rec[k] < v then   --
                 local delta = v - self._rec[k]
                 for lk, lv in pairs(labels) do
                     local title = string.lower(k)

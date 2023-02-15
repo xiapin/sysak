@@ -52,4 +52,4 @@ cp tsdb/native/*.so* ${APP}/tsdb/native/
 cp tsdb/native/*.lua ${APP}/tsdb/native/
 cp tsdb/*.lua ${APP}/tsdb
 
-tar zcv -f dist.tar.gz dist/
+tar zcv -f dist.tar.gz $DIST/
