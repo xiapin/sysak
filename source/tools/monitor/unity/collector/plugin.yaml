@@ -23,6 +23,9 @@ plugins:
   -
     so: proc_schedstat
     description: "collect schedule stat info of percpu"
+  -
+    so: proc_loadavg
+    description: "collect load avg"
 
 metrics:
   -
@@ -105,4 +108,9 @@ metrics:
     from: proc_schedstat
     head: value
     help: "schedule state of percpu."
+    type: "gauge"
+  - title: sysak_proc_loadavg
+    from: proc_loadavg
+    head: value
+    help: "loadavg of system from /proc/loadavg"
     type: "gauge"
