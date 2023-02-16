@@ -18,14 +18,14 @@ newdirs := $(shell find ./ -type d)
 
 bpfsrcs := bpfsample2.bpf.c
 csrcs := bpfsample2.c
-target := libbpfsample2.so
+so := libbpfsample2.so
 
-include $(SRC)/mk/bpfso.mk
+include ../bpfso.mk
 ```
 
 1. `bpfsrcs`: 用来指定需要编译的 eBPF 程序源文件
 2. `csrcs`: 用来指定需要编译的用户态程序源文件
-3. `target`: 用来指定生成目标动态库名称
+3. `so`: 用来指定生成目标动态库名称
 
 开发者只需要关注上述三个变量的修改即可。
 
@@ -53,7 +53,6 @@ int BPF_KPROBE(netstat_seq_show, struct sock *sk, struct msghdr *msg, size_t siz
     return 0;
 }
 
-char _license[] SEC("license") = "GPL";
 ```
 
 1. `vmlinux.h` 和 `coolbpf.h` 是coolbpf框架提供的两个头文件，里面包含了类似 `BPF_PERF_OUTPUT` 的helper函数，以及内核结构体的定义
