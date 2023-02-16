@@ -23,6 +23,5 @@ int BPF_KPROBE(netstat_seq_show, struct sock *sk, struct msghdr *msg, size_t siz
     return 0;
 }
 
-char _license[] SEC("license") = "GPL";
 
 
