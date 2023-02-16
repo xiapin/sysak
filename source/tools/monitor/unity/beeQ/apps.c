@@ -13,6 +13,7 @@
 
 #define gettidv1() syscall(__NR_gettid)
 static int sample_period = 0;
+extern char *g_yaml_file;
 
 LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1, const char *msg, int level);
 
@@ -187,7 +188,7 @@ int collector_qout(lua_State *L) {
     return 1;   // return a value.
 }
 
-static lua_State * app_collector_init(void* q, void* proto_q, int delta) {
+static lua_State * app_collector_init(void* q, void* proto_q) {
     int ret;
     lua_Number lret;
 
@@ -216,7 +217,7 @@ static lua_State * app_collector_init(void* q, void* proto_q, int delta) {
     lua_getglobal(L, "init");
     lua_pushlightuserdata(L, q);
     lua_pushlightuserdata(L, proto_q);
-    lua_pushinteger(L, delta);
+    lua_pushstring(L, g_yaml_file);
     ret = lua_pcall(L, 3, 1, 0);
     if (ret < 0) {
         perror("luaL_call init func error");
@@ -249,7 +250,7 @@ static lua_State * app_collector_init(void* q, void* proto_q, int delta) {
     return NULL;
 }
 
-static int app_collector_work(lua_State **pL, void* q, void* proto_q, int delta) {
+static int app_collector_work(lua_State **pL, void* q, void* proto_q) {
     int ret;
     lua_Number lret;
     static int counter = 0;
@@ -259,7 +260,7 @@ static int app_collector_work(lua_State **pL, void* q, void* proto_q, int delta)
     if (counter != sighup_counter) {    // check counter for signal.
         lua_close(L);
 
-        L = app_collector_init(q, proto_q, delta);
+        L = app_collector_init(q, proto_q);
         if (L == NULL) {
             exit(1);
         }
@@ -319,7 +320,7 @@ int app_collector_run(struct beeQ* q, void* arg) {
     lua_State **pL;
     struct beeQ* proto_que = (struct beeQ* )arg;
 
-    L = app_collector_init(q, proto_que, sample_period);
+    L = app_collector_init(q, proto_que);
     if (L == NULL) {
         ret = -1;
         goto endInit;
@@ -329,7 +330,7 @@ int app_collector_run(struct beeQ* q, void* arg) {
     while (1) {
         bee_time_t t1, t2, delta;
         t1 = local_time();
-        ret = app_collector_work(pL, q, proto_que, sample_period);
+        ret = app_collector_work(pL, q, proto_que);
         if (ret < 0) {
             goto endLoop;
         }

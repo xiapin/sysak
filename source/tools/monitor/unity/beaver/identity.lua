@@ -11,7 +11,6 @@ local socket = require("socket")
 local Cidentity = class("identity")
 
 function Cidentity:_init_(fYaml)
-    fYaml = fYaml or "../collector/plugin.yaml"
     local conf = system:parseYaml(fYaml)
     self._opts = conf.config.identity
     self._funcs = {

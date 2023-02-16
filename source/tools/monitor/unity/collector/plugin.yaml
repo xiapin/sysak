@@ -1,5 +1,8 @@
 config:
   freq: 20   # unit second
+  port: 8400  # bind port
+  bind_addr: 0.0.0.0 # bind ip
+  backlog: 32  # listen backlog
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     mode: specify
     name: test_specify

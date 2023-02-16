@@ -25,8 +25,8 @@ local function setupFreq(fYaml)
     end
 end
 
-function init(que, proto_q, t)
-    local fYaml = "../collector/plugin.yaml"
+function init(que, proto_q, yaml)
+    local fYaml = yaml or "../collector/plugin.yaml"
     local work = Cloop.new(que, proto_q, fYaml)
     workLoop = work
     return setupFreq(fYaml)

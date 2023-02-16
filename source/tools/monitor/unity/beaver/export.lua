@@ -13,7 +13,6 @@ local Cexport = class("Cexport")
 
 function Cexport:_init_(instance, fYaml)
     self._instance = instance
-    fYaml = fYaml or "../collector/plugin.yaml"
     local ms = system:parseYaml(fYaml)
     self._freq = ms.config.freq
     self._tDescr = ms.metrics

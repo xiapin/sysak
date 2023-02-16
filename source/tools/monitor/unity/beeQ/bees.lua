@@ -8,8 +8,6 @@ package.path = package.path .. ";../?.lua;"
 
 local CfoxRecv = require("beeQ.foxRecv")
 local unistd = require("posix.unistd")
---local proto = require("protoData")
---local system = require("system")
 
 
 local fox = CfoxRecv.new()
@@ -21,6 +19,5 @@ end
 
 function proc(stream)
     fox:write(stream)
-    collectgarbage("collect")
     return 0
 end

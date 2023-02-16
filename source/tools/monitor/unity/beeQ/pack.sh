@@ -21,8 +21,10 @@ cp -r /usr/local/share/lua/5.1/* ${DIST}/lua/
 
 mkdir ${APP}
 mkdir ${APP}/beaver
+mkdir ${APP}/beaver/native
 cp -r beaver/guide ${APP}/beaver/
 cp beaver/*.lua ${APP}/beaver/
+cp beaver/native/*.lua ${APP}/beaver/native
 
 mkdir ${APP}/beeQ/
 mkdir ${APP}/beeQ/lib
@@ -50,4 +52,4 @@ cp tsdb/native/*.so* ${APP}/tsdb/native/
 cp tsdb/native/*.lua ${APP}/tsdb/native/
 cp tsdb/*.lua ${APP}/tsdb
 
-tar zcv -f dist.tar.gz dist/
+tar zcv -f dist.tar.gz $DIST/

@@ -10,6 +10,7 @@
 typedef struct native_event {
     int fd;
     short int ev_in;
+    short int ev_out;
     short int ev_close;
 }native_event_t;
 
