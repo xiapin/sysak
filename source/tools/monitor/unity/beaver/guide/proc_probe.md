@@ -12,6 +12,7 @@
 | /proc/diskstats | /collector/proc\_diskstats.lua |
 | /proc/net/dev | /collector/proc\_netdev.lua |
 | /proc/schedstat | /collector/plugin/proc\_schedstat.c |
+| /proc/loadavg | /collector/plugin/proc\_loadavg.c |
 
 ## libbpf probes
 
