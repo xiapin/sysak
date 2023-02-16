@@ -37,7 +37,6 @@ function Cloop:_init_(que, proto_q, fYaml)
         CprocMounts.new(self._proto, procffi, res.config.proc_path),
         CprocStatm.new(self._proto, procffi, res.config.proc_path),
     }
-    print("proc new stop.")
     self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
 end
 

@@ -1,16 +1,19 @@
 CC := gcc
 CFLAG := -g -fpic
 LDFLAG := -g -fpic -shared
-OBJS := procffi.o sig_stop.o unity_interface.o
-SO := libprocffi.so
+OBJS := proc_loadavg.o
+SO := libproc_loadavg.so
 
-all: $(SO)
+all: $(SO) install
 
-%.o: %.c %.h
+%.o: %.c
 	$(CC) -c $< -o $@ $(CFLAG)
 
 $(SO): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAG)
 
+install: $(SO)
+	cp $(SO) ../../native/
+
 clean:
-	rm -f *.so $(OBJS)
+	rm -f $(SO) $(OBJS)

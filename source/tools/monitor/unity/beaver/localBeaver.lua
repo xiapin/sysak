@@ -11,9 +11,17 @@ require("common.class")
 
 local CLocalBeaver = class("poBeaver")
 
-function CLocalBeaver:_init_(frame, port, ip, backlog)
-    port = port or 8400
+local function setupServer(fYaml)
+    local res = system:parseYaml(fYaml)
+    local config = res.config
+    local port = config["port"] or 8400
+    local ip = config["bind_addr"] or "0.0.0.0"
+    local backlog = config["backlog"] or 32
+    return port, ip, backlog
+end
 
+function CLocalBeaver:_init_(frame, fYaml)
+    local port, ip, backlog = setupServer(fYaml)
     self._bfd = self:_install_fd(port, ip, backlog)
     self._efd = self:_installFFI()
 
@@ -74,9 +82,6 @@ function CLocalBeaver:_installFFI()
 end
 
 function CLocalBeaver:_install_fd(port, ip, backlog)
-    ip = ip or "0.0.0.0"
-    backlog = backlog or 100
-
     local fd, res, err, errno
     fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     if fd then  -- for socket
@@ -124,14 +129,50 @@ function CLocalBeaver:read(fd, maxLen)
     return readFd
 end
 
+function CLocalBeaver:write(fd, stream)
+    local sent, err, errno
+    local res
+
+    sent, err, errno = socket.send(fd, stream)
+    if sent then
+        if sent < #stream then  -- send buffer may full
+            print("need to send buffer for " .. (#stream - sent))
+            res = self._cffi.mod_fd(self._efd, fd, 1)  -- epoll write ev
+            assert(res == 0)
+
+            while sent < #stream do
+                local e = coroutine.yield()
+                if e.ev_close > 0 then
+                    return nil
+                elseif e.ev_out then
+                    stream = string.sub(stream, sent + 1)
+                    sent, err, errno = socket.send(fd, stream)
+                    if sent == nil then
+                        posixError("socket send error.", err, errno)
+                        return nil
+                    end
+                else  -- need to read ? may something error or closed.
+                    return nil
+                end
+            end
+            res = self._cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
+            assert(res == 0)
+        end
+        return 1
+    else
+        posixError("socket send error.", err, errno)
+        return nil
+    end
+end
+
 function CLocalBeaver:_proc(fd)
     local fread = self:read(fd)
     while true do
         local res, alive = self._frame:proc(fread)
         if res then
-            socket.send(fd, res)
+            local stat = self:write(fd, res)
 
-            if not alive then
+            if not alive or not stat then
                 self:co_exit(fd)
                 break
             end

@@ -18,14 +18,13 @@ static void report_lua_failed(lua_State *L) {
     fprintf(stderr, "\nFATAL ERROR:%s\n\n", lua_tostring(L, -1));
 }
 
-static int call_init(lua_State *L, int tid, int backlog) {
+static int call_init(lua_State *L, char *fYaml) {
     int ret;
     lua_Number lret;
 
     lua_getglobal(L, "init");
-    lua_pushinteger(L, tid);
-    lua_pushinteger(L, backlog);
-    ret = lua_pcall(L, 2, 1, 0);
+    lua_pushstring(L, fYaml);
+    ret = lua_pcall(L, 1, 1, 0);
     if (ret) {
         perror("luaL_call init func error");
         report_lua_failed(L);
@@ -66,7 +65,7 @@ void LuaAddPath(lua_State *L, char *name, char *value) {
     lua_pop(L, 2);
 }
 
-static lua_State * echos_init(int port, int backlog) {
+static lua_State * echos_init(char *fYaml) {
     int ret;
 
     /* create a state and load standard library. */
@@ -82,7 +81,6 @@ static lua_State * echos_init(int port, int backlog) {
     LuaAddPath(L, "path", "../beaver/?.lua");
 
     ret = luaL_loadfile(L, "../beaver/beaver.lua");
-    printf("ret: %d\n", ret);
     ret = lua_pcall(L, 0, LUA_MULTRET, 0);
     if (ret) {
         const char *msg = lua_tostring(L, -1);
@@ -94,7 +92,7 @@ static lua_State * echos_init(int port, int backlog) {
         goto endLoad;
     }
 
-    ret = call_init(L, port, backlog);
+    ret = call_init(L, fYaml);
     if (ret < 0) {
         goto endCall;
     }
@@ -139,11 +137,11 @@ static int echos(lua_State *L) {
     return ret;
 }
 
-int beaver_init(int port, int backlog) {
+int beaver_init(char *fYaml) {
     int ret = 0;
 
     while (ret == 0) {
-        lua_State *L = echos_init(port, backlog);
+        lua_State *L = echos_init(fYaml);
         if (L == NULL) {
             break;
         }

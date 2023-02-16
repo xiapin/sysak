@@ -13,6 +13,7 @@
 #define RUN_QUEUE_SIZE  32
 
 volatile int sighup_counter = 0;
+char *g_yaml_file = NULL;
 
 void sig_handler(int num)
 {
@@ -26,9 +27,12 @@ void sig_handler(int num)
 
 extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int main(int argc, char *argv[]) {
-
     struct beeQ* q;
     struct beeQ* proto_que;
+
+    if (argc > 1) {
+        g_yaml_file = argv[1];
+    }
 
     signal(SIGHUP, sig_handler);
     signal(SIGINT, sig_handler);
@@ -46,9 +50,9 @@ int main(int argc, char *argv[]) {
     }
     beeQ_send_thread(q, proto_que, app_collector_run);
 
-    beaver_init(8400, 64);
+    beaver_init(g_yaml_file);
     pause();
-    fprintf(stderr, "test exit.");
+    fprintf(stderr, "loop exit.");
     beeQ_stop(q);
     beeQ_stop(proto_que);
     return 0;
