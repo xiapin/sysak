@@ -192,7 +192,8 @@ class fsstatClass(diskstatClass):
                     kprobe = k
                     break
             if not kprobe:
-                print("warnning: not available %s kprobe" % op)
+                if self.enableJsonShow() == False:
+                    print("warnning: not available %s kprobe" % op)
                 continue
             pointKprobe = 'p '+kprobe+' '+kprobeArgs
             self.kprobe.append(kprobe)
@@ -203,7 +204,8 @@ class fsstatClass(diskstatClass):
             if kprobe in self.kprobe:
                 continue
             if not supportKprobe(kprobe):
-                print("not support kprobe %s" % kprobe)
+                if self.enableJsonShow() == False:
+                    print("not support kprobe %s" % kprobe)
                 continue
             pointKprobe = 'p '+kprobe+' '+kprobeArgs
             self.kprobe.append(kprobe)
