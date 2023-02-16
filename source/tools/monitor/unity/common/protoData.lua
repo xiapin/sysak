@@ -7,7 +7,7 @@
 require("common.class")
 local pb = require("pb")
 local protoc = require("protoc")
-local serpent = require("serpent")
+local serpent = require("common.serpent")
 
 local CprotoData = class("CprotoData")
 
