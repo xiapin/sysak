@@ -23,7 +23,6 @@ RUN source /opt/rh/devtoolset-9/enable && \
     cd curl-7.87.0 && \
     ./configure --with-openssl && make && make install && \
     cd ../ && \
-    luarocks install serpent && \
     luarocks install luasec && \
     luarocks install lua-cjson && \
     luarocks install luasocket && \
