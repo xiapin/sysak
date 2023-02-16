@@ -52,8 +52,17 @@ inline struct unity_lines *unity_new_lines(void) {
     return malloc(sizeof (struct unity_lines));
 }
 
+#define MAX_UNITY_LINES	2048
 inline int unity_alloc_lines(struct unity_lines * lines, unsigned int num) {
-    size_t size = num * sizeof (struct unity_line);
+    size_t size;
+
+    if (num > MAX_UNITY_LINES) {
+        errno = ENOMEM;
+        perror("The number of lines exceed the limit 2048.");
+        exit(-ENOMEM);
+    }
+
+    size = num * sizeof (struct unity_line);
     lines->line = (struct unity_line *)(malloc(size));
 
     if (lines->line == NULL) {
@@ -66,7 +75,8 @@ inline int unity_alloc_lines(struct unity_lines * lines, unsigned int num) {
 }
 
 inline struct unity_line * unity_get_line(struct unity_lines * lines, unsigned int i) {
-    if (i >= 4) {
+    if (i > lines->num) {
+        fprintf(stderr, "WARN: the index of unity_get_line out of memory\n");
         return NULL;
     }
     return &(lines->line[i]);
