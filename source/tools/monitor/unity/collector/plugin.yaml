@@ -10,6 +10,9 @@ config:
   proc_path: /mnt/home/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 #  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 
+outline:
+  - /tmp/sysom
+
 plugins:
   - so: kmsg
     description: "collect dmesg info."

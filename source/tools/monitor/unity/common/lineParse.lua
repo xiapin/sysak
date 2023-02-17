@@ -31,7 +31,7 @@ local function getNextQuote(vStr)
     return -1
 end
 
-local function parseValue(svs, vs)
+local function parseValue(svs, vs, log)
     local flag = true
     local vStr = svs
     while flag do
@@ -46,7 +46,7 @@ local function parseValue(svs, vs)
 
             idx = idx
             local s = string.sub(vStr, 1, idx)
-            vs[k] = json.decode(s)
+            log[k] = json.decode(s)
             if string.byte(vStr, idx + 1) == dot then
                 vStr = string.sub(vStr, idx + 2)
             else
@@ -68,13 +68,13 @@ function module.parse(line)
     local hvs = pystring:split(line, " ", 1)
     local heads, svs = hvs[1], hvs[2]
     local ths = pystring:split(heads, ",", 1)
-    local title, ls, vs = ths[1], {}, {}
+    local title, ls, vs, log = ths[1], {}, {}, {}
     if #ths > 1 then
         local sls = ths[2]
         parseLabel(sls, ls)
     end
-    parseValue(svs, vs)
-    return title, ls, vs
+    parseValue(svs, vs, log)
+    return title, ls, vs, log
 end
 
 function module.pack(title, ls, vs)

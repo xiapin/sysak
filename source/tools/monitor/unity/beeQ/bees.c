@@ -5,6 +5,7 @@
 #include "beeQ.h"
 #include "apps.h"
 #include "beaver.h"
+#include "outline.h"
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
@@ -27,8 +28,8 @@ void sig_handler(int num)
 
 extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int main(int argc, char *argv[]) {
-    struct beeQ* q;
-    struct beeQ* proto_que;
+    struct beeQ* q;           //for proto-buf stream
+    struct beeQ* proto_que;   //for trans c to proto-buf stream
 
     if (argc > 1) {
         g_yaml_file = argv[1];
@@ -50,8 +51,9 @@ int main(int argc, char *argv[]) {
     }
     beeQ_send_thread(q, proto_que, app_collector_run);
 
+    outline_init(q, g_yaml_file);
     beaver_init(g_yaml_file);
-    pause();
+
     fprintf(stderr, "loop exit.");
     beeQ_stop(q);
     beeQ_stop(proto_que);

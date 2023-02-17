@@ -46,7 +46,7 @@ function Cloop:work(t)
         lines = obj:proc(t, lines)
     end
     lines = self._plugin:proc(t, lines)
-    print(#lines.lines)
+    --print(#lines.lines)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 end

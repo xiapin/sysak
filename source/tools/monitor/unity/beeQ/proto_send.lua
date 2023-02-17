@@ -23,6 +23,5 @@ end
 
 function send(num, pline)
     local ret = workLoop:send(num, pline)
-    collectgarbage("collect")
     return ret
 end

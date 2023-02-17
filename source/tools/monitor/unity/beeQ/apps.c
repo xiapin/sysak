@@ -195,7 +195,7 @@ static lua_State * app_collector_init(void* q, void* proto_q) {
     /* create a state and load standard library. */
     lua_State *L = luaL_newstate();
     if (L == NULL) {
-        perror("new lua failed.");
+        perror("new lua for collector failed.");
         goto endNew;
     }
     luaL_openlibs(L);

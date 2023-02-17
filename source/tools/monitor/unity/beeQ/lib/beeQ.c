@@ -140,7 +140,7 @@ struct beeQ* beeQ_init(int size,
 
     q = (struct beeQ*) malloc(sizeof(struct beeQ));
     if (q == NULL) {
-        errno = ENOMEM;
+        perror("malloc for beeQ failed.");
         goto failStruct;
     }
 
@@ -170,8 +170,8 @@ struct beeQ* beeQ_init(int size,
     }
 
     res = pthread_create(&tid, NULL, beeQ_proc, (void *)q);
-    if (res == -1) {
-        errno = ENOENT;
+    if (res < 0) {
+        perror("create thread failed.");
         goto failThread;
     }
 
@@ -280,7 +280,7 @@ pthread_t beeQ_send_thread(struct beeQ *q, void *sarg, int (*cb)(struct beeQ *q,
 
     msg = malloc(sizeof(struct beeMsg));
     if (msg == NULL) {
-        res = -ENOMEM;
+        perror("malloc for beeQ send thread failed.");
         goto failMalloc;
     }
 
@@ -289,8 +289,8 @@ pthread_t beeQ_send_thread(struct beeQ *q, void *sarg, int (*cb)(struct beeQ *q,
     msg->cb = cb;
 
     res = pthread_create(&tid, NULL, beeQ_send_run, (void *)msg);
-    if (res == -1) {
-        res = -ENOENT;
+    if (res < 0) {
+        perror("create send thread failed.");
         goto failThread;
     }
     return tid;
