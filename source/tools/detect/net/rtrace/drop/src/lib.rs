@@ -31,6 +31,8 @@ use utils::net::Addrpair;
 //     TcpDrop,
 // }
 
+use chrono::{DateTime, Local, NaiveDateTime, Utc};
+use chrono::prelude::*;
 
 pub struct DropFilter {
     filter: drop_filter,
@@ -126,7 +128,7 @@ impl DropEvent {
 
 impl fmt::Display for DropEvent {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Sock Info:")?;
+        write!(f, "{} Sock Info:", Local::now())?;
         if self.has_sk {
             match self.sk_proto {
                 ProtocolType::Tcp => {

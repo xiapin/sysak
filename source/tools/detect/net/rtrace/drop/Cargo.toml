@@ -18,6 +18,7 @@ plain = "0.2"
 utils = { path = "../utils" }
 eutils-rs = "0.1.6"
 builder = { path = "../builder" }
+chrono = "0.4.19"
 
 [build-dependencies]
 libbpf-cargo = "0.13"
