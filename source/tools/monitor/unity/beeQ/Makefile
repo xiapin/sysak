@@ -27,4 +27,5 @@ clean:
 	rm -f $(OBJ) $(PRG)
 
 dist:$(PRG)
-	./pack.sh
+	@echo "move dist/ to tools/"
+	./pack.sh $(OBJPATH)/.sysak_components/tools/

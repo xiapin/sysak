@@ -1,5 +1,5 @@
 #!/bin/bash
-DIST=dist
+DIST=$1/dist
 APP=${DIST}/app
 
 echo $DIST
@@ -52,4 +52,4 @@ cp tsdb/native/*.so* ${APP}/tsdb/native/
 cp tsdb/native/*.lua ${APP}/tsdb/native/
 cp tsdb/*.lua ${APP}/tsdb
 
-tar zcv -f dist.tar.gz $DIST/
+#tar zcv -f dist.tar.gz $DIST/
