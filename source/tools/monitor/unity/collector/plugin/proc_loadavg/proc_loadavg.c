@@ -41,7 +41,7 @@ int full_line(struct unity_line *uline)
 			&st_load.nr_running,
 			&st_load.nr_threads) != 5) {
 		fclose(fp);
-		return;
+		return -1;
 	}
 #ifdef DEBUG_LOADAVG
 	printf("load1=%5f load5=%5f load15=%5f\n", st_load.load_avg_1, st_load.load_avg_5, st_load.load_avg_15);
@@ -59,6 +59,7 @@ int full_line(struct unity_line *uline)
 
 	if (fp)
 		fclose(fp);
+	return 0;
 }
 
 int call(int t, struct unity_lines* lines) {

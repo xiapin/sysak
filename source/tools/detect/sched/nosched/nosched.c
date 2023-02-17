@@ -428,7 +428,7 @@ int main(int argc, char **argv)
 	}
 	/* Set up libbpf errors and debug info callback */
 	libbpf_set_print(libbpf_print_fn);
-
+	nr_cpus = libbpf_num_possible_cpus();
 	/* Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything */
 	bump_memlock_rlimit();
 	err = load_kallsyms();
