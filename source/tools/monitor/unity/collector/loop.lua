@@ -17,6 +17,7 @@ local CprocSockStat = require("collector.proc_sockstat")
 local CprocSnmpStat = require("collector.proc_snmp_stat")
 local CprocMounts = require("collector.proc_mounts")
 local CprocStatm = require("collector.proc_statm")
+local CprocBuddyinfo = require("collector.proc_buddyinfo")
 local Cplugin = require("collector.plugin")
 
 local system = require("common.system")
@@ -36,6 +37,7 @@ function Cloop:_init_(que, proto_q, fYaml)
         CprocSnmpStat.new(self._proto, procffi, res.config.proc_path),
         CprocMounts.new(self._proto, procffi, res.config.proc_path),
         CprocStatm.new(self._proto, procffi, res.config.proc_path),
+        CprocBuddyinfo.new(self._proto, procffi, res.config.proc_path),
     }
     self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
 end
