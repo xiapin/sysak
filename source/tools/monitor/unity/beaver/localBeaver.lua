@@ -96,6 +96,7 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
         else   -- for bind failed
             unistd.close(fd)
             posixError("socket bind failed", err, errno)
+            os.exit(1)
         end
     else  -- socket failed
         posixError("create socket failed", err, errno)
@@ -253,6 +254,7 @@ function CLocalBeaver:poll()
         local res = self._cffi.del_fd(self._efd, fd)
         assert(res >= 0)
     end
+    return 0
 end
 
 return CLocalBeaver

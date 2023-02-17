@@ -39,6 +39,5 @@ function init(fYaml)
 end
 
 function echo()
-    lb:poll()
-    return 0
+    return lb:poll()
 end
