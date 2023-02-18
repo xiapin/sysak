@@ -319,13 +319,13 @@ running_print_live()
 
 
 
-/* find where start printting
+/* find where start printing
  * number:the suffix number of record data (tsar.data.number)
  * return
  * 0 ok
  * 1 need find last tsar.data file
  * 2 find error, find time is later than the last line at tsar.data.x, should stop find any more
- * 3 find error, tsar haved stopped after find time, should stop find it
+ * 3 find error, tsar have stopped after find time, should stop find it
  * 4 find error, data not exist, tsar just lost some time data which contains find time
  * 5 log format error
  * 6 other error
@@ -464,7 +464,7 @@ find_offset_from_start(FILE *fp, int number)
 
         if (offset == (off_start + off_end) / 2) {
             if (off_start != 0) {
-                /* tsar has been down for a while, so the following time's stat we can provied only; */
+                /* tsar has been down for a while, so the following time's stat we can provided only; */
                 conf.print_file_number = number;
                 return 4;
             }
@@ -493,7 +493,7 @@ set_record_time(const char *line)
 
     c_time = c_time - c_time % 60;
     pre_time = pre_time - pre_time % 60;
-    /* if skip record when two lines haveing same minute */
+    /* if skip record when two lines having same minute */
     if (!(conf.print_interval = c_time - pre_time)) {
         return 0;
 
@@ -503,7 +503,7 @@ set_record_time(const char *line)
 }
 
 /*
- * check time if corret for pirnt from tsar.data
+ * check time if correct for print from tsar.data
  */
 int
 check_time(const char *line)
@@ -636,7 +636,7 @@ print_tail(int tail_type)
 
 
 /*
- * init_running_print, if sucess then return fp, else return NULL
+ * init_running_print, if success then return fp, else return NULL
  */
 FILE *
 init_running_print()
