@@ -52,7 +52,7 @@ int output_http(int sk, int req, const char*sub_req)
 	char *precord, *psub;
 	U_64 *raw_array;
 	double    *st_array;
-	char lable[32] = {0};
+	char label[32] = {0};
 
 	line[0] = 0;
 
@@ -79,14 +79,14 @@ int output_http(int sk, int req, const char*sub_req)
 						 && strcmp(precord, sub_req))
 						ignore = 1;
 					snprintf(opt_line, LEN_64, "%s_", mod->opt_line+2);
-					snprintf(lable, sizeof(lable), "{%s=\"%s\"}",mod->lable, precord);
+					snprintf(label, sizeof(label), "{%s=\"%s\"}",mod->lable, precord);
 					precord = strstr(psub + 1, ";");
 					if (precord)
 						precord = precord + 1;
 					if (ignore)
 						continue;
                                 } else {
-					memset(lable, 0, sizeof(lable));
+					memset(label, 0, sizeof(label));
                                         snprintf(opt_line, LEN_64, "%s_", mod->opt_line+2);
                                 }
 				if (req > REQUEST_METRIC_CGROUP_ALL && req < REQUEST_MAX)
@@ -99,10 +99,10 @@ int output_http(int sk, int req, const char*sub_req)
 
 					if (req > REQUEST_METRIC_CGROUP_ALL && req < REQUEST_MAX)
                                         	n = snprintf(detail, LEN_1M, "%s%s%s %6llu\n",
-							opt_line, trim(mod->info[k].hdr, LEN_128), lable, raw_array[k]);
+							opt_line, trim(mod->info[k].hdr, LEN_128), label, raw_array[k]);
 					else
                                         	n = snprintf(detail, LEN_1M, "%s%s%s %6.2f\n",
-							opt_line, trim(mod->info[k].hdr, LEN_128), lable, st_array[k]);
+							opt_line, trim(mod->info[k].hdr, LEN_128), label, st_array[k]);
                                         if (n >= LEN_1M - 1) {
                                                 do_debug(LOG_FATAL, "mod %s lenth is overflow %d\n", mod->name, n);
                                         }
