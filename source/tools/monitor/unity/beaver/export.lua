@@ -43,12 +43,12 @@ local function packLine(title, ls, v)
     for k, v in pairs(ls) do
         table.insert(tLs, string.format("%s=\"%s\"", k , v))
     end
-    local lable = ""
+    local label = ""
     if #tLs then
-        lable = pystring:join(",", tLs)
-        lable = "{" .. lable .. "}"
+        label = pystring:join(",", tLs)
+        label = "{" .. label .. "}"
     end
-    return string.format("%s%s %.1f", title, lable, v)
+    return string.format("%s%s %.1f", title, label, v)
 end
 
 function Cexport:export()
