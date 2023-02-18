@@ -158,7 +158,7 @@ output_nagios()
     /* send to nagios server*/
     char    nagios_cmd[LEN_1024];
     sprintf(nagios_cmd, "echo \"%s;tsar;%d;%s|%s\"|%s -H %s -p %d -to 10 -d \";\" -c %s", host_name, result, output_err, output, conf.send_nsca_cmd, conf.server_addr, conf.server_port, conf.send_nsca_conf);
-    do_debug(LOG_DEBUG, "send to naigos:%s\n", nagios_cmd);
+    do_debug(LOG_DEBUG, "send to nagios:%s\n", nagios_cmd);
     if (system(nagios_cmd) != 0) {
         do_debug(LOG_WARN, "nsca run error:%s\n", nagios_cmd);
     }
