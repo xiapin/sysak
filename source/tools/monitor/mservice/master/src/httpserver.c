@@ -104,11 +104,11 @@ int output_http(int sk, int req, const char*sub_req)
                                         	n = snprintf(detail, LEN_1M, "%s%s%s %6.2f\n",
 							opt_line, trim(mod->info[k].hdr, LEN_128), label, st_array[k]);
                                         if (n >= LEN_1M - 1) {
-                                                do_debug(LOG_FATAL, "mod %s lenth is overflow %d\n", mod->name, n);
+                                                do_debug(LOG_FATAL, "mod %s length is overflow %d\n", mod->name, n);
                                         }
                                         /* one for \n one for \0 */
                                         if (strlen(line) + strlen(detail) >= LEN_10M - 2) {
-                                                do_debug(LOG_FATAL, "tsar.data line lenth is overflow line %d detail %d\n", strlen(line), strlen(detail));
+                                                do_debug(LOG_FATAL, "tsar.data line length is overflow line %d detail %d\n", strlen(line), strlen(detail));
                                         }
                                         strcat(line, detail);
                                 }
