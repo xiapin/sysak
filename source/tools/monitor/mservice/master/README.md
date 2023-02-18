@@ -57,7 +57,7 @@ Usage
 * -l/--live     :show real-time info, `tsar -l --cpu`
 * -i/--interval :set interval for report, `tsar -i 1 --cpu`
 * -s/--spec     :specify module detail field, `tsar --cpu -s sys,util`
-* -D/--detail   :do not conver data to K/M/G, `tsar --mem -D`
+* -D/--detail   :do not convert data to K/M/G, `tsar --mem -D`
 * -m/--merge    :merge multiply item to one, `tsar --io -m`
 * -I/--item     :show spec item data, `tsar --io -I sda`
 * -d/--date     :specify data, YYYYMMDD, or n means n days ago
