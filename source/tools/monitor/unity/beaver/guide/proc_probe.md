@@ -22,4 +22,4 @@ libbpf kprobe/kretprobe/trace\_event/perf event 等事件记录在这里
 | ----- | --------- |
 |  xxx | xxx |
 
-[返回目录](/guide)
+[返回目录](/guide/guide.md)

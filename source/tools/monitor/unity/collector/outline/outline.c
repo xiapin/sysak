@@ -5,23 +5,19 @@
 #include "outline.h"
 #include <errno.h>
 
-LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1, const char *msg, int level);
+extern int lua_reg_errFunc(lua_State *L);
+extern int lua_check_ret(int ret);
+int lua_load_do_file(lua_State *L, const char* path);
 
-static void report_lua_failed(lua_State *L) {
-    fprintf(stderr, "\nFATAL ERROR:%s\n\n", lua_tostring(L, -1));
-}
-
-static int call_init(lua_State *L, void* q, char *fYaml) {
+static int call_init(lua_State *L, int err_func, void* q, char *fYaml) {
     int ret;
     lua_Number lret;
 
     lua_getglobal(L, "init");
     lua_pushlightuserdata(L, q);
     lua_pushstring(L, fYaml);
-    ret = lua_pcall(L, 2, 1, 0);
+    ret = lua_pcall(L, 2, 1, err_func);
     if (ret) {
-        perror("luaL_call init func error");
-        report_lua_failed(L);
         goto endCall;
     }
 
@@ -48,6 +44,7 @@ static int call_init(lua_State *L, void* q, char *fYaml) {
 extern int collector_qout(lua_State *L);
 static lua_State * pipe_init(void* q, char *fYaml) {
     int ret;
+    int err_func;
     lua_Number lret;
 
     /* create a state and load standard library. */
@@ -57,21 +54,17 @@ static lua_State * pipe_init(void* q, char *fYaml) {
         goto endNew;
     }
     luaL_openlibs(L);
+    err_func = lua_reg_errFunc(L);
 
-    ret = luaL_dofile(L, "outline.lua");
+    ret = lua_load_do_file(L, "outline.lua");
     if (ret) {
-        const char *msg = lua_tostring(L, -1);
-        perror("luaL_dofile error");
-        if (msg) {
-            luaL_traceback(L, L, msg, 0);
-            fprintf(stderr, "FATAL ERROR:%s\n\n", msg);
-        }
         goto endLoad;
     }
 
     lua_register(L, "collector_qout", collector_qout);
-    ret = call_init(L, q, fYaml);
-    if (ret < 0) {
+    ret = call_init(L, err_func, q, fYaml);
+    if (ret) {
+        lua_check_ret(ret);
         goto endCall;
     }
     return L;
@@ -85,13 +78,14 @@ static lua_State * pipe_init(void* q, char *fYaml) {
 
 static int work(lua_State *L) {
     int ret;
+    int err_func;
     lua_Number lret;
 
+    err_func = lua_gettop(L);
     lua_getglobal(L, "work");
-    ret = lua_pcall(L, 0, 1, 0);
+    ret = lua_pcall(L, 0, 1, err_func);
     if (ret) {
-        perror("lua call error");
-        report_lua_failed(L);
+        lua_check_ret(ret);
         goto endCall;
     }
 

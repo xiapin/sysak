@@ -6,17 +6,16 @@
 
 -- refer to https://blog.csdn.net/zx_emily/article/details/83024065
 
-local unistd = require("posix.unistd")
-local poll = require("posix.poll")
-
 require("common.class")
 local ChttpComm = require("httplib.httpComm")
 local pystring = require("common.pystring")
+local system = require("common.system")
 local Cframe = class("frame", ChttpComm)
 
 function Cframe:_init_()
     ChttpComm._init_(self)
     self._objs = {}
+    self._obj_res = {}
 end
 
 local function waitDataRest(fread, rest, tReq)
@@ -123,6 +122,14 @@ function Cframe:echo404()
     return pystring:join("\r\n", tHttp)
 end
 
+function Cframe:findObjRes(path)
+    for k, v in pairs(self._obj_res) do
+        if string.find(path, k) then
+            return v
+        end
+    end
+end
+
 function Cframe:proc(fread)
     local stream = waitHttpHead(fread)
     if stream == nil then   -- read return stream or error code or nil
@@ -135,19 +142,26 @@ function Cframe:proc(fread)
             local obj = self._objs[tReq.path]
             local res, keep = obj:call(tReq)
             return res, keep
-        else
-            print("show all path.")
-            for k, _ in pairs(self._objs) do
-                print("path:",  k)
-            end
-            return self:echo404(), false
         end
+
+        local obj = self:findObjRes(tReq.path)
+        if obj then
+            local res, keep = obj:calls(tReq)
+            return res, keep
+        end
+
+        return self:echo404(), false
     end
 end
 
 function Cframe:register(path, obj)
     assert(self._objs[path] == nil, "the " .. path .. " is already registered.")
     self._objs[path] = obj
+end
+
+function Cframe:registerRe(path, obj)
+    assert(self._obj_res[path] == nil, "the " .. path .. " is already registered.")
+    self._obj_res[path] = obj
 end
 
 return Cframe
