@@ -2,7 +2,7 @@ Simple install procedure
 ========================
 
   % gzip -cd tsar-2.1.0.tar.gz | tar xvf -  # unpack the sources
-  % cd tsar-2.1.0                           # change to the toplevel directory
+  % cd tsar-2.1.0                           # change to the top level directory
   % make                                    # build tsar
 
   [ Become root if necessary ]

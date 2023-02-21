@@ -17,7 +17,7 @@ usage() {
 	echo "Usage: configure [options]"
 	echo "options:"
 	echo "  --kernel=KERNEL_VERSION    kernel version"
-	echo "  --buiddir=OBJDIR           the build dir"
+	echo "  --builddir=OBJDIR          the build dir"
 	echo "  --enable-lkm               enable linux kernel module"
 	echo "  --enable-libbpf            enable libbpf"
 	echo "  --enable-packages          auto install dependent packages for tools"
@@ -139,7 +139,7 @@ for opt; do
 		--kernel=*)
 			kern_ver=$optarg
 			;;
-		--buiddir=*)
+		--builddir=*)
 			objdir=$(readlink -f $optarg)
 			;;
 		--enable-lkm)

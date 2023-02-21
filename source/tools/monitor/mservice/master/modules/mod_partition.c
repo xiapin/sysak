@@ -132,11 +132,11 @@ static struct mod_info part_info[] = {
     {" iutil", DETAIL_BIT, MERGE_SUM,  STATS_NULL},
 };
 
-char *patition_lable = "path";
+char *partition_label = "path";
 
 void
 mod_register(struct module *mod)
 {
-	mod->lable = patition_lable;
+	mod->lable = partition_label;
     register_mod_fields(mod, "--partition", partition_usage, part_info, 7, read_partition_stat, set_part_record);
 }

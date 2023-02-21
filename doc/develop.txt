@@ -16,7 +16,7 @@ test  --  一些实验性质的功能，或者示例等
 Usage: configure [options]
 options:
 --kernel=KERNEL_VERSION , kernel version
---buiddir=OBJDIR ,the build dir
+--builddir=OBJDIR ,the build dir
 --enable-lkm ,enable linux kernel module
 --enable-libbpf ,enable libbpf
 --enable-static ,static link for c/cpp tools

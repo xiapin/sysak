@@ -120,3 +120,8 @@ metrics:
     head: value
     help: "loadavg of system from /proc/loadavg"
     type: "gauge"
+  - title: sysak_proc_buddyinfo
+    from: buddyinfo
+    head: value
+    help: "buddyinfo of system from /proc/loadavg"
+    type: "gauge"
