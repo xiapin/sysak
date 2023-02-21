@@ -5,12 +5,12 @@
 ---
 
 require("common.class")
-fcntl = require("posix.fcntl")
-unistd = require("posix.unistd")
-dirent = require("posix.dirent")
-stdlib = require("posix.stdlib")
-cjson = require("cjson")
-json = cjson.new()
+local fcntl = require("posix.fcntl")
+local unistd = require("posix.unistd")
+local dirent = require("posix.dirent")
+local stdlib = require("posix.stdlib")
+local cjson = require("cjson")
+local json = cjson.new()
 local CkvProc = require("collector.kvProc")
 local CvProc = require("collector.vproc")
 local pystring = require("common.pystring")
@@ -53,7 +53,7 @@ function CPodAlloc:get_container_info(did)
     local cname = did
     
     res = dockerinfo:get_inspect(did)
-    restable = json.decode(res)
+    local restable = json.decode(res)
     if #restable > 0 then
         restable = restable[1]
     end
@@ -146,7 +146,7 @@ function CPodAlloc:get_pidalloc()
 end
 
 function CPodAlloc:scan_namespace()
-    root = self.proc_fs
+    local root = self.proc_fs
     for pid in dirent.files(root) do
         repeat
         if pystring:startswith(pid,".") then break end

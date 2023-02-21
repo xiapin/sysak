@@ -66,7 +66,7 @@ function dockerinfo:get_dockerid(pid)
     local idstring = "unknow"
     if not file_exists(proc_fs .. pid .. "/cgroup") then return idstring end
     local cmd = "cat "  .. proc_fs .. pid .. "/cgroup 2>/dev/null | grep memory:"
-    pfile = io.popen(cmd,"r")
+    local pfile = io.popen(cmd,"r")
     local res = pfile:read("*a")
     pfile:close()
 
