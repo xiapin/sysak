@@ -7,6 +7,8 @@ config:
     mode: specify
     name: test_specify
 #    mode: hostip
+#  real_timestamps: true
+#  unix_socket: "/tmp/sysom_unity.sock"
   proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 #  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 
@@ -14,7 +16,7 @@ outline:
   - /tmp/sysom
 
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
-            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat"]
+            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat","pod_allocpage"]
 
 plugins:
   - so: kmsg
@@ -204,3 +206,8 @@ metrics:
     help: "gpuinfo of system from nvidia-smi"
     type: "gauge"
 
+    #- title: sysak_pod_alloc
+    #from: pod_alloc
+    #head: value
+    #help: "get pod alloc page used"
+    #type: "gauge"
