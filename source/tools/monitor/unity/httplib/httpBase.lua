@@ -5,6 +5,7 @@
 ---
 
 require("common.class")
+local system = require("common.system")
 local ChttpComm = require("httplib.httpComm")
 
 local ChttpBase = class("ChttpBase", ChttpComm)
@@ -20,22 +21,35 @@ function ChttpBase:_install(frame)
     end
 end
 
+function ChttpBase:_installRe(path, frame)
+    frame:registerRe(path, self)
+end
+
 function ChttpBase:echo(tRet, keep)
     error("ChttpBase:echo is a virtual function.")
 end
 
 local function checkKeep(tReq)
     local conn = tReq.header["connection"]
-    if conn and string.lower(conn) == "keep-alive" then
-        return true
+    if conn and string.lower(conn) == "close" then
+        return false
     end
-    return false
+    return true
 end
 
 function ChttpBase:call(tReq)
-    local tRet = self._urlCb[tReq.path](tReq)
     local keep = checkKeep(tReq)
-    return self:echo(tRet, keep), keep
+    local tRet = self._urlCb[tReq.path](tReq)
+    local res = self:echo(tRet, keep)
+
+    return res, keep
+end
+
+function ChttpBase:calls(tReq)
+    local keep = checkKeep(tReq)
+    local res = self:callRe(tReq, keep)
+
+    return res, keep
 end
 
 return ChttpBase

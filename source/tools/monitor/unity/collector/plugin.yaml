@@ -125,3 +125,4 @@ metrics:
     head: value
     help: "buddyinfo of system from /proc/loadavg"
     type: "gauge"
+
