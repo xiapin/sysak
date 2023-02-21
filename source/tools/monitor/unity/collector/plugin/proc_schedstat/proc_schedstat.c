@@ -164,10 +164,10 @@ int call(int t, struct unity_lines* lines) {
 	unity_alloc_lines(lines, nr_cpus+1);
 	for (i = 0; i < nr_cpus; i++) {
 		lines1[i] = unity_get_line(lines, i);
-		unity_set_table(lines1[i], "proc_schedstat");
+		unity_set_table(lines1[i], "sched_moni");
 	}
 	line2 = unity_get_line(lines, nr_cpus);
-	unity_set_table(line2, "proc_schedstat");
+	unity_set_table(line2, "sched_moni");
 	full_line(lines1, line2);
 	return 0;
 }
