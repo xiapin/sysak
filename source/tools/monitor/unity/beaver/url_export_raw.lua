@@ -14,6 +14,7 @@ function CurlExportRaw:_init_(frame, export)
     self._export = export
 
     self._urlCb["/export/metrics"] = function(tReq) return self:show(tReq)  end
+    self._urlCb["/metrics"] = function(tReq) return self:show(tReq)  end
     self:_install(frame)
 end
 

@@ -125,4 +125,9 @@ function system:parseYaml(fYaml)
     return lyaml.load(s)
 end
 
+function system:posixError(msg, err, errno)
+    local s = msg .. string.format(": %s, errno: %d", err, errno)
+    error(s)
+end
+
 return system

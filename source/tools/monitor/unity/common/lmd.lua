@@ -10,6 +10,7 @@ require("common.class")
 local pystring = require("common.pystring")
 
 local Clmd = class("lmd")
+local srcPath = ""
 
 function Clmd:_init_()
     self._escs = '\\`*_{}[]()>#+-.!'
@@ -98,9 +99,24 @@ local function pCode(s)
     end
 end
 
+local function images(s)
+    local name, link = unpack(pystring:split(s, "](", 1))
+    name = string.sub(name, 3)  -- ![]()
+    link = string.sub(link, 1, -2)
+
+    if string.sub(name, -1, -1) == "\\" then
+        return s
+    end
+    if string.sub(link, -1, -1) == "\\" then
+        return s
+    end
+    local path = srcPath .. link
+    return string.format('<img src="%s" alt="%s"/>', path, name)
+end
+
 local function links(s)
     local name, link = unpack(pystring:split(s, "](", 1))
-    name = string.sub(name, 2)
+    name = string.sub(name, 2)  -- []()
     link = string.sub(link, 1, -2)
     if string.sub(name, -1, -1) == "\\" then
         return s
@@ -109,6 +125,10 @@ local function links(s)
         return s
     end
     return string.format('<a href="%s">%s</a>', link, name)
+end
+
+local function pImages(s)
+    return string.gsub(s, "!%[.-%]%(.-%)", function(s) return images(s)  end)
 end
 
 local function pLink(s)
@@ -353,6 +373,7 @@ function Clmd:seg(s)
     s = pItalic(s)
     s = pDelete(s)
     s = pCode(s)
+    s = pImages(s)
     s = pLink(s)
     return pEscape(s)
 end
@@ -362,11 +383,12 @@ function Clmd:pSeg(s)
     return pystring:join("", {"<p>", pEnter(s), "</p>"})
 end
 
-function Clmd:toHtml(md)
+function Clmd:toHtml(md, path)
     local mds = pystring:split(md, '\n')
     local res = {}
     local len = #mds
     local stop = 0
+    srcPath = path or ""
 
     for i = 1, len do
         local line = mds[i]

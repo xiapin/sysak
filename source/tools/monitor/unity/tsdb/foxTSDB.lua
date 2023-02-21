@@ -268,27 +268,30 @@ function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
 end
 
 function CfoxTSDB:qlast(last, ms)
+    assert(last < 24 * 60 * 60)
+
     local now = self:get_us()
     local date = self:getDateFrom_us(now)
     local beg = now - last * 1e6;
 
-    if self._man then   -- has setup
-        if self.cffi.check_pman_date(self._man, date) == 1 then  -- at the same day
-            return self:query(beg, now, ms)
-        else
-            self:_del_()   -- destroy old manager
-            if self:_setupRead(now) ~= 0 then    -- try to create new
-                return ms
-            else
-                return self:query(beg, now, ms)
-            end
-        end
-    else
+    if not self._man then    -- check _man is already installed.
         if self:_setupRead(now) ~= 0 then    -- try to create new
             return ms
-        else
-            return self:query(beg, now, ms)
         end
+    end
+
+    if self.cffi.check_pman_date(self._man, date) == 1 then  -- at the same day
+        return self:query(beg, now, ms)
+    else
+        local dStop = self:getDateFrom_us(now)
+
+        local beg1 = beg
+        local beg2 = self.cffi.make_stamp(dStop)
+        local now1 = beg2 - 1
+        local now2 = now
+
+        ms = self:query(beg1, now1, ms)
+        return self:query(beg2, now2, ms)
     end
 end
 

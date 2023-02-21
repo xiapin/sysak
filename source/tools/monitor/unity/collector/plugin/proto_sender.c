@@ -10,23 +10,19 @@
 #define PROTO_QUEUE_SIZE  64
 #define gettidv1() syscall(__NR_gettid)
 
-LUALIB_API void luaL_traceback(lua_State *L, lua_State *L1, const char *msg, int level);
+extern int lua_reg_errFunc(lua_State *L);
+extern int lua_check_ret(int ret);
+int lua_load_do_file(lua_State *L, const char* path);
 
-static void report_lua_failed(lua_State *L) {
-    fprintf(stderr, "\nFATAL ERROR:%s\n\n", lua_tostring(L, -1));
-}
-
-static int call_init(lua_State *L, struct beeQ* pushQ) {
+static int call_init(lua_State *L, int err_func, struct beeQ* pushQ) {
     int ret;
     lua_Number lret;
 
     lua_getglobal(L, "init");
     lua_pushlightuserdata(L, pushQ);
     lua_pushinteger(L, (int)gettidv1());
-    ret = lua_pcall(L, 2, 1, 0);
+    ret = lua_pcall(L, 2, 1, err_func);
     if (ret) {
-        perror("proto_sender lua init func error");
-        report_lua_failed(L);
         goto endCall;
     }
 
@@ -52,6 +48,7 @@ static int call_init(lua_State *L, struct beeQ* pushQ) {
 extern int collector_qout(lua_State *L);
 lua_State * proto_sender_lua(struct beeQ* pushQ)  {
     int ret;
+    int err_func;
 
     /* create a state and load standard library. */
     lua_State *L = luaL_newstate();
@@ -61,20 +58,15 @@ lua_State * proto_sender_lua(struct beeQ* pushQ)  {
     }
     /* opens all standard Lua libraries into the given state. */
     luaL_openlibs(L);
+    err_func = lua_reg_errFunc(L);
 
-    ret = luaL_dofile(L, "proto_send.lua");
+    ret = lua_load_do_file(L, "proto_send.lua");
     if (ret) {
-        const char *msg = lua_tostring(L, -1);
-        perror("luaL_dofile error");
-        if (msg) {
-            luaL_traceback(L, L, msg, 0);
-            fprintf(stderr, "FATAL ERROR:%s\n\n", msg);
-        }
         goto endLoad;
     }
 
     lua_register(L, "collector_qout", collector_qout);
-    ret = call_init(L, pushQ);
+    ret = call_init(L, err_func, pushQ);
     if (ret < 0) {
         goto endCall;
     }
@@ -88,13 +80,13 @@ lua_State * proto_sender_lua(struct beeQ* pushQ)  {
 
 struct beeQ* proto_que(lua_State *L) {
     int ret;
+    int err_func = lua_gettop(L);
     struct beeQ* que;
 
     lua_getglobal(L, "que");
-    ret = lua_pcall(L, 0, 1, 0);
+    ret = lua_pcall(L, 0, 1, err_func);
     if (ret) {
-        perror("proto_que lua que func error");
-        report_lua_failed(L);
+        lua_check_ret(ret);
         goto endCall;
     }
     if (!lua_isuserdata(L, -1)) {   // check
@@ -120,6 +112,7 @@ struct beeQ* proto_que(lua_State *L) {
 extern volatile int sighup_counter;
 int proto_send_proc(void* msg, struct beeQ* q) {
     int ret = 0;
+    int err_func;
     struct unity_lines *lines = (struct unity_lines *)msg;
     int num = lines->num;
     struct unity_line * pLine = lines->line;
@@ -139,14 +132,14 @@ int proto_send_proc(void* msg, struct beeQ* q) {
         q->qarg = L;
         counter = sighup_counter;
     }
+    err_func = lua_gettop(L);
 
     lua_getglobal(L, "send");
     lua_pushnumber(L, num);
     lua_pushlightuserdata(L, pLine);
-    ret = lua_pcall(L, 2, 1, 0);
+    ret = lua_pcall(L, 2, 1, err_func);
     if (ret) {
-        perror("lua call error");
-        report_lua_failed(L);
+        lua_check_ret(ret);
         goto endCall;
     }
 
