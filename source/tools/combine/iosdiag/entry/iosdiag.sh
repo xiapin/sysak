@@ -125,7 +125,7 @@ enable_latency() {
 		#mkdir -p `dirname $datafile`
 		chmod +x $latency_bin
 		rm -f $(dirname $logfile)/result.log*
-		$SYSAK_WORK_PATH/../sysak btf
+		#$SYSAK_WORK_PATH/../sysak btf
 		$latency_bin $* &
 		wait $!
 		disable_latency
