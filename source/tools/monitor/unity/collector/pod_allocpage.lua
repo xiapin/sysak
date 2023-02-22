@@ -156,6 +156,7 @@ function CPodAlloc:scan_namespace()
         if not self:file_exists(proc_ns) then break end
 
         local slink = unistd.readlink(proc_ns)
+        if not slink then break end
         if not string.find(slink,"net") then break end
 
         local inode = string.match(slink,"%[(%S+)%]")
