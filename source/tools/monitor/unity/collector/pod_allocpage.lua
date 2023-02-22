@@ -9,6 +9,7 @@ local fcntl = require("posix.fcntl")
 local unistd = require("posix.unistd")
 local dirent = require("posix.dirent")
 local stdlib = require("posix.stdlib")
+local stat = require("posix.sys.stat")
 local cjson = require("cjson")
 local json = cjson.new()
 local CkvProc = require("collector.kvProc")
@@ -28,9 +29,8 @@ function CPodAlloc:_init_(proto, pffi, mnt, pFile)
 end
 
 function CPodAlloc:file_exists(file)
-    local f=io.open(file,"r")
+    local f=stat.lstat(file)
     if f ~= nil then
-        io.close(f)
         return true
     else
         return false

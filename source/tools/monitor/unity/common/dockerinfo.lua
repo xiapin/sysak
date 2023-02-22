@@ -9,11 +9,11 @@ local posix = require("posix")
 local cjson = require("cjson")
 local json = cjson.new()
 local pystring = require("common.pystring")
+local stat = require("posix.sys.stat")
 
 function file_exists(file)
-    local f=io.open(file,"r")
+    local f=stat.lstat(file)
     if f ~= nil then
-        io.close(f)
         return true
     else
         return false
@@ -70,10 +70,10 @@ function dockerinfo:get_dockerid(pid)
     local res = pfile:read("*a")
     pfile:close()
 
-    if not string.find(res,"kubepods") and not string.find(res,"docker-")  then return idstring end
-    if string.find(res,"docker-") then
+    if not string.find(res,"kubepods") and not string.find(res,"docker%-")  then return idstring end
+    if string.find(res,"docker%-") then
         idstring = pystring:split(res,"docker-")[2]
-    elseif string.find(res,"cri-containerd-") then
+    elseif string.find(res,"cri%-containerd%-") then
         idstring = pystring:split(res,"cri-containerd-")[2]
     else
         local tmp = pystring:split(res,"/",10)
