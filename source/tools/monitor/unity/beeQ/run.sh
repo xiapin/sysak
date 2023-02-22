@@ -9,4 +9,8 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../../install/
 export LUA_PATH="../../lua/?.lua;../../lua/?/init.lua;"
 export LUA_CPATH="../../lib/?.so;../../lib/loadall.so;"
 
-./unity-mon
+yaml_path=$1
+[ ! $yaml_path ] && yaml_path="/etc/sysak/plugin.yaml"
+
+echo $yaml_yaml_path
+./unity-mon $yaml_path

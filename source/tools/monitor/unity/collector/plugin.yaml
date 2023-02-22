@@ -7,7 +7,7 @@ config:
     mode: specify
     name: test_specify
 #    mode: hostip
-  proc_path: /mnt/home/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 #  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 
 outline:

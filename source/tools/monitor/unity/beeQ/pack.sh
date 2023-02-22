@@ -35,9 +35,11 @@ cp beeQ/run.sh ${APP}/beeQ/
 
 mkdir ${APP}/collector
 mkdir ${APP}/collector/native
+mkdir ${APP}/collector/outline
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
+cp collector/outline/*.lua ${APP}/collector/outline
 cp collector/plugin.yaml ${APP}/collector/
 
 mkdir ${APP}/common
