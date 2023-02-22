@@ -339,8 +339,11 @@ class ioMonitorClass(object):
                 if stat[2] in fieldDicts.keys():
                     self._removeDiskMonitor(stat[2])
                 continue
-            for idx, value in fieldDicts[stat[2]].items():
-                value[1] = long(stat[int(idx) + 2])
+            try:
+                for idx, value in fieldDicts[stat[2]].items():
+                    value[1] = long(stat[int(idx) + 2])
+            except Exception:
+                continue
 
         for devname, field in fieldDicts.items():
             io = self._calcIoIndex(devname, field, secs)
