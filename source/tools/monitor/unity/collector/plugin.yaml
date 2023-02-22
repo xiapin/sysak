@@ -125,4 +125,19 @@ metrics:
     head: value
     help: "buddyinfo of system from /proc/loadavg"
     type: "gauge"
+  - title: sysak_IOMonIndForDisksIO
+    from: IOMonIndForDisksIO
+    head: value
+    help: "Disk IO indicators and abnormal events"
+    type: "gauge"
+  - title: sysak_IOMonIndForSystemIO
+    from: IOMonIndForSystemIO
+    head: value
+    help: "System indicators and abnormal events about IO"
+    type: "gauge"
+  - title: sysak_IOMonDiagLog
+    from: IOMonDiagLog
+    head: value
+    help: "Diagnose log for IO exception"
+    type: "gauge"
 
