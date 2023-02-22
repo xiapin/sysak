@@ -32,7 +32,9 @@ plugins:
   -
     so: proc_loadavg
     description: "collect load avg"
-
+  -
+    so: unity_nosched
+    description: "nosched:sys hold cpu and didn't scheduling"
 metrics:
   -
     title: sysak_proc_cpu_total
@@ -124,5 +126,25 @@ metrics:
     from: buddyinfo
     head: value
     help: "buddyinfo of system from /proc/loadavg"
+    type: "gauge"
+  - title: sysak_IOMonIndForDisksIO
+    from: IOMonIndForDisksIO
+    head: value
+    help: "Disk IO indicators and abnormal events"
+    type: "gauge"
+  - title: sysak_IOMonIndForSystemIO
+    from: IOMonIndForSystemIO
+    head: value
+    help: "System indicators and abnormal events about IO"
+    type: "gauge"
+  - title: sysak_IOMonDiagLog
+    from: IOMonDiagLog
+    head: value
+    help: "Diagnose log for IO exception"
+    type: "gauge"
+  - title: sched_moni_jitter
+    from: sched_moni_jitter
+    head: value
+    help: "nosched:sys hold cpu and didn't scheduling"
     type: "gauge"
 
