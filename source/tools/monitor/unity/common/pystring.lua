@@ -55,8 +55,10 @@ end
 
 local function setupDelimiter(delimiter)
     local rt = {}
+    local i = 0
     for c in string.gmatch(delimiter, ".") do
-        table.insert(rt, checkDelimiter(c))
+        i = i + 1
+        rt[i] = checkDelimiter(c)
     end
     return table.concat(rt)
 end
@@ -78,18 +80,22 @@ function pystring:split(s, delimiter, n)
 
     local nums = 0
     local beg = 1
+    local c = 0
     while (true) do
         local iBeg, iEnd = string.find(s, delimiter, beg)
         if (iBeg) then
-            table.insert(result, string.sub(s, beg, iBeg - 1))
+            c = c + 1
+            result[c] = string.sub(s, beg, iBeg - 1)
             beg = iEnd + 1
             nums = nums + 1
             if nums >= n then
-                table.insert(result, string.sub(s, beg, string.len(s)))
+                c = c + 1
+                result[c] = string.sub(s, beg, string.len(s))
                 break
             end
         else
-            table.insert(result, string.sub(s, beg, string.len(s)))
+            c = c + 1
+            result[c] = string.sub(s, beg, string.len(s))
             break
         end
     end
@@ -112,19 +118,23 @@ function pystring:rsplit(s, delimiter, n)
     rDel = setupDelimiter(rDel)
     local nums = 0
     local beg = 1
+    local c = 0
 
     while (true) do
         local iBeg, iEnd = string.find(rs, rDel, beg)
         if (iBeg) then
-            table.insert(result, string.sub(s, len - (iBeg - 1),len - beg))
+            c = c + 1
+            result[c] = string.sub(s, len - (iBeg - 1),len - beg))
             beg = iEnd + 1
             nums = nums + 1
             if nums >= n then
-                table.insert(result, string.sub(s, 1, len - beg))
+                c = c + 1
+                result[c] = string.sub(s, 1, len - beg)
                 break
             end
         else
-            table.insert(result, string.sub(s, 1, len - beg))
+            c = c + 1
+            result[c] = string.sub(s, 1, len - beg)
             break
         end
     end

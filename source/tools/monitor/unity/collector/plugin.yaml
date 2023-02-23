@@ -13,6 +13,9 @@ config:
 outline:
   - /tmp/sysom
 
+luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
+            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat"]
+
 plugins:
   - so: kmsg
     description: "collect dmesg info."

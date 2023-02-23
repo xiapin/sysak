@@ -14,6 +14,13 @@ assert(#ret == 3)
 assert(ret[1] == "hello")
 assert(ret[2] == "lua")
 assert(ret[3] == "language")
+ret = pystring:split("hello lua language lua language")
+assert(#ret == 5 )
+assert(ret[1] == "hello")
+assert(ret[2] == "lua")
+assert(ret[3] == "language")
+assert(ret[4] == "lua")
+assert(ret[5] == "language")
 
 -- 自定符号分割
 ret = pystring:split("hello*lua *language", "*")

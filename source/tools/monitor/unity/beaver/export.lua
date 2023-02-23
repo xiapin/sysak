@@ -24,11 +24,13 @@ local function qFormData(from, tData)
     local res = {}
     local len = #tData
     local last = 0
+    local c = 0
     for i = len, 1, -1 do
         local line = tData[i]
         if from == line.title then
             if last == 0 or last == line.time then
-                table.insert(res, line)
+                c = c + 1
+                res[c] = line
                 last = line.time
             else
                 break
@@ -40,8 +42,10 @@ end
 
 local function packLine(title, ls, v)
     local tLs = {}
+    local c = 0
     for k, v in pairs(ls) do
-        table.insert(tLs, string.format("%s=\"%s\"", k , v))
+        c = c + 1
+        tLs[c] = string.format("%s=\"%s\"", k , v)
     end
     local label = ""
     if #tLs then
@@ -56,15 +60,18 @@ function Cexport:export()
     self._fox:resize()
     self._fox:qlast(self._freq, qs)
     local res = {}
+    local c = 0
     for _, line in ipairs(self._tDescr) do
         local from = line.from
         local tFroms = qFormData(from, qs)
         if #tFroms then
             local title = line.title
             local help = string.format("# HELP %s %s", title, line.help)
-            table.insert(res, help)
+            c = c + 1
+            res[c] = help
             local sType = string.format("# TYPE %s %s", title, line.type)
-            table.insert(res, sType)
+            c = c + 1
+            res[c] = sType
 
             for _, tFrom in ipairs(tFroms) do
                 local labels = system:deepcopy(tFrom.labels)
@@ -74,7 +81,8 @@ function Cexport:export()
                 labels.instance = self._instance
                 for k, v in pairs(tFrom.values) do
                     labels[line.head] = k
-                    table.insert(res, packLine(title, labels, v))
+                    c = c + 1
+                    res[c] = packLine(title, labels, v)
                 end
             end
         end

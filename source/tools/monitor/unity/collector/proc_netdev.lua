@@ -27,7 +27,7 @@ function CprocNetdev:_getNewValue(ifName, data)
     local now = {}
     local index = self:_netdevIndex()
     for i = 1, #index do
-        table.insert(now, tonumber(data.value[i - 1]))
+        now[i] = tonumber(data.value[i - 1])
     end
     self._lastData[ifName] = now
     self._lastIfNames[ifName] = 1
@@ -43,13 +43,13 @@ function CprocNetdev:_calcIf(ifName, data, res, elapsed)
     }
     for i, index in ipairs(index) do
         local nowValue = tonumber(data.value[i -1])
-        table.insert(now, nowValue)
+        now[i] = nowValue
         local value = (nowValue - res[i]) / elapsed
         local cell = {
             name = index,
             value = value
         }
-        table.insert(protoTable.vs, cell)
+        protoTable.vs[i] = cell
     end
 
     self:appendLine(protoTable)

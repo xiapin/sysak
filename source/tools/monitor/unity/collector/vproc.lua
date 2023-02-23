@@ -31,8 +31,10 @@ function CvProc:copyLine(line)
 end
 
 function CvProc:push(lines)
+    local c = #lines
     for _, v in ipairs(self._lines["lines"]) do
-        table.insert(lines["lines"], v)
+        c = c + 1
+        lines["lines"][c] = v
     end
     self._lines = nil
     return lines
