@@ -19,13 +19,22 @@ struct sched_stats {
 };
 
 long nr_cpus;
+char *real_proc_path;
 struct unity_line **lines1;
 struct sched_stats *schstats, *schstats2, *delta, *curr, *oldp;
 
 int init(void * arg)
 {
 	int ret;
+	int i, lenth;
+	char *mntpath = get_unity_proc();
 
+	lenth = strlen(mntpath)+strlen(SCHEDSTAT_PATH);
+	real_proc_path = calloc(lenth+2, 1);
+	if (!real_proc_path)
+		return -errno;
+	snprintf(real_proc_path, lenth+1, "%s%s", mntpath, SCHEDSTAT_PATH);
+	printf("path=%s\n", real_proc_path);
 	errno = 0;
 
 	lines1 = NULL;
@@ -87,7 +96,7 @@ int full_line(struct unity_line **uline1, struct unity_line *uline2)
 	fp = NULL;
 	errno = 0;
 	idx = 0;
-	if ((fp = fopen(SCHEDSTAT_PATH, "r")) == NULL) {
+	if ((fp = fopen(real_proc_path, "r")) == NULL) {
 		ret = errno;
 		printf("WARN: proc_schedstat install FAIL fopen\n");
 		return ret;

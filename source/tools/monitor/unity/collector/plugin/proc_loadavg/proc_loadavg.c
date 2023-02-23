@@ -4,6 +4,7 @@
 #include "proc_loadavg.h"
 
 #define LOADAVG_PATH	"/proc/loadavg"
+char *real_proc_path;
 
 struct stats_load {
 	unsigned long nr_running;
@@ -15,6 +16,14 @@ struct stats_load {
 
 int init(void * arg)
 {
+	int i, lenth;
+	char *mntpath = get_unity_proc();
+
+	lenth = strlen(mntpath)+strlen(LOADAVG_PATH);
+	real_proc_path = calloc(lenth+2, 1);
+	if (!real_proc_path)
+		return -errno;
+	snprintf(real_proc_path, lenth+1, "%s%s", mntpath, LOADAVG_PATH);
 	printf("proc_loadavg plugin install.\n");
 	return 0;
 }
@@ -28,7 +37,7 @@ int full_line(struct unity_line *uline)
 
 	fp = NULL;
 	errno = 0;
-	if ((fp = fopen(LOADAVG_PATH, "r")) == NULL) {
+	if ((fp = fopen(real_proc_path, "r")) == NULL) {
 		ret = errno;
 		printf("WARN: proc_loadavg install FAIL fopen\n");
 		return ret;
@@ -74,5 +83,7 @@ int call(int t, struct unity_lines* lines) {
 
 void deinit(void)
 {
+	if (real_proc_path)
+		free(real_proc_path);
 	printf("proc_loadavg plugin uninstall\n");
 }
