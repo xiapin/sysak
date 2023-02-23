@@ -52,6 +52,10 @@ plugins:
   -
     so: cpufreq
     description: "collect cpufreq"
+  -
+    so: gpuinfo
+    description: "collect gpuinfo"
+
 metrics:
   -
     title: sysak_proc_cpu_total
@@ -194,3 +198,9 @@ metrics:
     head: value
     help: "cpufreq of system from /proc/cpuinfo"
     type: "gauge"
+  - title: sysak_gpuinfo
+    from: gpuinfo
+    head: value
+    help: "gpuinfo of system from nvidia-smi"
+    type: "gauge"
+
