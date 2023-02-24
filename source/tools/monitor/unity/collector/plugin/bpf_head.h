@@ -40,7 +40,7 @@
                 DESTORY_SKEL_BOJECT(skel_name);                                                     \
                 goto load_bpf_skel_out;                                                             \
             }                                                                                       \
-            struct perf_thread_arguments *perf_args = malloc(sizeof(struct perf_thread_arguments)); \
+            struct perf_thread_arguments *perf_args = calloc(sizeof(struct perf_thread_arguments)); \
             if (!perf_args)                                                                         \
             {                                                                                       \
                 __ret = -ENOMEM;                                                                    \
