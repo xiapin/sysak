@@ -21,6 +21,7 @@ struct sched_stats {
 long nr_cpus;
 char *real_proc_path;
 struct unity_line **lines1;
+struct sched_stats curr_min, curr_max;
 struct sched_stats *schstats, *schstats2, *delta, *curr, *oldp;
 
 int init(void * arg)
@@ -73,6 +74,9 @@ int init(void * arg)
 		printf("WARN: proc_schedstat install FAIL calloc 4\n");
 		return ret;
 	}
+
+	curr_min.delay = -1ULL;
+	curr_max.delay = 0;
 	printf("proc_schedstat plugin install.\n");
 	return 0;
 }
@@ -143,6 +147,16 @@ int full_line(struct unity_line **uline1, struct unity_line *uline2)
 			unity_set_index(uline1[cpu], 0, "cpu", cpu_name);
 			unity_set_value(uline1[cpu], 0, "pcount", delta[cpu].pcount);
 			unity_set_value(uline1[cpu], 1, "delay", delta[cpu].delay);
+			if (delta[cpu].delay > curr_max.delay) {
+				curr_max.delay = delta[cpu].delay;
+				curr_max.pcount = delta[cpu].pcount;
+				strcpy(curr_max.cpu_name, cpu_name);
+			}
+			if (delta[cpu].delay < curr_min.delay) {
+				curr_min.delay = delta[cpu].delay;
+				curr_min.pcount = delta[cpu].pcount;
+				strcpy(curr_min.cpu_name, cpu_name);
+			}
 		}
 	}
 
@@ -158,6 +172,7 @@ int full_line(struct unity_line **uline1, struct unity_line *uline2)
 	unity_set_index(uline2, 0, "summary", "avg");
 	unity_set_value(uline2, 0, "pcount", sum_cnt/nr_cpus);
 	unity_set_value(uline2, 1, "delay", sum_delay/nr_cpus);
+
 	tmp = curr;
 	curr = oldp;
 	oldp = tmp;
@@ -168,16 +183,28 @@ int full_line(struct unity_line **uline1, struct unity_line *uline2)
 int call(int t, struct unity_lines* lines) {
 	int i = 0;
 	static double value = 0.0;
-	struct unity_line* line2;
+	struct unity_line *line2, *line3, *line4;
 
-	unity_alloc_lines(lines, nr_cpus+1);
+	unity_alloc_lines(lines, nr_cpus+3);
 	for (i = 0; i < nr_cpus; i++) {
 		lines1[i] = unity_get_line(lines, i);
-		unity_set_table(lines1[i], "sched_moni");
+		unity_set_table(lines1[i], "proc_schedstat");
 	}
 	line2 = unity_get_line(lines, nr_cpus);
-	unity_set_table(line2, "sched_moni");
+	unity_set_table(line2, "proc_schedstat");
 	full_line(lines1, line2);
+
+	line3 = unity_get_line(lines, nr_cpus+1);
+	unity_set_table(line3, "proc_schedstat");
+	unity_set_index(line3, 0, "max", curr_max.cpu_name);
+	unity_set_value(line3, 0, "pcount", curr_max.delay);
+	unity_set_value(line3, 1, "delay", curr_max.pcount);
+
+	line4 = unity_get_line(lines, nr_cpus+2);
+	unity_set_table(line4, "proc_schedstat");
+	unity_set_index(line4, 0, "min", curr_min.cpu_name);
+	unity_set_value(line4, 0, "pcount", curr_min.delay);
+	unity_set_value(line4, 1, "delay", curr_min.pcount);
 	return 0;
 }
 
