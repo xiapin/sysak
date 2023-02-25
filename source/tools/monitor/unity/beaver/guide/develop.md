@@ -59,6 +59,10 @@ config:
 outline:   # 外部数据入口，适合接入外部数据场景
   - /tmp/sysom    # 外部unix socket 路径，可以指定多个
 
+luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
+            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat"]  # 控制lua 插件加载
+            
+
 plugins:    # 插件列表 对应 /collector/plugin 路径下编译出来的c库文件。
   - so: kmsg   # 库名
     description: "collect dmesg info."  # 描述符

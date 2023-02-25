@@ -81,18 +81,23 @@ function module.pack(title, ls, vs)
     local line = title
     if system:keyCount(ls) > 0 then
         local lss = {}
+        local c = 0
         for k, v in pairs(ls) do
-            table.insert(lss, k .. "=" .. v)
+            c = c + 1
+            lss[c] = table.concat({k, v}, "=")
         end
         line = line .. ',' .. pystring:join(",", lss)
     end
     local vss = {}
+    local c = 0
     for k, v in pairs(vs) do
         local tStr = type(v)
         if tStr == "number" then
-            table.insert(vss, k .. '=' .. tostring(v))
+            c = c + 1
+            vss[c] = table.concat({k, tostring(v)}, "=")
         elseif tStr == "string" then
-            table.insert(vss, k .. '=' .. json.encode(v))
+            c = c + 1
+            vss[c] = table.concat({k, json.encode(v)}, "=")
         else
             error("bad value type for " .. tStr)
         end

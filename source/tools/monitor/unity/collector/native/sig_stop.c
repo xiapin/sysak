@@ -4,8 +4,10 @@
 
 #include "sig_stop.h"
 #include <signal.h>
-
 #include <stdio.h>
+#include <limits.h>
+#include <sys/resource.h>
+#include "fastKsym.h"
 
 static volatile int working = 1;
 
@@ -38,7 +40,22 @@ static void sig_register(void) {
     sigaction(SIGQUIT, &action, NULL);
 }
 
+static void bump_memlock_rlimit1(void)
+{
+    struct rlimit rlim_new = {
+            .rlim_cur	= RLIM_INFINITY,
+            .rlim_max	= RLIM_INFINITY,
+    };
+
+    if (setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
+        fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
+        exit(1);
+    }
+}
+
 void plugin_init(void) {
+    bump_memlock_rlimit1();
+    ksym_setup(1);
     sig_register();
     working = 1;
 }

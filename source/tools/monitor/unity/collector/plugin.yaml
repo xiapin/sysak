@@ -13,6 +13,9 @@ config:
 outline:
   - /tmp/sysom
 
+luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
+            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat"]
+
 plugins:
   - so: kmsg
     description: "collect dmesg info."
@@ -35,6 +38,10 @@ plugins:
   -
     so: unity_nosched
     description: "nosched:sys hold cpu and didn't scheduling"
+  - so: net_health
+    description: "tcp net health."
+  - so: net_retrans
+    description: "tcp retrans monitor."
 metrics:
   -
     title: sysak_proc_cpu_total
@@ -147,4 +154,23 @@ metrics:
     head: value
     help: "nosched:sys hold cpu and didn't scheduling"
     type: "gauge"
-
+  - title: sysak_cpu_dist
+    from: cpu_dist
+    head: value
+    help: "task cpu sched dist."
+    type: "gauge"
+  - title: sysak_net_health_hist
+    from: net_health_hist
+    head: value
+    help: "net_health_hist"
+    type: "gauge"
+  - title: sysak_net_health_count
+    from: net_health_count
+    head: value
+    help: "net_health_count"
+    type: "gauge"
+  - title: sysak_net_retrans_count
+    from: net_retrans_count
+    head: value
+    help: "net_retrans_count"
+    type: "gauge"

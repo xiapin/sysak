@@ -25,8 +25,8 @@ end
 local function getAdd(hostName)
     local _, resolved = socket.dns.toip(hostName)
     local listTab = {}
-    for _, v in pairs(resolved.ip) do
-        table.insert(listTab, v)
+    for i, v in pairs(resolved.ip) do
+        listTab[i] = v
     end
     return listTab
 end

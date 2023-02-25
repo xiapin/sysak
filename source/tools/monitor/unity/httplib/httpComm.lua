@@ -87,12 +87,15 @@ function ChttpComm:packHeaders(headTable, len) -- just for http out.
     end
     local origin = originHeader()
 
+    local c = 0
     for k, v in pairs(origin) do
-        table.insert(lines, k .. ": " .. v)
+        c = c + 1
+        lines[c] = table.concat({k, v}, ": ")
     end
 
     for k, v in pairs(headTable) do
-        table.insert(lines, k .. ": " .. v)
+        c = c + 1
+        lines[c] = table.concat({k, v}, ": ")
     end
     return pystring:join("\r\n", lines) .. "\r\n"
 end

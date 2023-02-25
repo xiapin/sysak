@@ -21,11 +21,13 @@ end
 local function waitDataRest(fread, rest, tReq)
     local len = 0
     local tStream = {tReq.data}
+    local c = #tStream
     while len < rest do
         local s = fread()
         if s then
             len = len + #s
-            table.insert(tStream, s)
+            c = c + 1
+            tStream[c] = s
         else
             return -1
         end
