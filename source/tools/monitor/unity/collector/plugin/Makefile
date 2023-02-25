@@ -4,7 +4,7 @@ LDFLAG := -g -fpic -shared
 OBJS := proto_sender.o
 LIB := libproto_sender.a
 
-DEPMOD=sample threads kmsg proc_schedstat proc_loadavg bpfsample2 unity_nosched
+DEPMOD=sample threads kmsg proc_schedstat proc_loadavg bpfsample2 unity_nosched cpudist net_health net_retrans
 
 all: $(LIB) $(DEPMOD)
 

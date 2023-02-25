@@ -176,12 +176,16 @@ function CLocalBeaver:write(fd, stream)
                     stream = string.sub(stream, sent + 1)
                     sent, err, errno = socket.send(fd, stream)
                     if sent == nil then
+                        if errno == 11 then  -- EAGAIN ?
+                            goto continue
+                        end
                         system:posixError("socket send error.", err, errno)
                         return nil
                     end
                 else  -- need to read ? may something error or closed.
                     return nil
                 end
+                ::continue::
             end
             res = self._cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
             assert(res == 0)

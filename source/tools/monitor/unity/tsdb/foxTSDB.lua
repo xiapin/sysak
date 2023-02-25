@@ -291,7 +291,7 @@ function CfoxTSDB:qlast(last, ms)
     assert(last < 24 * 60 * 60)
 
     local now = self:get_us()
-    local beg = now - last * 1e6;
+    local beg = now - last * 1e6
 
     local dStart = self:getDateFrom_us(beg)
     local dStop = self:getDateFrom_us(now)
@@ -299,6 +299,7 @@ function CfoxTSDB:qlast(last, ms)
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
         self:_qlast(dStart, beg, now, ms)
     else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
         local beg2 = self.cffi.make_stamp(dStop)
         local now1 = beg2 - 1
@@ -405,6 +406,7 @@ function CfoxTSDB:qDate(dStart, dStop, tbls)
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
         self:qDay(beg, now, ms, tbls)
     else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
         local beg2 = self.cffi.make_stamp(dStop)
         local now1 = beg2 - 1
@@ -433,6 +435,7 @@ function CfoxTSDB:qNow(sec, tbls)
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
         self:qDay(beg, now, ms, tbls)
     else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
         local beg2 = self.cffi.make_stamp(dStop)
         local now1 = beg2 - 1
@@ -461,6 +464,7 @@ function CfoxTSDB:qTabelNow(sec)
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
         self:qDayTables(beg, now, tbls)
     else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
         local beg2 = self.cffi.make_stamp(dStop)
         local now1 = beg2 - 1

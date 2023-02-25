@@ -31,10 +31,19 @@ end
 
 local function checkKeep(tReq)
     local conn = tReq.header["connection"]
-    if conn and string.lower(conn) == "close" then
-        return false
+    if tReq.vers == "1.0" then
+        if conn and string.lower(conn) == "keep-alive" then
+            return true
+        else   -- for http 1.0, close as default
+            return false
+        end
+    else
+        if conn and string.lower(conn) == "close" then
+            return false
+        else   -- for http 1.1 and newer, for keep-alive as default
+            return true
+        end
     end
-    return true
 end
 
 function ChttpBase:call(tReq)

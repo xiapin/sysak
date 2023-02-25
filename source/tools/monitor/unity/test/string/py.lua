@@ -21,6 +21,8 @@ assert(ret[2] == "lua")
 assert(ret[3] == "language")
 assert(ret[4] == "lua")
 assert(ret[5] == "language")
+ret = pystring:split("Node 0, zone      DMA      1      0      0      1      2      1      1      0      1      1      3")
+assert(#ret == 15)
 
 -- 自定符号分割
 ret = pystring:split("hello*lua *language", "*")

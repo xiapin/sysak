@@ -75,6 +75,9 @@ end
 
 function pystring:split(s, delimiter, n)
     local result = {}
+    if not delimiter or delimiter == "" then  -- for blank, gsub multi blank to single
+        s = string.gsub(s, "%s+", " ")
+    end
     local delimiter = setupDelimiter(delimiter or " ")
     local n = n or 2 ^ 63 - 1
 
@@ -124,7 +127,7 @@ function pystring:rsplit(s, delimiter, n)
         local iBeg, iEnd = string.find(rs, rDel, beg)
         if (iBeg) then
             c = c + 1
-            result[c] = string.sub(s, len - (iBeg - 1),len - beg))
+            result[c] = string.sub(s, len - (iBeg - 1),len - beg)
             beg = iEnd + 1
             nums = nums + 1
             if nums >= n then
