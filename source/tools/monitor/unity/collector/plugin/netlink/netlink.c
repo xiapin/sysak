@@ -9,7 +9,7 @@ int get_conntrack_drop()
 {
     int total_drop = 0, i;
     FILE *fp = NULL;
-    fp = popen("conntrack -S", "r"); // 将命令ls-l 同过管道读到fp
+    fp = popen("conntrack -S", "r");
 
     if (!fp)
         return -1;
@@ -40,7 +40,7 @@ int get_tc_drop()
 {
     int total_drop = 0, i;
     FILE *fp = NULL;
-    fp = popen("tc -s qdisc", "r"); // 将命令ls-l 同过管道读到fp
+    fp = popen("tc -s qdisc", "r");
 
     if (!fp)
         return -1;
@@ -76,7 +76,7 @@ int init(void * arg) {
 int call(int t, struct unity_lines* lines) {
     struct unity_line* line;
 
-    unity_alloc_lines(lines, 3);    // 预分配好
+    unity_alloc_lines(lines, 1);
     line = unity_get_line(lines, 0);
     unity_set_table(line, "netlink");
     unity_set_value(line, 0, "conntrack_drop", get_conntrack_drop());
