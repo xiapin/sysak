@@ -42,6 +42,9 @@ plugins:
     description: "tcp net health."
   - so: net_retrans
     description: "tcp retrans monitor."
+  -
+    so: unity_irqoff
+    description: "irqoff:detect irq turned off and can't response"
 metrics:
   -
     title: sysak_proc_cpu_total
@@ -152,7 +155,7 @@ metrics:
   - title: sched_moni_jitter
     from: sched_moni_jitter
     head: value
-    help: "nosched:sys hold cpu and didn't scheduling"
+    help: "nosched/irqoff:sys and irqoff hold cpu and didn't scheduling"
     type: "gauge"
   - title: sysak_cpu_dist
     from: cpu_dist
