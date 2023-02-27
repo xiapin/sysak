@@ -7,17 +7,29 @@
 #include <coolbpf.h>
 #include "../../../../unity/beeQ/beeQ.h"
 
-DEFINE_SEKL_OBJECT(bpfsample);
+struct coolbpf_object *cb = NULL;
+int countfd = 0;
 
 int init(void *arg)
 {
+    cb = coolbpf_object_new(bpfsample);
+    if (!cb) {
+        printf("Failed to create coolbpf object\n");
+        return -EINVAL;
+    }
+    
+    countfd = coolbpf_object_find_map(cb, "count");
+    if (countfd < 0) {
+        printf("Failed to get count map fd\n");
+        return countfd;
+    }
     printf("bpfsample plugin install.\n");
-    return LOAD_SKEL_OBJECT(bpfsample);
+    printf("count map fd is %d\n", countfd);
+    return 0;
 }
 
 int call(int t, struct unity_lines *lines)
 {
-    int countfd = bpf_map__fd(bpfsample->maps.count);
     int default_key = 0;
     uint64_t count = 0;
     uint64_t default_count = 0;
@@ -37,5 +49,5 @@ int call(int t, struct unity_lines *lines)
 void deinit(void)
 {
     printf("bpfsample plugin uninstall.\n");
-    DESTORY_SKEL_BOJECT(bpfsample);
+    coolbpf_object_destroy(cb);
 }
