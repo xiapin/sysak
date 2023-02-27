@@ -54,6 +54,8 @@ config:
   		    # specify:	指定id，需要指定name参数
     mode: specify
     name: test_specify
+  real_timestamps: true #上报监测数据的真实时间，默认关闭
+  unix_socket: "/tmp/sysom_unity.sock" #通过unix_socket方式进行数据传输，默认关闭
   proc_path: /mnt/host/  # proc 文件路径，在host侧，为 / 在容器侧，如配置 -v /:/mnt/host 则配置为 /mnt/host
   
 outline:   # 外部数据入口，适合接入外部数据场景

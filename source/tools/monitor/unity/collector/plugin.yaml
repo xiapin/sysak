@@ -4,9 +4,12 @@ config:
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
-    mode: specify
-    name: test_specify
+    mode: curl
+    url: "http://100.100.100.200/latest/meta-data/instance-id"
+#    name: test_specify
 #    mode: hostip
+#  real_timestamps: true
+#  unix_socket: "/tmp/sysom_unity.sock"
   proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 #  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 
@@ -204,3 +207,8 @@ metrics:
     help: "gpuinfo of system from nvidia-smi"
     type: "gauge"
 
+    #- title: sysak_pod_alloc
+    #from: pod_alloc
+    #head: value
+    #help: "get pod alloc page used"
+    #type: "gauge"
