@@ -35,6 +35,7 @@ plugins:
   -
     so: proc_loadavg
     description: "collect load avg"
+
   -
     so: unity_nosched
     description: "nosched:sys hold cpu and didn't scheduling"
@@ -45,6 +46,16 @@ plugins:
   -
     so: unity_irqoff
     description: "irqoff:detect irq turned off and can't response"
+  -
+    so: numainfo
+    description: "collect numainfo"
+  # -
+  #   so: cpufreq
+  #   description: "collect cpufreq"
+  -
+    so: gpuinfo
+    description: "collect gpuinfo"
+
 metrics:
   -
     title: sysak_proc_cpu_total
@@ -135,7 +146,7 @@ metrics:
   - title: sysak_proc_buddyinfo
     from: buddyinfo
     head: value
-    help: "buddyinfo of system from /proc/loadavg"
+    help: "buddyinfo of system from /proc/buddyinfo"
     type: "gauge"
   - title: sysak_IOMonIndForDisksIO
     from: IOMonIndForDisksIO
@@ -177,3 +188,19 @@ metrics:
     head: value
     help: "net_retrans_count"
     type: "gauge"
+  - title: sysak_numainfo
+    from: numainfo
+    head: value
+    help: "numainfo of system from /sys/devices/system/"
+    type: "gauge"
+  # - title: sysak_proc_cpufreq
+  #   from: cpufreq
+  #   head: value
+  #   help: "cpufreq of system from /proc/cpuinfo"
+  #   type: "gauge"
+  - title: sysak_gpuinfo
+    from: gpuinfo
+    head: value
+    help: "gpuinfo of system from nvidia-smi"
+    type: "gauge"
+
