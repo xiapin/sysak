@@ -32,8 +32,6 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
         struct unity_line *line;
         struct unity_lines *lines = unity_new_lines();
 
-        printf("receive: %d msg.\n", data_sz);
-
         unity_alloc_lines(lines, 1);
         line = unity_get_line(lines, 0);
         ret = proc(stack_fd, e, line);

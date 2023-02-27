@@ -73,6 +73,73 @@ local function setupPatten(s)
     return patten
 end
 
+function pystring:shift(s, n)  -- position for right, negative for left
+    local len = string.len(s)
+    if len == 0 then
+        return s
+    end
+    n = n % len
+    if n == 0 then
+        return s
+    elseif n > 0 then  -- "abcd >> 1"
+        local offset = len - n
+        local s1 = string.sub(s, offset + 1)
+        local s2 = string.sub(s, 1, offset)
+        return s1 .. s2
+    else   -- "abcd << 1"
+        local offset = len + n
+        local s1 = string.sub(s, offset + 1)
+        local s2 = string.sub(s, 1, offset)
+        return s2 .. s1
+    end
+end
+
+function pystring:lower(s)
+    return string.lower(s)
+end
+
+function pystring:upper(s)
+    return string.upper(s)
+end
+
+function pystring:swapcase(s)
+    local swaps = {}
+    for i=1, #s do
+        local ch = string.byte(s, i)
+        if ch >= 65 and ch <= 90 then
+            swaps[i] = string.char(ch + 32)
+        elseif ch >= 97 and ch <= 122 then
+            swaps[i] = string.char(ch - 32)
+        else
+            swaps[i] = string.char(ch)
+        end
+    end
+    return table.concat(swaps)
+end
+
+function pystring:capitalize(s)
+    if #s < 1 then
+        return s
+    end
+    local s1 = string.sub(s, 1, 1)
+    local s2 = string.sub(s, 2)
+    return string.upper(s1) .. s2
+end
+
+function pystring:capwords(s)
+    local lines = pystring:split(s, "\n")
+    local rLines = {}
+    for i, line in ipairs(lines) do
+        local rWords = {}
+        local words = pystring:split(line, " ")
+        for j, word in ipairs(words) do
+            rWords[j] = pystring:capitalize(word)
+        end
+        rLines[i] = table.concat(rWords, " ")
+    end
+    return table.concat(rLines, "\n")
+end
+
 function pystring:split(s, delimiter, n)
     local result = {}
     if not delimiter or delimiter == "" then  -- for blank, gsub multi blank to single

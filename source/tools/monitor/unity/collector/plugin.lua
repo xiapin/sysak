@@ -120,7 +120,6 @@ function Cplugin:proc(t, lines)
         end
         self._ffi.C.free(unity_lines.line)   -- should free memory.
     end
-    return lines
 end
 
 return Cplugin

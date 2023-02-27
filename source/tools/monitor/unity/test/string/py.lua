@@ -72,3 +72,19 @@ assert(pystring:endswith("hello world", "world"))
 
 -- find
 assert(pystring:find("hello world.", "hello") == 1)
+
+-- shift
+assert(pystring:shift("abcd", 1) == "dabc")
+assert(pystring:shift("abcd", -1) == "bcda")
+
+-- swapcase
+assert(pystring:swapcase("Hello, World!") == "hELLO, wORLD!")
+
+-- capitalize
+assert(pystring:capitalize("hello") == "Hello")
+assert(pystring:capitalize("") == "")
+assert(pystring:capitalize("H") == "H")
+
+-- capwords
+assert(pystring:capwords("hello world.") == "Hello World.")
+assert(pystring:capwords("hello world.\nhere  you are.") == "Hello World.\nHere  You Are.")
