@@ -23,8 +23,10 @@ local function get_lines(fName)
     local fName = fName or "/proc/mounts"
 
     local f = assert(io.open(fName, "r"))
+    local c = 0
     for line in f:lines() do
-        table.insert(lines, line)
+        c = c + 1
+        lines[c] = line
     end
     return lines
 end

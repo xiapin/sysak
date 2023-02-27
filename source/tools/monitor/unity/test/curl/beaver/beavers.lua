@@ -86,13 +86,15 @@ function Cbeavers:poll()
         if err then
             print("socket select return " .. err)
         end
+        local c = 0
         for _, read in pairs(reads) do
             if type(read) == "number" then
                 break
             elseif read == self._server then
                 local s = read:accept()
                 print("accept " .. s:getfd())
-                table.insert(self._ss, s)
+                c = c + 1
+                self._ss[c] = s
                 local co = coroutine.create(function(o, s)  self._proc(o, s) end)
                 self._cos[s:getfd()] = co
                 coroutine.resume(co, self, s)

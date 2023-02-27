@@ -17,10 +17,10 @@ end
 
 function CprocBuddyinfo:proc(elapsed, lines)
     CvProc.proc(self)
-    buddyinfo = {}
+    local buddyinfo = {}
     for line in io.lines(self.pFile) do
         if string.find(line,"Normal") then
-            subline = pystring:split(line,"Normal",1)[2]
+            local subline = pystring:split(line,"Normal",1)[2]
             for num in string.gmatch(subline, "%d+") do
                table.insert(buddyinfo,tonumber(num))
             end
@@ -31,7 +31,7 @@ function CprocBuddyinfo:proc(elapsed, lines)
     if not buddyinfo then
         for line in io.lines(self.pFile) do
             if string.find(line,"DMA32") then
-                subline = pystring:split(line,"DMA32",1)[2]
+                local subline = pystring:split(line,"DMA32",1)[2]
                 for num in string.gmatch(subline, "%d+") do
                    table.insert(buddyinfo,tonumber(num))
                 end

@@ -21,12 +21,14 @@ function CprotoQueue:que()
 end
 
 function CprotoQueue:load_label(unity_line, line)
+    local c = #line.ls
     for i=0, 4 - 1 do
         local name = self._ffi.string(unity_line.indexs[i].name)
         local index = self._ffi.string(unity_line.indexs[i].index)
 
         if #name > 0 then
-            table.insert(line.ls, {name = name, index = index})
+            c = c + 1
+            line.ls[c] = {name = name, index = index}
         else
             return
         end
@@ -34,12 +36,14 @@ function CprotoQueue:load_label(unity_line, line)
 end
 
 function CprotoQueue:load_value(unity_line, line)
+    local c = #line.vs
     for i=0, 32 - 1 do
         local name = self._ffi.string(unity_line.values[i].name)
         local value = unity_line.values[i].value
 
         if #name > 0 then
-            table.insert(line.vs, {name = name, value = value})
+            c = c + 1
+            line.vs[c] = {name = name, value = value}
         else
             return
         end
@@ -56,7 +60,8 @@ function CprotoQueue:load_log(unity_line, line)
 end
 
 function CprotoQueue:_proc(unity_lines, lines)
-    for i=0, unity_lines.num - 1 do
+    local c = #lines["lines"]
+    for i = 0, unity_lines.num - 1 do
         local unity_line = unity_lines.line[i]
         local line = {line = self._ffi.string(unity_line.table),
                       ls = {},
@@ -66,7 +71,8 @@ function CprotoQueue:_proc(unity_lines, lines)
         self:load_label(unity_line, line)
         self:load_value(unity_line, line)
         self:load_log(unity_line, line)
-        table.insert(lines["lines"], line)
+        c = c + 1
+        lines["lines"][c] = line
     end
 end
 

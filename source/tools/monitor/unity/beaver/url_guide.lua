@@ -5,56 +5,20 @@
 ---
 
 require("common.class")
+local pystring = require("common.pystring")
 local ChttpHtml = require("httplib.httpHtml")
 
 local CurlGuide = class("CurlIndex", ChttpHtml)
 
 function CurlGuide:_init_(frame)
     ChttpHtml._init_(self)
-    self._urlCb["/guide"] = function(tReq) return self:guide(tReq)  end
-    self._urlCb["/guide/hotplugin"] = function(tReq) return self:hotplugin(tReq)  end
-    self._urlCb["/guide/oop"] = function(tReq) return self:oop(tReq)  end
-    self._urlCb["/guide/pystring"] = function(tReq) return self:pystring(tReq)  end
-    self._urlCb["/guide/webdevel"] = function(tReq) return self:webdevel(tReq)  end
-    self._urlCb["/guide/proc_probe"] = function(tReq) return self:proc_probe(tReq)  end
-    self._urlCb["/guide/dev_proc"] = function(tReq) return self:dev_proc(tReq)  end
-    self:_install(frame)
+    self:_installRe("^/guide*", frame)
+    self._head = "/"   -- need to strip
+    self._filePath = "../beaver/"
 end
 
-local function loadFile(fPpath)
-    local path = "../beaver/guide/" .. fPpath
-    local f = io.open(path,"r")
-    local s = f:read("*all")
-    f:close()
-    return s
-end
-
-function CurlGuide:guide(tReq)
-    return {title="guide", content=self:markdown(loadFile("guide.md"))}
-end
-
-function CurlGuide:hotplugin(tReq)
-    return {title="hotplugin", content=self:markdown(loadFile("hotplugin.md"))}
-end
-
-function CurlGuide:oop(tReq)
-    return {title="oop", content=self:markdown(loadFile("oop.md"))}
-end
-
-function CurlGuide:pystring(tReq)
-    return {title="pystring", content=self:markdown(loadFile("pystring.md"))}
-end
-
-function CurlGuide:webdevel(tReq)
-    return {title="webdevel", content=self:markdown(loadFile("webdevel.md"))}
-end
-
-function CurlGuide:proc_probe(tReq)
-    return {title="proc and probes", content=self:markdown(loadFile("proc_probe.md"))}
-end
-
-function CurlGuide:dev_proc(tReq)
-    return {title="develop proc interface.", content=self:markdown(loadFile("dev_proc.md"))}
+function CurlGuide:callRe(tReq, keep)
+    return self:reSource(tReq, keep, self._head, self._filePath)
 end
 
 return CurlGuide

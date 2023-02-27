@@ -7,11 +7,14 @@ config:
     mode: specify
     name: test_specify
 #    mode: hostip
-  proc_path: /mnt/home/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 #  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 
 outline:
   - /tmp/sysom
+
+luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
+            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat"]
 
 plugins:
   - so: kmsg
@@ -32,7 +35,16 @@ plugins:
   -
     so: proc_loadavg
     description: "collect load avg"
-
+  -
+    so: unity_nosched
+    description: "nosched:sys hold cpu and didn't scheduling"
+  - so: net_health
+    description: "tcp net health."
+  - so: net_retrans
+    description: "tcp retrans monitor."
+  -
+    so: unity_irqoff
+    description: "irqoff:detect irq turned off and can't response"
 metrics:
   -
     title: sysak_proc_cpu_total
@@ -124,4 +136,44 @@ metrics:
     from: buddyinfo
     head: value
     help: "buddyinfo of system from /proc/loadavg"
+    type: "gauge"
+  - title: sysak_IOMonIndForDisksIO
+    from: IOMonIndForDisksIO
+    head: value
+    help: "Disk IO indicators and abnormal events"
+    type: "gauge"
+  - title: sysak_IOMonIndForSystemIO
+    from: IOMonIndForSystemIO
+    head: value
+    help: "System indicators and abnormal events about IO"
+    type: "gauge"
+  - title: sysak_IOMonDiagLog
+    from: IOMonDiagLog
+    head: value
+    help: "Diagnose log for IO exception"
+    type: "gauge"
+  - title: sched_moni_jitter
+    from: sched_moni_jitter
+    head: value
+    help: "nosched/irqoff:sys and irqoff hold cpu and didn't scheduling"
+    type: "gauge"
+  - title: sysak_cpu_dist
+    from: cpu_dist
+    head: value
+    help: "task cpu sched dist."
+    type: "gauge"
+  - title: sysak_net_health_hist
+    from: net_health_hist
+    head: value
+    help: "net_health_hist"
+    type: "gauge"
+  - title: sysak_net_health_count
+    from: net_health_count
+    head: value
+    help: "net_health_count"
+    type: "gauge"
+  - title: sysak_net_retrans_count
+    from: net_retrans_count
+    head: value
+    help: "net_retrans_count"
     type: "gauge"
