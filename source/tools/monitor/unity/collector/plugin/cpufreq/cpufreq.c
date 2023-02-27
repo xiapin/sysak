@@ -4,6 +4,7 @@
 
 #include "cpufreq.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 int init(void * arg) {
     printf("cpufreq plugin install, proc: %s\n", get_unity_proc());
@@ -55,7 +56,6 @@ int call(int t, struct unity_lines* lines) {
                 }
                 memcpy(result, pLast2-len, len);
                 // printf("res2 is %s, %d\n", result, len);
-                // printf("res22 is %s\n", str);
                 unity_set_value(line, 1, "curr_freq", atof(result));
                 memset(result, 0, 16);
                 len = 0;

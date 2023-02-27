@@ -31,7 +31,7 @@ int call(int t, struct unity_lines* lines) {
 
     for (i = 0; i < num_nodes; i++) {
         char numa_name[10];
-        sprintf(numa_name, "%s%d", "node", i);
+        snprintf(numa_name, 10, "%s%d", "node", i);
         // printf("numa is %s\n", numa_name);
         line = unity_get_line(lines, i);
         unity_set_table(line, "numainfo");
