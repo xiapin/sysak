@@ -26,16 +26,10 @@ int init(void *arg)
 static int get_dist(unsigned long *locals) {
     int i = 0;
     unsigned long value = 0;
-    int key, key_next;
 
-    key = 0;
-    while (coobpf_key_next(dist_fd, &key, &key_next) == 0) {
-        coobpf_key_value(dist_fd, &key_next, &value);
+    for (i = 0; i < DIST_ARRAY_SIZE; i ++) {
+        coobpf_key_value(dist_fd, &i, &value);
         locals[i ++] = value;
-        if (i > DIST_ARRAY_SIZE) {
-            break;
-        }
-        key = key_next;
     }
     return i;
 }

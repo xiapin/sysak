@@ -34,11 +34,10 @@ end
 
 function Cloop:work(t)
     local lines = self._proto:protoTable()
-    for k, obj in pairs(self._procs) do
-        lines = obj:proc(t, lines)
+    for _, obj in pairs(self._procs) do
+        obj:proc(t, lines)
     end
-    lines = self._plugin:proc(t, lines)
-    --print(#lines.lines)
+    self._plugin:proc(t, lines)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 end
