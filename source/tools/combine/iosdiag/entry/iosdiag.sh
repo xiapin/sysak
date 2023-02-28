@@ -149,6 +149,7 @@ disable_latency() {
 
 	if [ "$comm" = "latency" ]
 	then
+		echo "kill -9 $pid 2>/dev/null"
 		kill -9 $pid 2>/dev/null
 	fi
 
