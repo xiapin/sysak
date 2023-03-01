@@ -49,9 +49,9 @@ plugins:
   -
     so: unity_irqoff
     description: "irqoff:detect irq turned off and can't response"
-  -
-    so: numainfo
-    description: "collect numainfo"
+  #-
+  #  so: numainfo
+  #  description: "collect numainfo"
   # -
   #   so: cpufreq
   #   description: "collect cpufreq"
@@ -191,11 +191,11 @@ metrics:
     head: value
     help: "net_retrans_count"
     type: "gauge"
-  - title: sysak_numainfo
-    from: numainfo
-    head: value
-    help: "numainfo of system from /sys/devices/system/"
-    type: "gauge"
+  #- title: sysak_numainfo
+  #  from: numainfo
+  #  head: value
+  #  help: "numainfo of system from /sys/devices/system/"
+  #  type: "gauge"
   # - title: sysak_proc_cpufreq
   #   from: cpufreq
   #   head: value

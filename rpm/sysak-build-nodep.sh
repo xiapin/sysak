@@ -38,11 +38,13 @@ fi
 
 %install
 mkdir -p \$RPM_BUILD_ROOT/usr/bin
+mkdir -p \$RPM_BUILD_ROOT/etc/sysak
 mkdir -p \$RPM_BUILD_ROOT/usr/local/sysak/log
 mkdir -p \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 /bin/cp -rf $BUILD_DIR/.sysak_components \$RPM_BUILD_ROOT/usr/local/sysak/.sysak_components
 /bin/cp -rf $BUILD_DIR/sysak \$RPM_BUILD_ROOT/usr/bin/
 /bin/cp -f $BUILD_DIR/.sysak_components/tools/monitor/sysakmon.conf \$RPM_BUILD_ROOT/usr/local/sysak
+/bin/cp -f $BUILD_DIR/.sysak_components/tools/dist/app/collector/plugin.yaml \$RPM_BUILD_ROOT/etc/sysak/
 /bin/cp $SOURCE_DIR/rpm/sysak.service \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 /bin/cp $SOURCE_DIR/rpm/sysak_server.conf \$RPM_BUILD_ROOT/usr/local/sysak/
 
@@ -58,6 +60,7 @@ fi
 rm -rf /usr/local/sysak
 
 %files
+/etc/sysak
 /usr/local/sysak
 /usr/bin/sysak
 /usr/lib/systemd/system/sysak.service
@@ -83,7 +86,7 @@ main() {
 
 	export LINUX_VERSION=$(uname -r)
 
-	TARGET_LIST="--enable-target-all --enable-static --disable-target-rtrace --disable-target-PingTrace"
+	TARGET_LIST="--enable-target-all"
 
 	build_rpm
 }
