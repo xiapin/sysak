@@ -16,7 +16,7 @@ function Cexport:_init_(instance, fYaml)
     local ms = system:parseYaml(fYaml)
     self._freq = ms.config.freq
     self._tDescr = ms.metrics
-    self._fox = CfoxTSDB.new()
+    self._fox = CfoxTSDB.new(fYaml)
     self._fox:_setupRead()
 end
 

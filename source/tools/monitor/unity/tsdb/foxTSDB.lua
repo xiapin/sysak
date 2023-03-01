@@ -14,11 +14,11 @@ local foxFFI = require("tsdb.native.foxffi")
 
 local CfoxTSDB = class("CfoxTSDB")
 
-function CfoxTSDB:_init_()
+function CfoxTSDB:_init_(fYaml)
     self.ffi = foxFFI.ffi
     self.cffi = foxFFI.cffi
     self._proto = CprotoData.new(nil)
-    self._qBudget = 200
+    self:setupConf(fYaml)
 end
 
 function CfoxTSDB:_del_()
@@ -26,6 +26,13 @@ function CfoxTSDB:_del_()
         self.cffi.fox_del_man(self._man)
     end
     self._man = nil
+end
+
+function CfoxTSDB:setupConf(fYaml)
+    local conf = system:parseYaml(fYaml)
+    local dbConf = conf.db or {budget = 200, rotate=7}
+    self._qBudget = dbConf.budget or 200
+    self._rotate = dbConf.rotate or 7
 end
 
 function CfoxTSDB:get_us()

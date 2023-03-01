@@ -9,12 +9,16 @@ config:
 #    mode: hostip
   proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
 #  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  db:
+    rotate: 7  # tsdb file retention time, unit day
+    budget: 200 # max query buffer from tsdb.
 
 outline:
   - /tmp/sysom
 
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
-            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat"]
+            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
+             "proc_uptime"]
 
 plugins:
   - so: kmsg
@@ -25,9 +29,9 @@ plugins:
   -
     so: sample_threads
     description: "threads example."
-#  -
-#    so: bpfsample2
-#    description: "bpf threads example."
+  -
+    so: bpfsample2
+    description: "bpf threads example."
 
   -
     so: proc_schedstat

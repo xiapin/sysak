@@ -70,7 +70,8 @@ static int call_init(lua_State *L, int err_func) {
 
     lua_getglobal(L, "init");
     lua_pushinteger(L, (int)gettidv1());
-    ret = lua_pcall(L, 1, 1, err_func);
+    lua_pushstring(L, g_yaml_file);
+    ret = lua_pcall(L, 2, 1, err_func);
     if (ret) {
         goto endCall;
     }

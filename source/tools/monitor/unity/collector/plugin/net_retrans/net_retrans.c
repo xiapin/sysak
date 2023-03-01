@@ -104,10 +104,9 @@ void deinit(void)
 #define LOG_MAX 256
 static char log[LOG_MAX];
 
-static char * transIP(unsigned long lip) {
-    struct in_addr addr;
-    memcpy(&addr, &lip, sizeof(lip));
-    return inet_ntoa(addr);
+static int transIP(unsigned long lip, char *result, int size) {
+    inet_ntop(AF_INET, (void *) &lip, result, size);
+    return 0;
 }
 
 static const char * resetSock(int stack_fd, struct data_t *e){
@@ -167,9 +166,14 @@ static const char * resetActive(int stack_fd, struct data_t *e){
 }
 
 int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
+    char sip[32];
+    char dip[32];
+
+    transIP(e->ip_src, sip, 32);
+    transIP(e->ip_dst, dip, 32);
     snprintf(log, LOG_MAX, "task:%d|%s, tcp:%s:%d->%s:%d, state:%d, ", e->pid, e->comm, \
-             transIP(e->ip_src), htons(e->sport),   \
-             transIP(e->ip_src), htons(e->sport),   \
+             sip, htons(e->sport),   \
+             dip, htons(e->sport),   \
              e->sk_state);
     switch (e->type) {
         case NET_RETRANS_TYPE_RTO:
@@ -177,30 +181,30 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
         case NET_RETRANS_TYPE_SYN:
         case NET_RETRANS_TYPE_SYN_ACK:
         {
-            char buf[LOG_MAX];
-            snprintf(buf, LOG_MAX, "rcv_nxt:%d, rcv_wup:%d, snd_nxt:%d, snd_una:%d, copied_seq:%d, "
+            char buf[LOG_MAX - 1];
+            snprintf(buf, LOG_MAX - 1, "rcv_nxt:%d, rcv_wup:%d, snd_nxt:%d, snd_una:%d, copied_seq:%d, "
                                    "snd_wnd:%d, rcv_wnd:%d, lost_out:%d, packets_out:%d, retrans_out:%d, "
                                    "sacked_out:%d, reordering:%d",
                      e->rcv_nxt, e->rcv_wup, e->snd_nxt, e->snd_una, e->copied_seq,
                      e->snd_wnd, e->rcv_wnd, e->lost_out, e->packets_out, e->retrans_out,
                      e->sacked_out, e->reordering
             );
-            strncat(log, buf, LOG_MAX);
+            strncat(log, buf, LOG_MAX -1);
         }
             break;
         case NET_RETRANS_TYPE_RST:
-            strncat(log, "noport", LOG_MAX);
+            strncat(log, "noport", LOG_MAX - 1);
             break;
         case NET_RETRANS_TYPE_RST_SK:
         {
             const char *type = resetSock(stack_fd, e);
-            strncat(log, type, LOG_MAX);
+            strncat(log, type, LOG_MAX - 1);
         }
             break;
         case NET_RETRANS_TYPE_RST_ACTIVE:
         {
             const char *type = resetActive(stack_fd, e);
-            strncat(log, type, LOG_MAX);
+            strncat(log, type, LOG_MAX - 1);
         }
             break;
         default:

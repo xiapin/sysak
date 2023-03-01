@@ -132,7 +132,7 @@ function Cframe:findObjRes(path)
     end
 end
 
-function Cframe:proc(fread)
+function Cframe:proc(fread, session)
     local stream = waitHttpHead(fread)
     if stream == nil then   -- read return stream or error code or nil
         return nil
@@ -140,19 +140,20 @@ function Cframe:proc(fread)
 
     local tReq = self:parse(fread, stream)
     if tReq then
+        tReq.session = session
         if self._objs[tReq.path] then
             local obj = self._objs[tReq.path]
             local res, keep = obj:call(tReq)
-            return res, keep
+            return res, keep, tReq.session
         end
 
         local obj = self:findObjRes(tReq.path)
         if obj then
             local res, keep = obj:calls(tReq)
-            return res, keep
+            return res, keep, tReq.session
         end
 
-        return self:echo404(), false
+        return self:echo404(), false, {}
     end
 end
 

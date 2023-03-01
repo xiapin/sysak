@@ -199,8 +199,10 @@ end
 
 function CLocalBeaver:_proc(fd)
     local fread = self:read(fd)
+    local session = {}
+    local res, alive
     while true do
-        local res, alive = self._frame:proc(fread)
+        res, alive, session = self._frame:proc(fread, session)
         if res then
             local stat = self:write(fd, res)
 

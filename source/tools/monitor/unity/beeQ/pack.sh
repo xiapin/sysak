@@ -22,7 +22,9 @@ cp -r /usr/local/share/lua/5.1/* ${DIST}/lua/
 mkdir ${APP}
 mkdir ${APP}/beaver
 mkdir ${APP}/beaver/native
+mkdir ${APP}/beaver/query
 cp -r beaver/guide ${APP}/beaver/
+cp -r beaver/query ${APP}/beaver/
 cp beaver/*.lua ${APP}/beaver/
 cp beaver/native/*.lua ${APP}/beaver/native
 

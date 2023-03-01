@@ -17,7 +17,7 @@ def q_table():
 
 
 def q_by_table():
-    post_test({"mode": "last", "time": "100m", "table": ["cpu_total", "cpus"]})
+    post_test({"mode": "last", "time": "100m", "table": ["IOMonDiagLog"]})
 
 
 def q_by_date():

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+pkill unity-mon
+
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:./lib/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../tsdb/native/
@@ -8,10 +10,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../beaver/
 source /etc/profile
 
 cd ../../beeQ
-make
-if [ $? -ne 0 ];then
-	echo " make  -- Failed  : "$?
-	exit 0
-fi
 
-./unity-mon
+yaml_path=$1
+[ ! $yaml_path ] && yaml_path="/etc/sysak/plugin.yaml"
+
+echo $yaml_yaml_path
+./unity-mon $yaml_path &
