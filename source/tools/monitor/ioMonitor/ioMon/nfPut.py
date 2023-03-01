@@ -14,7 +14,6 @@ __author__ = 'liaozhaoyan'
 
 import os
 import socket
-import requests
 MAX_BUFF = 128 * 1024
 
 

@@ -41,11 +41,11 @@ function Cidentity:hostip()
 end
 
 function Cidentity:curl()
-    if self._opts.curl then
+    if self._opts.url then
         local ChttpCli = require("httplib.httpCli")
 
         local cli = ChttpCli.new()
-        local res = cli:get(self._opts.curl)
+        local res = cli:get(self._opts.url)
         return res.body
     else
         return "None"

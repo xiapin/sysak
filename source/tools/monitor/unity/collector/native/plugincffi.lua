@@ -38,6 +38,7 @@ int call(int t, struct unity_lines* lines);
 void deinit(void);
 
 void free(void *p);
+int setns(int fd, int nstype);
 ]]
 
 return ffi

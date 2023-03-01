@@ -6,19 +6,18 @@
 
 
 
-BPF_PERF_OUTPUT(perf, 1024);
+BPF_ARRAY(count, u64, 200);
 
-
-SEC("kprobe/tcp_sendmsg")
-int BPF_KPROBE(tcp_sendmsg, struct sock *sk, struct msghdr *msg, size_t size)
+SEC("kprobe/netstat_seq_show")
+int BPF_KPROBE(netstat_seq_show, struct sock *sk, struct msghdr *msg, size_t size)
 {
-    struct event e = {};
-
-    e.ns = ns();
-    e.cpu = cpu();
-    e.pid = pid();
-    comm(e.comm);
-    
-    bpf_perf_event_output(ctx, &perf, BPF_F_CURRENT_CPU, &e, sizeof(struct event));
+    int default_key = 0;
+    u64 *value = bpf_map_lookup_elem(&count, &default_key);
+    if (value) {
+        __sync_fetch_and_add(value, 1);
+    }
     return 0;
 }
+
+
+

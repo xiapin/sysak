@@ -35,7 +35,6 @@ class runDiag(object):
             return
         startTime = time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(now))
         logdir = self.logRootPath+'/iosdiag/hangdetect/'+startTime
-        file = logdir+'/result.log.seq'
         outlog = logdir+'/resultCons.log'
         if not os.path.exists(logdir):
             try:
@@ -45,10 +44,10 @@ class runDiag(object):
         self.lastDiagTimeDicts['iohang'] = now
         if devname is not None:
             os.system(self.sysakPath+' -g iosdiag hangdetect -o -t 3000 -T 10 -f '+
-                      file+' '+devname+' > '+outlog+' &')
+                      logdir+' '+devname+' > '+outlog+' &')
         else:
             os.system(self.sysakPath+' -g iosdiag hangdetect -o -t 3000 -T 10 -f '+
-                      file+' > '+outlog+' &')
+                      logdir+' > '+outlog+' &')
         self.display.start(20, 'iohang', logdir, now, now+60)
 
 
@@ -61,7 +60,6 @@ class runDiag(object):
             return
         startTime = time.strftime('%Y-%m-%d-%H:%M:%S', time.localtime(now))
         logdir = self.logRootPath+'/iosdiag/latency/'+startTime
-        file = logdir+'/result.log.seq'
         outlog = logdir+'/resultCons.log'
         if not os.path.exists(logdir):
             try:
@@ -71,10 +69,10 @@ class runDiag(object):
         self.lastDiagTimeDicts['iolatency'] = now
         if devname is not None:
             os.system(self.sysakPath+' -g iosdiag latency -t '+str(thresh) +
-                      ' -T 45 -f '+file+' '+devname+' > '+outlog+' &')
+                      ' -T 45 -f '+logdir+' '+devname+' > '+outlog+' &')
         else:
             os.system(self.sysakPath+' -g iosdiag latency -t '+str(thresh) +
-                      ' -T 45 -f '+file+' > '+outlog+' &')
+                      ' -T 45 -f '+logdir+' > '+outlog+' &')
         if ioburst:
             self.display.markIoburst(now)
         self.display.start(60, 'iolatency', logdir, now, now+60)

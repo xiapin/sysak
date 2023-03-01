@@ -126,7 +126,7 @@ class ioMonCfgClass(object):
                 cmdline = f.read().strip()
         except Exception:
             sys.exit(0)
-        if 'ioMonEntry' in cmdline:
+        if 'ioMonitorMain' in cmdline:
             os.system('kill -USR2 '+str(pid))
 
 

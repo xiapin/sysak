@@ -17,12 +17,17 @@ local function setupServer(fYaml)
     local port = config["port"] or 8400
     local ip = config["bind_addr"] or "0.0.0.0"
     local backlog = config["backlog"] or 32
-    return port, ip, backlog
+    local unix_socket = config["unix_socket"]
+    return port, ip, backlog,unix_socket
 end
 
 function CLocalBeaver:_init_(frame, fYaml)
-    local port, ip, backlog = setupServer(fYaml)
-    self._bfd = self:_install_fd(port, ip, backlog)
+    local port, ip, backlog, unix_socket = setupServer(fYaml)
+    if not unix_socket then
+        self._bfd = self:_install_fd(port, ip, backlog)
+    else
+        self._bfd = self:_install_fd_unisock(backlog, unix_socket)
+    end
     self._efd = self:_installFFI()
 
     self._cos = {}
@@ -105,6 +110,31 @@ local function localBind(fd, tPort)
         end
     end
     system:posixError(string.format("bind port %d failed.", tPort.port), err, errno)
+end
+
+function CLocalBeaver:_install_fd_unisock(backlog,unix_socket)
+    local fd, res, err, errno
+    unistd.unlink(unix_socket)
+    fd, err, errno = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0)
+    if fd then  -- for socket
+        local tPort = {family=socket.AF_UNIX, path=unix_socket}
+        local r, msg = pcall(localBind, fd, tPort)
+        if r then
+            res, err, errno = socket.listen(fd, backlog)
+            if res then -- for listen
+                return fd
+            else
+                unistd.close(fd)
+                system:posixError("socket listen failed", err, errno)
+            end
+        else
+            print(msg)
+            unistd.close(fd)
+            os.exit(1)
+        end
+    else  -- socket failed
+        system:posixError("create socket failed", err, errno)
+    end
 end
 
 function CLocalBeaver:_install_fd(port, ip, backlog)

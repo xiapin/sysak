@@ -11,6 +11,7 @@ require("common.class")
 
 local Cexport = class("Cexport")
 
+
 function Cexport:_init_(instance, fYaml)
     self._instance = instance
     local ms = system:parseYaml(fYaml)
@@ -40,6 +41,19 @@ local function qFormData(from, tData)
     return res
 end
 
+local function packLine_us(title, ls, v, time)
+    local tLs = {}
+    for k, v in pairs(ls) do
+        table.insert(tLs, string.format("%s=\"%s\"", k , v))
+    end
+    local label = ""
+    if #tLs then
+        label = pystring:join(",", tLs)
+        label = "{" .. label .. "}"
+    end
+    return string.format("%s%s %.1f %d", title, label, v, time/1000)
+end
+
 local function packLine(title, ls, v)
     local tLs = {}
     local c = 0
@@ -53,6 +67,21 @@ local function packLine(title, ls, v)
         label = "{" .. label .. "}"
     end
     return string.format("%s%s %.1f", title, label, v)
+end
+
+function Cexport:_init_(instance, fYaml)
+    self._instance = instance
+    local ms = system:parseYaml(fYaml)
+    self._freq = ms.config.freq
+    self._timestamps = ms.config.real_timestamps
+    if self._timestamps == true then
+        self.pack_line = packLine_us
+    else
+        self.pack_line = packLine
+    end
+    self._tDescr = ms.metrics
+    self._fox = CfoxTSDB.new()
+    self._fox:_setupRead()
 end
 
 function Cexport:export()
@@ -82,7 +111,7 @@ function Cexport:export()
                 for k, v in pairs(tFrom.values) do
                     labels[line.head] = k
                     c = c + 1
-                    res[c] = packLine(title, labels, v)
+                    res[c] = self.pack_line(title, labels, v, tFrom.time)
                 end
             end
         end
