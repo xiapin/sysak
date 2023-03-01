@@ -24,7 +24,7 @@ struct env {
 };
 
 static int nr_cpus;
-struct sched_jit_summary summary, *percpu_summary;
+struct sched_jit_summary summary, prev;
 struct bpf_link **sw_mlinks, **hw_mlinks= NULL;
 
 DEFINE_SEKL_OBJECT(unity_irqoff);
@@ -204,7 +204,8 @@ int init(void *arg)
 
 	return 0;
 }
-
+#define delta(sum, value)	\
+	sum.value - prev.value
 int call(int t, struct unity_lines *lines)
 {
 	struct unity_line *line;
@@ -213,14 +214,15 @@ int call(int t, struct unity_lines *lines)
 	line = unity_get_line(lines, 0);
 	unity_set_table(line, "sched_moni_jitter");
 	unity_set_index(line, 0, "mod", "irqoff");
-	unity_set_value(line, 0, "dltnum", summary.num);
-	unity_set_value(line, 1, "dlttm", summary.total);
-	unity_set_value(line, 2, "lt10ms", summary.less10ms);
-	unity_set_value(line, 3, "lt50ms", summary.less50ms);
-	unity_set_value(line, 4, "lt100ms", summary.less100ms);
-	unity_set_value(line, 5, "lt500ms", summary.less500ms);
-	unity_set_value(line, 6, "lt1s", summary.less1s);
-	unity_set_value(line, 7, "mts", summary.plus1s);
+	unity_set_value(line, 0, "dltnum", delta(summary, num));
+	unity_set_value(line, 1, "dlttm", delta(summary, total));
+	unity_set_value(line, 2, "lt10ms", delta(summary, less10ms));
+	unity_set_value(line, 3, "lt50ms", delta(summary, less50ms));
+	unity_set_value(line, 4, "lt100ms", delta(summary, less100ms));
+	unity_set_value(line, 5, "lt500ms", delta(summary, less500ms));
+	unity_set_value(line, 6, "lt1s", delta(summary, less1s));
+	unity_set_value(line, 7, "mts", delta(summary, plus1s));
+	prev = summary;
 	return 0;
 }
 
