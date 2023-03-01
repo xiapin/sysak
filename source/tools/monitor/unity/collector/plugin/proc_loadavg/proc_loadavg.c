@@ -76,7 +76,7 @@ int call(int t, struct unity_lines* lines) {
 
 	unity_alloc_lines(lines, 1);
 	line = unity_get_line(lines, 0);
-	unity_set_table(line, "sched_moni");
+	unity_set_table(line, "proc_loadavg");
 	full_line(line);
 	return 0;
 }
