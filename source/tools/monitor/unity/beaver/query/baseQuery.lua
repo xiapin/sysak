@@ -226,7 +226,7 @@ function CbaseQuery:baseQ(tReq)
     local ms = self._fox:qNow(tonumber(session.timeLen) * 60,
                             {session.selTable})
     table.insert(contents, "# 反馈输入\n")
-    table.insert(contents, "* 表名: " .. session.selTable)
+    table.insert(contents, "* 表名: " .. system:escMd(session.selTable))
     table.insert(contents, "* 时间戳: " .. session.gmt)
     table.insert(contents, "* 时长: " .. session.timeLen)
     table.insert(contents, "\n")

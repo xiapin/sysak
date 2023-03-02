@@ -12,15 +12,6 @@ require("common.class")
 local Cexport = class("Cexport")
 
 
-function Cexport:_init_(instance, fYaml)
-    self._instance = instance
-    local ms = system:parseYaml(fYaml)
-    self._freq = ms.config.freq
-    self._tDescr = ms.metrics
-    self._fox = CfoxTSDB.new(fYaml)
-    self._fox:_setupRead()
-end
-
 local function qFormData(from, tData)
     local res = {}
     local len = #tData
@@ -80,7 +71,7 @@ function Cexport:_init_(instance, fYaml)
         self.pack_line = packLine
     end
     self._tDescr = ms.metrics
-    self._fox = CfoxTSDB.new()
+    self._fox = CfoxTSDB.new(fYaml)
     self._fox:_setupRead()
 end
 

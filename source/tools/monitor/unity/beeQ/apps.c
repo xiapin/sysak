@@ -161,7 +161,6 @@ int app_recv_proc(void* msg, struct beeQ* q) {
             q->qarg = L;
             counter = sighup_counter;
         }
-
         body = malloc(len);   //  http://www.lua.org/manual/5.1/manual.html#lua_pushlstring
         //Pushes the string pointed to by s with size len onto the stack.
         // Lua makes (or reuses) an internal copy of the given string,

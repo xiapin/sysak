@@ -5,6 +5,7 @@
 #include "sig_stop.h"
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <sys/resource.h>
 #include "fastKsym.h"
@@ -58,4 +59,8 @@ void plugin_init(void) {
     ksym_setup(1);
     sig_register();
     working = 1;
+}
+
+void plugin_deinit(void) {
+    ksym_free();
 }

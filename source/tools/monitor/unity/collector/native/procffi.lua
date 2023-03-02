@@ -33,6 +33,7 @@ void set_unity_sys(const char *path);
 int  plugin_is_working(void);
 void plugin_stop(void);
 void plugin_init(void);
+void plugin_deinit(void);
 ]]
 
 return {ffi = ffi, cffi=cffi}

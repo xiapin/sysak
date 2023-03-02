@@ -26,7 +26,7 @@ struct liphdr {
 
 BPF_PERF_OUTPUT(perf, 1024);
 BPF_STACK_TRACE(stack, MAX_ENTRY);
-BPF_ARRAY(outCnt, u64, NET_RETRANS_TYPE_MAX);
+BPF_HASH(outCnt, int, u64, NET_RETRANS_TYPE_MAX);
 
 static inline void addCnt(int k, u64 val) {
     u64 *pv = bpf_map_lookup_elem(&outCnt, &k);
@@ -61,7 +61,6 @@ static inline int get_skb_info(struct data_t* pdata, struct sk_buff *skb, u32 ty
     struct liphdr *piph;
     struct tcphdr *ptcph;
 
-    addCnt(type, 1);
     pdata->type = type;
     pdata->sk_state = 0;
 
@@ -109,26 +108,10 @@ static inline void get_task(struct data_t* pdata, struct sock *sk) {
     get_sock_task(sk, pdata);
 }
 
-static inline void get_socket_task(struct data_t* e, struct sock *sk) {
-//    struct socket* psocket;
-//    struct socket_wq *wq;
-
-    e->pid = 0;
-    e->comm[0] = '\0';
-
-//    psocket = BPF_CORE_READ(sk, sk_socket);
-//    wq = BPF_CORE_READ(psocket, wq);
-//    if (wq) {
-//        struct list_head* phead = (struct list_head*)((char *)wq + offsetof(struct socket_wq, wait.head));
-//        get_list_task(phead, e);
-//    }
-}
-
 static inline int get_info(struct data_t* pdata, struct sock *sk, u32 type)
 {
     struct inet_sock *inet = (struct inet_sock *)sk;
 
-    addCnt(type, 1);
     pdata->type = type;
     pdata->ip_dst = BPF_CORE_READ(sk, __sk_common.skc_daddr);
     pdata->dport = BPF_CORE_READ(sk, __sk_common.skc_dport);
@@ -176,6 +159,7 @@ int j_tcp_enter_loss(struct pt_regs *ctx)
         return 0;
     }
     get_task(&data, sk);
+    addCnt(NET_RETRANS_TYPE_RTO, 1);
     get_info(&data, sk, NET_RETRANS_TYPE_RTO);
     data.stack_id = 0;
     get_tcp_info(&data, (struct tcp_sock *)sk);
@@ -198,6 +182,7 @@ int j_tcp_send_probe0(struct pt_regs *ctx)
         return 0;
     }
 
+    addCnt(NET_RETRANS_TYPE_ZERO, 1);
     get_info(&data, sk, NET_RETRANS_TYPE_ZERO);
     data.stack_id = 0;
     get_task(&data, sk);
@@ -216,13 +201,19 @@ int j_tcp_v4_send_reset(struct pt_regs *ctx)
     sk = (struct sock *)PT_REGS_PARM1(ctx);
     if (sk == NULL) {
         struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM2(ctx);
+        addCnt(NET_RETRANS_TYPE_RST, 1);
         get_skb_info(&data, skb, NET_RETRANS_TYPE_RST);
         get_task(&data, NULL);
         data.stack_id = 0;
     }
     else {
+        addCnt(NET_RETRANS_TYPE_RST_SK, 1);
         get_info(&data, sk, NET_RETRANS_TYPE_RST_SK);
         get_task(&data, sk);
+        if (data.sk_state == 10) { // for listen cath skb info.
+            struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM2(ctx);
+            get_skb_info(&data, skb, NET_RETRANS_TYPE_RST_SK);
+        }
         data.stack_id = bpf_get_stackid(ctx, &stack, KERN_STACKID_FLAGS);
     }
     if (check_ip(&data)) {
@@ -236,6 +227,8 @@ int j_tcp_send_active_reset(struct pt_regs *ctx)
 {
     struct sock *sk;
     struct data_t data = {};
+
+    addCnt(NET_RETRANS_TYPE_RST_ACTIVE, 1);
 
     sk = (struct sock *)PT_REGS_PARM1(ctx);
     get_info(&data, sk, NET_RETRANS_TYPE_RST_ACTIVE);
@@ -262,8 +255,10 @@ int j_tcp_retransmit_skb(struct pt_regs *ctx){
     {
         struct data_t data = {};
 
+        addCnt(NET_RETRANS_TYPE_SYN, 1);
         get_info(&data, sk, NET_RETRANS_TYPE_SYN);
         get_task(&data, sk);
+        get_tcp_info(&data, (struct tcp_sock *)sk);
         bpf_perf_event_output(ctx, &perf, BPF_F_CURRENT_CPU, &data, sizeof(data));
     }
     return 0;
@@ -272,12 +267,16 @@ int j_tcp_retransmit_skb(struct pt_regs *ctx){
 SEC("kprobe/tcp_rtx_synack")
 int j_tcp_rtx_synack(struct pt_regs *ctx)
 {
-    struct sock *sk;
+    struct sock *sk, *sk2;
+    struct request_sock *req = (struct request_sock *)PT_REGS_PARM2(ctx);
     struct data_t data = {};
 
+    addCnt(NET_RETRANS_TYPE_SYN_ACK, 1);
     sk = (struct sock *)PT_REGS_PARM1(ctx);
-    get_info(&data, sk, NET_RETRANS_TYPE_SYN_ACK);
+    sk2 = BPF_CORE_READ(req, sk);
+    get_info(&data, sk2, NET_RETRANS_TYPE_SYN_ACK);
     get_task(&data, sk);
+    get_tcp_info(&data, (struct tcp_sock *)sk2);
     bpf_perf_event_output(ctx, &perf, BPF_F_CURRENT_CPU, &data, sizeof(data));
     return 0;
 }

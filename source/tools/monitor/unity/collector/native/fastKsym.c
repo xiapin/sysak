@@ -94,6 +94,8 @@ static int sort_ksym(int fd, int count) {
 
     qsort(pmmap, count, sizeof (struct ksym_cell), sym_cmp);
 
+    madvise(pmmap, sb.st_size, MADV_DONTNEED);
+    madvise(pmmap, sb.st_size, MADV_NORMAL);
     gCell = (struct ksym_cell*)pmmap;
 
     return ret;
@@ -131,6 +133,11 @@ int ksym_setup(int stack_only) {
     close(tfd);
     endTmpfile:
     return ret;
+}
+
+void ksym_free(void) {
+    munmap((void *)gCell, sym_cnt * sizeof (struct ksym_cell));
+    close(tfd);
 }
 
 struct ksym_cell* ksym_search(addr_t key) {

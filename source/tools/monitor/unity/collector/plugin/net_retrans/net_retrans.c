@@ -110,13 +110,13 @@ static int transIP(unsigned long lip, char *result, int size) {
 }
 
 static const char * resetSock(int stack_fd, struct data_t *e){
-    unsigned long addr;
-    int i = 1;  //last stack
+    unsigned long addr[128];
+    int i = e->stack_id;  //last stack
     struct ksym_cell* cell;
 
     coobpf_key_value(stack_fd, &i, &addr);
-    if (addr) {
-        cell = ksym_search(addr);
+    if (addr[1] > 0) {
+        cell = ksym_search(addr[1]);
         if (cell) {
             if (strcmp(cell->func, "tcp_v4_rcv") == 0) {
                 if (e->sk_state == 12) {
@@ -129,6 +129,7 @@ static const char * resetSock(int stack_fd, struct data_t *e){
             } else if (strcmp(cell->func, "tcp_v4_do_rcv") == 0) {
                 return "tcp_stat";
             } else {
+                printf("sym: %s\n", cell->func);
                 return "unknown_sock";
             }
         }
@@ -171,9 +172,9 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
 
     transIP(e->ip_src, sip, 32);
     transIP(e->ip_dst, dip, 32);
-    snprintf(log, LOG_MAX, "task:%d|%s, tcp:%s:%d->%s:%d, state:%d, ", e->pid, e->comm, \
+    snprintf(log, LOG_MAX, "task:%d(%s), tcp:%s:%d->%s:%d, state:%d, ", e->pid, e->comm, \
              sip, htons(e->sport),   \
-             dip, htons(e->sport),   \
+             dip, htons(e->dport),   \
              e->sk_state);
     switch (e->type) {
         case NET_RETRANS_TYPE_RTO:
@@ -182,9 +183,9 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
         case NET_RETRANS_TYPE_SYN_ACK:
         {
             char buf[LOG_MAX - 1];
-            snprintf(buf, LOG_MAX - 1, "rcv_nxt:%d, rcv_wup:%d, snd_nxt:%d, snd_una:%d, copied_seq:%d, "
-                                   "snd_wnd:%d, rcv_wnd:%d, lost_out:%d, packets_out:%d, retrans_out:%d, "
-                                   "sacked_out:%d, reordering:%d",
+            snprintf(buf, LOG_MAX - 1, "rcv_nxt:%u, rcv_wup:%u, snd_nxt:%u, snd_una:%u, copied_seq:%u, "
+                                   "snd_wnd:%u, rcv_wnd:%u, lost_out:%u, packets_out:%u, retrans_out:%u, "
+                                   "sacked_out:%u, reordering:%u",
                      e->rcv_nxt, e->rcv_wup, e->snd_nxt, e->snd_una, e->copied_seq,
                      e->snd_wnd, e->rcv_wnd, e->lost_out, e->packets_out, e->retrans_out,
                      e->sacked_out, e->reordering
@@ -212,6 +213,7 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
     }
     unity_set_table(line, "net_retrans_log");
     unity_set_index(line, 0, "type", net_title[e->type]);
+    printf("%s\n", log);
     unity_set_log(line, "log", log);
     return 0;
 }
