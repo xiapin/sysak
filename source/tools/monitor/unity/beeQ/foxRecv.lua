@@ -10,8 +10,8 @@ local CfoxTSDB = require("tsdb.foxTSDB")
 
 local CfoxRecv = class("CfoxRecv")
 
-function CfoxRecv:_init_()
-    self._fox = CfoxTSDB.new()
+function CfoxRecv:_init_(fYaml)
+    self._fox = CfoxTSDB.new(fYaml)
     self._fox:setupWrite()
 end
 

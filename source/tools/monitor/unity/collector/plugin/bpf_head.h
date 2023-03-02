@@ -65,8 +65,8 @@
         })
 
 #define DESTORY_SKEL_BOJECT(skel_name) \
-    if (perf_thread > 0)               \
-        kill_perf_thread(perf_thread); \
+    if (perf_thread != 0)              \
+        plugin_thread_stop(perf_thread); \
     skel_name##_bpf__destroy(skel_name);
 #else
 #define DEFINE_SEKL_OBJECT(skel_name)                            \

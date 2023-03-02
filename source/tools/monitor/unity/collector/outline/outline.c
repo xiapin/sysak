@@ -102,10 +102,12 @@ static int work(lua_State *L) {
         perror("beaver.lua echo failed.");
         goto endReturn;
     }
+    lua_close(L);
 
     return ret;
     endReturn:
     endCall:
+    lua_close(L);
     return ret;
 }
 

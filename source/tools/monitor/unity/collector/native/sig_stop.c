@@ -5,6 +5,7 @@
 #include "sig_stop.h"
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <limits.h>
 #include <sys/resource.h>
 #include "fastKsym.h"
@@ -22,7 +23,7 @@ void plugin_stop(void) {
 void plugin_thread_stop(pthread_t tid) {
     if (tid > 0) {
         printf("send sig stop to thread %lu\n", tid);
-        pthread_kill(tid, SIGQUIT);
+        pthread_kill(tid, SIGUSR1);
         pthread_join(tid, NULL);
     }
 }
@@ -37,7 +38,7 @@ static void sig_register(void) {
     action.sa_handler = stop_signal_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
-    sigaction(SIGQUIT, &action, NULL);
+    sigaction(SIGUSR1, &action, NULL);
 }
 
 static void bump_memlock_rlimit1(void)
@@ -58,4 +59,8 @@ void plugin_init(void) {
     ksym_setup(1);
     sig_register();
     working = 1;
+}
+
+void plugin_deinit(void) {
+    ksym_free();
 }

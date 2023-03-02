@@ -15,6 +15,7 @@ local CurlGuide = require("beaver.url_guide")
 local CurlExportHtml = require("beaver.url_export_html")
 local CurlExportRaw = require("beaver.url_export_raw")
 local CLocalBeaver = require("beaver.localBeaver")
+local CbaseQuery = require("beaver.query.baseQuery")
 
 local lb = nil
 
@@ -24,9 +25,10 @@ function init(fYaml)
     local web = Cframe.new()
 
     CurlIndex.new(web)
-    CurlApi.new(web)
+    CurlApi.new(web, fYaml)
     CurlRpc.new(web)
     CurlGuide.new(web)
+    CbaseQuery.new(web, fYaml)
 
     local Cidentity = require("beaver.identity")
     local inst = Cidentity.new(fYaml)

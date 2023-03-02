@@ -15,6 +15,7 @@ struct ksym_cell {
 };
 
 int ksym_setup(int stack_only);
+void ksym_free(void);
 struct ksym_cell* ksym_search(addr_t key);
 
 #endif //FASTKSYM_FASTKSYM_H

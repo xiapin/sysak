@@ -27,6 +27,7 @@ function Cplugin:_del_()
         local cffi = plugin.cffi
         cffi.deinit()
     end
+    self._sig_cffi.plugin_deinit()
 end
 
 function Cplugin:setProcSys(procFFI, config)

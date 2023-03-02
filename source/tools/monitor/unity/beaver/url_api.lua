@@ -10,13 +10,13 @@ local ChttpApp = require("httplib.httpApp")
 local CfoxTSDB = require("tsdb.foxTSDB")
 local CurlApi = class("urlApi", ChttpApp)
 
-function CurlApi:_init_(frame)
+function CurlApi:_init_(frame, fYaml)
     ChttpApp._init_(self)
     self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
     self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
     self:_install(frame)
-    self:_setupQs()
+    self:_setupQs(fYaml)
 end
 
 function CurlApi:sum(tReq)
@@ -89,8 +89,8 @@ function CurlApi:qtable(tJson)
     return self.fox:qTabelNow(secs)
 end
 
-function CurlApi:_setupQs()
-    self.fox = CfoxTSDB.new()
+function CurlApi:_setupQs(fYaml)
+    self.fox = CfoxTSDB.new(fYaml)
     self._q = {}
     self._q["last"] = function(tJson) return self:qlast(tJson) end
     self._q["table"] = function(tJson) return self:qtable(tJson) end

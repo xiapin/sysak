@@ -13,6 +13,8 @@ DEFINE_SEKL_OBJECT(net_health);
 static int cnt_fd = 0;
 static int dist_fd = 0;
 
+//#define ZHAOYAN_DEBUG
+
 int init(void *arg)
 {
     int ret;
@@ -26,11 +28,23 @@ int init(void *arg)
 static int get_dist(unsigned long *locals) {
     int i = 0;
     unsigned long value = 0;
+    int key, key_next;
 
-    for (i = 0; i < DIST_ARRAY_SIZE; i ++) {
-        coobpf_key_value(dist_fd, &i, &value);
+    key = 0;
+    while (coobpf_key_next(dist_fd, &key, &key_next) == 0) {
+        coobpf_key_value(dist_fd, &key_next, &value);
         locals[i ++] = value;
+        if (i > DIST_ARRAY_SIZE) {
+            break;
+        }
+        key = key_next;
     }
+#ifdef ZHAOYAN_DEBUG
+    for (i = 0; i < NET_DIST_INDEX; i ++) {
+        printf("%ld, ", locals[i]);
+    }
+    printf("\n");
+#endif
     return i;
 }
 

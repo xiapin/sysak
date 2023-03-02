@@ -70,7 +70,8 @@ static int call_init(lua_State *L, int err_func) {
 
     lua_getglobal(L, "init");
     lua_pushinteger(L, (int)gettidv1());
-    ret = lua_pcall(L, 1, 1, err_func);
+    lua_pushstring(L, g_yaml_file);
+    ret = lua_pcall(L, 2, 1, err_func);
     if (ret) {
         goto endCall;
     }
@@ -160,7 +161,6 @@ int app_recv_proc(void* msg, struct beeQ* q) {
             q->qarg = L;
             counter = sighup_counter;
         }
-
         body = malloc(len);   //  http://www.lua.org/manual/5.1/manual.html#lua_pushlstring
         //Pushes the string pointed to by s with size len onto the stack.
         // Lua makes (or reuses) an internal copy of the given string,

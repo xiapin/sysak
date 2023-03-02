@@ -81,27 +81,29 @@ end
 function CprocMounts:_proc()
     for k, v in pairs(self._mpoints) do
         local stat = statvfs(k)
-        local ls = {
-            {
-                name = "fs",
-                index = v,
-            },
-            {
-                name = "mount",
-                index = k,
-            },
-        }
-        local vs = {
-            { name="f_bsize", value=stat.f_bsize, },
-            { name="f_blocks", value=stat.f_blocks, },
-            { name="f_bfree", value=stat.f_bfree, },
-            { name="f_bavail", value=stat.f_bavail, },
-            { name="f_files", value=stat.f_files, },
-            { name="f_ffree", value=stat.f_ffree, },
-            { name="f_favail", value=stat.f_favail, },
-        }
-        local line = self:_packProto("fs_stat", ls, vs)
-        self:appendLine(line)
+        if stat then   -- stat may return 0
+            local ls = {
+                {
+                    name = "fs",
+                    index = v,
+                },
+                {
+                    name = "mount",
+                    index = k,
+                },
+            }
+            local vs = {
+                { name="f_bsize", value=stat.f_bsize, },
+                { name="f_blocks", value=stat.f_blocks, },
+                { name="f_bfree", value=stat.f_bfree, },
+                { name="f_bavail", value=stat.f_bavail, },
+                { name="f_files", value=stat.f_files, },
+                { name="f_ffree", value=stat.f_ffree, },
+                { name="f_favail", value=stat.f_favail, },
+            }
+            local line = self:_packProto("fs_stat", ls, vs)
+            self:appendLine(line)
+        end
     end
 end
 

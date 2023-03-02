@@ -11,6 +11,7 @@ require("common.class")
 
 local Cexport = class("Cexport")
 
+
 local function qFormData(from, tData)
     local res = {}
     local len = #tData
@@ -70,7 +71,7 @@ function Cexport:_init_(instance, fYaml)
         self.pack_line = packLine
     end
     self._tDescr = ms.metrics
-    self._fox = CfoxTSDB.new()
+    self._fox = CfoxTSDB.new(fYaml)
     self._fox:_setupRead()
 end
 
