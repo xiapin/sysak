@@ -5,18 +5,23 @@
 ---
 
 require("common.class")
-local CkvProc = require("collector.kvProc")
 local CvProc = require("collector.vproc")
 local pystring = require("common.pystring")
 
-local CprocBuddyinfo = class("proc_buddyinfo", CkvProc)
+local CprocBuddyinfo = class("proc_buddyinfo", CvProc)
 
 function CprocBuddyinfo:_init_(proto, pffi, mnt,pFile)
-    CkvProc._init_(self, proto, pffi, mnt,  pFile or "proc/buddyinfo", "buddyinfo")
+    CvProc._init_(self, proto, pffi, mnt, pFile or "proc/buddyinfo")
+    self._protoTable = {
+        line = "buddyinfo",
+        ls = nil,
+        vs = {}
+    }
 end
 
 function CprocBuddyinfo:proc(elapsed, lines)
     CvProc.proc(self)
+    self._protoTable.vs = {}
     local buddyinfo = {}
     for line in io.lines(self.pFile) do
         if string.find(line,"Normal") then
