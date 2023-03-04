@@ -57,15 +57,16 @@ function Cidentity:hostname()
 end
 
 function Cidentity:file()
+    local res = "None"
     if self._opts.path then
         local file = io.open(self._opts.path, "r")
-        io.input(file)
-        local res = io.read()
-        io.close(file)
-        return res
-    else
-        return "None"
+        if file then
+            io.input(file)
+            res = io.read()
+            io.close(file)
+        end
     end
+    return res
 end
 
 function Cidentity:specify()
