@@ -23,7 +23,7 @@ void plugin_stop(void) {
 void plugin_thread_stop(pthread_t tid) {
     if (tid > 0) {
         printf("send sig stop to thread %lu\n", tid);
-        pthread_kill(tid, SIGUSR1);
+        pthread_kill(tid, SIGUSR2);
         pthread_join(tid, NULL);
     }
 }
@@ -38,7 +38,7 @@ static void sig_register(void) {
     action.sa_handler = stop_signal_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
-    sigaction(SIGUSR1, &action, NULL);
+    sigaction(SIGUSR2, &action, NULL);
 }
 
 static void bump_memlock_rlimit1(void)

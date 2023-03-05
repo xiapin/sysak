@@ -135,8 +135,8 @@ static int outline_run(struct beeQ* q, void* arg) {
     return ret;
 }
 
-int outline_init(struct beeQ* pushQ, char *fYaml) {
-    pthread_t tid;
+pthread_t outline_init(struct beeQ* pushQ, char *fYaml) {
+    pthread_t tid = 0;
 
     tid = beeQ_send_thread(pushQ, fYaml, outline_run);
     return tid;

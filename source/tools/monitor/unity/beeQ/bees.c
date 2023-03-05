@@ -15,14 +15,22 @@
 
 volatile int sighup_counter = 0;
 char *g_yaml_file = NULL;
+static pthread_t pid_collector = 0;
+static pthread_t pid_outline = 0;
 
 void sig_handler(int num)
 {
     printf("receive the signal %d.\n", num);
-    if (num == SIGHUP) {
-        sighup_counter ++;
-    } else {
-        exit(1);
+    switch (num) {
+        case SIGHUP:
+            sighup_counter ++;
+            pthread_kill(pid_collector, SIGUSR1);
+            pthread_kill(pid_outline, SIGUSR1);
+            break;
+        case SIGUSR1:   // to stop
+            break;
+        default:
+            exit(1);
     }
 }
 
@@ -36,6 +44,7 @@ int main(int argc, char *argv[]) {
     }
 
     signal(SIGHUP, sig_handler);
+    signal(SIGUSR1, sig_handler);
     signal(SIGINT, sig_handler);
 
     q = beeQ_init(RUN_QUEUE_SIZE,
@@ -49,9 +58,15 @@ int main(int argc, char *argv[]) {
     if (proto_que == NULL) {
         exit(1);
     }
-    beeQ_send_thread(q, proto_que, app_collector_run);
+    pid_collector = beeQ_send_thread(q, proto_que, app_collector_run);
+    if (pid_collector == 0) {
+        exit(1);
+    }
 
-    outline_init(q, g_yaml_file);
+    pid_outline = outline_init(q, g_yaml_file);
+    if (pid_outline == 0) {
+        exit(1);
+    }
     beaver_init(g_yaml_file);
 
     fprintf(stderr, "loop exit.");

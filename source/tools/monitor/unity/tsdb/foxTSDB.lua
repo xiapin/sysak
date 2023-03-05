@@ -154,7 +154,6 @@ function CfoxTSDB:rotateDb()
                 print("delete " .. "./" .. f)
                 pcall(unistd.unlink, "./" .. f)
             end
-            --pcall(unistd.unlink, "../" .. f)
         end
     end
 end

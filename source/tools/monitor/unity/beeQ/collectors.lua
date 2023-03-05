@@ -7,8 +7,7 @@ package.path = package.path .. ";../?.lua;"
 
 local Cloop = require("collector.loop")
 local system = require("common.system")
-
-workLoop = nil
+local ptime = require("posix.time")
 
 local function setupFreq(fYaml)
     local conf = system:parseYaml(fYaml)
@@ -25,14 +24,32 @@ local function setupFreq(fYaml)
     end
 end
 
-function init(que, proto_q, yaml)
-    local fYaml = yaml or "../collector/plugin.yaml"
-    local work = Cloop.new(que, proto_q, fYaml)
-    workLoop = work
-    return setupFreq(fYaml)
+local function calcSleep(hope, now)
+    if hope.tv_nsec >= now.tv_nsec then
+        return {tv_sec  = hope.tv_sec - now.tv_sec,
+                tv_nsec = hope.tv_nsec - now.tv_nsec}
+    else
+        return {tv_sec  = hope.tv_sec - now.tv_sec - 1,
+                tv_nsec = 1e9 + hope.tv_nsec - now.tv_nsec}
+    end
 end
 
-function work(t)
-    workLoop:work(t)
-    return 0
+function work(que, proto_q, yaml)
+    local fYaml = yaml or "../collector/plugin.yaml"
+    local w = Cloop.new(que, proto_q, fYaml)
+    local unit = setupFreq(fYaml)
+    local tStart = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
+    while true do
+        local now = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
+        local hope = {tv_sec = tStart.tv_sec + unit, tv_nsec = tStart.tv_sec}
+        local diff = calcSleep(hope, now)
+        assert(diff.tv_sec >= 0)
+        w:work(unit)
+        local _, s, errno, _ = ptime.nanosleep(diff)
+        if errno then   -- interrupt by signal
+            print(string.format("new sleep stop. %d, %s", errno, s))
+            return 0
+        end
+        tStart = hope
+    end
 end
