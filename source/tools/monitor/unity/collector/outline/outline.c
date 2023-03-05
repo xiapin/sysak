@@ -56,7 +56,7 @@ static lua_State * pipe_init(void* q, char *fYaml) {
     luaL_openlibs(L);
     err_func = lua_reg_errFunc(L);
 
-    ret = lua_load_do_file(L, "outline.lua");
+    ret = lua_load_do_file(L, "../beeQ/outline.lua");
     if (ret) {
         goto endLoad;
     }

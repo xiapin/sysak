@@ -27,13 +27,11 @@ int var_input_long(const char * line, struct var_long *p);
 int var_input_string(const char * line, struct var_string *p);
 int var_input_kvs(const char * line, struct var_kvs *p);
 
-void set_unity_proc(const char *path);
-void set_unity_sys(const char *path);
-
-int  plugin_is_working(void);
-void plugin_stop(void);
-void plugin_init(void);
-void plugin_deinit(void);
+void ffi_set_unity_proc(const char *path);
+void ffi_set_unity_sys(const char *path);
+void ffi_plugin_init(void);
+void ffi_plugin_stop(void);
+void ffi_plugin_deinit(void);
 ]]
 
 return {ffi = ffi, cffi=cffi}

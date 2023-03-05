@@ -1,7 +1,7 @@
 CC := gcc
 CFLAG := -g -fpic
 LDFLAG := -g -fpic -shared
-OBJS := procffi.o sig_stop.o unity_interface.o fastKsym.o
+OBJS := procffi.o ffi_unity_api.o
 SO := libprocffi.so
 
 all: $(SO)

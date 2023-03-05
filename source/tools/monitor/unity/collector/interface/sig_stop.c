@@ -22,7 +22,7 @@ void plugin_stop(void) {
 
 void plugin_thread_stop(pthread_t tid) {
     if (tid > 0) {
-        printf("send sig stop to thread %lu\n", tid);
+        printf("send sig user2 to thread %lu\n", tid);
         pthread_kill(tid, SIGUSR2);
         pthread_join(tid, NULL);
     }

@@ -15,27 +15,27 @@ function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
     self:setProcSys(procffi, res.config)
 
     self._sig_cffi = procffi["cffi"]
-    self._sig_cffi.plugin_init()
+    self._sig_cffi.ffi_plugin_init()
 
     self._ffi = require("collector.native.plugincffi")
     self:setup(res.plugins, proto_q)
 end
 
 function Cplugin:_del_()
-    self._sig_cffi.plugin_stop()
+    self._sig_cffi.ffi_plugin_stop()
     for _, plugin in ipairs(self._plugins) do
         local cffi = plugin.cffi
         cffi.deinit()
     end
-    self._sig_cffi.plugin_deinit()
+    self._sig_cffi.ffi_plugin_deinit()
 end
 
 function Cplugin:setProcSys(procFFI, config)
     local proc = config["proc_path"] or "/"
     local sys = config["sys_path"] or "/"
 
-    procFFI.cffi.set_unity_proc(procFFI.ffi.string(proc))
-    procFFI.cffi.set_unity_sys(procFFI.ffi.string(sys))
+    procFFI.cffi.ffi_set_unity_proc(procFFI.ffi.string(proc))
+    procFFI.cffi.ffi_set_unity_sys(procFFI.ffi.string(sys))
 end
 
 function Cplugin:setup(plugins, proto_q)

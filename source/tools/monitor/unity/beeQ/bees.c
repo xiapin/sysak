@@ -30,6 +30,7 @@ void sig_handler(int num)
         case SIGUSR1:   // to stop
             break;
         default:
+            printf("signal %d exit.\n", num);
             exit(1);
     }
 }

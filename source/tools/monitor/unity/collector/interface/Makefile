@@ -1,8 +1,8 @@
 CC := gcc
 CFLAG := -g -fpic
 LDFLAG := -g -fpic -shared
-OBJS := local_beaver.o
-SO := liblbeaver.so
+OBJS :=  unity_interface.o sig_stop.o fastKsym.o
+SO := libcollectorApi.so
 
 all: $(SO) install
 

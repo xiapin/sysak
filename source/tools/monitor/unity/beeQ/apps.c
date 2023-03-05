@@ -108,7 +108,7 @@ static lua_State * app_recv_init(void)  {
     luaL_openlibs(L);
     err_func = lua_reg_errFunc(L);
 
-    ret = lua_load_do_file(L, "bees.lua");
+    ret = lua_load_do_file(L, "../beeQ/bees.lua");
     if (ret) {
         goto endLoad;
     }
@@ -239,7 +239,7 @@ static int app_collector_work(void* q, void* proto_q) {
     luaL_openlibs(L);
     err_func = lua_reg_errFunc(L);
 
-    ret = lua_load_do_file(L, "collectors.lua");
+    ret = lua_load_do_file(L, "../beeQ/collectors.lua");
     if (ret) {
         goto endLoad;
     }
