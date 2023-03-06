@@ -38,6 +38,21 @@ local function readNum(pFile)
     return res1, res2
 end
 
+local function readUname()
+    local distro, s, errno = utsname.uname()
+    if distro then
+        return {
+            {name = "sysname", index = distro.sysname},
+            {name = "nodename", index = distro.nodename},
+            {name = "release", index = distro.release},
+            {name = "version", index = distro.version},
+            {name = "machine", index = distro.machine},
+        }
+    else
+        error(string.format("read uname get %s, errno %d"), s, errno)
+    end
+end
+
 local function readRelease(pFile)
     local f = io.open(pFile)
     local res = "unknown"
@@ -61,7 +76,8 @@ function CprocUptime:proc(elapsed, lines)
     local totalTime = elapsed * self._counter
     if totalTime >= 60 * 60 then   -- report by hour
         local dummyValue = {{name = "dummy", value=1.0}}
-        self:appendLine(self:_packProto("uname", self._labels, dummyValue))
+        local labels = readUname()
+        self:appendLine(self:_packProto("uname", labels, dummyValue))
         local releaseInfo = {{name = "release", index = readRelease(self._release)}}
         self:appendLine(self:_packProto("system_release", releaseInfo, dummyValue))
         self._counter = 0
