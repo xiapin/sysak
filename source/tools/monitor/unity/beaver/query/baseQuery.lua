@@ -100,7 +100,7 @@ end
 
 function CbaseQuery:qTables(session, fresh)
     fresh = fresh or false
-    local t = session.qlast or 4 * 6
+    local t = session.qlast or 4 * 60
     if session.tables == nil or fresh then
         session.tables = self._fox:qTabelNow(t * 60)
     end
