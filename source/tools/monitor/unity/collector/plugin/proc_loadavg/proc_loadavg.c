@@ -60,9 +60,9 @@ int full_line(struct unity_line *uline)
 		st_load.nr_running--;
 	}
 	//unity_set_index(uline1[cpu], 0, "load", cpu_name);
-	unity_set_value(uline, 0, "load1", st_load.load_avg_1*100);
-	unity_set_value(uline, 1, "load5", st_load.load_avg_5*100);
-	unity_set_value(uline, 2, "load15", st_load.load_avg_15*100);
+	unity_set_value(uline, 0, "load1", st_load.load_avg_1);
+	unity_set_value(uline, 1, "load5", st_load.load_avg_5);
+	unity_set_value(uline, 2, "load15", st_load.load_avg_15);
 	unity_set_value(uline, 3, "runq", st_load.nr_running);
 	unity_set_value(uline, 4, "plit", st_load.nr_threads);
 
