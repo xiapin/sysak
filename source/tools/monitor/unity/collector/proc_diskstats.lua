@@ -127,7 +127,7 @@ function CprocDiskstats:proc(elapsed, lines)
         self:_proc(line, elapsed)
     end
     self:checkLastDisks()
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocDiskstats

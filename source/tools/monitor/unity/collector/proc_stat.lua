@@ -185,7 +185,7 @@ function CprocStat:proc(elapsed, lines)
         end
     end
     self:appendLine(self:_packProto("stat_counters", nil, counter, nil))
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocStat

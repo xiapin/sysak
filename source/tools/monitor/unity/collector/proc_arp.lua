@@ -8,13 +8,13 @@ require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
 
-local CprocArp = class("procStatm", CvProc)
+local CprocArp = class("procArp", CvProc)
 
 function CprocArp:_init_(proto, pffi, mnt, pFile)
     CvProc._init_(self, proto, pffi, mnt, pFile or "proc/net/arp")
 end
 
-function CprocStatm:proc(elapsed, lines)
+function CprocArp:proc(elapsed, lines)
     local c = 0
     CvProc.proc(self)
     local arps = {}
@@ -30,13 +30,20 @@ function CprocStatm:proc(elapsed, lines)
         c = c + 1
     end
 
-    local i = 1
-    local values = {}
     for k, v in pairs(arps) do
-        values[i] = {
-            name = k,
+        local ls = {}
+        ls = {
+            name = "dev",
+            index = k,
+        }
+        local vs = {}
+        vs = {
+            name = "count",
             value = v,
         }
+        self:appendLine(self:_packProto("arp", {ls}, {vs}))
     end
-    self:appendLine(self:_packProto("arp", nil, values))
+    self:push(lines)
 end
+
+return CprocArp

@@ -38,7 +38,7 @@ function CprocSockStat:proc(elapsed, lines)
         end
     end
     self:appendLine(self:_packProto("sock_stat", nil, vs))
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocSockStat

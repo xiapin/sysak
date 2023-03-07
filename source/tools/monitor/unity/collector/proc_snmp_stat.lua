@@ -109,7 +109,7 @@ function CprocSnmpStat:proc(elapsed, lines)
     self:_proc(self.pFile .. "proc/net/snmp", now)
     self:_proc(self.pFile .. "proc/net/netstat", now)
     self:check(now)
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocSnmpStat

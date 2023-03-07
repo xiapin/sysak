@@ -112,7 +112,7 @@ function CprocMounts:proc(elapsed, lines)
 
     CvProc.proc(self)
     self:_proc()
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocMounts

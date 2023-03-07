@@ -156,7 +156,7 @@ function CprocMeminfo:proc(elapsed, lines)
     table.insert(self._protoTable["vs"], cell)
 
     self:appendLine(self._protoTable)
-    return self:push(lines)
+    self:push(lines)
 
 end
 

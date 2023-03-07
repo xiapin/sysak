@@ -33,7 +33,7 @@ function CprocStatm:proc(elapsed, lines)
         self:appendLine(self:_packProto("self_statm", nil, vs))
     end
 
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocStatm
