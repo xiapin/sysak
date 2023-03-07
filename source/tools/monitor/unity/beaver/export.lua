@@ -105,6 +105,8 @@ function Cexport:export()
                     res[c] = self.pack_line(title, labels, v, tFrom.time)
                 end
             end
+            c = c + 1
+            res[c] = ""
         end
     end
     local lines = pystring:join("\n", res)
