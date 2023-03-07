@@ -107,6 +107,8 @@ function Cexport:export()
             end
         end
     end
+    c = c + 1
+    res[c] = ""
     local lines = pystring:join("\n", res)
     return lines
 end

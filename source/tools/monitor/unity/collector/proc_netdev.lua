@@ -91,7 +91,7 @@ function CprocNetdev:proc(elapsed, lines)
         i = i + 1
     end
     self:checkLastIfNames()
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocNetdev

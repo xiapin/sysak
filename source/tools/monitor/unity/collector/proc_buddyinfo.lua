@@ -51,7 +51,7 @@ function CprocBuddyinfo:proc(elapsed, lines)
     end
 
     self:appendLine(self._protoTable)
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocBuddyinfo

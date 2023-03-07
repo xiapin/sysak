@@ -678,6 +678,3 @@ int deinit(void *arg)
     return DESTORY_SKEL_BOJECT(bpf_sample2);
 }
 ```
-
-
-

@@ -184,7 +184,7 @@ function CPodAlloc:proc(elapsed, lines)
     local cell = {{name="pod_allocpage_total", value=self.total/1024}}
     self:appendLine(self:_packProto("pod_alloc", nil, cell))
 
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CPodAlloc
