@@ -136,7 +136,7 @@ function CfoxTSDB:rotateDb()
     local unistd = require("posix.unistd")
 
     local usec = self._man.now
-    local sec = 7 * 24 * 60 * 60
+    local sec = self._rotate * 24 * 60 * 60
 
     local foxTime = self:getDateFrom_us(usec - sec * 1e6)
     local level = foxTime.year * 10000 + foxTime.mon * 100 + foxTime.mday
@@ -154,7 +154,6 @@ function CfoxTSDB:rotateDb()
                 print("delete " .. "./" .. f)
                 pcall(unistd.unlink, "./" .. f)
             end
-            --pcall(unistd.unlink, "../" .. f)
         end
     end
 end

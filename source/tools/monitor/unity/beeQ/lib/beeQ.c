@@ -298,5 +298,5 @@ pthread_t beeQ_send_thread(struct beeQ *q, void *sarg, int (*cb)(struct beeQ *q,
     failThread:
     free(msg);
     failMalloc:
-    return res;
+    return 0;
 }

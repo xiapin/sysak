@@ -29,7 +29,7 @@ function ChttpHtml:_init_(frame)
     }
 end
 
-local function loadFile(fPpath)
+local function loadFile(fPpath)  -- conform file already exist.
     local f = io.open(fPpath,"r")
     local s = f:read("*all")
     f:close()

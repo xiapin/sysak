@@ -8,6 +8,6 @@
 #include "../../beeQ/beeQ.h"
 #include <lauxlib.h>
 #include <lualib.h>
-int outline_init(struct beeQ* pushQ, char *fYaml);
+pthread_t outline_init(struct beeQ* pushQ, char *fYaml);
 
 #endif //UNITY_OUTLINE_H

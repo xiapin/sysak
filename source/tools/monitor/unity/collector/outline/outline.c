@@ -56,7 +56,7 @@ static lua_State * pipe_init(void* q, char *fYaml) {
     luaL_openlibs(L);
     err_func = lua_reg_errFunc(L);
 
-    ret = lua_load_do_file(L, "outline.lua");
+    ret = lua_load_do_file(L, "../beeQ/outline.lua");
     if (ret) {
         goto endLoad;
     }
@@ -135,8 +135,8 @@ static int outline_run(struct beeQ* q, void* arg) {
     return ret;
 }
 
-int outline_init(struct beeQ* pushQ, char *fYaml) {
-    pthread_t tid;
+pthread_t outline_init(struct beeQ* pushQ, char *fYaml) {
+    pthread_t tid = 0;
 
     tid = beeQ_send_thread(pushQ, fYaml, outline_run);
     return tid;

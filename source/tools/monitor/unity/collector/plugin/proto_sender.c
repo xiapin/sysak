@@ -60,7 +60,7 @@ lua_State * proto_sender_lua(struct beeQ* pushQ)  {
     luaL_openlibs(L);
     err_func = lua_reg_errFunc(L);
 
-    ret = lua_load_do_file(L, "proto_send.lua");
+    ret = lua_load_do_file(L, "../beeQ/proto_send.lua");
     if (ret) {
         goto endLoad;
     }
