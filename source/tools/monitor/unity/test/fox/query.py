@@ -17,7 +17,7 @@ def q_table():
 
 
 def q_by_table():
-    post_test({"mode": "last", "time": "100m", "table": ["IOMonDiagLog"]})
+    post_test({"mode": "last", "time": "5m", "table": ["per_sirqs"]})
 
 
 def q_by_date():
@@ -34,7 +34,7 @@ def q_by_date():
 
 
 if __name__ == "__main__":
-    post_test({"mode": "last", "time": "4m"})
+    # post_test({"mode": "last", "time": "4m"})
     # q_table()
-    # q_by_table()
+    q_by_table()
     # q_by_date()
