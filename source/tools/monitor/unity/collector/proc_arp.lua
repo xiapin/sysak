@@ -31,13 +31,11 @@ function CprocArp:proc(elapsed, lines)
     end
 
     for k, v in pairs(arps) do
-        local ls = {}
-        ls = {
+        local ls = {
             name = "dev",
             index = k,
         }
-        local vs = {}
-        vs = {
+        local vs = {
             name = "count",
             value = v,
         }

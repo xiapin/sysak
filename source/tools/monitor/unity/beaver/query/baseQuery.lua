@@ -128,6 +128,7 @@ local function escape(s)
     end
     return "None"
 end
+
 local function packDataHead(res, labels, values, logs)
     local heads = system:listMerge({"time"}, labels, values, logs)
     local show_head = {}
