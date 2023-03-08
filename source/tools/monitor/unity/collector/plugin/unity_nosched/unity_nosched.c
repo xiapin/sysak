@@ -30,13 +30,13 @@ static void update_summary(struct sched_jit_summary* summary, const struct event
 	} else if (e->delay < 50) {
 		summary->less50ms++;
 	} else if (e->delay < 100) {
-		summary->less100ms++;
+		summary->less100ms++;	/* gt50 */
 	} else if (e->delay < 500) {
-		summary->less500ms++;
+		summary->less500ms++;	/* gt100 */
 	} else if (e->delay < 1000) {
-		summary->less1s++;
+		summary->less1s++;	/* gt500 */
 	} else {
-		summary->plus1s++;
+		summary->plus1s++;	/* gt1s */
 	}
 }
 
@@ -141,12 +141,10 @@ int call(int t, struct unity_lines *lines)
 	unity_set_index(line, 0, "mod", "noschd");
 	unity_set_value(line, 0, "dltnum", delta(summary,num));
 	unity_set_value(line, 1, "dlttm", delta(summary,total));
-	unity_set_value(line, 2, "lt10ms", delta(summary,less10ms));
-	unity_set_value(line, 3, "lt50ms", delta(summary,less50ms));
-	unity_set_value(line, 4, "lt100ms", delta(summary,less100ms));
-	unity_set_value(line, 5, "lt500ms", delta(summary,less500ms));
-	unity_set_value(line, 6, "lt1s", delta(summary,less1s));
-	unity_set_value(line, 7, "mts", delta(summary,plus1s));
+	unity_set_value(line, 2, "gt50ms", delta(summary,less100ms));
+	unity_set_value(line, 3, "gt100ms", delta(summary,less500ms));
+	unity_set_value(line, 4, "gt500ms", delta(summary,less1s));
+	unity_set_value(line, 5, "gt1s", delta(summary,plus1s));
 	prev = summary;
 	return 0;
 }
