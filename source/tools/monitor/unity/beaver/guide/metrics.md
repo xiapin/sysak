@@ -85,3 +85,21 @@ This parser parses the stats from network devices. These stats includes events p
 | received\_rps | 个 | cpu，对应CPU号 | number of times cpu woken up received_rps. | collector/proc\_softnet\_stat.lua |
 | time\_squeeze | 个 | cpu，对应CPU号 | net_rx_action. | collector/proc\_softnet\_stat.lua |
 | flow\_limit\_count | 个 | cpu，对应CPU号 | number of times reached flow limit count. | collector/proc\_softnet\_stat.lua |
+
+### cgroups 表
+
+| 指标名     | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---       | --- | :---- | :---- | :--- |
+| type       | -  | subsys类型            |  | collector/proc_cgroups.lua |
+| blkio      | 个 | blkio cgroup 数量     |  | collector/proc_cgroups.lua |
+| freezer    | 个 | freezer cgroup数量    |  | collector/proc_cgroups.lua |
+| devices    | 个 | devices cgroup数量    |  | collector/proc_cgroups.lua |
+| hugetlb    | 个 | hugetlb cgroup数量    |  | collector/proc_cgroups.lua |
+| pids       | 个 | blkio cgroup 数量     |  | collector/proc_cgroups.lua |
+| rdma       | 个 | rdma cgroup数量       |  | collector/proc_cgroups.lua |
+| net_prio   | 个 | net_prio cgroup数量   |  | collector/proc_cgroups.lua |
+| net_cls    | 个 | net_cls cgroup数量    |  | collector/proc_cgroups.lua |
+| cpu        | 个 | cpu cgroup 数量       |  | collector/proc_cgroups.lua |
+| cpuacct    | 个 | cpuacct cgroup数量    |  | collector/proc_cgroups.lua |
+| perf_event | 个 | perf_event cgroup数量 |  | collector/proc_cgroups.lua |
+| memory     | 个 | memory cgroup数量     |  | collector/proc_cgroups.lua |
