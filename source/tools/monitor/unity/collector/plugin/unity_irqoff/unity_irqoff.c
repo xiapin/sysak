@@ -216,12 +216,10 @@ int call(int t, struct unity_lines *lines)
 	unity_set_index(line, 0, "mod", "irqoff");
 	unity_set_value(line, 0, "dltnum", delta(summary, num));
 	unity_set_value(line, 1, "dlttm", delta(summary, total));
-	unity_set_value(line, 2, "lt10ms", delta(summary, less10ms));
-	unity_set_value(line, 3, "lt50ms", delta(summary, less50ms));
-	unity_set_value(line, 4, "lt100ms", delta(summary, less100ms));
-	unity_set_value(line, 5, "lt500ms", delta(summary, less500ms));
-	unity_set_value(line, 6, "lt1s", delta(summary, less1s));
-	unity_set_value(line, 7, "mts", delta(summary, plus1s));
+	unity_set_value(line, 2, "gt50ms", delta(summary, less100ms));
+	unity_set_value(line, 3, "gt100ms", delta(summary, less500ms));
+	unity_set_value(line, 4, "gt500ms", delta(summary, less1s));
+	unity_set_value(line, 5, "gt1s", delta(summary, plus1s));
 	prev = summary;
 	return 0;
 }
