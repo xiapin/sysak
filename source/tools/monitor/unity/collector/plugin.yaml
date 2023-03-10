@@ -23,6 +23,8 @@ luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", 
             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
              "proc_uptime"]
 
+
+
 plugins:
   - so: kmsg
     description: "collect dmesg info."

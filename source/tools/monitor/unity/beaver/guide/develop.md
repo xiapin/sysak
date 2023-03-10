@@ -17,7 +17,7 @@ git clone -b unity https://gitee.com/anolis/sysak.git
 ## 2.2 拉起容器
 
 ```
-docker run -v /root/1ext/code/:/root/code -v /:/mnt/host:ro -v /var/run/docker.sock:/var/run/docker.sock --net=host --name unity --privileged  -itd registry.cn-hangzhou.aliyuncs.com/sysom/sysom:v1.0 /bin/sh
+docker run -v /root/1ext/code/:/root/code -v /:/mnt/host:ro --net=host --pid=host --name unity --privileged  -itd registry.cn-hangzhou.aliyuncs.com/sysom/sysom:v1.0 /bin/sh
 ```
 
 docker 参数说明：
