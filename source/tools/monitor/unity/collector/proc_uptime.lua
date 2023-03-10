@@ -25,7 +25,7 @@ function CprocUptime:_init_(proto, pffi, mnt, pFile)
         error(string.format("read uname get %s, errno %d"), s, errno)
     end
     self._release = mnt .. "etc/system-release"
-    self._counter = 0
+    self._counter = 60 * 60
 end
 
 local function readNum(pFile)
@@ -74,7 +74,7 @@ function CprocUptime:proc(elapsed, lines)
     self:appendLine(self:_packProto("uptime", nil, vs))
 
     local totalTime = elapsed * self._counter
-    if totalTime >= 60 * 60 then   -- report by hour
+    if totalTime >= 10 * 60 then   -- report by hour
         local dummyValue = {{name = "dummy", value=1.0}}
         local labels = readUname()
         self:appendLine(self:_packProto("uname", labels, dummyValue))

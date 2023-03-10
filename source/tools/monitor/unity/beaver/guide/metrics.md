@@ -75,7 +75,7 @@
 
 ### softnets
 
-This parser parses the stats from network devices. These stats includes events per cpu\(in row\), number of packets processed i.e packet_process \(first column\), number of packet drops packet\_drops \(second column\), time squeeze eg net\_rx\_action performed time_squeeze\(third column\), cpu collision eg collision occur while obtaining device lock while transmitting cpu\_collision packets \(eighth column\), received_rps number of times cpu woken up received\_rps \(ninth column\), number of times reached flow limit count flow_limit_count \(tenth column\), backlog status \(eleventh column\), core id \(twelfth column\).
+This parser parses the stats from network devices. These stats includes events per cpu\(in row\), number of packets processed i.e packet_process \(first column\), number of packet drops packet\_drops \(second column\), time squeeze eg net\_rx\_action performed time_squeeze\(third column\), cpu collision eg collision occur while obtaining device lock while transmitting cpu\_collision packets \(eighth column\), received_rps number of times cpu woken up received\_rps \(ninth column\), number of times reached flow limit count flow\_limit\_count \(tenth column\), backlog status \(eleventh column\), core id \(twelfth column\).
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :--- | ---: | :---- | :---- | :--- |
@@ -83,7 +83,7 @@ This parser parses the stats from network devices. These stats includes events p
 | packet\_drop | 个 | cpu，对应CPU号 | 所在核丢包个数 | collector/proc\_softnet\_stat.lua |
 | cpu\_collision | 个 | cpu，对应CPU号 | number of times reached flow limit count. | collector/proc\_softnet\_stat.lua |
 | received\_rps | 个 | cpu，对应CPU号 | number of times cpu woken up received_rps. | collector/proc\_softnet\_stat.lua |
-| time\_squeeze | 个 | cpu，对应CPU号 | net_rx_action. | collector/proc\_softnet\_stat.lua |
+| time\_squeeze | 个 | cpu，对应CPU号 | net\_rx\_action. | collector/proc\_softnet\_stat.lua |
 | flow\_limit\_count | 个 | cpu，对应CPU号 | number of times reached flow limit count. | collector/proc\_softnet\_stat.lua |
 
 ### cgroups 表

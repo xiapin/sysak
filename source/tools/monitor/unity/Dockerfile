@@ -2,7 +2,7 @@ FROM registry.cn-hangzhou.aliyuncs.com/sysom/lcc
 MAINTAINER "liaozhaoyan <zhaoyan.lzy@alibaba-inc.com>"
 WORKDIR /root/
 RUN source /opt/rh/devtoolset-9/enable && \
-    yum install -y make wget lua-devel unzip git numactl-devel && \
+    yum install -y make wget lua-devel unzip git numactl-devel m4 && \
     mkdir /root/build && \
     cd /root/build && \
     git clone https://gitee.com/chuyansz/sysak.git && \
@@ -33,7 +33,7 @@ RUN source /opt/rh/devtoolset-9/enable && \
     luarocks install sha1 && \
     luarocks install md5 && \
     luarocks install luaposix 35.1-1 && \
-    luarocks install uname && \
+    luarocks install http && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ && \
     cd ../beeQ/ && \
     make
