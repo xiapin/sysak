@@ -4,12 +4,12 @@
 --- DateTime: 2023/3/10 12:00 AM
 ---
 
-local client = require 'http.client'
-local headers = require 'http.headers'
-local util = require 'http.util'
+local client = require("http.client")
+local headers = require("http.headers")
+local util = require("http.util")
 
-local cjson = require 'cjson.safe'
-local basexx = require 'basexx'
+local cjson = require("cjson.safe")
+local basexx = require("basexx")
 
 local handle_response_body = function (body)
     if type(body) == 'string' then

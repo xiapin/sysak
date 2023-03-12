@@ -40,12 +40,9 @@ local function newStack()
     return stack
 end
 
-local function checkDelimiter(ch)
-    local s = "().%+-*?[]^$"
-    if ch == " " then
-        return "%s"
-    end
-    for c in string.gmatch(s, ".") do
+local luaReReserve = "().%+-*?[]^$"
+local function checkLuaReReserve(ch)
+    for c in string.gmatch(luaReReserve, ".") do
         if c == ch then
             return "%" .. ch
         end
@@ -58,7 +55,11 @@ local function setupDelimiter(delimiter)
     local i = 0
     for c in string.gmatch(delimiter, ".") do
         i = i + 1
-        rt[i] = checkDelimiter(c)
+        if c == " " then
+            rt[i] = "%s"
+        else
+            rt[i] = checkLuaReReserve(c)
+        end
     end
     return table.concat(rt)
 end
@@ -73,8 +74,26 @@ local function setupPatten(s)
     return patten
 end
 
+local function _setupRepl(repl)
+    local rt = {}
+    local i = 0
+    for c in string.gmatch(repl, ".") do
+        i = i + 1
+        rt[i] = checkLuaReReserve(c)
+    end
+    return table.concat(rt)
+end
+
+local function setupRepl(s)
+    if s == nil then
+        error("repl must be a string.")
+    else
+        return _setupRepl(s)
+    end
+end
+
 function pystring:shift(s, n)  -- position for right, negative for left
-    local len = string.len(s)
+    local len = #s
     if len == 0 then
         return s
     end
@@ -94,7 +113,77 @@ function pystring:shift(s, n)  -- position for right, negative for left
     end
 end
 
+function pystring:islower(s)
+    local match = string.match(s, "[%l%s%p]+")
+    if not match then
+        return false
+    end
+    return #match == #s
+end
+
+function pystring:isupper(s)
+    local match = string.match(s, "[%u%s%p]+")
+    if not match then
+        return false
+    end
+    return #match == #s
+end
+
+function pystring:isdigit(s)
+    local match = string.match(s, "%d+")
+    if not match then
+        return false
+    end
+    return #match == #s
+end
+
+function pystring:ishex(s)
+    local match = string.match(s, "%x+")
+    if not match then
+        return false
+    end
+    return #match == #s
+end
+
+function pystring:isalnum(s)
+    local match = string.match(s, "%w+")
+    if not match then
+        return false
+    end
+    return #match == #s
+end
+
+function pystring:istilte(s)
+    local match = string.match(s, "%u%l*")
+    if not match then
+        return false
+    end
+    return #match == #s
+end
+
+function pystring:isfloat(s)
+    local dotCnt = 0
+    local ascDot = string.byte(".")
+    local asc0, asc9 = string.byte("0"), string.byte("9")
+    for i = 1, #s do
+        local ch = s:byte(i)
+        if ch == ascDot then
+            dotCnt = dotCnt + 1
+            if dotCnt > 1 then
+                return false
+            end
+        elseif ch > asc9 or ch < asc0 then
+            return false
+        end
+    end
+    return true
+end
+
 function pystring:lower(s)
+    return string.lower(s)
+end
+
+function pystring:casefold(s)
     return string.lower(s)
 end
 
@@ -104,11 +193,12 @@ end
 
 function pystring:swapcase(s)
     local swaps = {}
+    local ascA, ascZ, asc_a, asc_z = string.byte('A'), string.byte('Z'), string.byte('a'), string.byte('z')
     for i=1, #s do
         local ch = string.byte(s, i)
-        if ch >= 65 and ch <= 90 then
+        if ch >= ascA and ch <= ascZ  then
             swaps[i] = string.char(ch + 32)
-        elseif ch >= 97 and ch <= 122 then
+        elseif ch >= asc_a and ch <= asc_z then
             swaps[i] = string.char(ch - 32)
         else
             swaps[i] = string.char(ch)
@@ -126,6 +216,17 @@ function pystring:capitalize(s)
     return string.upper(s1) .. s2
 end
 
+function pystring:title(s)
+    if #s < 1 then
+        return s
+    end
+    local ss = pystring:split(s, " ")
+    for i = 1, #ss do
+        ss[i] = pystring:capitalize(ss[i])
+    end
+    return table.concat(ss, " ")
+end
+
 function pystring:capwords(s)
     local lines = pystring:split(s, "\n")
     local rLines = {}
@@ -138,6 +239,55 @@ function pystring:capwords(s)
         rLines[i] = table.concat(rWords, " ")
     end
     return table.concat(rLines, "\n")
+end
+
+function pystring:ljust(s, len, ch)
+    ch = ch or " "
+    if #ch ~= 1 then
+        error("pad string master a single word, not " .. ch)
+    end
+    local delta = len - #s
+    if delta > 0 then
+        local pad = string.rep(ch, delta)
+        return pad .. s
+    else
+        return s
+    end
+end
+
+function pystring:rjust(s, len, ch)
+    ch = ch or " "
+    if #ch ~= 1 then
+        error("pad string master a single word, not " .. ch)
+    end
+    local delta = len - #s
+    if delta > 0  then
+        local pad = string.rep(ch, delta)
+        return s .. pad
+    else
+        return s
+    end
+end
+
+function pystring:center(s, len, ch)
+    ch = ch or " "
+    if #ch ~= 1 then
+        error("pad string master a single word, not " .. ch)
+    end
+    local delta = len - #s
+    if delta > 0 then
+        local left = math.floor(delta / 2)
+        local right = delta - left
+
+        local res = {string.rep(ch, left), s, string.rep(ch, right)}
+        return table.concat(res)
+    else
+        return s
+    end
+end
+
+function pystring:zfill(s, len)
+    return pystring:ljust(s, len, "0")
 end
 
 function pystring:split(s, delimiter, n)
@@ -160,16 +310,46 @@ function pystring:split(s, delimiter, n)
             nums = nums + 1
             if nums >= n then
                 c = c + 1
-                result[c] = string.sub(s, beg, string.len(s))
+                result[c] = string.sub(s, beg, #s)
                 break
             end
         else
             c = c + 1
-            result[c] = string.sub(s, beg, string.len(s))
+            result[c] = string.sub(s, beg, #s)
             break
         end
     end
     return result
+end
+
+function pystring:partition(s, del)
+    local result = {}
+    del = del or " "
+    local delimiter = setupDelimiter(del)
+    local iBeg, iEnd = string.find(s, delimiter)
+    if iBeg then
+        result[1] = string.sub(s, 1, iBeg - 1)
+        result[2] = del
+        result[3] = string.sub(s, iEnd + 1)
+        return result
+    else
+        return nil
+    end
+end
+
+function pystring:partition(s, del)
+    local result = {}
+    del = del or " "
+    local delimiter = setupDelimiter(del)
+    local iBeg, iEnd = string.find(s, delimiter)
+    if iBeg then
+        result[1] = string.sub(s, 1, iBeg - 1)
+        result[2] = del
+        result[3] = string.sub(s, iEnd + 1)
+        return result
+    else
+        return nil
+    end
 end
 
 function pystring:reverseTable(t)
@@ -182,7 +362,7 @@ end
 function pystring:rsplit(s, delimiter, n)
     local result = {}
     local n = n or 2 ^ 63 - 1
-    local len = string.len(s) + 1
+    local len = #s + 1
     local rs = string.reverse(s)
     local rDel = string.reverse(delimiter or " ")
     rDel = setupDelimiter(rDel)
@@ -211,6 +391,29 @@ function pystring:rsplit(s, delimiter, n)
     --return result
     pystring:reverseTable(result)
     return result
+end
+
+function pystring:rpartition(s, del)
+    local result = {}
+    del = del or " "
+    local rs = string.reverse(s)
+    local rDel = string.reverse(del)
+    local delimiter = setupDelimiter(rDel)
+    local len = #s
+
+    local iBeg, iEnd = string.find(rs, delimiter)
+    if iBeg then
+        result[1] = string.sub(s, 1, len - iBeg + 1 - #del)
+        result[2] = del
+        result[3] = string.sub(s, len - iEnd + 1 + #del)
+        return result
+    else
+        return nil
+    end
+end
+
+function pystring:splitlines(s)
+    return pystring:split(s, '\n')
 end
 
 function pystring:lstrip(s, chars)
@@ -243,15 +446,73 @@ function pystring:join(delim, strings)
 end
 
 function pystring:startswith(s1, s2)
-    return string.sub(s1,1,string.len(s2)) == s2
+    return string.sub(s1,1, #s2) == s2
 end
 
 function pystring:endswith(s1, s2)
-    return s2=='' or string.sub(s1,-string.len(s2)) == s2
+    return s2 == '' or string.sub(s1,-#s2) == s2
 end
 
-function pystring:find(s1, s2)
-    return string.find(s1, s2, 1, false)
+function pystring:find(s1, s2, start, stop)
+    start = start or 1
+    stop = stop or -1
+    s1 = string.sub(s1, start, stop)
+    local res = string.find(s1, s2, 1, false)
+    return res or -1
+end
+
+function pystring:rfind(s1, s2, start, stop)
+    start = start or 1
+    stop = stop or -1
+    s1 = string.sub(s1, start, stop)
+
+    local len = #s1
+    local lFind = #s2
+    local rs1, rs2 = string.reverse(s1), string.reverse(s2)
+    local i = string.find(rs1, rs2, 1, false)
+    if i then
+        return len - i - lFind + 1
+    else
+        return -1
+    end
+end
+
+function pystring:index(s1, s2, start, stop)
+    local res = pystring:find(s1, s2, start, stop)
+    if res < 0 then
+        error(s2 .. " is  not in " .. s1)
+    end
+    return res
+end
+
+function pystring:rindex(s1, s2, start, stop)
+    local res = pystring:rfind(s1, s2, start, stop)
+    if res < 0 then
+        error(s2 .. " is  not in " .. s1)
+    end
+    return res
+end
+
+function pystring:count(s, find)
+    local i = 0
+    local patten = setupPatten(find)
+    for _ in string.gmatch(s, patten) do
+        i = i + 1
+    end
+    return i
+end
+
+function pystring:replace(s, find, repl, n)
+    local patten = setupPatten(find)
+    repl = setupRepl(repl)
+
+    return string.gsub(s, patten, repl, n)
+end
+
+function pystring:expandtabs(s, tabs)
+    tabs = tabs or 4
+    local repl = string.rep(" ", tabs)
+    return string.gsub(s, "\t", repl)
 end
 
 return pystring
