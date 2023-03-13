@@ -30,13 +30,14 @@ ebpf:
 	# hard code
 	cp -f ebpf/src/libnginx.a nginx/
 	cp -f ebpf/src/*.o  profile/agent/ebpf/bpf
-	cp -f ebpf/src/*.o  nginx
+	cp -f ebpf/src/nginx.bpf.o  nginx
 
 .PHONY: profile
 profile:
 	@echo "COMPLIE eBPF PROFILE..."
 	$(MAKE) -C ebpf/src profile
 	cp -f ebpf/src/*.o  profile/agent/ebpf/bpf
+	cp -f ebpf/src/nginx.bpf.o  nginx
 
 .PHONY: clean
 clean:
