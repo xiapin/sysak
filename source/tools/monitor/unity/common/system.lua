@@ -36,6 +36,10 @@ function system:dump(t)
     return serpent.block(t)
 end
 
+function system:dumps(t)
+    print(serpent.block(t))
+end
+
 function system:keyIsIn(tbl, key)
     if type(tbl) ~= "table" then
         return false
