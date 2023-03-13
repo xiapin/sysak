@@ -73,6 +73,26 @@
 | retrans | 次 |  | 协议栈溢出次数 | collector/proc\_snmp\_stat.lua |
 | drop | 次 |  | 协议栈丢包次数 | collector/proc\_snmp\_stat.lua |
 
+### sock_stat 
+
+统计所有包状态。[参考连接](https://developer.aliyun.com/article/484451)
+
+ 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :--- | ---: | :---- | :---- | :--- |
+| frag\_inuse | 个 |  | 使用的IP段数量 | collector/proc\_sockstat.lua |
+| frag\_memory | 页 |  | IP段使用内存数量 | collector/proc\_sockstat.lua |
+| udplite\_inuse | 个 |  | udplite 使用量 | collector/proc\_sockstat.lua |
+| udp\_mem | 页 |  | udp socket 内存使用量，含收发缓冲区队列 | collector/proc\_sockstat.lua |
+| udp\_inuse | 个 |  | udp 使用量 | collector/proc\_sockstat.lua |
+| tcp\_mem | 页 |  | udp socket 内存使用量，含收发缓冲区队列 | collector/proc\_sockstat.lua |
+| tcp\_alloc | 个 |  | TCP socket 申请总数 | collector/proc\_sockstat.lua |
+| tcp\_tw | 个 |  | TCP time wait socket 总数 | collector/proc\_sockstat.lua |
+| tcp\_orphan | 个 |  | TCP ophan socket 总数 | collector/proc\_sockstat.lua |
+| tcp\_inuse | 个 |  | TCP 常规 socket 总数 | collector/proc\_sockstat.lua |
+| raw\_inuse | 个 |  | raw socket 使用量 | collector/proc\_sockstat.lua |
+| sockets\_used | 个 |  | 总socket 使用量 | collector/proc\_sockstat.lua |
+
+
 ### softnets
 
 This parser parses the stats from network devices. These stats includes events per cpu\(in row\), number of packets processed i.e packet_process \(first column\), number of packet drops packet\_drops \(second column\), time squeeze eg net\_rx\_action performed time_squeeze\(third column\), cpu collision eg collision occur while obtaining device lock while transmitting cpu\_collision packets \(eighth column\), received_rps number of times cpu woken up received\_rps \(ninth column\), number of times reached flow limit count flow\_limit\_count \(tenth column\), backlog status \(eleventh column\), core id \(twelfth column\).
