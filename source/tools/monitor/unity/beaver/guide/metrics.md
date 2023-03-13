@@ -81,7 +81,7 @@ This parser parses the stats from network devices. These stats includes events p
 | :--- | ---: | :---- | :---- | :--- |
 | packet\_process | 个 | cpu，对应CPU号 | 所在核收包个数 | collector/proc\_softnet\_stat.lua |
 | packet\_drop | 个 | cpu，对应CPU号 | 所在核丢包个数 | collector/proc\_softnet\_stat.lua |
-| cpu\_collision | 个 | cpu，对应CPU号 | number of times reached flow limit count. | collector/proc\_softnet\_stat.lua |
+| cpu\_collision | 个 | cpu，对应CPU号 | collision occur while obtaining device lock while transmitting. | collector/proc\_softnet\_stat.lua |
 | received\_rps | 个 | cpu，对应CPU号 | number of times cpu woken up received_rps. | collector/proc\_softnet\_stat.lua |
 | time\_squeeze | 个 | cpu，对应CPU号 | net\_rx\_action. | collector/proc\_softnet\_stat.lua |
 | flow\_limit\_count | 个 | cpu，对应CPU号 | number of times reached flow limit count. | collector/proc\_softnet\_stat.lua |
