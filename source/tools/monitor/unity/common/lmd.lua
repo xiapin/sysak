@@ -141,7 +141,7 @@ local function Quotes(quotes, res)
     local level = 1
     for i = start, len do
         local levels, body = unpack(pystring:split(quotes[i], " ", 1))
-        local v = string.len(levels)
+        local v = #levels
         if v > level then
             while v > level do
                 table.insert(res, "<blockquote>")
