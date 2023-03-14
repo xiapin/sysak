@@ -12,7 +12,7 @@ LIBBPF_VERSION ?= v0.8.1
 # outdated
 INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX))
 CFLAGS := -g -Wall -fPIC
-MYCFLAGS := -ggdb -gdwarf -O2 -Wall -fpie -Wno-unused-variable -Wno-unused-function
+MYCFLAGS := -ggdb -gdwarf -O2 -Wall -fpie -Wno-unused-variable -Wno-unused-function -I./lib/include
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
 
 APPS = net nginx
@@ -99,13 +99,12 @@ libnginx.a: $(OUTPUT)/nginx.o $(LIBBPF_OBJ) $(COMM_OBJ) | $(OUTPUT)
 	$(call msg,BINARY,$@)
 	$(Q)$(AR) rcs $@ $^
 
-.PHONY: build_libbpf
-build_libbpf:
-	test -d bpfsrc || git clone https://github.com/libbpf/libbpf bpfsrc
-	cd bpfsrc && git checkout $(LIBBPF_VERSION)
-	PREFIX=$(shell pwd)/lib make -C bpfsrc/src -j16 install
+.PHONY: build_bpf
+build_bpf:
+	make -C bcc/
+	make -C libbpf/
 
-profile: oncpu.bpf.o offcpu.bpf.o user_slow.bpf.o ping_slow.bpf.o nginx.bpf.o
+profile: oncpu.bpf.o offcpu.bpf.o user_slow.bpf.o ping_slow.bpf.o nginx.bpf.o build_bpf
 
 oncpu.bpf.o: oncpu.bpf.c profile.bpf.h $(VMLINUX)
 	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 -I. -c oncpu.bpf.c -o $@
