@@ -1,3 +1,4 @@
 target := raptor
+SUBMOD_SRC := source
 
-include $(SRC)/mk/bin.mk
+include $(SRC)/mk/submod.mk

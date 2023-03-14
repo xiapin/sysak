@@ -45,3 +45,7 @@ clean:
 	rm -rf profile/agent/ebpf/bpf/*.o nginx/*.o
 	rm -rf nginx/libnginx.a
 	$(MAKE) -C ebpf/src clean
+
+install:profile
+	make
+	cp raptor $(INSTALL_PRE)/
