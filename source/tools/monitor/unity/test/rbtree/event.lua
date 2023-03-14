@@ -9,8 +9,10 @@ package.path = package.path .. ";../../?.lua;"
 
 local CrbEvent = require("common/rbEvent")
 
-local e = CrbEvent()
+local e = CrbEvent.new()
 
-e:addEvent("test", 2)
+e:addEvent("test period 2", 2)
+e:addEvent("test period 3", 3)
+e:addEvent("stop period 3", 3, true, 10)
 
 e:proc()

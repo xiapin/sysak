@@ -52,7 +52,7 @@ function CrbEvent:addEvent(e, period, start, loop)
     local node = {
         e = e,
         t = beg,
-        period = e,
+        period = period,
         loop = loop,
     }
     self._tree:insert(node)
