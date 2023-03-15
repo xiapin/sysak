@@ -7,41 +7,37 @@
 require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
-local root = "sys/fs/cgroup/cpuacct/"
-local child = "system.slice/"	--pass to me
-local dfile = "cpuacct.wait_latency"
+local root = "sys/fs/cgroup/cpuacct"
+local dfile = "/cpuacct.wait_latency"
 
 local CgWaitLatency = class("cg_wait_latency", CvProc)
 
 --ls{}, (pod_name and docker_name
-function CgWaitLatency:_init_(proto, pffi, mnt, pFile, lsex)
-    CvProc._init_(self, proto, pffi, mnt, pFile or root..child..dfile)
-	self.ls = lsex
+function CgWaitLatency:_init_(proto, pffi, mnt, path, ls)
+    CvProc._init_(self, proto, pffi, mnt, root .. path .. dfile)
+	self.ls = ls
 end
 
 function CgWaitLatency:proc(elapsed, lines)
 	-- if pFile not valid ,return -1
-    local c = 0
+    local c = 1
     CvProc.proc(self)
     local values = {}
-    local ls = {
-		name = "cg",
-		index = child,
-	}
+
     for line in io.lines(self.pFile) do
         local cell = pystring:split(line)
-	tmp = cell[1]
-	tmp = string.gsub(tmp, ":", "", 1)
-	tmp = string.gsub(tmp, ">=", "", 1)
-	tmp = string.gsub(tmp, "-", "to", 1)
-	tmp = string.gsub(tmp, "%(.*%)", "", 1)
+	    local tmp = cell[1]
+	    tmp = string.gsub(tmp, ":", "", 1)
+	    tmp = string.gsub(tmp, ">=", "", 1)
+	    tmp = string.gsub(tmp, "-", "to", 1)
+	    tmp = string.gsub(tmp, "%(.*%)", "", 1)
         values[c] = {
             name = "wait_lat_"..tmp,
             value = tonumber(cell[2])
         }
         c = c + 1
     end
-    self:appendLine(self:_packProto("wait_latency", {ls}, values))
+    self:appendLine(self:_packProto("cg_wait_latency", self.ls, values))
     self:push(lines)
 end
 

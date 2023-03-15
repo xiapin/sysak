@@ -229,3 +229,33 @@ metrics:
     head: value
     help: "pmu info of cycles/instructions."
     type: "gauge"
+  - title: sysak_cg_memfail_cnt
+    from: cg_memfail_cnt
+    head: value
+    help: "sysak_cg_memFail_cnt"
+    type: "gauge"
+  - title: sysak_cg_memdrcm_latency
+    from: cg_memdrcm_latency
+    head: value
+    help: "sysak_cg_memdrcm_latency"
+    type: "gauge"
+  - title: sysak_cg_memmcmp_latency
+    from: cg_memmcmp_latency
+    head: value
+    help: "sysak_cg_memmcmp_latency"
+    type: "gauge"
+  - title: sysak_cg_wait_latency
+    from: cg_wait_latency
+    head: value
+    help: "sysak_cg_wait_latency"
+    type: "gauge"
+  - title: sysak_cg_cpuacct_proc_stat
+    from: cg_cpuacct_proc_stat
+    head: value
+    help: "sysak_cg_cpuacct_proc_stat"
+    type: "gauge"
+  - title: sysak_cg_cpu_stat
+    from: cg_cpu_stat
+    head: value
+    help: "sysak_cg_cpu_stat"
+    type: "gauge"

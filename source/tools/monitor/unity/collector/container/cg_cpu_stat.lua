@@ -4,28 +4,24 @@
 --- DateTime: 2023/3/8 2:32 PM
 ---
 
-package.path = package.path .. ";../../?.lua;../?.lua"
 require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
-local root = "sys/fs/cgroup/cpu/"
-local child = "system.slice/" --pass to me
-local dfile = "cpu.stat"
+local root = "sys/fs/cgroup/cpu"
+local dfile = "/cpu.stat"
 
 local cgCpuStat = class("cg_cpu_stat", CvProc)
 
-function cgCpuStat:_init_(proto, pffi, mnt, pFile)
-    CvProc._init_(self, proto, pffi, mnt, pFile or root..child..dfile)
+function cgCpuStat:_init_(proto, pffi, mnt, path, ls)
+    CvProc._init_(self, proto, pffi, mnt, root .. path .. dfile)
+    self.ls = ls
 end
 
 function cgCpuStat:proc(elapsed, lines)
     local c = 1
     CvProc.proc(self)
     local values = {}
-    local ls = {
-		name = "cg",
-		index = child
-	}
+
     for line in io.lines(self.pFile) do
         local cell = pystring:split(line)
         values[c] = {
@@ -33,11 +29,11 @@ function cgCpuStat:proc(elapsed, lines)
             value = tonumber(cell[2])
         }
         c = c + 1
-	if c > 3 then
-		break
-	end
+	    if c > 3 then
+		    break
+	    end
     end
-    self:appendLine(self:_packProto("cpu_stat", ls, values))
+    self:appendLine(self:_packProto("cg_cpu_stat", self.ls, values))
     self:push(lines)
 end
 

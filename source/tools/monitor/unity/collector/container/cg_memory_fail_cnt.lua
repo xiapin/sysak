@@ -8,26 +8,22 @@ require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
 local root = "sys/fs/cgroup/memory/"
-local child = "system.slice/"	--pass to me
-local dfile = "memory.failcnt"
+local dfile = "/memory.failcnt"
 
 local CgMemFailCnt = class("cg_memFail_cnt", CvProc)
 
 --ls{}, (pod_name and docker_name
-function CgMemFailCnt:_init_(proto, pffi, mnt, pFile, lsex)
-    CvProc._init_(self, proto, pffi, mnt, pFile or root..child..dfile)
-	self.ls = lsex
+function CgMemFailCnt:_init_(proto, pffi, mnt, path, ls)
+    CvProc._init_(self, proto, pffi, mnt, root .. path .. dfile)
+	self.ls = ls
 end
 
 function CgMemFailCnt:proc(elapsed, lines)
 	-- if pFile not valid ,return -1
-    local c = 0
+    local c = 1
     CvProc.proc(self)
     local values = {}
-    local ls = {
-		name = "cg",
-		index = child,
-	}
+
     for line in io.lines(self.pFile) do
         local cell = pystring:split(line)
         values[c] = {
@@ -36,7 +32,7 @@ function CgMemFailCnt:proc(elapsed, lines)
         }
         c = c + 1
     end
-    self:appendLine(self:_packProto("memFail_cnt", {ls}, values))
+    self:appendLine(self:_packProto("cg_memfail_cnt", self.ls, values))
     self:push(lines)
 end
 

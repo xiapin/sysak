@@ -8,15 +8,14 @@ require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
 local root = "sys/fs/cgroup/memory/"
-local child = "system.slice/"	--pass to me
-local dfile = "memory.direct_compact_latency"
+local dfile = "/memory.direct_compact_latency"
 
 local CgMemDcmpLatency = class("cg_memDcmp_latency", CvProc)
 
 --ls{}, (pod_name and docker_name
-function CgMemDcmpLatency:_init_(proto, pffi, mnt, pFile, lsex)
-    CvProc._init_(self, proto, pffi, mnt, pFile or root..child..dfile)
-	self.ls = lsex
+function CgMemDcmpLatency:_init_(proto, pffi, mnt, path, ls)
+    CvProc._init_(self, proto, pffi, mnt, root .. path .. dfile)
+	self.ls = ls
 end
 
 function CgMemDcmpLatency:proc(elapsed, lines)
@@ -24,24 +23,21 @@ function CgMemDcmpLatency:proc(elapsed, lines)
     local c = 0
     CvProc.proc(self)
     local values = {}
-    local ls = {
-		name = "cg",
-		index = child,
-	}
+
     for line in io.lines(self.pFile) do
         local cell = pystring:split(line)
-	tmp = cell[1]
-	tmp = string.gsub(tmp, ":", "", 1)
-	tmp = string.gsub(tmp, ">=", "", 1)
-	tmp = string.gsub(tmp, "-", "to", 1)
-	tmp = string.gsub(tmp, "%(.*%)", "", 1)
+	    local tmp = cell[1]
+	    tmp = string.gsub(tmp, ":", "", 1)
+	    tmp = string.gsub(tmp, ">=", "", 1)
+	    tmp = string.gsub(tmp, "-", "to", 1)
+	    tmp = string.gsub(tmp, "%(.*%)", "", 1)
         values[c] = {
             name = "memDcmp_lat_"..tmp,
             value = tonumber(cell[2])
         }
         c = c + 1
     end
-    self:appendLine(self:_packProto("memDcmp_latency", {ls}, values))
+    self:appendLine(self:_packProto("cg_memmcmp_latency", self.ls, values))
     self:push(lines)
 end
 
