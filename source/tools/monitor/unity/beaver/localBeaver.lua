@@ -17,12 +17,17 @@ local function setupServer(fYaml)
     local port = config["port"] or 8400
     local ip = config["bind_addr"] or "0.0.0.0"
     local backlog = config["backlog"] or 32
-    return port, ip, backlog
+    local unix_socket = config["unix_socket"]
+    return port, ip, backlog,unix_socket
 end
 
 function CLocalBeaver:_init_(frame, fYaml)
-    local port, ip, backlog = setupServer(fYaml)
-    self._bfd = self:_install_fd(port, ip, backlog)
+    local port, ip, backlog, unix_socket = setupServer(fYaml)
+    if not unix_socket then
+        self._bfd = self:_install_fd(port, ip, backlog)
+    else
+        self._bfd = self:_install_fd_unisock(backlog, unix_socket)
+    end
     self._efd = self:_installFFI()
 
     self._cos = {}
@@ -34,17 +39,19 @@ function CLocalBeaver:_init_(frame, fYaml)
 end
 
 function CLocalBeaver:_del_()
+    for fd in pairs(self._cos) do
+        socket.shutdown(fd, socket.SHUT_RDWR)
+        local res = self._cffi.del_fd(self._efd, fd)
+        print("close fd: " .. fd)
+        assert(res >= 0)
+    end
+
     if self._efd then
         self._cffi.deinit(self._efd)
     end
     if self._bfd then
         unistd.close(self._bfd)
     end
-end
-
-local function posixError(msg, err, errno)
-    local s = msg .. string.format(": %s, errno: %d", err, errno)
-    error(s)
 end
 
 function CLocalBeaver:_installTmo(fd)
@@ -57,7 +64,7 @@ function CLocalBeaver:_checkTmo()
         -- ! coroutine will del self._tmos cell in loop, so create a mirror table for safety
         local tmos = system:dictCopy(self._tmos)
         for fd, t in pairs(tmos) do
-            if now - t >= 60 then
+            if now - t >= 10 * 60 then
                 local e = self._ffi.new("native_event_t")
                 e.ev_close = 1
                 e.fd = fd
@@ -81,25 +88,76 @@ function CLocalBeaver:_installFFI()
     return efd
 end
 
-function CLocalBeaver:_install_fd(port, ip, backlog)
+local function localBind(fd, tPort)
+    local try = 0
+    local res, err, errno
+
+    -- can reuse for time wait socket.
+    res, err, errno = socket.setsockopt(fd, socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+    if not res then
+        system:posixError("set sock opt failed.");
+    end
+
+    while try < 120 do
+        res, err, errno = socket.bind(fd, tPort)
+        if res then
+            return 0
+        elseif errno == 98 then  -- port  already in use? try 30s;
+            unistd.sleep(1)
+            try = try + 1
+        else
+            break
+        end
+    end
+    system:posixError(string.format("bind port %d failed.", tPort.port), err, errno)
+end
+
+function CLocalBeaver:_install_fd_unisock(backlog,unix_socket)
     local fd, res, err, errno
-    fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    unistd.unlink(unix_socket)
+    fd, err, errno = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0)
     if fd then  -- for socket
-        res, err, errno = socket.bind(fd, {family=socket.AF_INET, addr=ip, port=port})
-        if res then  -- for bind
+        local tPort = {family=socket.AF_UNIX, path=unix_socket}
+        local r, msg = pcall(localBind, fd, tPort)
+        if r then
             res, err, errno = socket.listen(fd, backlog)
             if res then -- for listen
                 return fd
             else
-                posixError("socket listen failed", err, errno)
+                unistd.close(fd)
+                system:posixError("socket listen failed", err, errno)
             end
-        else   -- for bind failed
+        else
+            print(msg)
             unistd.close(fd)
-            posixError("socket bind failed", err, errno)
             os.exit(1)
         end
     else  -- socket failed
-        posixError("create socket failed", err, errno)
+        system:posixError("create socket failed", err, errno)
+    end
+end
+
+function CLocalBeaver:_install_fd(port, ip, backlog)
+    local fd, res, err, errno
+    fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    if fd then  -- for socket
+        local tPort = {family=socket.AF_INET, addr=ip, port=port}
+        local r, msg = pcall(localBind, fd, tPort)
+        if r then
+            res, err, errno = socket.listen(fd, backlog)
+            if res then -- for listen
+                return fd
+            else
+                unistd.close(fd)
+                system:posixError("socket listen failed", err, errno)
+            end
+        else
+            print(msg)
+            unistd.close(fd)
+            os.exit(1)
+        end
+    else  -- socket failed
+        system:posixError("create socket failed", err, errno)
     end
 end
 
@@ -120,7 +178,7 @@ function CLocalBeaver:read(fd, maxLen)
                     return nil
                 end
             else
-                posixError("socket recv error", err, errno)
+                system:posixError("socket recv error", err, errno)
             end
         else
             print(system:dump(e))
@@ -137,7 +195,6 @@ function CLocalBeaver:write(fd, stream)
     sent, err, errno = socket.send(fd, stream)
     if sent then
         if sent < #stream then  -- send buffer may full
-            print("need to send buffer for " .. (#stream - sent))
             res = self._cffi.mod_fd(self._efd, fd, 1)  -- epoll write ev
             assert(res == 0)
 
@@ -149,27 +206,33 @@ function CLocalBeaver:write(fd, stream)
                     stream = string.sub(stream, sent + 1)
                     sent, err, errno = socket.send(fd, stream)
                     if sent == nil then
-                        posixError("socket send error.", err, errno)
+                        if errno == 11 then  -- EAGAIN ?
+                            goto continue
+                        end
+                        system:posixError("socket send error.", err, errno)
                         return nil
                     end
                 else  -- need to read ? may something error or closed.
                     return nil
                 end
+                ::continue::
             end
             res = self._cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
             assert(res == 0)
         end
         return 1
     else
-        posixError("socket send error.", err, errno)
+        system:posixError("socket send error.", err, errno)
         return nil
     end
 end
 
 function CLocalBeaver:_proc(fd)
     local fread = self:read(fd)
+    local session = {}
+    local res, alive
     while true do
-        local res, alive = self._frame:proc(fread)
+        res, alive, session = self._frame:proc(fread, session)
         if res then
             local stat = self:write(fd, res)
 
@@ -211,12 +274,12 @@ function CLocalBeaver:accept(fd, e)
             self:co_add(nfd)
             self:_installTmo(nfd)
         else
-            posixError("accept new socket failed", err, errno)
+            system:posixError("accept new socket failed", err, errno)
         end
     end
 end
 
-function CLocalBeaver:_poll(bfd, nes)
+function CLocalBeaver:_pollFd(bfd, nes)
     for i = 0, nes.num - 1 do
         local e = nes.evs[i];
         local fd = e.fd
@@ -233,10 +296,7 @@ function CLocalBeaver:_poll(bfd, nes)
     self:_checkTmo()
 end
 
-function CLocalBeaver:poll()
-    assert(self._once, "poll loop only run once time.")
-    self._once = false
-
+function CLocalBeaver:_poll()
     local bfd = self._bfd
     local efd = self._efd
     while true do
@@ -244,16 +304,20 @@ function CLocalBeaver:poll()
         local res = self._cffi.poll_fds(efd, 10, nes)
 
         if res < 0 then
-            break
+            return "end poll."
         end
 
-        self:_poll(bfd, nes)
+        self:_pollFd(bfd, nes)
     end
+end
 
-    for fd in pairs(self._cos) do
-        local res = self._cffi.del_fd(self._efd, fd)
-        assert(res >= 0)
-    end
+function CLocalBeaver:poll()
+    assert(self._once, "poll loop only run once time.")
+    self._once = false
+
+    local _, msg = pcall(self._poll, self)
+    print(msg)
+
     return 0
 end
 

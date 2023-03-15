@@ -17,6 +17,7 @@ end
 function CprocSockStat:proc(elapsed, lines)
     CvProc.proc(self)
     local vs = {}
+    local c = 0
     for line in io.lines(self.pFile) do
         local cells = pystring:split(line, ":", 1)
         if #cells > 1 then
@@ -31,12 +32,13 @@ function CprocSockStat:proc(elapsed, lines)
                     name = title,
                     value = tonumber(bodies[2 * i])
                 }
-                table.insert(vs, v)
+                c = c + 1
+                vs[c] = v
             end
         end
     end
     self:appendLine(self:_packProto("sock_stat", nil, vs))
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocSockStat

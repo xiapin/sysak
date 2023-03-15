@@ -22,7 +22,9 @@ cp -r /usr/local/share/lua/5.1/* ${DIST}/lua/
 mkdir ${APP}
 mkdir ${APP}/beaver
 mkdir ${APP}/beaver/native
+mkdir ${APP}/beaver/query
 cp -r beaver/guide ${APP}/beaver/
+cp -r beaver/query ${APP}/beaver/
 cp beaver/*.lua ${APP}/beaver/
 cp beaver/native/*.lua ${APP}/beaver/native
 
@@ -35,9 +37,11 @@ cp beeQ/run.sh ${APP}/beeQ/
 
 mkdir ${APP}/collector
 mkdir ${APP}/collector/native
+mkdir ${APP}/collector/outline
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
+cp collector/outline/*.lua ${APP}/collector/outline
 cp collector/plugin.yaml ${APP}/collector/
 
 mkdir ${APP}/common

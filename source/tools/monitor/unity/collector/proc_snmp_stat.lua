@@ -58,12 +58,14 @@ end
 
 function CprocSnmpStat:pack(labels, logs)
     local vs = {}
+    local c = 0
     for k, v in pairs(labels) do
         local value = {
             name = k,
             value = tonumber(v)
         }
-        table.insert(vs, value)
+        c = c + 1
+        vs[c] = value
     end
     self:appendLine(self:_packProto("pkt_status", nil, vs))
     if #logs > 0 then
@@ -82,6 +84,7 @@ function CprocSnmpStat:check(now)
     local labels = self:createLabels()
     local logs = {}
     if self._rec then
+        local c = 0
         for k, v in pairs(now) do
             if self._rec[k] and self._rec[k] < v then   --
                 local delta = v - self._rec[k]
@@ -91,7 +94,8 @@ function CprocSnmpStat:check(now)
                         labels[lk] = lv + delta
                     end
                 end
-                table.insert(logs, string.format("%s: %d", k, tonumber(delta)))
+                c = c + 1
+                logs[c] = string.format("%s: %d", k, tonumber(delta))
             end
         end
     end
@@ -105,7 +109,7 @@ function CprocSnmpStat:proc(elapsed, lines)
     self:_proc(self.pFile .. "proc/net/snmp", now)
     self:_proc(self.pFile .. "proc/net/netstat", now)
     self:check(now)
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocSnmpStat

@@ -5,22 +5,27 @@
 ---
 
 require("common.class")
-local CkvProc = require("collector.kvProc")
 local CvProc = require("collector.vproc")
 local pystring = require("common.pystring")
 
-local CprocBuddyinfo = class("proc_buddyinfo", CkvProc)
+local CprocBuddyinfo = class("proc_buddyinfo", CvProc)
 
 function CprocBuddyinfo:_init_(proto, pffi, mnt,pFile)
-    CkvProc._init_(self, proto, pffi, mnt,  pFile or "proc/buddyinfo", "buddyinfo")
+    CvProc._init_(self, proto, pffi, mnt, pFile or "proc/buddyinfo")
+    self._protoTable = {
+        line = "buddyinfo",
+        ls = nil,
+        vs = {}
+    }
 end
 
 function CprocBuddyinfo:proc(elapsed, lines)
     CvProc.proc(self)
-    buddyinfo = {}
+    self._protoTable.vs = {}
+    local buddyinfo = {}
     for line in io.lines(self.pFile) do
         if string.find(line,"Normal") then
-            subline = pystring:split(line,"Normal",1)[2]
+            local subline = pystring:split(line,"Normal",1)[2]
             for num in string.gmatch(subline, "%d+") do
                table.insert(buddyinfo,tonumber(num))
             end
@@ -31,7 +36,7 @@ function CprocBuddyinfo:proc(elapsed, lines)
     if not buddyinfo then
         for line in io.lines(self.pFile) do
             if string.find(line,"DMA32") then
-                subline = pystring:split(line,"DMA32",1)[2]
+                local subline = pystring:split(line,"DMA32",1)[2]
                 for num in string.gmatch(subline, "%d+") do
                    table.insert(buddyinfo,tonumber(num))
                 end
@@ -46,7 +51,7 @@ function CprocBuddyinfo:proc(elapsed, lines)
     end
 
     self:appendLine(self._protoTable)
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocBuddyinfo

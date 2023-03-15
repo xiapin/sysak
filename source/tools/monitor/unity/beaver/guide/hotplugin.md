@@ -111,4 +111,4 @@ unity监控采用[yaml](http://yaml.org/)对插件进行管理，当前插件分
 
 此时数据只是已经更新入库了，但是要在nodexport上面显示，需要配置beaver/export.yaml 文件，才能将查询从数据表中更新。
 
-[返回目录](/guide)
+[返回目录](/guide/guide.md)

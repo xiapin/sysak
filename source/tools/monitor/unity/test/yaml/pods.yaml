@@ -1,0 +1,10 @@
+pods:
+  - hello
+  - wolrd
+  - pod2
+  - pod1
+
+confs:
+  - path: /sys/cgroup
+    depth: 3
+  - path:

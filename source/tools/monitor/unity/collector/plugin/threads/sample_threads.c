@@ -17,6 +17,7 @@ int init(void * arg) {
 }
 
 static int sample_thread_func(struct beeQ* q, void * arg) {
+    unsigned int ret;
     while (plugin_is_working()) {
         static double value = 1.0;
         struct unity_line* line;
@@ -29,7 +30,10 @@ static int sample_thread_func(struct beeQ* q, void * arg) {
         unity_set_value(line, 1, "value2", 2.0 + value);
         unity_set_log(line, "log", "hello world.");
         beeQ_send(q, lines);
-        sleep(1);
+        ret = sleep(5);
+        if (ret > 0) {  // interrupt by signal
+            break;
+        }
     }
     return 0;
 }

@@ -13,7 +13,7 @@ $(SO): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAG)
 
 install: $(SO)
-	cp $(SO) ../../collector/native/
+	cp $(SO) ../../beeQ/lib
 
 clean:
 	rm -f $(SO) $(OBJS)

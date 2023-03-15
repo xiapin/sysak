@@ -40,6 +40,7 @@ function CprocStat:_procCpu(now, last)
                 local cell = {name=index[i], value=tonumber(v * 100.0 / total)}
                 table.insert(res, cell)
             end
+            table.insert(res, {name="total", value=total})
             return res
         end
     end
@@ -185,7 +186,7 @@ function CprocStat:proc(elapsed, lines)
         end
     end
     self:appendLine(self:_packProto("stat_counters", nil, counter, nil))
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocStat

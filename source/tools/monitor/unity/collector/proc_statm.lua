@@ -16,6 +16,7 @@ end
 function CprocStatm:proc(elapsed, lines)
     CvProc.proc(self)
     local heads = {"size", "resident", "shared", "text", "lib", "data", "dt"}
+    local c = 0
     for line in io.lines("/proc/self/statm") do
         local vs = {}
         local data = self._ffi.new("var_long_t")
@@ -26,12 +27,13 @@ function CprocStatm:proc(elapsed, lines)
                 name = k,
                 value = tonumber(data.value[i - 1]),
             }
-            table.insert(vs, cell)
+            c = c + 1
+            vs[c] = cell
         end
         self:appendLine(self:_packProto("self_statm", nil, vs))
     end
 
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocStatm

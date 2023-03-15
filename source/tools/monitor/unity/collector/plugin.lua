@@ -15,26 +15,27 @@ function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
     self:setProcSys(procffi, res.config)
 
     self._sig_cffi = procffi["cffi"]
-    self._sig_cffi.plugin_init()
+    self._sig_cffi.ffi_plugin_init()
 
     self._ffi = require("collector.native.plugincffi")
     self:setup(res.plugins, proto_q)
 end
 
 function Cplugin:_del_()
-    self._sig_cffi.plugin_stop()
+    self._sig_cffi.ffi_plugin_stop()
     for _, plugin in ipairs(self._plugins) do
         local cffi = plugin.cffi
         cffi.deinit()
     end
+    self._sig_cffi.ffi_plugin_deinit()
 end
 
 function Cplugin:setProcSys(procFFI, config)
     local proc = config["proc_path"] or "/"
     local sys = config["sys_path"] or "/"
 
-    procFFI.cffi.set_unity_proc(procFFI.ffi.string(proc))
-    procFFI.cffi.set_unity_sys(procFFI.ffi.string(sys))
+    procFFI.cffi.ffi_set_unity_proc(procFFI.ffi.string(proc))
+    procFFI.cffi.ffi_set_unity_sys(procFFI.ffi.string(sys))
 end
 
 function Cplugin:setup(plugins, proto_q)
@@ -55,12 +56,14 @@ function Cplugin:setup(plugins, proto_q)
 end
 
 function Cplugin:load_label(unity_line, line)
+    local c = #line.ls
     for i=0, 4 - 1 do
         local name = self._ffi.string(unity_line.indexs[i].name)
         local index = self._ffi.string(unity_line.indexs[i].index)
 
         if #name > 0 then
-            table.insert(line.ls, {name = name, index = index})
+            c = c + 1
+            line.ls[c] = {name = name, index = index}
         else
             return
         end
@@ -68,12 +71,14 @@ function Cplugin:load_label(unity_line, line)
 end
 
 function Cplugin:load_value(unity_line, line)
+    local c = #line.vs
     for i=0, 32 - 1 do
         local name = self._ffi.string(unity_line.values[i].name)
         local value = unity_line.values[i].value
 
         if #name > 0 then
-            table.insert(line.vs, {name = name, value = value})
+            c = c + 1
+            line.vs[c] = {name = name, value = value}
         else
             return
         end
@@ -90,6 +95,7 @@ function Cplugin:load_log(unity_line, line)
 end
 
 function Cplugin:_proc(unity_lines, lines)
+    local c = #lines["lines"]
     for i=0, unity_lines.num - 1 do
         local unity_line = unity_lines.line[i]
         local line = {line = self._ffi.string(unity_line.table),
@@ -100,7 +106,8 @@ function Cplugin:_proc(unity_lines, lines)
         self:load_label(unity_line, line)
         self:load_value(unity_line, line)
         self:load_log(unity_line, line)
-        table.insert(lines["lines"], line)
+        c = c + 1
+        lines["lines"][c] = line
     end
 end
 
@@ -114,7 +121,6 @@ function Cplugin:proc(t, lines)
         end
         self._ffi.C.free(unity_lines.line)   -- should free memory.
     end
-    return lines
 end
 
 return Cplugin

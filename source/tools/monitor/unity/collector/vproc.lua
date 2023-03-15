@@ -31,11 +31,12 @@ function CvProc:copyLine(line)
 end
 
 function CvProc:push(lines)
-    for _, v in ipairs(self._lines["lines"]) do
-        table.insert(lines["lines"], v)
+    local c = #lines["lines"]   -- not for #lines
+    for _, line in ipairs(self._lines["lines"]) do
+        c = c + 1
+        lines["lines"][c] = line
     end
     self._lines = nil
-    return lines
 end
 
 function CvProc:_packProto(head, labels, vs, log)

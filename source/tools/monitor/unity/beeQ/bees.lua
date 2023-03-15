@@ -10,9 +10,11 @@ local CfoxRecv = require("beeQ.foxRecv")
 local unistd = require("posix.unistd")
 
 
-local fox = CfoxRecv.new()
+local fox
 
-function init(tid)
+function init(tid, fYaml)
+    fYaml = fYaml or "../collector/plugin.yaml"
+    fox = CfoxRecv.new(fYaml)
     print(string.format("hello beeQ, pid: %d, tid: %d", unistd.getpid(), tid))
     return 0
 end

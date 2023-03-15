@@ -46,7 +46,7 @@ function CkvProc:proc(elapsed, lines)
         self:readKV(line)
     end
     self:appendLine(self._protoTable)
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CkvProc
