@@ -40,6 +40,7 @@ function CprocStat:_procCpu(now, last)
                 local cell = {name=index[i], value=tonumber(v * 100.0 / total)}
                 table.insert(res, cell)
             end
+            table.insert(res, {name="total", value=total})
             return res
         end
     end

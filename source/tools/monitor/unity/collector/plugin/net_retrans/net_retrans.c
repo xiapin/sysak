@@ -213,7 +213,6 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
     }
     unity_set_table(line, "net_retrans_log");
     unity_set_index(line, 0, "type", net_title[e->type]);
-    printf("%s\n", log);
     unity_set_log(line, "log", log);
     return 0;
 }

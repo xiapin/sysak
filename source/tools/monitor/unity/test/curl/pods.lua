@@ -8,8 +8,91 @@ package.path = package.path .. ";../../?.lua;"
 
 local ChttpCli = require("httplib.httpCli")
 local system = require("common.system")
+local pystring = require("common.pystring")
+local unistd = require("posix.unistd")
 
+local function spiltConId(conId)
+    local res = pystring:split(conId, "//", 1)
+    return res[2]
+end
+
+local function getRuntime()
+    if unistd.access("/var/run/docker/runtime-runc/moby/") == 0 then
+        return "docker"
+    end
+    return "cri-containerd"
+end
+
+local function joinNPath(cell, runtime)
+    -- "/sys/fs/cgroup/cpu/kubepods.slice/kubepods-${qos}.slice/kubepods-${qos}-pod${podid}.slice/${runtime}-${cid}.scope"
+    local paths = {
+        "/sys/fs/cgroup/cpu/kubepods.slice/kubepods-",
+        cell.pod.qos,
+        ".slice/kubepods-",
+        cell.pod.qos,
+        "-pod",
+        cell.pod.uid,
+        ".slice/",
+        runtime,
+        "-",
+        cell.id,
+        ".scope"
+    }
+    return pystring:join("", paths)
+end
+
+local function joinGPath(cell, runtime)
+    -- "/sys/fs/cgroup/cpu/kubepods.slice/kubepods-pod${podid}.slice/${runtime}-${cid}.scope"
+    local paths = {
+        "/sys/fs/cgroup/cpu/kubepods.slice/kubepods-pod",
+        cell.pod.uid,
+        ".slice/",
+        runtime,
+        "-",
+        cell.id,
+        ".scope"
+    }
+    return pystring:join("", paths)
+end
+
+local function joinPath(cell, runtime)
+    if cell.pod.qos == "guaranteed" then
+        return joinGPath(cell, runtime)
+    else
+        return joinNPath(cell, runtime)
+    end
+end
+
+local runtime = getRuntime()
 local cli = ChttpCli.new()
 local res = cli:get("http://127.0.0.1:10255/pods")
 local obj = cli:jdecode(res.body)
-print(system:dump(obj.items))
+--print(system:dump(obj.items))
+local cons = {}
+local c = 0
+for _, pod in ipairs(obj.items) do
+    local metadata = pod.metadata
+    local lpod = {name = metadata.name,
+                  namespace = metadata.namespace,
+                  uid = pystring:replace(metadata.uid, "-", "_"),
+                  qos = pystring:lower(pod.status.qosClass),
+    }
+    local containerStatuses = pod.status.containerStatuses
+    for _, con in ipairs(containerStatuses) do
+        local cell = {
+            pod = lpod,
+            name = con.name,
+            id = spiltConId(con.containerID)
+        }
+        cell.path = joinPath(cell, runtime)
+        if unistd.access("/mnt/host" .. cell.path) == 0 then
+            c = c + 1
+            cons[c] = cell
+        end
+    end
+end
+
+print(#cons)
+for _, con in ipairs(cons) do
+    assert(unistd.access("/mnt/host" .. con.path))
+end

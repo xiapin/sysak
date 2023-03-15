@@ -19,11 +19,14 @@ config:
 outline:
   - /tmp/sysom
 
+container:
+  mode: "pods"
+  luaPlugin: ["cg_cpuacct_proc_stat", "cg_memory_dcmp_latency",  "cg_memory_fail_cnt",
+    "cg_cpu_stat",  "cg_cpuacct_wait_latency",  "cg_memory_drcm_latency"]
+
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
              "proc_uptime"]
-
-
 
 plugins:
   - so: kmsg
