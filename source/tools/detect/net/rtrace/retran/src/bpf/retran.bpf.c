@@ -17,11 +17,9 @@ struct tracepoint_args
     struct sock *sk;
 };
 
-SEC("tracepoint/tcp/tcp_retransmit_skb")
-int tp_tcp_retransmit_skb(struct tracepoint_args *args) 
+
+__always_inline void trace_retransmit(void *ctx, struct sock *sk, struct sk_buff *skb)
 {
-    struct sk_buff *skb = args->skb;
-    struct sock *sk = args->sk;
     struct inet_connection_sock *icsk = sk;
     struct retran_event re = {};
 
@@ -33,9 +31,24 @@ int tp_tcp_retransmit_skb(struct tracepoint_args *args)
 
     set_addr_pair_by_sock(sk, &re.ap);
     re.ts = ns();
-    bpf_perf_event_output(args, &perf_map, BPF_F_CURRENT_CPU, &re, sizeof(re));
+    bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU, &re, sizeof(re));
+}
+
+SEC("tracepoint/tcp/tcp_retransmit_skb")
+int tp_tcp_retransmit_skb(struct tracepoint_args *args) 
+{
+    struct sk_buff *skb = args->skb;
+    struct sock *sk = args->sk;
+    trace_retransmit(args, sk, skb);
     return 0;
 }
 
+
+SEC("kprobe/tcp_retransmit_skb")
+int BPF_KPROBE(tcp_retransmit_skb, struct sock *sk, struct sk_buff *skb)
+{
+    trace_retransmit(ctx, sk, skb);
+    return 0;
+}
 
 char _license[] SEC("license") = "GPL";

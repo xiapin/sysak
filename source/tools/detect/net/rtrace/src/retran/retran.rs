@@ -14,13 +14,23 @@ pub struct RetranCommand {
     dst: Option<String>,
     #[structopt(long, default_value = "600", help = "program running time in seconds")]
     duration: usize,
+}
 
+
+fn get_enabled_points() -> Result<Vec<(&'static str, bool)>> {
+    let mut enabled = vec![];
+    if eutils_rs::KernelVersion::current()? >= eutils_rs::KernelVersion::try_from("4.10.0")? {
+        enabled.push(("tp_tcp_retransmit_skb", true));
+    } else {
+        enabled.push(("tcp_retransmit_skb", true));
+    }
+    Ok(enabled)
 }
 
 pub fn run_retran(cmd: &RetranCommand, debug: bool, btf: &Option<String>) {
     let mut retran = Retran::builder()
         .open(debug, btf)
-        .load()
+        .load_enabled(get_enabled_points().expect("failed to get enabled points"))
         .open_perf()
         .build();
 
