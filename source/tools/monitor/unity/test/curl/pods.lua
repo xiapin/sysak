@@ -12,4 +12,8 @@ local system = require("common.system")
 local cli = ChttpCli.new()
 local res = cli:get("http://127.0.0.1:10255/pods")
 local obj = cli:jdecode(res.body)
-print(system:dump(obj.items))
+--print(system:dump(obj.items))
+local cons = {}
+for i, pod in ipairs(obj.items) do
+    print(pod.metadata.name)
+end
