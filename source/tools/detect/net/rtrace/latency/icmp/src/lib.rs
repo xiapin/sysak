@@ -13,8 +13,9 @@ pub use {icmp::Icmp, skel::OpenIcmpSkel};
 use bindings::*;
 use cenum_rs::CEnum;
 use std::fmt;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, CEnum)]
+#[derive(Clone, Copy, CEnum, Serialize, Deserialize)]
 pub enum IcmpEventType {
     #[cenum(value = "PING_SND", display = "PingSend")]
     PingSnd,
@@ -32,6 +33,8 @@ pub enum IcmpEventType {
     PingRcv,
 }
 
+
+#[derive(Serialize, Deserialize)]
 pub struct IcmpEvent {
     pub cpu: u16,
     pub ty: IcmpEventType,
@@ -68,6 +71,7 @@ impl IcmpEvent {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct IcmpEvents {
     pub sender: bool,
     pub id: u16,
