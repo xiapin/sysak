@@ -64,6 +64,9 @@ plugins:
   -
     so: gpuinfo
     description: "collect gpuinfo"
+  -
+    so: pmu_cpi
+    description: "collect cpi"
 
 metrics:
   -
@@ -218,3 +221,8 @@ metrics:
     #head: value
     #help: "get pod alloc page used"
     #type: "gauge"
+  - title: sysak_pmu_cpi
+    from: pmu cpi
+    head: value
+    help: "pmu info of cycles/instructions."
+    type: "gauge"
