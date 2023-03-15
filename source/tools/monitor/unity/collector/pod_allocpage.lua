@@ -22,7 +22,8 @@ local CPodAlloc = class("podalloc", CkvProc)
 function CPodAlloc:_init_(proto, pffi, mnt, pFile)
     CkvProc._init_(self, proto, pffi, mnt, pFile , "pod_alloc")
     self._ffi = require("collector.native.plugincffi")
-    self.proc_fs, self.sys_fs, self.pods_fs, self.root_fs = dockerinfo:get_hostfs()
+    self.root_fs = mnt
+    self.proc_fs = mnt .. "/proc/"
     self.name_space = {}
     self.pod_mem = {}
     self.total = 0
@@ -42,8 +43,11 @@ function CPodAlloc:switch_ns(pid)
     if not self:file_exists(pid_ns) then return end
 
     local f = fcntl.open(pid_ns,fcntl.O_RDONLY)
-    self._ffi.C.setns(f,0)
+    if f == nil then return false end
+    local res = self._ffi.C.setns(f,0)
+    if res == -1 then return false end
     unistd.close(f)
+    return true
 end
 
 function CPodAlloc:get_container_info(did)
@@ -52,7 +56,7 @@ function CPodAlloc:get_container_info(did)
     local podns = did
     local cname = did
     
-    res = dockerinfo:get_inspect(did)
+    res = dockerinfo:get_inspect(did, self.root_fs)
     local restable = json.decode(res)
     if #restable > 0 then
         restable = restable[1]
@@ -96,7 +100,8 @@ function CPodAlloc:get_pidalloc()
     for net,pidn in pairs(self.name_space) do
         if pidn == "self" then pidn = "1" end
 
-        self:switch_ns(pidn)
+        local ns_res = self:switch_ns(pidn)
+        if not ns_res then goto continue end 
         -- local env = posix.getenv()
         -- env["PROC_ROOT"] = self.proc_fs
 
@@ -113,7 +118,7 @@ function CPodAlloc:get_pidalloc()
 
             local dockerid = ""
             if not dockerids[pid] then
-                dockerid = dockerinfo:get_dockerid(pid)
+                dockerid = dockerinfo:get_dockerid(pid, self.root_fs)
                 if dockerid == "unknow" then break end
                 dockerids[pid] = dockerid
             else
@@ -142,6 +147,7 @@ function CPodAlloc:get_pidalloc()
         pfile:close()
         self:switch_ns("1")
         stdlib.setenv("PROC_ROOT","")
+        ::continue::
     end
 end
 

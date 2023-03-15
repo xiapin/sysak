@@ -33,7 +33,7 @@ function CprocBuddyinfo:proc(elapsed, lines)
         end
     end
 
-    if not buddyinfo then
+    if #buddyinfo == 0 then
         for line in io.lines(self.pFile) do
             if string.find(line,"DMA32") then
                 local subline = pystring:split(line,"DMA32",1)[2]
