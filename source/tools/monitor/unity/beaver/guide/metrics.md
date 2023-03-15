@@ -26,6 +26,74 @@
 | machine  | - | uname -r |  | collector/proc\_uptime.lua |
 | sysname | - | uname -r |  | collector/proc\_uptime.lua |
 
+### cgroups 表
+
+| 指标名     | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---       | --- | :---- | :---- | :--- |
+| type       | -  | subsys类型            |  | collector/proc\_cgroups.lua |
+| blkio      | 个 | blkio cgroup 数量     |  | collector/proc\_cgroups.lua |
+| freezer    | 个 | freezer cgroup数量    |  | collector/proc\_cgroups.lua |
+| devices    | 个 | devices cgroup数量    |  | collector/proc\_cgroups.lua |
+| hugetlb    | 个 | hugetlb cgroup数量    |  | collector/proc\_cgroups.lua |
+| pids       | 个 | blkio cgroup 数量     |  | collector/proc\_cgroups.lua |
+| rdma       | 个 | rdma cgroup数量       |  | collector/proc\_cgroups.lua |
+| net\_prio   | 个 | net_prio cgroup数量   |  | collector/proc\_cgroups.lua |
+| net\_cls    | 个 | net_cls cgroup数量    |  | collector/proc\_cgroups.lua |
+| cpu        | 个 | cpu cgroup 数量       |  | collector/proc\_cgroups.lua |
+| cpuacct    | 个 | cpuacct cgroup数量    |  | collector/proc\_cgroups.lua |
+| perf\_event | 个 | perf_event cgroup数量 |  | collector/proc\_cgroups.lua |
+| memory     | 个 | memory cgroup数量     |  | collector/proc\_cgroups.lua |
+
+### interrupts 表
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| cpu      | - | CPU ID       |  | collector/proc\_interrupts.lua |
+| 中断名称 | 次 | 中断触发次数 |  | collector/proc\_interrupts.lua |
+
+### mounts 表
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| fs     | - | sysfs       |  | collector/proc\_mounts.lua |
+| mount  | - | 挂载目录 |  | collector/proc\_mounts.lua |
+| f\_bsize  | - | Filesystem block size |  | collector/proc\_mounts.lua |
+| f\_blocks | - | Size of fs in f_frsize units |  | collector/proc\_mounts.lua |
+| f\_bfree  | - | Number of free blocks |  | collector/proc\_mounts.lua |
+| f\_bavail | - | Number of free blocks for unprivileged users |  | collector/proc\_mounts.lua |
+| f\_files  | - | Number of inodes |  | collector/proc\_mounts.lua |
+| f\_ffree  | - | Number of free inodes |  | collector/proc\_mounts.lua |
+| f\_favail | - | Number of free inodes for unprivileged users |  | collector/proc\_mounts.lua |
+
+### softirqs 表
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| cpu     | - | CPU ID       |  | collector/proc\_softirqs.lua |
+| HI       | 次 | HI软中断触发次数       |  | collector/proc\_softirqs.lua |
+| TIMER    | 次 | TIMER软中断触发次数    |  | collector/proc\_softirqs.lua |
+| NET\_TX   | 次 | NET\_TX软中断触发次数   |  | collector/proc\_softirqs.lua |
+| NET\_RX   | 次 | NET\_RX软中断触发次数   |  | collector/proc\_softirqs.lua |
+| BLOCK    | 次 | BLOCK软中断触发次数    |  | collector/proc\_softirqs.lua |
+| IRQ_POLL | 次 | IRQ\_POLL软中断触发次数 |  | collector/proc\_softirqs.lua |
+| TASKLET  | 次 | TASKLET软中断触发次数  |  | collector/proc\_softirqs.lua |
+| SCHED    | 次 | SCHED软中断触发次数    |  | collector/proc\_softirqs.lua |
+| HRTIMER  | 次 | HRTIMER软中断触发次数  |  | collector/proc\_softirqs.lua |
+| RCU      | 次 | RCU软中断触发次数      |  | collector/proc\_softirqs.lua |
+
+### self_statm 表
+统计监控进程的statm信息
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| size     | Page | total program size |  | collector/proc\_statm.lua |
+| resident | Page | resident set size |  | collector/proc\_statm.lua |
+| shared   | Page | number of resident shared pages |  | collector/proc\_statm.lua |
+| text     | Page | text (code) |  | collector/proc\_statm.lua |
+| lib      | Page | library |  | collector/proc\_statm.lua |
+| data     | Page | data + stack |  | collector/proc\_statm.lua |
+| dt       | Page | dirty pages |  | collector/proc\_statm.lua |
+
 ## 网络指标
 
 -----------
@@ -105,71 +173,3 @@ This parser parses the stats from network devices. These stats includes events p
 | received\_rps | 个 | cpu，对应CPU号 | number of times cpu woken up received_rps. | collector/proc\_softnet\_stat.lua |
 | time\_squeeze | 个 | cpu，对应CPU号 | net\_rx\_action. | collector/proc\_softnet\_stat.lua |
 | flow\_limit\_count | 个 | cpu，对应CPU号 | number of times reached flow limit count. | collector/proc\_softnet\_stat.lua |
-
-### cgroups 表
-
-| 指标名     | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---       | --- | :---- | :---- | :--- |
-| type       | -  | subsys类型            |  | collector/proc\_cgroups.lua |
-| blkio      | 个 | blkio cgroup 数量     |  | collector/proc\_cgroups.lua |
-| freezer    | 个 | freezer cgroup数量    |  | collector/proc\_cgroups.lua |
-| devices    | 个 | devices cgroup数量    |  | collector/proc\_cgroups.lua |
-| hugetlb    | 个 | hugetlb cgroup数量    |  | collector/proc\_cgroups.lua |
-| pids       | 个 | blkio cgroup 数量     |  | collector/proc\_cgroups.lua |
-| rdma       | 个 | rdma cgroup数量       |  | collector/proc\_cgroups.lua |
-| net\_prio   | 个 | net_prio cgroup数量   |  | collector/proc\_cgroups.lua |
-| net\_cls    | 个 | net_cls cgroup数量    |  | collector/proc\_cgroups.lua |
-| cpu        | 个 | cpu cgroup 数量       |  | collector/proc\_cgroups.lua |
-| cpuacct    | 个 | cpuacct cgroup数量    |  | collector/proc\_cgroups.lua |
-| perf\_event | 个 | perf_event cgroup数量 |  | collector/proc\_cgroups.lua |
-| memory     | 个 | memory cgroup数量     |  | collector/proc\_cgroups.lua |
-
-### interrupts 表
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| cpu      | - | CPU ID       |  | collector/proc\_interrupts.lua |
-| 中断名称 | 次 | 中断触发次数 |  | collector/proc\_interrupts.lua |
-
-### mounts 表
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| fs     | - | sysfs       |  | collector/proc\_mounts.lua |
-| mount  | - | 挂载目录 |  | collector/proc\_mounts.lua |
-| f\_bsize  | - | Filesystem block size |  | collector/proc\_mounts.lua |
-| f\_blocks | - | Size of fs in f_frsize units |  | collector/proc\_mounts.lua |
-| f\_bfree  | - | Number of free blocks |  | collector/proc\_mounts.lua |
-| f\_bavail | - | Number of free blocks for unprivileged users |  | collector/proc\_mounts.lua |
-| f\_files  | - | Number of inodes |  | collector/proc\_mounts.lua |
-| f\_ffree  | - | Number of free inodes |  | collector/proc\_mounts.lua |
-| f\_favail | - | Number of free inodes for unprivileged users |  | collector/proc\_mounts.lua |
-
-### softirqs 表
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| cpu     | - | CPU ID       |  | collector/proc\_softirqs.lua |
-| HI       | 次 | HI软中断触发次数       |  | collector/proc\_softirqs.lua |
-| TIMER    | 次 | TIMER软中断触发次数    |  | collector/proc\_softirqs.lua |
-| NET\_TX   | 次 | NET\_TX软中断触发次数   |  | collector/proc\_softirqs.lua |
-| NET\_RX   | 次 | NET\_RX软中断触发次数   |  | collector/proc\_softirqs.lua |
-| BLOCK    | 次 | BLOCK软中断触发次数    |  | collector/proc\_softirqs.lua |
-| IRQ_POLL | 次 | IRQ\_POLL软中断触发次数 |  | collector/proc\_softirqs.lua |
-| TASKLET  | 次 | TASKLET软中断触发次数  |  | collector/proc\_softirqs.lua |
-| SCHED    | 次 | SCHED软中断触发次数    |  | collector/proc\_softirqs.lua |
-| HRTIMER  | 次 | HRTIMER软中断触发次数  |  | collector/proc\_softirqs.lua |
-| RCU      | 次 | RCU软中断触发次数      |  | collector/proc\_softirqs.lua |
-
-### self_statm 表
-统计监控进程的statm信息
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| size     | - | total program size |  | collector/proc\_statm.lua |
-| resident | - | resident set size |  | collector/proc\_statm.lua |
-| shared   | - | number of resident shared pages |  | collector/proc\_statm.lua |
-| text     | - | text (code) |  | collector/proc\_statm.lua |
-| lib      | - | library |  | collector/proc\_statm.lua |
-| data     | - | data + stack |  | collector/proc\_statm.lua |
-| dt       | - | dirty pages |  | collector/proc\_statm.lua |
