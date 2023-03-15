@@ -6,17 +6,14 @@
 
 require("common.class")
 local CkvProc = require("collector.kvProc")
-local root = "sys/fs/cgroup/cpuacct/"
-local child = "system.slice/" --pass to me
-local dfile = "cpuacct.proc_stat"
+local root = "sys/fs/cgroup/cpuacct"
+local dfile = "/cpuacct.proc_stat"
 
 local cgCpuacctProcStat = class("cg_cpuacct_proc_stat", CkvProc)
 
-function cgCpuacctProcStat:_init_(proto, pffi, mnt, pFile)
-    CkvProc._init_(self, proto, pffi, mnt,pFile or root..child..dfile,"cpuacct_proc_stat")
-    self._protoTable.ls = {{name = "cg", index = child}}
-    --self._protoTable.ls = child
-    --print(system.dump(self._protoTable))
+function cgCpuacctProcStat:_init_(proto, pffi, mnt, path, ls)
+    CkvProc._init_(self, proto, pffi, mnt,root .. path .. dfile,"cg_cpuacct_proc_stat")
+    self._protoTable.ls = ls
 end
 
 return cgCpuacctProcStat

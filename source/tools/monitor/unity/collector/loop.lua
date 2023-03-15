@@ -8,6 +8,7 @@ require("common.class")
 local CprotoData = require("common.protoData")
 local procffi = require("collector.native.procffi")
 local Cplugin = require("collector.plugin")
+local CpodsApi = require("collector.container.podsApi")
 local system = require("common.system")
 
 local Cloop = class("loop")
@@ -17,6 +18,7 @@ function Cloop:_init_(que, proto_q, fYaml)
     self._proto = CprotoData.new(que)
     self:loadLuaPlugin(res, res.config.proc_path)
     self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
+    self._pods = CpodsApi.new(res, self._proto, procffi, res.config.proc_path)
 end
 
 function Cloop:loadLuaPlugin(res, proc_path)
@@ -38,6 +40,7 @@ function Cloop:work(t)
         obj:proc(t, lines)
     end
     self._plugin:proc(t, lines)
+    self._pods:proc(t, lines)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 end
