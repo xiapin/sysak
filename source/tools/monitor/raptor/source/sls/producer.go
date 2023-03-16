@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	sls "github.com/aliyun/aliyun-log-go-sdk"
 	"github.com/aliyun/aliyun-log-go-sdk/producer"
 )
 
@@ -60,6 +61,11 @@ func (p *SLSProducer) Send(text map[string]string) error {
 	//fmt.Printf("endpoint:%s, id:%s, secret:%s, text:%v\n", p.Config.Endpoint, p.Config.AccessKeyID, p.Config.AccessKeySecret, text)
 	log := producer.GenerateLog(uint32(time.Now().Unix()), text)
 	err := p.Instance.SendLog(p.Project, p.Logstore, "topic", "127.0.0.1", log)
+	return err
+}
+
+func (p *SLSProducer) SendRawLogWithCallBack(log *sls.Log) error {
+	err := p.Instance.SendLogWithCallBack(p.Project, p.Logstore, "topic", "127.0.0.1", log, p.CallBack)
 	return err
 }
 

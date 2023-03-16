@@ -33,3 +33,7 @@ func (cmd *Cmd) ProfileCmd() {
 func (cmd *Cmd) NginxCmd() {
 	nginx.NginxCmdInit(cmd.cfg, cmd.rootCmd)
 }
+
+func (cmd *Cmd) NetTraceCmd() {
+
+}

@@ -1,18 +1,18 @@
 package ebpf
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 
 	"github.com/chentao-kernel/cloud_ebpf/profile/spy"
 )
 
 type EbpfSpy struct {
-	mutex  sync.Mutex
-	reset  bool
-	stop   bool
+	mutex    sync.Mutex
+	reset    bool
+	stop     bool
 	stopdata bool
-	stopCh chan struct{}
+	stopCh   chan struct{}
 
 	// session中包含ebpf的信息
 	session *Session

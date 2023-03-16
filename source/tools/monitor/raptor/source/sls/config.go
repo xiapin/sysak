@@ -5,9 +5,10 @@ import (
 )
 
 const (
-	SLSPRODUCER string = "producer"
-	SLSCONSUMER string = "consumer"
-	SLSUNUSER   string = "unuser"
+	SLSPRODUCER   string = "producer"
+	SLSPRODUCERAW string = "produceraw"
+	SLSCONSUMER   string = "consumer"
+	SLSUNUSER     string = "unuser"
 )
 
 func SLSInit(slsType string, endpoint string, akid string, akse string,
@@ -17,9 +18,8 @@ func SLSInit(slsType string, endpoint string, akid string, akse string,
 		fmt.Printf("===========SLS CONSUMER START=========\n")
 		c := NewSLSConsumer(endpoint, akid, akse, project, logstore)
 		c.Init()
-		return fmt.Errorf("consumer")
-	} else if slsType == SLSPRODUCER {
-		fmt.Printf("===========SLS PRODUCER START=========\n")
+	} else if slsType == SLSPRODUCER || slsType == SLSPRODUCERAW {
+		fmt.Printf("===========SLS PRODUCER START, TYPE:%s=========\n", slsType)
 		SlsProducer = NewSLSProducer(endpoint, akid, akse, project, logstore)
 		SlsProducer.Init()
 	} else if slsType == SLSUNUSER {

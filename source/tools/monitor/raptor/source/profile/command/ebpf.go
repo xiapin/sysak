@@ -187,16 +187,19 @@ func RunOFFCPU(cfg *config.CPU) error {
 		return err
 	}
 	logger := NewLogger(cfg.LogLevel, false /*cfg.NoLogging*/)
-	var isSlsUpload bool
+	var slsUploadType int
 	if cfg.SLS == sls.SLSPRODUCER {
-		isSlsUpload = true
+		slsUploadType = 2
+	} else if cfg.SLS == sls.SLSPRODUCERAW {
+		slsUploadType = 1
 	}
+
 	rc := remote.RemoteConfig{
 		AuthToken:              "", //cfg.AuthToken,
 		UpstreamThreads:        cfg.UploadThreads,
 		UpstreamAddress:        cfg.Server,
 		UpstreamRequestTimeout: cfg.UploadTimeout,
-		SlsUpload:              isSlsUpload,
+		SlsUploadType:          slsUploadType,
 	}
 	up, err := remote.New(rc, logger)
 	if err != nil {
@@ -309,16 +312,18 @@ func RunONCPU(cfg *config.CPU) error {
 
 	logger := NewLogger(cfg.LogLevel, false /*cfg.NoLogging*/)
 
-	var isSlsUpload bool
+	var slsUploadType int
 	if cfg.SLS == sls.SLSPRODUCER {
-		isSlsUpload = true
+		slsUploadType = 2
+	} else if cfg.SLS == sls.SLSPRODUCERAW {
+		slsUploadType = 1
 	}
 	rc := remote.RemoteConfig{
 		AuthToken:              "", //cfg.AuthToken,
 		UpstreamThreads:        cfg.UploadThreads,
 		UpstreamAddress:        cfg.Server,
 		UpstreamRequestTimeout: cfg.UploadTimeout,
-		SlsUpload:              isSlsUpload,
+		SlsUploadType:          slsUploadType,
 	}
 	var up upstream.Upstream
 	if cfg.Server == "local" {
@@ -451,17 +456,19 @@ func RunPingSlow(cfg *config.NET) error {
 		return err
 	}
 	logger := NewLogger(cfg.LogLevel, false /*cfg.NoLogging*/)
-
-	var isSlsUpload bool
+	var slsUploadType int
 	if cfg.SLS == sls.SLSPRODUCER {
-		isSlsUpload = true
+		slsUploadType = 2
+	} else if cfg.SLS == sls.SLSPRODUCERAW {
+		slsUploadType = 1
 	}
+
 	rc := remote.RemoteConfig{
 		AuthToken:              "", //cfg.AuthToken,
 		UpstreamThreads:        cfg.UploadThreads,
 		UpstreamAddress:        cfg.Server,
 		UpstreamRequestTimeout: cfg.UploadTimeout,
-		SlsUpload:              isSlsUpload,
+		SlsUploadType:          slsUploadType,
 	}
 	up, err := remote.New(rc, logger)
 	if err != nil {
@@ -563,16 +570,19 @@ func RunUserSlow(cfg *config.NET) error {
 		return err
 	}
 	logger := NewLogger(cfg.LogLevel, false /*cfg.NoLogging*/)
-	var isSlsUpload bool
+
+	var slsUploadType int
 	if cfg.SLS == sls.SLSPRODUCER {
-		isSlsUpload = true
+		slsUploadType = 2
+	} else if cfg.SLS == sls.SLSPRODUCERAW {
+		slsUploadType = 1
 	}
 	rc := remote.RemoteConfig{
 		AuthToken:              "", //cfg.AuthToken,
 		UpstreamThreads:        cfg.UploadThreads,
 		UpstreamAddress:        cfg.Server,
 		UpstreamRequestTimeout: cfg.UploadTimeout,
-		SlsUpload:              isSlsUpload,
+		SlsUploadType:          slsUploadType,
 	}
 	up, err := remote.New(rc, logger)
 	if err != nil {

@@ -33,6 +33,7 @@ type Remote struct {
 
 	done chan struct{}
 	wg   sync.WaitGroup
+	Eder sls.Encoder
 }
 
 type RemoteConfig struct {
@@ -40,7 +41,7 @@ type RemoteConfig struct {
 	UpstreamThreads        int
 	UpstreamAddress        string
 	UpstreamRequestTimeout time.Duration
-	SlsUpload              bool
+	SlsUploadType          int // 0:origial 1:rawsls 2:sls
 }
 
 func New(cfg RemoteConfig, logger log.Logger) (*Remote, error) {
@@ -103,6 +104,16 @@ func (r *Remote) DumpMetaData() {
 // UploadSync is only used in benchmarks right now
 func (r *Remote) UploadSync(job *upstream.UploadJob) error {
 	return r.uploadProfile(job)
+}
+
+func (r *Remote) uploadRawProfileSLS(j *upstream.UploadJob) error {
+
+	r.Logger.Debugf("uploading sls rawprofile")
+	r.Eder.Encode(j, map[string]string{"cluster": "no", "__name__": j.Name})
+	if err := sls.SlsProducer.SendRawLogWithCallBack(r.Eder.Logs); err != nil {
+		return fmt.Errorf("sls send failed:%v", err)
+	}
+	return nil
 }
 
 func (r *Remote) uploadProfileSLS(j *upstream.UploadJob) error {
@@ -209,10 +220,13 @@ func (r *Remote) safeUpload(job *upstream.UploadJob) {
 			r.Logger.Errorf("recover stack: %v", debug.Stack())
 		}
 	}()
-	if r.cfg.SlsUpload {
+	if r.cfg.SlsUploadType == 1 {
+		if err := r.uploadRawProfileSLS(job); err != nil {
+			r.Logger.Errorf("upload profile: %v", err)
+		}
+	} else if r.cfg.SlsUploadType == 2 {
 		if err := r.uploadProfileSLS(job); err != nil {
 			r.Logger.Errorf("upload profile: %v", err)
-			fmt.Printf("upload profile failed:%v", err)
 		}
 	} else {
 		// update the profile data to server

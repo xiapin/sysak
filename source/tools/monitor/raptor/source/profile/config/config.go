@@ -37,7 +37,7 @@ type CPU struct {
 	SymbolCacheSize int    `def:"256" desc:"max size of symbols cache" mapstructure:"symbol-cache-size"`
 	Usage           int    `def:"-1" desc:"Cpu usage trigger to start the profiling" mapstructure:"usage"`
 	Timer           int    `def:"-1" desc:"Timer(min) trigger to start the profiling, minimum timer every 5 minutes" mapstructure:"timer"`
-	SLS             string `def:"unuser" desc:"producer/consumer data to/from SLS" mapstructure:"sls"`
+	SLS             string `def:"unuser" desc:"producer/procuderaw/consumer data to/from SLS" mapstructure:"sls"`
 	Endpoint        string `def:"endpoint" desc:"SLS Endpoint" mapstructure:"endpoint"`
 	AKID            string `def:"akid" desc:"SLS AccessKeyID" mapstructure:"akid"`
 	AKSE            string `def:"akse" desc:"SLS AccessKeySecret" mapstructure:"akse"`
