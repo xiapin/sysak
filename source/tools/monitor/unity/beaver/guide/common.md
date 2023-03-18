@@ -126,8 +126,8 @@ python 最擅长在于字符串处理。可以参考这里的[官方库说明](h
 
 使用 pystring 库是要注意以下事项：
 
-1. 当前unity\-mon 采用的是lua 自动的正则匹配方法，未集成regexp 标准正则库；
-2. pystring 中提供的绝大部分函数都与python的处理方法保持一致，但是不能保证百分百，故使用时建议根据实际用例测试一遍，可以参考[测试用例函数](https://gitee.com/anolis/sysak/blob/opensource_branch/source/tools/monitor/unity/test/string/py.lua)
+1. 当前unity\-mon 采用的是lua 自带的正则匹配方法，未集成regexp 标准正则库；
+2. pystring 中提供的绝大部分函数都与python的处理方法保持一致，但是不保证百分百兼容，故使用时建议根据实际用例测试一遍，可以参考[测试用例函数](https://gitee.com/anolis/sysak/blob/opensource_branch/source/tools/monitor/unity/test/string/py.lua)
 
 ### pystring:shift(s, n)
 
@@ -139,48 +139,69 @@ python 最擅长在于字符串处理。可以参考这里的[官方库说明](h
 ### pystring:islower(s)
 
 * 函数说明：判断字符串是否全部为小写字母
-* 传参 1：s 要判断的字符串
+* 参数1： s 目标字符串
+* 返回值：true/false
 
 ### pystring:isupper(s)
 
 * 函数说明：同python 实现
+* 参数1： s 目标字符串
+* 返回值：true/false
 
 ### pystring:ishex(s)
 
 * 函数说明：判断目标字符串是否为hex 字符串，含0-9,a-f,A-F
+* 参数1： s 目标字符串
+* 返回值：true/false
 
 ### pystring:isalnum(s)
 
 * 函数说明：同python 实现
+* 参数1： s 目标字符串
+* 返回值：true/false
 
 
 ### pystring:istilte(s)
 
 * 函数说明：判断单词是否符合首字母大写，其余字母小写的方式
+* 参数1： s 目标字符串
+* 返回值：true/false
 
 ### pystring:isfloat(s)
 
 * 函数说明：判断字符串是否为浮点数呈现形式
+* 参数1： s 目标字符串
+* 返回值：true/false
 
 ### pystring:lower(s)
 
 * 函数说明：同python 实现，转小写
+* 参数1： s 目标字符串
+* 返回值：处理后的字符串
 
 ### pystring:upper(s)
 
 * 函数说明：同python 实现，转大写
+* 参数1： s 目标字符串
+* 返回值：处理后的字符串
 
 ### pystring:swapcase(s)
 
 * 函数说明：同python 实现，交换大小写
+* 参数1： s 目标字符串
+* 返回值：处理后的字符串
 
 ### pystring:capitalize(s)
 
 * 函数说明：单词首字母大写
+* 参数1： s 目标字符串
+* 返回值：处理后的字符串
 
 ### pystring:title(s)
 
 * 函数说明：字符串中所有单词首字母大写
+* 参数1： s 目标字符串
+* 返回值：处理后的字符串
 
 ### pystring:ljust(s, len, ch)
 
@@ -206,4 +227,27 @@ python 最擅长在于字符串处理。可以参考这里的[官方库说明](h
 * 参数2：len 对齐长度
 * 参数3：ch 填充字符，默认为空格，必须是单字符，否则会抛异常
 * 返回值：对齐后的字符串
+
+### pystring:zfill(s, len)
+
+* 函数说明：将字符串s 按照 len 长度向左填0
+* 参数1： s 目标字符串
+* 参数2：len 对齐长度
+* 返回值：填齐后的字符串
+
+### pystring:split(s, delimiter, n)
+
+* 函数说明：将字符串s 按照 delimiter 分隔符进行分割
+* 参数1： s 目标字符串
+* 参数2：delimiter 分隔符，如果为空，则按照 多空格模式进行分割
+* 参数3：n 分割次数，默认为最多次数
+* 返回值：分割后的字符串数组
+
+### pystring:split(s, delimiter, n)
+
+* 函数说明：将字符串s 按照 delimiter 分隔符进行分割
+* 参数1： s 目标字符串
+* 参数2：delimiter 分隔符，如果为空，则按照 多空格模式进行分割
+* 参数3：n 分割次数，默认为最多次数
+* 返回值：分割后的字符串数组
 
