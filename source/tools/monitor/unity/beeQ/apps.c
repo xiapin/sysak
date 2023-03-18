@@ -11,6 +11,7 @@
 #include "apps.h"
 #include "clock/ee_clock.h"
 #include <sys/syscall.h>
+#include <sys/prctl.h>
 
 #define gettidv1() syscall(__NR_gettid)
 extern char *g_yaml_file;
@@ -127,9 +128,11 @@ static lua_State * app_recv_init(void)  {
     return NULL;
 }
 
+// 这是接收队列初始化动作
 int app_recv_setup(struct beeQ* q) {
     lua_State *L;
 
+    prctl(PR_SET_NAME, (unsigned long)"app_recv");
     L = app_recv_init();
     if (L == NULL) {
         return -1;
@@ -232,10 +235,13 @@ int collector_qout(lua_State *L) {
     return 1;   // return a value.
 }
 
+// 这是 collector 初始化操作
 static int app_collector_work(void* q, void* proto_q) {
     int ret;
     int err_func;
     lua_Number lret;
+
+    prctl(PR_SET_NAME, (unsigned long)"app_collector");
 
     /* create a state and load standard library. */
     lua_State *L = luaL_newstate();
