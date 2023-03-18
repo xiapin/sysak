@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#define TIME_SECOND_UNIT 1000000UL
+#define TIME_SECOND_UNIT 100000UL
 
 static ee_clock_t clk_coef = 0;
 
@@ -28,9 +28,9 @@ int calibrate_local_clock(){
     ee_clock_t res;
 
     t1 = get_cycles();
-    sleep(1);
+    usleep(TIME_SECOND_UNIT);
     t2 = get_cycles();
-    sleep(1);
+    usleep(TIME_SECOND_UNIT);
     t3 = get_cycles();
 
     delta1 = t2 - t1;
