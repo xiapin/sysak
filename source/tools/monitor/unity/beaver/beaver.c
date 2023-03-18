@@ -11,6 +11,8 @@
 #include <lauxlib.h>
 #include <lualib.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <sys/prctl.h>
 
 extern int lua_reg_errFunc(lua_State *L);
 extern int lua_check_ret(int ret);
