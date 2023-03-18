@@ -243,11 +243,123 @@ python 最擅长在于字符串处理。可以参考这里的[官方库说明](h
 * 参数3：n 分割次数，默认为最多次数
 * 返回值：分割后的字符串数组
 
-### pystring:split(s, delimiter, n)
+### pystring:rsplit(s, delimiter, n)
 
-* 函数说明：将字符串s 按照 delimiter 分隔符进行分割
+* 函数说明：将字符串s 按照 delimiter 分隔符从右边进行分割
 * 参数1： s 目标字符串
 * 参数2：delimiter 分隔符，如果为空，则按照 多空格模式进行分割
 * 参数3：n 分割次数，默认为最多次数
 * 返回值：分割后的字符串数组
 
+
+### pystring:partition(s, del)
+
+* 函数说明：将字符串s 按照 del 分隔符进行一次分割，返回 [head, del, tail] list
+* 参数1： s 目标字符串
+* 参数2：del 分隔符，如果为空，则按照 多空格模式进行分割
+* 返回值：分割后的字符串数组
+
+### pystring:rpartition(s, del)
+
+* 函数说明：将字符串s 按照 del 分隔符从右侧进行一次分割，返回 [head, del, tail] list
+* 参数1： s 目标字符串
+* 参数2：del 分隔符，如果为空，则按照 多空格模式进行分割
+* 返回值：分割后的字符串数组
+
+### pystring:splitlines(s)
+
+* 函数说明：将字符串s 按照换行符进行分割
+* 参数1： s 目标字符串
+* 返回值：分割后的字符串数组
+
+### pystring:lstrip(s, chars)
+
+* 函数说明：strip 左边的字符
+* 参数1： s 目标字符串
+* 参数2：chars 要strip 字符串
+* 返回值：strip 后面的字符串
+
+### pystring:rstrip(s, chars)
+
+* 函数说明：strip 右边的字符
+* 参数1： s 目标字符串
+* 参数2：chars 要strip 字符串
+* 返回值：strip 后面的字符串
+
+### pystring:strip(s, chars)
+
+* 函数说明：strip 两边的字符
+* 参数1： s 目标字符串
+* 参数2：chars 要strip 字符串
+* 返回值：strip 后面的字符串
+
+### pystring:join(delim, strings)
+
+* 函数说明：将字符串list拼接成单一字符串
+* 参数1： delim 字符串间的分隔符号
+* 参数2：strings 要拼接的字符串list
+* 返回值：拼接后的字符串
+
+### pystring:startswith(s1, s2)
+* 函数说明：判断字符串s1是否以s2 开头
+* 参数1： s1 目标字符串
+* 参数2：s2 
+* 返回值：true/false
+
+### pystring:endswith(s1, s2)
+* 函数说明：判断字符串s1是否以s2 结尾
+* 参数1： s1 目标字符串
+* 参数2：s2 
+* 返回值：true/false
+
+### pystring:find(s1, s2, start, stop)
+* 函数说明：判断s1 是否包含s2 子串
+* 参数1： s1 目标字符串
+* 参数2：s2 目标子串
+* 参数3： 字符串起点 默认为1
+* 参数4：字符串截止点 默认为-1
+* 返回值：如果包含s2，返回字符下标，不包含返回-1
+
+### pystring:rfind(s1, s2, start, stop)
+* 函数说明：从右边开始,判断s1 是否包含s2 子串
+* 参数1： s1 目标字符串
+* 参数2：s2 目标子串
+* 参数3： 字符串起点 默认为1
+* 参数4：字符串截止点 默认为-1
+* 返回值：如果包含s2，返回字符下标，不包含返回-1
+
+### pystring:index(s1, s2, start, stop)
+* 函数说明：判断s1 是否包含s2 子串
+* 参数1： s1 目标字符串
+* 参数2：s2 目标子串
+* 参数3： 字符串起点 默认为1
+* 参数4：字符串截止点 默认为-1
+* 返回值：如果包含s2，返回字符下标，不包含则抛出异常
+
+### pystring:rindex(s1, s2, start, stop)
+* 函数说明：从右边开始,判断s1 是否包含s2 子串
+* 参数1： s1 目标字符串
+* 参数2：s2 目标子串
+* 参数3： 字符串起点 默认为1
+* 参数4：字符串截止点 默认为-1
+* 返回值：如果包含s2，返回字符下标，不包含则抛出异常
+
+### pystring:count(s, find)
+* 函数说明：获取目标字符串中 子串数量
+* 参数1： s 目标字符串
+* 参数2：find 要查找的子串
+* 返回值：查找到的子串数量
+
+### pystring:replace(s, find, repl, n)
+* 函数说明：替换字符串中的子串数据
+* 参数1： s 目标字符串
+* 参数2：find 要查找的子串
+* 参数3：repl 要替换的结果
+* 参数4：替换数量，默认为不限
+* 返回值：替换结果
+
+### pystring:expandtabs(s, tabs)
+* 函数说明：将字符串中tabs 替换成空格
+* 参数1： s 目标字符串
+* 参数2：tabs 占空格数量，默认为4
+* 返回值：替换结果

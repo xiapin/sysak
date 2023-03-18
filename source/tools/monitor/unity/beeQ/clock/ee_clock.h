@@ -6,4 +6,9 @@
 #ifndef UNITY_EE_CLOCK_H
 #define UNITY_EE_CLOCK_H
 
+typedef unsigned long ee_clock_t;
+
+int calibrate_local_clock();
+ee_clock_t get_local_clock();
+
 #endif //UNITY_EE_CLOCK_H

@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "beeQ.h"
 #include "apps.h"
+#include "clock/ee_clock.h"
 #include <sys/syscall.h>
 
 #define gettidv1() syscall(__NR_gettid)
@@ -205,6 +206,12 @@ int app_recv_proc(void* msg, struct beeQ* q) {
     return ret;
 }
 
+static int lua_local_clock(lua_State *L) {
+    clock_t t = get_local_clock();
+    lua_pushnumber(L, t);
+    return 1;
+}
+
 int collector_qout(lua_State *L) {
     int ret;
     struct beeQ* q = (struct beeQ*) lua_topointer(L, 1);
@@ -245,6 +252,7 @@ static int app_collector_work(void* q, void* proto_q) {
     }
 
     lua_register(L, "collector_qout", collector_qout);
+    lua_register(L, "lua_local_clock", lua_local_clock);
 
     // call init.
     lua_getglobal(L, "work");
@@ -280,6 +288,7 @@ static int app_collector_work(void* q, void* proto_q) {
     endNew:
     return -1;
 }
+
 
 int app_collector_run(struct beeQ* q, void* arg) {
     int ret = 0;

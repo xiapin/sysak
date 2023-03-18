@@ -124,6 +124,9 @@ function work(que, proto_q, yaml)
     local w = Cloop.new(que, proto_q, fYaml)
     local unit = setupFreq(fYaml)
     local tStart = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
+
+    print("clock " .. lua_local_clock())
+
     while true do
         w:work(unit)
         local now = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
