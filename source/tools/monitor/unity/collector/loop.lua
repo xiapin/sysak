@@ -9,12 +9,15 @@ local CprotoData = require("common.protoData")
 local procffi = require("collector.native.procffi")
 local Cplugin = require("collector.plugin")
 local system = require("common.system")
+local calcJiffies = require("collector.calcJiffies")
 
 local Cloop = class("loop")
 
 function Cloop:_init_(que, proto_q, fYaml)
     local res = system:parseYaml(fYaml)
     self._proto = CprotoData.new(que)
+
+    self._jiffies = calcJiffies.calc(res.config.proc_path, procffi)
     self:loadLuaPlugin(res, res.config.proc_path)
     self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
 end
@@ -24,18 +27,24 @@ function Cloop:loadLuaPlugin(res, proc_path)
 
     self._procs = {}
     if res.luaPlugins then
-        for i, plugin in ipairs(luas) do
+        for _, plugin in ipairs(luas) do
             local CProcs = require("collector." .. plugin)
-            self._procs[i] = CProcs.new(self._proto, procffi, proc_path)
+            self._procs[plugin] = CProcs.new(self._proto, procffi, proc_path)
         end
     end
-    print("add " .. #self._procs .. " lua plugin.")
+    print("add " .. system:keyCount(self._procs) .. " lua plugin.")
 end
+
 
 function Cloop:work(t)
     local lines = self._proto:protoTable()
+    local del = {}
+    local tLast = lua_local_clock()
+    local tNow
+
     for _, obj in pairs(self._procs) do
         obj:proc(t, lines)
+        tNow = lua_local_clock()
     end
     self._plugin:proc(t, lines)
     local bytes = self._proto:encode(lines)

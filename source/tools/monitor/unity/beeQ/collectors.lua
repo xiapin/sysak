@@ -125,11 +125,6 @@ function work(que, proto_q, yaml)
     local unit = setupFreq(fYaml)
     local tStart = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
 
-    local t1 = lua_local_clock()
-    unistd.sleep(1)
-    local t2 = lua_local_clock()
-    print("clock " .. (t2 - t1))
-
     while true do
         w:work(unit)
         local now = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)

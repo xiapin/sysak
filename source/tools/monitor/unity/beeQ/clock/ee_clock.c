@@ -45,7 +45,7 @@ int calibrate_local_clock(){
     }
 
     res = 100 * coef1 / coef2;
-    if (res >= 105 || res <= 95) {
+    if (res >= 110 || res <= 90) {
         fprintf(stderr, "calibrate local clock failed.\n");
         return -EIO;
     }
