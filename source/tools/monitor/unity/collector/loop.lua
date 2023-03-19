@@ -10,6 +10,7 @@ local procffi = require("collector.native.procffi")
 local Cplugin = require("collector.plugin")
 local system = require("common.system")
 local calcJiffies = require("collector.calcJiffies")
+local CcollectorStat = require("collector.guard.collector_stat")
 
 local Cloop = class("loop")
 
@@ -19,6 +20,7 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self._proto = CprotoData.new(que)
     self._tid = tid
     self._jiffies = calcJiffies.calc(res.config.proc_path, procffi)
+    self._collectorStat = CcollectorStat.new(tid)
     print(string.format("setup jiffies %f, for tid: %d", self._jiffies, self._tid))
 
     self:loadLuaPlugin(res, res.config.proc_path)
@@ -45,6 +47,7 @@ function Cloop:work(t)
     local tLast = lua_local_clock()
     local tNow
 
+    print(self._collectorStat:jiffies())
     for _, obj in pairs(self._procs) do
         obj:proc(t, lines)
         tNow = lua_local_clock()

@@ -5,7 +5,24 @@
 ---
 
 require("common.class")
+local pystring = require("common.pystring")
+-- refer to https://blog.csdn.net/longyuelang/article/details/114025476
 
 local CcollectorStat = class("CcollectorStat")
+
+function CcollectorStat:_init_(tid)
+    self._path = string.format("/proc/self/task/%d/stat", tid)
+end
+
+function CcollectorStat:jiffies()
+    local s
+    for line in io.lines(self._path) do
+        s = line
+    end
+    local ss = pystring:rsplit(s, ") ", 1)
+    local rest = ss[2]
+    local vs = pystring:split(rest, " ", 14)
+    return tonumber(vs[12]) + tonumber(vs[13])
+end
 
 return CcollectorStat
