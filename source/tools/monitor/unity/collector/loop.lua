@@ -13,11 +13,14 @@ local calcJiffies = require("collector.calcJiffies")
 
 local Cloop = class("loop")
 
-function Cloop:_init_(que, proto_q, fYaml)
+function Cloop:_init_(que, proto_q, fYaml, tid)
     local res = system:parseYaml(fYaml)
-    self._proto = CprotoData.new(que)
 
+    self._proto = CprotoData.new(que)
+    self._tid = tid
     self._jiffies = calcJiffies.calc(res.config.proc_path, procffi)
+    print(string.format("setup jiffies %f, for tid: %d", self._jiffies, self._tid))
+
     self:loadLuaPlugin(res, res.config.proc_path)
     self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
 end

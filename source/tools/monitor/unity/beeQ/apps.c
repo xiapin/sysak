@@ -265,7 +265,8 @@ static int app_collector_work(void* q, void* proto_q) {
     lua_pushlightuserdata(L, q);
     lua_pushlightuserdata(L, proto_q);
     lua_pushstring(L, g_yaml_file);
-    ret = lua_pcall(L, 3, 1, err_func);
+    lua_pushinteger(L, (int)gettidv1());
+    ret = lua_pcall(L, 4, 1, err_func);
     if (ret < 0) {
         lua_check_ret(ret);
         goto endCall;

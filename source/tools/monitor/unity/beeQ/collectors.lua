@@ -117,11 +117,11 @@ local function calcSleep(hope, now)
     end
 end
 
-function work(que, proto_q, yaml)
+function work(que, proto_q, yaml, tid)
     local fYaml = yaml or "../collector/plugin.yaml"
     checkSos()
     local Cloop = require("collector.loop")
-    local w = Cloop.new(que, proto_q, fYaml)
+    local w = Cloop.new(que, proto_q, fYaml, tid)
     local unit = setupFreq(fYaml)
     local tStart = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
 
