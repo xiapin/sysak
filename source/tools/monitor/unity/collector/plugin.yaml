@@ -68,7 +68,7 @@ plugins:
     so: gpuinfo
     description: "collect gpuinfo"
   -
-    so: pmu_cpi
+    so: pmu_events
     description: "collect cpi"
 
 metrics:
@@ -224,10 +224,10 @@ metrics:
     #head: value
     #help: "get pod alloc page used"
     #type: "gauge"
-  - title: sysak_pmu_cpi
-    from: pmu cpi
+  - title: sysak_pmu_events
+    from: pmu_events
     head: value
-    help: "pmu info of cycles/instructions."
+    help: "pmu events, such as  cycles/instructions, llc events"
     type: "gauge"
   - title: sysak_cg_memfail_cnt
     from: cg_memfail_cnt
