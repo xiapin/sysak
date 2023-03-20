@@ -67,9 +67,9 @@ plugins:
   -
     so: gpuinfo
     description: "collect gpuinfo"
-  -
-    so: pmu_events
-    description: "collect cpi"
+  #-
+  #  so: pmu_events
+  #  description: "collect pmu events"
 
 metrics:
   -
