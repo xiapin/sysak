@@ -18,7 +18,7 @@ local function setupServer(fYaml)
     local ip = config["bind_addr"] or "0.0.0.0"
     local backlog = config["backlog"] or 32
     local unix_socket = config["unix_socket"]
-    return port, ip, backlog,unix_socket
+    return port, ip, backlog, unix_socket
 end
 
 function CLocalBeaver:_init_(frame, fYaml)

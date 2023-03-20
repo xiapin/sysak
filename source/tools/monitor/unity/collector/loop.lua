@@ -9,8 +9,7 @@ local CprotoData = require("common.protoData")
 local procffi = require("collector.native.procffi")
 local Cplugin = require("collector.plugin")
 local system = require("common.system")
-local calcJiffies = require("collector.calcJiffies")
-local CcollectorStat = require("collector.guard.collector_stat")
+local CguradSched = require("collector.guard.guardSched")
 
 local Cloop = class("loop")
 
@@ -19,11 +18,9 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
 
     self._proto = CprotoData.new(que)
     self._tid = tid
-    self._jiffies = calcJiffies.calc(res.config.proc_path, procffi)
-    self._collectorStat = CcollectorStat.new(tid)
-    print(string.format("setup jiffies %f, for tid: %d", self._jiffies, self._tid))
-
     self:loadLuaPlugin(res, res.config.proc_path)
+
+    self._guardSched = CguradSched.new(tid, res.config.proc_path, procffi, self._procs, self._names)
     self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
 end
 
@@ -31,10 +28,14 @@ function Cloop:loadLuaPlugin(res, proc_path)
     local luas = res.luaPlugins
 
     self._procs = {}
+    self._names = {}
     if res.luaPlugins then
+        local c = 1
         for _, plugin in ipairs(luas) do
             local CProcs = require("collector." .. plugin)
-            self._procs[plugin] = CProcs.new(self._proto, procffi, proc_path)
+            self._procs[c] = CProcs.new(self._proto, procffi, proc_path)
+            self._names[c] = plugin
+            c = c + 1
         end
     end
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
@@ -43,15 +44,9 @@ end
 
 function Cloop:work(t)
     local lines = self._proto:protoTable()
-    local del = {}
-    local tLast = lua_local_clock()
-    local tNow
 
-    print(self._collectorStat:jiffies())
-    for _, obj in pairs(self._procs) do
-        obj:proc(t, lines)
-        tNow = lua_local_clock()
-    end
+    self._guardSched:proc(t, lines)
+
     self._plugin:proc(t, lines)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)

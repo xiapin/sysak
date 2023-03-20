@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#define TIME_SECOND_UNIT 100000UL
+#define TIME_SECOND_UNIT 1000000UL  // 单位 微秒
 
 static ee_clock_t clk_coef = 0;
 
