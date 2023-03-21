@@ -15,10 +15,31 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include "../plugin_head.h"
-
 #define	NR_GROUP	3
 #define NR_EVENTS	6
 #define NR_CELL	2
+
+
+#ifdef DEBUG
+/* for test */
+__u32 hw_types[] = {
+	PERF_TYPE_SOFTWARE,
+	PERF_TYPE_SOFTWARE,
+	PERF_TYPE_SOFTWARE,
+	PERF_TYPE_SOFTWARE,
+	PERF_TYPE_SOFTWARE,
+	PERF_TYPE_SOFTWARE,
+};
+
+__u64 hw_configs[] = {
+	PERF_COUNT_SW_CPU_CLOCK,
+	PERF_COUNT_SW_CONTEXT_SWITCHES,
+	PERF_COUNT_SW_PAGE_FAULTS,
+	PERF_COUNT_SW_PAGE_FAULTS_MIN,
+	PERF_COUNT_SW_CPU_MIGRATIONS,
+	PERF_COUNT_SW_PAGE_FAULTS_MAJ,
+};
+#endif
 
 __u32 hw_types[] = {
 	PERF_TYPE_HARDWARE,
@@ -45,7 +66,6 @@ __u64 hw_configs[] = {
 	(PERF_COUNT_HW_CACHE_OP_WRITE		<<  8) |
 	(PERF_COUNT_HW_CACHE_RESULT_MISS	<< 16),
 };
-
 enum {
 	CYCLES,
 	INSTRUCTIONS,
@@ -66,6 +86,7 @@ struct pcpu_hw_info {
 	pid_t pid;
 	int cpu;
 	unsigned long flags;
+	double values[NR_EVENTS];
 	struct hw_info hwi[NR_EVENTS];
 };
 
