@@ -50,7 +50,15 @@ impl<'a> Icmp<'a> {
                 let ts = event.ts;
                 let cpu = event.cpu;
                 let pid = event.pid;
-                let comm = unsafe { String::from_utf8_unchecked(event.comm.to_vec()) };
+
+                let mut idx = 0;
+                for i in &event.comm {
+                    if *i == '\0' as u8 {
+                        break;
+                    }
+                    idx += 1;
+                }
+                let comm = unsafe { String::from_utf8_unchecked(event.comm[..idx].to_vec()) };
 
                 let mut ie = IcmpEvent::new(cpu, ty, ts);
                 ie.set_pid(pid);

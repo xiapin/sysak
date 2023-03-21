@@ -1,4 +1,5 @@
 # 字符串处理
+![pystring](image/python.png)
 
 同为脚本语言，lua 默认的字符串处理并不像python 那么完善。但只要通过拓展，也可以像python 一样对字符串进行处理。当前已经实现了split/strip 等高频使用函数。参考[Python字符串处理](https://www.jianshu.com/p/b758332c44bb) 
 
@@ -98,4 +99,4 @@ find 用于子串查找，成功返回首次开始的位置，如果不包含，
 assert(pystring:find("hello world.", "hello") == 1)
 ```
 
-[返回目录](/guide)
+[返回目录](/guide/guide.md)

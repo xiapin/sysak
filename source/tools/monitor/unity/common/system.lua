@@ -36,6 +36,10 @@ function system:dump(t)
     return serpent.block(t)
 end
 
+function system:dumps(t)
+    print(serpent.block(t))
+end
+
 function system:keyIsIn(tbl, key)
     if type(tbl) ~= "table" then
         return false
@@ -89,6 +93,20 @@ function system:dictCopy(tbl)
     return cp
 end
 
+function system:listMerge(...)
+    local res = {}
+    local i = 1
+    for _, vt in ipairs{...} do
+        if type(vt) == "table" then
+            for _, v in ipairs(vt) do
+                res[i] = v
+                i = i + 1
+            end
+        end
+    end
+    return res
+end
+
 function system:hex2ups(hex)
     return (string.gsub(hex, ".", function (c)
         return string.format("%02X", string.byte(c))
@@ -111,6 +129,29 @@ function system:hexdump(buf)
     end
 end
 
+local htmlRep  = {
+    ["<"] = function() return "&lt;" end,
+    [">"] = function() return "&gt;" end,
+    ["&"] = function() return "&amp;" end,
+    ['"'] = function() return "&quot;" end,
+    ["\t"] = function() return "&emsp;" end,
+}
+local function esc_html(s)
+    return htmlRep[s]()
+end
+function system:escHtml(s)
+    local reHtml = '[<>&"\t]'
+    return string.gsub(s, reHtml, function(s) return esc_html(s)  end)
+end
+
+local function esc_md(s)
+    return "\\" .. s
+end
+function system:escMd(s)
+    local reFmt = "[\\`%*_%{%}%[%]%(%)#%+%-%.!|]"
+    return string.gsub(s, reFmt, function(s) return esc_md(s)  end)
+end
+
 function system:timeRfc1123(t)
     t = t or os.time()
     return os.date("!%a, %d %b %Y %H:%M:%S GMT", t)
@@ -119,10 +160,18 @@ end
 function system:parseYaml(fYaml)
     local lyaml = require("lyaml")
     local f = io.open(fYaml,"r")
+    if not f then
+        error("file: " .. fYaml .. " is not exist.")
+    end
     local s = f:read("*all")
     f:close()
 
     return lyaml.load(s)
+end
+
+function system:posixError(msg, err, errno)
+    local s = msg .. string.format(": %s, errno: %d", err, errno)
+    error(s)
 end
 
 return system

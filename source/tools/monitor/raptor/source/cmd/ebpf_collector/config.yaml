@@ -1,0 +1,8 @@
+netobserv:
+  proto: [http,dns,redis,mysql]
+  pid: -1
+  port: -1
+  sample: -1
+filepath:
+  btf:
+  sofile:

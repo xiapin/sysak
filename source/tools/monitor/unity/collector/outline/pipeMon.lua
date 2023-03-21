@@ -35,11 +35,11 @@ end
 function CpipeMon:setupPipe(fYaml)
     local res = system:parseYaml(fYaml)
 
-    for _, path in ipairs(res.outline) do
+    for i, path in ipairs(res.outline) do
         if unistd.access(path) then
             unistd.unlink(path)
         end
-        table.insert(self._paths, path)
+        self._paths[i] = path
 
         socket.unix = require("socket.unix")
         local s = socket.unix.udp()
@@ -58,14 +58,20 @@ local function trans(title, ls, vs, log)
     local values = {}
     local logs = {}
 
+    local c = 0
     for k, v in pairs(ls) do
-        table.insert(labels, {name=k, index=v})
+        c = c + 1
+        labels[c] = {name=k, index=v}
     end
+    c = 0
     for k, v in pairs(vs) do
-        table.insert(values, {name=k, value=v})
+        c = c + 1
+        values[c] = {name=k, value=v}
     end
+    c = 0
     for k, v in pairs(log) do
-        table.insert(logs, {name=k, log=v})
+        c = c + 1
+        logs[c] = {name=k, log=v}
     end
     return {line = title, ls = labels, vs = values, log = logs}
 end

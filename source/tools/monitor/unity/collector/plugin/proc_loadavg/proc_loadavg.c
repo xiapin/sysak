@@ -4,6 +4,7 @@
 #include "proc_loadavg.h"
 
 #define LOADAVG_PATH	"/proc/loadavg"
+char *real_proc_path;
 
 struct stats_load {
 	unsigned long nr_running;
@@ -15,6 +16,14 @@ struct stats_load {
 
 int init(void * arg)
 {
+	int i, lenth;
+	char *mntpath = get_unity_proc();
+
+	lenth = strlen(mntpath)+strlen(LOADAVG_PATH);
+	real_proc_path = calloc(lenth+2, 1);
+	if (!real_proc_path)
+		return -errno;
+	snprintf(real_proc_path, lenth+1, "%s%s", mntpath, LOADAVG_PATH);
 	printf("proc_loadavg plugin install.\n");
 	return 0;
 }
@@ -28,7 +37,7 @@ int full_line(struct unity_line *uline)
 
 	fp = NULL;
 	errno = 0;
-	if ((fp = fopen(LOADAVG_PATH, "r")) == NULL) {
+	if ((fp = fopen(real_proc_path, "r")) == NULL) {
 		ret = errno;
 		printf("WARN: proc_loadavg install FAIL fopen\n");
 		return ret;
@@ -51,9 +60,9 @@ int full_line(struct unity_line *uline)
 		st_load.nr_running--;
 	}
 	//unity_set_index(uline1[cpu], 0, "load", cpu_name);
-	unity_set_value(uline, 0, "load1", st_load.load_avg_1*100);
-	unity_set_value(uline, 1, "load5", st_load.load_avg_5*100);
-	unity_set_value(uline, 2, "load15", st_load.load_avg_15*100);
+	unity_set_value(uline, 0, "load1", st_load.load_avg_1);
+	unity_set_value(uline, 1, "load5", st_load.load_avg_5);
+	unity_set_value(uline, 2, "load15", st_load.load_avg_15);
 	unity_set_value(uline, 3, "runq", st_load.nr_running);
 	unity_set_value(uline, 4, "plit", st_load.nr_threads);
 
@@ -74,5 +83,7 @@ int call(int t, struct unity_lines* lines) {
 
 void deinit(void)
 {
+	if (real_proc_path)
+		free(real_proc_path);
 	printf("proc_loadavg plugin uninstall\n");
 }

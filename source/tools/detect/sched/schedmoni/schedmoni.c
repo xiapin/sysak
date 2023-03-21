@@ -247,7 +247,7 @@ int check_kprobe(struct schedmoni_bpf *obj)
 {
 	int i, ret = 0;
 	char *str, *endptr;
-	unsigned long ver[3];
+	unsigned long ver[4];
 	struct utsname ut;
 
 	ret = uname(&ut);
@@ -255,7 +255,7 @@ int check_kprobe(struct schedmoni_bpf *obj)
 		return -errno;
 
 	str = ut.release;
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 4; i++) {
 		errno = 0;
 		ver[i] = strtoul(str, &endptr, 10);
 		if ((errno == ERANGE && (ver[i] == LONG_MAX || ver[i] == LONG_MIN))
@@ -273,13 +273,27 @@ int check_kprobe(struct schedmoni_bpf *obj)
 			return ret;
 		}
 	} else {
-		bpf_program__set_autoload(obj->progs.raw_tp__sched_wakeup, false);
+		ret = bpf_program__set_autoload(obj->progs.raw_tp__sched_wakeup, false);
 		if (ret < 0) {
 			printf("FAIL:bpf_program__set_autoload raw_tp__sched_wakeup\n");
 			return ret;
 		}
+		if (ver[3] == 957 && ver[0] == 3 &&
+			ver[1] == 10 && ver[2] == 0) {	
+			ret = bpf_program__set_autoload(obj->progs.wake_up_new_task, false);
+			printf("SUCCESS:bpf_program__set_autoload wake_up_new_task\n");
+			if (ret < 0) {
+				printf("FAIL:bpf_program__set_autoload wake_up_new_task\n");
+				return ret;
+			}
+		} else {
+			ret = bpf_program__set_autoload(obj->progs.schedmoni_wake_up_new, false);
+			if (ret < 0) {
+				printf("FAIL:bpf_program__set_autoload schedmoni_wake_up_new\n");
+				return ret;
+			}
+		}
 	}
-
 	return 0;
 }
 

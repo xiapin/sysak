@@ -12,22 +12,19 @@
 #include <lualib.h>
 #include <unistd.h>
 
-LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1, const char *msg, int level);
+extern int lua_reg_errFunc(lua_State *L);
+extern int lua_check_ret(int ret);
+int lua_load_do_file(lua_State *L, const char* path);
 
-static void report_lua_failed(lua_State *L) {
-    fprintf(stderr, "\nFATAL ERROR:%s\n\n", lua_tostring(L, -1));
-}
-
-static int call_init(lua_State *L, char *fYaml) {
+static int call_init(lua_State *L, int err_func, char *fYaml) {
     int ret;
     lua_Number lret;
 
     lua_getglobal(L, "init");
     lua_pushstring(L, fYaml);
-    ret = lua_pcall(L, 1, 1, 0);
+    ret = lua_pcall(L, 1, 1, err_func);
     if (ret) {
-        perror("luaL_call init func error");
-        report_lua_failed(L);
+        lua_check_ret(ret);
         goto endCall;
     }
 
@@ -67,6 +64,7 @@ void LuaAddPath(lua_State *L, char *name, char *value) {
 
 static lua_State * echos_init(char *fYaml) {
     int ret;
+    int err_func;
 
     /* create a state and load standard library. */
     lua_State *L = luaL_newstate();
@@ -77,22 +75,15 @@ static lua_State * echos_init(char *fYaml) {
 
     /* opens all standard Lua libraries into the given state. */
     luaL_openlibs(L);
-
     LuaAddPath(L, "path", "../beaver/?.lua");
+    err_func = lua_reg_errFunc(L);
 
-    ret = luaL_loadfile(L, "../beaver/beaver.lua");
-    ret = lua_pcall(L, 0, LUA_MULTRET, 0);
+    ret = lua_load_do_file(L, "../beaver/beaver.lua");
     if (ret) {
-        const char *msg = lua_tostring(L, -1);
-        perror("luaL_dofile error");
-        if (msg) {
-            luaL_traceback(L, L, msg, 0);
-            fprintf(stderr, "FATAL ERROR:%s\n\n", msg);
-        }
         goto endLoad;
     }
 
-    ret = call_init(L, fYaml);
+    ret = call_init(L, err_func, fYaml);
     if (ret < 0) {
         goto endCall;
     }
@@ -107,13 +98,14 @@ static lua_State * echos_init(char *fYaml) {
 
 static int echos(lua_State *L) {
     int ret;
+    int err_func;
     lua_Number lret;
 
+    err_func = lua_gettop(L);
     lua_getglobal(L, "echo");
-    ret = lua_pcall(L, 0, 1, 0);
+    ret = lua_pcall(L, 0, 1, err_func);
     if (ret) {
-        perror("lua call error");
-        report_lua_failed(L);
+        lua_check_ret(ret);
         goto endCall;
     }
 
@@ -147,7 +139,6 @@ int beaver_init(char *fYaml) {
         }
         ret = echos(L);
         lua_close(L);
-        sleep(5);   // to release port
     }
     exit(1);
 }

@@ -17,6 +17,7 @@ cenum-rs = { path = "../../cenum-rs" }
 plain = "0.2"
 utils = { path = "../../utils" }
 builder = { path = "../../builder" }
+serde = {version = "1.0", features = ["derive"]}
 
 [build-dependencies]
 libbpf-cargo = "0.13"

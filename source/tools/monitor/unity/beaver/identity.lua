@@ -25,8 +25,8 @@ end
 local function getAdd(hostName)
     local _, resolved = socket.dns.toip(hostName)
     local listTab = {}
-    for _, v in pairs(resolved.ip) do
-        table.insert(listTab, v)
+    for i, v in pairs(resolved.ip) do
+        listTab[i] = v
     end
     return listTab
 end
@@ -41,11 +41,11 @@ function Cidentity:hostip()
 end
 
 function Cidentity:curl()
-    if self._opts.curl then
+    if self._opts.url then
         local ChttpCli = require("httplib.httpCli")
 
         local cli = ChttpCli.new()
-        local res = cli:get(self._opts.curl)
+        local res = cli:get(self._opts.url)
         return res.body
     else
         return "None"
@@ -57,15 +57,16 @@ function Cidentity:hostname()
 end
 
 function Cidentity:file()
+    local res = "None"
     if self._opts.path then
         local file = io.open(self._opts.path, "r")
-        io.input(file)
-        local res = io.read()
-        io.close(file)
-        return res
-    else
-        return "None"
+        if file then
+            io.input(file)
+            res = io.read()
+            io.close(file)
+        end
     end
+    return res
 end
 
 function Cidentity:specify()

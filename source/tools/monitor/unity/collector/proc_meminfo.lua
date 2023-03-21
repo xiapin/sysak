@@ -33,7 +33,7 @@ function CprocMeminfo:readIomem()
             reserved = reserved + (tonumber(cells[2], 16)-tonumber(cells[1], 16))
         end
     end
-    self._protoTable_dict["vs"]["res"],_ = math.modf(reserved/1024)
+    self._protoTable_dict["vs"]["res"], _ = math.modf(reserved/1024)
 end
 
 function CprocMeminfo:readVmalloc()
@@ -61,11 +61,11 @@ function CprocMeminfo:readUsed()
 end
 
 function CprocMeminfo:readHugepage(size,name)
-    file = "/sys/kernel/mm/hugepages/hugepages-" .. size .. "kB/nr_hugepages"
+    local file = "/sys/kernel/mm/hugepages/hugepages-" .. size .. "kB/nr_hugepages"
     local f=io.open(file,"r")
 
     if f ~= nil then
-        pages = tonumber(f:read("*a"))
+        local pages = tonumber(f:read("*a"))
         io.close(f)
         self._protoTable_dict["vs"][name]=pages * size
     end
@@ -91,7 +91,7 @@ function CprocMeminfo:proc(elapsed, lines)
     for line in io.lines(self.pFile) do
         self:readKV(line)
     end
-    tmp_dict = self._protoTable_dict.vs
+    local tmp_dict = self._protoTable_dict.vs
 
     local cell = {name="total", value=tmp_dict["MemTotal"]+tmp_dict["res"]}
     table.insert(self._protoTable["vs"], cell)
@@ -156,7 +156,7 @@ function CprocMeminfo:proc(elapsed, lines)
     table.insert(self._protoTable["vs"], cell)
 
     self:appendLine(self._protoTable)
-    return self:push(lines)
+    self:push(lines)
 
 end
 

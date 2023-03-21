@@ -12,3 +12,5 @@ metrics:
     field: [user, nice, sys, idle, iowait, hardirq, softirq, steal, guest, guestnice]
     help: "cpu usage info for per-cpu."
     type: "gauge"
+config:
+  path: pods.yaml

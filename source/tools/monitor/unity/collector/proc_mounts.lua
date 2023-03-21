@@ -23,8 +23,10 @@ local function get_lines(fName)
     local fName = fName or "/proc/mounts"
 
     local f = assert(io.open(fName, "r"))
+    local c = 0
     for line in f:lines() do
-        table.insert(lines, line)
+        c = c + 1
+        lines[c] = line
     end
     return lines
 end
@@ -79,27 +81,29 @@ end
 function CprocMounts:_proc()
     for k, v in pairs(self._mpoints) do
         local stat = statvfs(k)
-        local ls = {
-            {
-                name = "fs",
-                index = v,
-            },
-            {
-                name = "mount",
-                index = k,
-            },
-        }
-        local vs = {
-            { name="f_bsize", value=stat.f_bsize, },
-            { name="f_blocks", value=stat.f_blocks, },
-            { name="f_bfree", value=stat.f_bfree, },
-            { name="f_bavail", value=stat.f_bavail, },
-            { name="f_files", value=stat.f_files, },
-            { name="f_ffree", value=stat.f_ffree, },
-            { name="f_favail", value=stat.f_favail, },
-        }
-        local line = self:_packProto("fs_stat", ls, vs)
-        self:appendLine(line)
+        if stat then   -- stat may return 0
+            local ls = {
+                {
+                    name = "fs",
+                    index = v,
+                },
+                {
+                    name = "mount",
+                    index = k,
+                },
+            }
+            local vs = {
+                { name="f_bsize", value=stat.f_bsize, },
+                { name="f_blocks", value=stat.f_blocks, },
+                { name="f_bfree", value=stat.f_bfree, },
+                { name="f_bavail", value=stat.f_bavail, },
+                { name="f_files", value=stat.f_files, },
+                { name="f_ffree", value=stat.f_ffree, },
+                { name="f_favail", value=stat.f_favail, },
+            }
+            local line = self:_packProto("fs_stat", ls, vs)
+            self:appendLine(line)
+        end
     end
 end
 
@@ -108,7 +112,7 @@ function CprocMounts:proc(elapsed, lines)
 
     CvProc.proc(self)
     self:_proc()
-    return self:push(lines)
+    self:push(lines)
 end
 
 return CprocMounts

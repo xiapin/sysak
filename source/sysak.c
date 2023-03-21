@@ -67,11 +67,15 @@ char module_tag[MAX_NAME_LEN];
 char sysak_work_path[MAX_WORK_PATH_LEN];
 char sysak_other_rule[MAX_WORK_PATH_LEN];
 char sysak_components_server[MAX_WORK_PATH_LEN];
+char sysak_oss_server[MAX_WORK_PATH_LEN];
 char download_cmd[MAX_WORK_PATH_LEN];
+char region[MAX_NAME_LEN] = {0};
+
 bool pre_module = false;
 bool post_module = false;
 bool btf_depend = false;
 bool auto_get_components = false;
+bool oss_get_components = false;
 pid_t child_pid;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
@@ -86,9 +90,9 @@ static void usage(void)
     fprintf(stdout,
                 "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
                 "       cmd:\n"
-                "              list [-a],	show subcmds\n"
-                "              -h/help, 	help information for specify subcmd\n"
-                "              -g, 		auto download btf and components\n"
+                "              list [-a],   show subcmds\n"
+                "              -h/help,     help informati on for specify subcmd\n"
+                "              -g,          auto download btf and components\n"
                 "       subcmd: see the result of list\n");
 }
 
@@ -180,10 +184,12 @@ static bool get_server_addr(void)
     }
 
     fgets(sysak_components_server, sizeof(sysak_components_server), fp);
+    fgets(sysak_oss_server, sizeof(sysak_oss_server), fp);
     fclose(fp);
 
     strim(sysak_components_server);
-    if (strlen(sysak_components_server) == 0) {
+    strim(sysak_oss_server);
+    if (strlen(sysak_components_server) == 0 || strlen(sysak_oss_server) == 0) {
         fprintf(stderr, "no sysak server setting\n");
         return false;
     }
@@ -218,6 +224,26 @@ static bool get_module_tag(void)
     }
 
     return false;
+}
+
+static bool get_region(char *region)
+{
+    FILE *res;
+    const char *region_cmd = "curl -s --connect-timeout 2 http://100.100.100.200/latest/meta-data/region-id 2>&1";
+
+    res = popen(region_cmd, "r");
+    if (res == NULL) {
+        printf("get region id failed\n");
+        return -1;
+    }
+
+    if (feof(res)) {
+        printf("cmd line end\n");
+        return 0;
+    }
+    fread(region, 1,512, res);
+    pclose(res);
+    return 0;
 }
 
 static int down_install_ext_tools(const char *tool)
@@ -316,19 +342,28 @@ static int down_install(const char *component_name)
 
         //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s 1&>/dev/null",
         //        sysak_components_server, machine, module_tag, module_path, kern_version);
-        sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
-                sysak_components_server, machine, kern_version, module_path, kern_version);
+        if (oss_get_components){
+            sprintf(download_cmd, "wget -T 5 -t 2 -q -O %s/%s/sysak.ko %s-%s.oss-cn-%s-internal.aliyuncs.com/home/hive/sysak/modules/%s/sysak-%s.ko",
+                    module_path, kern_version, sysak_oss_server, &region[3], &region[3], machine, kern_version);
+        }
+        else
+            sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
+                    sysak_components_server, machine, kern_version, module_path, kern_version);
         //printf("%s ... \n", download_cmd);
         ret = system(download_cmd);
         if (access(ko_file,0) == 0)
             ret = 0;
         return ret;
     } else if (strcmp(component_name, "btf") == 0) {
-        sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
 	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
-	    sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
-               sysak_components_server, machine, kern_version, tools_path);
+        if (oss_get_components){
+            sprintf(download_cmd, "wget -T 5 -t 2 -q -P %s %s-%s.oss-cn-%s-internal.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",
+                    tools_path, sysak_oss_server, &region[3], &region[3], machine, kern_version);
+        }
+        else
+	        sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
+                    sysak_components_server, machine, kern_version, tools_path);
         //printf("%s ... \n", download_cmd);
         ret = system(download_cmd);
         if (access(btf_file,0) == 0)
@@ -407,6 +442,8 @@ static int check_or_install_components(const char *name)
         need_module = NULL;
     if (access(btf_path, 0) == 0)
         need_btf = NULL;
+
+    get_region(region);
 
     if (need_module && need_btf){
         ret = pre_down_install(need_module, need_btf, NULL);
@@ -782,7 +819,7 @@ static int parse_arg(int argc, char *argv[])
         return 0;
     }
 
-    if (!strcmp(argv[1], "help") || !strcmp(argv[1], "-h")) {
+    if (!strcmp(argv[1], "help") || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
         usage();
         return 0;
     }
@@ -792,10 +829,30 @@ static int parse_arg(int argc, char *argv[])
             usage();
             return -ERR_MISSARG;
         }
-
         auto_get_components = true;
-        argc = argc - 2;
-        argv = &argv[2];
+
+        if (!strcmp(argv[2], "-oss")){
+            oss_get_components = true;
+            argc = argc - 3;
+            argv = &argv[3];
+        } else {
+            argc = argc - 2;
+            argv = &argv[2];
+        }
+    } else if (!strcmp(argv[1], "-oss")) {
+        if (argc < 3) {
+            usage();
+            return -ERR_MISSARG;
+        }
+        oss_get_components = true;
+        auto_get_components = true;
+        if (!strcmp(argv[2], "-g")){
+            argc = argc - 3;
+            argv = &argv[3];
+        } else {
+            argc = argc - 2;
+            argv = &argv[2];
+        }
     } else {
         argc = argc - 1;
         argv = &argv[1];

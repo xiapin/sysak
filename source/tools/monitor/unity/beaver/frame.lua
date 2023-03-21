@@ -6,27 +6,28 @@
 
 -- refer to https://blog.csdn.net/zx_emily/article/details/83024065
 
-local unistd = require("posix.unistd")
-local poll = require("posix.poll")
-
 require("common.class")
 local ChttpComm = require("httplib.httpComm")
 local pystring = require("common.pystring")
+local system = require("common.system")
 local Cframe = class("frame", ChttpComm)
 
 function Cframe:_init_()
     ChttpComm._init_(self)
     self._objs = {}
+    self._obj_res = {}
 end
 
 local function waitDataRest(fread, rest, tReq)
     local len = 0
     local tStream = {tReq.data}
+    local c = #tStream
     while len < rest do
         local s = fread()
         if s then
             len = len + #s
-            table.insert(tStream, s)
+            c = c + 1
+            tStream[c] = s
         else
             return -1
         end
@@ -123,7 +124,15 @@ function Cframe:echo404()
     return pystring:join("\r\n", tHttp)
 end
 
-function Cframe:proc(fread)
+function Cframe:findObjRes(path)
+    for k, v in pairs(self._obj_res) do
+        if string.find(path, k) then
+            return v
+        end
+    end
+end
+
+function Cframe:proc(fread, session)
     local stream = waitHttpHead(fread)
     if stream == nil then   -- read return stream or error code or nil
         return nil
@@ -131,23 +140,31 @@ function Cframe:proc(fread)
 
     local tReq = self:parse(fread, stream)
     if tReq then
+        tReq.session = session
         if self._objs[tReq.path] then
             local obj = self._objs[tReq.path]
             local res, keep = obj:call(tReq)
-            return res, keep
-        else
-            print("show all path.")
-            for k, _ in pairs(self._objs) do
-                print("path:",  k)
-            end
-            return self:echo404(), false
+            return res, keep, tReq.session
         end
+
+        local obj = self:findObjRes(tReq.path)
+        if obj then
+            local res, keep = obj:calls(tReq)
+            return res, keep, tReq.session
+        end
+
+        return self:echo404(), false, {}
     end
 end
 
 function Cframe:register(path, obj)
     assert(self._objs[path] == nil, "the " .. path .. " is already registered.")
     self._objs[path] = obj
+end
+
+function Cframe:registerRe(path, obj)
+    assert(self._obj_res[path] == nil, "the " .. path .. " is already registered.")
+    self._obj_res[path] = obj
 end
 
 return Cframe

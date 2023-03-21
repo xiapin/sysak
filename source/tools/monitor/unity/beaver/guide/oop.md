@@ -113,4 +113,4 @@ Ctwo 继承于Cone，这里重新实现并复用了父类的say方法。
 	function Cone:say()
 	function Cone.say(self)
 
-[返回目录](/guide)
+[返回目录](/guide/guide.md)

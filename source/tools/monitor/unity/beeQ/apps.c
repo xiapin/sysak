@@ -12,25 +12,66 @@
 #include <sys/syscall.h>
 
 #define gettidv1() syscall(__NR_gettid)
-static int sample_period = 0;
 extern char *g_yaml_file;
 
-LUALIB_API void luaL_traceback (lua_State *L, lua_State *L1, const char *msg, int level);
-
-static void report_lua_failed(lua_State *L) {
-    fprintf(stderr, "\nFATAL ERROR:%s\n\n", lua_tostring(L, -1));
+static int lua_traceback(lua_State *L)
+{
+    const char *errmsg = lua_tostring(L, -1);
+    lua_getglobal(L, "debug");
+    lua_getfield(L, -1, "traceback");
+    lua_call(L, 0, 1);
+    printf("%s \n%s\n", errmsg, lua_tostring(L, -1));
+    return 1;
 }
 
-static int call_init(lua_State *L) {
+int lua_reg_errFunc(lua_State *L) {
+    lua_pushcfunction(L, lua_traceback);
+    return lua_gettop(L);
+}
+
+int lua_check_ret(int ret) {
+    switch (ret) {
+        case 0:
+            break;
+        case LUA_ERRRUN:
+            printf("lua runtime error.\n");
+            break;
+        case LUA_ERRMEM:
+            printf("lua memory error.\n");
+        case LUA_ERRERR:
+            printf("lua exec error.\n");
+        case LUA_ERRSYNTAX:
+            printf("file syntax error.\n");
+        case LUA_ERRFILE:
+            printf("load lua file error.\n");
+        default:
+            printf("bad res for %d\n", ret);
+            exit(1);
+    }
+    return ret;
+}
+
+int lua_load_do_file(lua_State *L, const char* path) {
+    int err_func = lua_gettop(L);
+    int ret;
+
+    ret = luaL_loadfile(L, path);
+    if (ret) {
+        return lua_check_ret(ret);
+    }
+    ret = lua_pcall(L, 0, LUA_MULTRET, err_func);
+    return lua_check_ret(ret);
+}
+
+static int call_init(lua_State *L, int err_func) {
     int ret;
     lua_Number lret;
 
     lua_getglobal(L, "init");
     lua_pushinteger(L, (int)gettidv1());
-    ret = lua_pcall(L, 1, 1, 0);
+    lua_pushstring(L, g_yaml_file);
+    ret = lua_pcall(L, 2, 1, err_func);
     if (ret) {
-        perror("luaL_call init func error");
-        report_lua_failed(L);
         goto endCall;
     }
 
@@ -56,7 +97,7 @@ static int call_init(lua_State *L) {
 
 static lua_State * app_recv_init(void)  {
     int ret;
-
+    int err_func;
     /* create a state and load standard library. */
     lua_State *L = luaL_newstate();
     if (L == NULL) {
@@ -65,19 +106,14 @@ static lua_State * app_recv_init(void)  {
     }
     /* opens all standard Lua libraries into the given state. */
     luaL_openlibs(L);
+    err_func = lua_reg_errFunc(L);
 
-    ret = luaL_dofile(L, "bees.lua");
+    ret = lua_load_do_file(L, "../beeQ/bees.lua");
     if (ret) {
-        const char *msg = lua_tostring(L, -1);
-        perror("luaL_dofile error");
-        if (msg) {
-            luaL_traceback(L, L, msg, 0);
-            fprintf(stderr, "FATAL ERROR:%s\n\n", msg);
-        }
         goto endLoad;
     }
 
-    ret = call_init(L);
+    ret = call_init(L, err_func);
     if (ret < 0) {
         goto endCall;
     }
@@ -112,6 +148,7 @@ int app_recv_proc(void* msg, struct beeQ* q) {
         int lret;
         lua_State *L = (lua_State *)(q->qarg);
         char *body;
+        int err_func;
 
         if (counter != sighup_counter) {    // check counter for signal.
             lua_close(L);
@@ -123,7 +160,6 @@ int app_recv_proc(void* msg, struct beeQ* q) {
             q->qarg = L;
             counter = sighup_counter;
         }
-
         body = malloc(len);   //  http://www.lua.org/manual/5.1/manual.html#lua_pushlstring
         //Pushes the string pointed to by s with size len onto the stack.
         // Lua makes (or reuses) an internal copy of the given string,
@@ -134,13 +170,13 @@ int app_recv_proc(void* msg, struct beeQ* q) {
             goto endMem;
         }
         memcpy(body, &pMsg->body[0], len);
+        err_func = lua_gettop(L);
         lua_getglobal(L, "proc");
         lua_pushlstring(L, body, len);
-        ret = lua_pcall(L, 1, 1, 0);
+        ret = lua_pcall(L, 1, 1, err_func);
         free(body);
         if (ret) {
-            perror("lua call error");
-            report_lua_failed(L);
+            lua_check_ret(ret);
             goto endCall;
         }
 
@@ -165,6 +201,7 @@ int app_recv_proc(void* msg, struct beeQ* q) {
     endReturn:
     endCall:
     free(msg);
+    exit(1);
     return ret;
 }
 
@@ -188,8 +225,9 @@ int collector_qout(lua_State *L) {
     return 1;   // return a value.
 }
 
-static lua_State * app_collector_init(void* q, void* proto_q) {
+static int app_collector_work(void* q, void* proto_q) {
     int ret;
+    int err_func;
     lua_Number lret;
 
     /* create a state and load standard library. */
@@ -199,29 +237,23 @@ static lua_State * app_collector_init(void* q, void* proto_q) {
         goto endNew;
     }
     luaL_openlibs(L);
+    err_func = lua_reg_errFunc(L);
 
-    ret = luaL_dofile(L, "collectors.lua");
+    ret = lua_load_do_file(L, "../beeQ/collectors.lua");
     if (ret) {
-        const char *msg = lua_tostring(L, -1);
-        perror("luaL_dofile error");
-        if (msg) {
-            luaL_traceback(L, L, msg, 0);
-            fprintf(stderr, "FATAL ERROR:%s\n\n", msg);
-        }
         goto endLoad;
     }
 
     lua_register(L, "collector_qout", collector_qout);
 
     // call init.
-    lua_getglobal(L, "init");
+    lua_getglobal(L, "work");
     lua_pushlightuserdata(L, q);
     lua_pushlightuserdata(L, proto_q);
     lua_pushstring(L, g_yaml_file);
-    ret = lua_pcall(L, 3, 1, 0);
+    ret = lua_pcall(L, 3, 1, err_func);
     if (ret < 0) {
-        perror("luaL_call init func error");
-        report_lua_failed(L);
+        lua_check_ret(ret);
         goto endCall;
     }
 
@@ -235,117 +267,30 @@ static lua_State * app_collector_init(void* q, void* proto_q) {
     if (lret < 0) {
         errno = -EINVAL;
         ret = -1;
-        perror("collectors.lua init failed.");
+        perror("collectors.lua work failed.");
         goto endReturn;
     }
-    sample_period = lret;
-    printf("setup sample period %ds\n", sample_period);
-    return L;
+    lua_close(L);
+    return lret;
 
     endReturn:
     endCall:
     endLoad:
     lua_close(L);
     endNew:
-    return NULL;
-}
-
-static int app_collector_work(lua_State **pL, void* q, void* proto_q) {
-    int ret;
-    lua_Number lret;
-    static int counter = 0;
-
-    lua_State *L = *pL;
-
-    if (counter != sighup_counter) {    // check counter for signal.
-        lua_close(L);
-
-        L = app_collector_init(q, proto_q);
-        if (L == NULL) {
-            exit(1);
-        }
-        *pL = L;
-        counter = sighup_counter;
-    }
-
-    lua_getglobal(L, "work");
-    lua_pushinteger(L, sample_period);
-    ret = lua_pcall(L, 1, 1, 0);
-    if (ret) {
-        perror("luaL_call init func error");
-        report_lua_failed(L);
-        goto endCall;
-    }
-
-    if (!lua_isnumber(L, -1)) {   // check
-        errno = -EINVAL;
-        perror("function collectors.lua work must return a number.");
-        goto endReturn;
-    }
-    lret = lua_tonumber(L, -1);
-    lua_pop(L, 1);
-    if (lret < 0) {
-        errno = -EINVAL;
-        ret = -1;
-        perror("collectors.lua work failed.");
-        goto endReturn;
-    }
-
-    return ret;
-    endReturn:
-    endCall:
-    return ret;
-}
-
-#include <unistd.h>
-#include <time.h>
-typedef long bee_time_t;
-static bee_time_t local_time(void) {
-    int ret;
-    struct timespec tp;
-
-    ret = clock_gettime(CLOCK_MONOTONIC, &tp);
-    if (ret == 0) {
-        return tp.tv_sec * 1000000 + tp.tv_nsec / 1000;
-    } else {
-        perror("get clock failed.");
-        exit(1);
-        return 0;
-    }
+    return -1;
 }
 
 int app_collector_run(struct beeQ* q, void* arg) {
     int ret = 0;
-    lua_State *L;
-    lua_State **pL;
     struct beeQ* proto_que = (struct beeQ* )arg;
 
-    L = app_collector_init(q, proto_que);
-    if (L == NULL) {
-        ret = -1;
-        goto endInit;
-    }
-    pL = &L;
-
     while (1) {
-        bee_time_t t1, t2, delta;
-        t1 = local_time();
-        ret = app_collector_work(pL, q, proto_que);
+        ret = app_collector_work(q, proto_que);
         if (ret < 0) {
-            goto endLoop;
-        }
-        t2 = local_time();
-
-        delta = t1 + sample_period * 1000000 - t2;
-
-        if (delta > 0) {
-            usleep(delta);
+            perror("collect work run failed.");
+            break;
         }
     }
-
-    lua_close(L);
-    return 0;
-    endLoop:
-    endInit:
     return ret;
 }

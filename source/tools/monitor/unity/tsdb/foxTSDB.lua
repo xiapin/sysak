@@ -14,11 +14,11 @@ local foxFFI = require("tsdb.native.foxffi")
 
 local CfoxTSDB = class("CfoxTSDB")
 
-function CfoxTSDB:_init_()
+function CfoxTSDB:_init_(fYaml)
     self.ffi = foxFFI.ffi
     self.cffi = foxFFI.cffi
     self._proto = CprotoData.new(nil)
-    self._qBudget = 200
+    self:setupConf(fYaml)
 end
 
 function CfoxTSDB:_del_()
@@ -26,6 +26,13 @@ function CfoxTSDB:_del_()
         self.cffi.fox_del_man(self._man)
     end
     self._man = nil
+end
+
+function CfoxTSDB:setupConf(fYaml)
+    local conf = system:parseYaml(fYaml)
+    local dbConf = conf.db or {budget = 200, rotate=7}
+    self._qBudget = dbConf.budget or 200
+    self._rotate = dbConf.rotate or 7
 end
 
 function CfoxTSDB:get_us()
@@ -129,7 +136,7 @@ function CfoxTSDB:rotateDb()
     local unistd = require("posix.unistd")
 
     local usec = self._man.now
-    local sec = 7 * 24 * 60 * 60
+    local sec = self._rotate * 24 * 60 * 60
 
     local foxTime = self:getDateFrom_us(usec - sec * 1e6)
     local level = foxTime.year * 10000 + foxTime.mon * 100 + foxTime.mday
@@ -147,7 +154,6 @@ function CfoxTSDB:rotateDb()
                 print("delete " .. "./" .. f)
                 pcall(unistd.unlink, "./" .. f)
             end
-            --pcall(unistd.unlink, "../" .. f)
         end
     end
 end
@@ -240,6 +246,7 @@ function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
 
     self:curMove(start)    -- moveto position
 
+    local lenMs = #ms
     for line in self:loadData(stop) do
         local time = line.time
         for _, v in ipairs(line.lines) do
@@ -261,34 +268,51 @@ function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
             end
             tCell.values = values
 
-            table.insert(ms, tCell)
+            lenMs = lenMs + 1
+            ms[lenMs] = tCell
         end
     end
     return ms
 end
 
-function CfoxTSDB:qlast(last, ms)
-    local now = self:get_us()
-    local date = self:getDateFrom_us(now)
-    local beg = now - last * 1e6;
-
-    if self._man then   -- has setup
-        if self.cffi.check_pman_date(self._man, date) == 1 then  -- at the same day
-            return self:query(beg, now, ms)
-        else
-            self:_del_()   -- destroy old manager
-            if self:_setupRead(now) ~= 0 then    -- try to create new
-                return ms
-            else
-                return self:query(beg, now, ms)
-            end
-        end
-    else
-        if self:_setupRead(now) ~= 0 then    -- try to create new
+function CfoxTSDB:_qlast(date, beg, stop, ms)
+    if not self._man then    -- check _man is already installed.
+        if self:_setupRead(beg) ~= 0 then    -- try to create new
             return ms
-        else
-            return self:query(beg, now, ms)
         end
+    end
+
+    if self.cffi.check_pman_date(self._man, date) == 1 then
+        return self:query(beg, stop, ms)
+    else
+        self:_del_()
+        if self:_setupRead(beg) ~= 0 then    -- try to create new
+            return ms
+        end
+        return self:query(beg, stop, ms)
+    end
+end
+
+function CfoxTSDB:qlast(last, ms)
+    assert(last < 24 * 60 * 60)
+
+    local now = self:get_us()
+    local beg = now - last * 1e6
+
+    local dStart = self:getDateFrom_us(beg)
+    local dStop = self:getDateFrom_us(now)
+
+    if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
+        self:_qlast(dStart, beg, now, ms)
+    else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
+        local beg1 = beg
+        local beg2 = self.cffi.make_stamp(dStop)
+        local now1 = beg2 - 1
+        local now2 = now
+
+        self:_qlast(dStart, beg1, now1, ms)
+        self:_qlast(dStop,  beg2, now2, ms)
     end
 end
 
@@ -304,6 +328,7 @@ function CfoxTSDB:qDay(start, stop, ms, tbls, budget)
     budget = budget or self._qBudget
     self:curMove(start)
     local inc = false
+    local lenMs = #ms
     for line in self:loadData(stop) do
         inc = false
         local time = line.time
@@ -336,7 +361,8 @@ function CfoxTSDB:qDay(start, stop, ms, tbls, budget)
                 end
                 tCell.logs = logs
 
-                table.insert(ms, tCell)
+                lenMs = lenMs + 1
+                ms[lenMs] = tCell
                 inc = true
             end
         end
@@ -361,11 +387,13 @@ function CfoxTSDB:qDayTables(start, stop, tbls)
     end
 
     self:curMove(start)
+    local lenTbls = #tbls
     for line in self:loadData(stop) do
         for _, v in ipairs(line.lines) do
             local title = v.line
             if not system:valueIsIn(tbls, title) then
-                table.insert(tbls, title)
+                lenTbls = lenTbls + 1
+                tbls[lenTbls] = title
             end
         end
     end
@@ -384,6 +412,7 @@ function CfoxTSDB:qDate(dStart, dStop, tbls)
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
         self:qDay(beg, now, ms, tbls)
     else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
         local beg2 = self.cffi.make_stamp(dStop)
         local now1 = beg2 - 1
@@ -412,6 +441,7 @@ function CfoxTSDB:qNow(sec, tbls)
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
         self:qDay(beg, now, ms, tbls)
     else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
         local beg2 = self.cffi.make_stamp(dStop)
         local now1 = beg2 - 1
@@ -440,6 +470,7 @@ function CfoxTSDB:qTabelNow(sec)
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
         self:qDayTables(beg, now, tbls)
     else
+        dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
         local beg2 = self.cffi.make_stamp(dStop)
         local now1 = beg2 - 1

@@ -52,7 +52,8 @@ function CurlIndex:show(tReq)
 
 ### Tips
 
-&emsp;This page is rendered directly via markdown, for [guide](/guide)
+&emsp;This page is rendered directly via markdown, for [guide](/guide/guide.md)
+&emsp;local data  [query entry](/query/base)
 ]]
     local content2 = string.format("\n&emsp;thread id is:%d\n", unistd.getpid())
     local title = "welcome to visit SysAk Agent server."
