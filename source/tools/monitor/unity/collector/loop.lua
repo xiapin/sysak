@@ -7,9 +7,10 @@
 require("common.class")
 local CprotoData = require("common.protoData")
 local procffi = require("collector.native.procffi")
-local Cplugin = require("collector.plugin")
 local system = require("common.system")
-local CguradSched = require("collector.guard.guardSched")
+local CpluginManager = require("collector.pluginManager")
+local calcJiffies = require("collector.guard.calcJiffies")
+local CguardSched = require("collector.guard.guardSched")
 
 local Cloop = class("loop")
 
@@ -19,9 +20,10 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self._proto = CprotoData.new(que)
     self._tid = tid
     self:loadLuaPlugin(res, res.config.proc_path)
+    local jperiod = calcJiffies.calc(res.config.proc_path, procffi)  --
 
-    self._guardSched = CguradSched.new(tid, res.config.proc_path, procffi, self._procs, self._names)
-    self._plugin = Cplugin.new(self._proto, procffi, que, proto_q, fYaml)
+    self._guardSched = CguardSched.new(tid, self._procs, self._names, jperiod)
+    self._soPlugins = CpluginManager.new(procffi, proto_q, res, tid, jperiod)
 end
 
 function Cloop:loadLuaPlugin(res, proc_path)
@@ -41,13 +43,11 @@ function Cloop:loadLuaPlugin(res, proc_path)
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
 end
 
-
 function Cloop:work(t)
     local lines = self._proto:protoTable()
 
     self._guardSched:proc(t, lines)
-
-    self._plugin:proc(t, lines)
+    self._soPlugins:proc(t, lines)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 end

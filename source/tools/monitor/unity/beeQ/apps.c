@@ -305,6 +305,7 @@ int app_collector_run(struct beeQ* q, void* arg) {
         ret = app_collector_work(q, proto_que);
         if (ret < 0) {
             perror("collect work run failed.");
+            exit(1);
             break;
         }
     }

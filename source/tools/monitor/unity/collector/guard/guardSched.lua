@@ -6,14 +6,13 @@
 
 require("common.class")
 local CcollectorStat = require("collector.guard.collector_stat")
-local calcJiffies = require("collector.guard.calcJiffies")
 local system = require("common.system")
 
 local CguardSched = class("guardSched")
 
-function CguardSched:_init_(tid, mnt, procffi, procs, names)
+function CguardSched:_init_(tid, procs, names, jperiod)
     self._stat = CcollectorStat.new(tid)
-    self._jiffies = calcJiffies.calc(mnt, procffi)
+    self._jperiod = jperiod
     self._procs = procs
     self._names = names
     self._limit = 1e5
@@ -31,7 +30,7 @@ function CguardSched:proc(t, lines)
         stop = lua_local_clock()
         if stop - start >= self._limit then   --
             local j2 = self._stat:jiffies()
-            if j2 - j1 >= self._limit / 1e6 * self._jiffies * 3 / 4 then  -- 3/4 time used bye plugin
+            if j2 - j1 >= self._limit / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used bye plugin
                 table.insert(toRemove, i)
             end
         end
