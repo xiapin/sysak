@@ -7,12 +7,15 @@
 require("common.class")
 local system = require("common.system")
 local Cplugin = class("plugin")
+local dockerinfo = require("common.dockerinfo")
 
 function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
     self._proto = proto
 
     local res = system:parseYaml(fYaml)
     self:setProcSys(procffi, res.config)
+    self.proc_fs = res.config["proc_path"] or "/" 
+    self.fill_arg = {["podname"]="pid"}
 
     self._sig_cffi = procffi["cffi"]
     self._sig_cffi.ffi_plugin_init()
@@ -57,13 +60,27 @@ end
 
 function Cplugin:load_label(unity_line, line)
     local c = #line.ls
+    local table_dict = {}
+
+    for i=0, 4 - 1 do
+        local name = self._ffi.string(unity_line.indexs[i].name)
+        local index = self._ffi.string(unity_line.indexs[i].index)
+        table_dict[name] = index
+    end
     for i=0, 4 - 1 do
         local name = self._ffi.string(unity_line.indexs[i].name)
         local index = self._ffi.string(unity_line.indexs[i].index)
 
         if #name > 0 then
             c = c + 1
-            line.ls[c] = {name = name, index = index}
+            if index == "?" and self.fill_arg[name] and table_dict[self.fill_arg[name]] then
+                if name == "podname" then
+                    local podname = dockerinfo:get_podname_pid(table_dict[self.fill_arg[name]], self.proc_fs) 
+                    line.ls[c] = {name = name, index = podname}
+                end
+            else
+                line.ls[c] = {name = name, index = index}
+            end
         else
             return
         end
