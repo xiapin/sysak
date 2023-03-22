@@ -241,3 +241,77 @@ This parser parses the stats from network devices. These stats includes events p
 | lib      | - | library |  | collector/proc\_statm.lua |
 | data     | - | data + stack |  | collector/proc\_statm.lua |
 | dt       | - | dirty pages |  | collector/proc\_statm.lua |
+
+## 混部指标
+
+-----------
+
+### cg_cpu_stat 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| nr_throttled | - | total throttled number |  | collector/container/cg\_cpu\_stat.lua | 
+| throttled_time | ms | total throttled time |  | collector/container/cg\_cpu\_stat.lua | 
+
+### cg_proc_stat 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| user      | % | usr cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| nice      | % | nice cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| system    | % | system cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| idle      | % | idl cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| iowait    | % | iowait cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| irq       | % | irq cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| softirq   | % | softirq cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| steal     | % | steal cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| guest     | % | guest cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| load1min  | - | load of 1min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| load5min  | - | load of 5min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| load15min  | - | load of 15min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| r_load1min  | - | running load of 1min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| r_load5min  | - | running load of 5min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| r_load15min  | - | running  load of 15min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| nr_running  | - | number of runable tasks |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| nr_uninterruptible  | - | number of deep sleep tasks |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+ 
+### cg_memfail_cnt 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| fail_cnt | - | number of mem fail counts |  | collector/container/cg\_memory\_fail\_cnt.lua | 
+ 
+### cg_memdrcm_latency 表
+This table show the hist of the latency of direct memory reclamation
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| memDrcm_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_5to10ms | - | times 5to10ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_10to100ms | - | times 10to100ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_100to500ms | - | times 100to500ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_500to1000ms | - | times 500msto1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+ 
+### cg_memmcmp_latency 表
+This table show the hist of the latency of direct memory compaction
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| memDcmp_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_5to10ms | - | times 5to10ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_10to100ms | - | times 10to100ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_100to500ms | - | times 100to500ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_500to1000ms | - | times 500msto1s |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+ 
+### pmu_events 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| cpu_cycles | - | cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| instructions | - | instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| ipc | - | instructions per cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| cpi | - | cycles per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_store_ref | - | llc stroe hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_store_miss | - | llc stroe miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_load_ref | - | llc load hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_load_miss | - | llc load miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_rmiss_rate | - | llc load miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_wmiss_rate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_miss_rate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_cache_mpi | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
