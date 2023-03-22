@@ -229,6 +229,11 @@ metrics:
     head: value
     help: "pmu events, such as  cycles/instructions, llc events"
     type: "gauge"
+  - title: sysak_pmu_events_percpu
+    from: pmu_events_percpu
+    head: value
+    help: "pmu events of percpu"
+    type: "gauge"
   - title: sysak_cg_memfail_cnt
     from: cg_memfail_cnt
     head: value
