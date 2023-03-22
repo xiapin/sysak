@@ -51,13 +51,13 @@ function CPodAlloc:switch_ns(pid)
 end
 
 function CPodAlloc:get_container_info(did)
-    local res = "unknow"
+    local restable = {}
     local podname = did
     local podns = did
     local cname = did
     
-    res = dockerinfo:get_inspect(did, self.root_fs)
-    local restable = json.decode(res)
+    restable = dockerinfo:get_inspect(did, self.root_fs)
+    if not restable then return podname end
     if #restable > 0 then
         restable = restable[1]
     end
