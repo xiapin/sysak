@@ -284,7 +284,7 @@ int call(int t, struct unity_lines* lines)
 
 	for (i = 0; i < nr_cpus; i++) {
 		line = unity_get_line(lines, 1+i);
-		unity_set_table(line, "pmu_events");
+		unity_set_table(line, "pmu_events_percpu");
 		snprintf(index, sizeof(index), "percpu%d", i);
 		fill_line(line, pcp_hw[i].values, index);
 	}
