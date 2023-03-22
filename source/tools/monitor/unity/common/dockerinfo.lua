@@ -6,8 +6,6 @@
 
 local dockerinfo = {}
 local posix = require("posix")
-local cjson = require("cjson")
-local json = cjson.new()
 local pystring = require("common.pystring")
 local stat = require("posix.sys.stat")
 local unistd = require("posix.unistd")
@@ -93,6 +91,7 @@ function dockerinfo:get_podname_did(did, root_fs)
         cname = restable['status']['labels']['io.kubernetes.container.name']
         podns = restable['status']['labels']['io.kubernetes.pod.namespace']
     end
+    if pystring:startswith(podname,"/") then podname=string.sub(podname,2,-1) end
     return podname
 end
 
@@ -114,11 +113,15 @@ function dockerinfo:get_dockerid(pid, root_fs)
     local res = pfile:read("*a")
     pfile:close()
 
-    if not string.find(res,"kubepods") and not string.find(res,"docker%-")  then return idstring end
+    if not string.find(res,"kubepods") and not string.find(res,"docker%-")  and not string.find(res,"libpod") then return idstring end
     if string.find(res,"docker%-") then
         idstring = pystring:split(res,"docker-")[2]
     elseif string.find(res,"cri%-containerd%-") then
         idstring = pystring:split(res,"cri-containerd-")[2]
+    elseif string.find(res,"libpod%-conmon%-") then
+        idstring = pystring:split(res,"libpod-conmon-")[2]
+    elseif string.find(res,"libpod%-") then
+        idstring = pystring:split(res,"libpod-")[2]
     else
         local tmp = pystring:split(res,"/",10)
         idstring = tmp[#tmp]
