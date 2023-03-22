@@ -299,3 +299,19 @@ This table show the hist of the latency of direct memory compaction
 | memDcmp_lat_100to500ms | - | times 100to500ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
 | memDcmp_lat_500to1000ms | - | times 500msto1s |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
 | memDcmp_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+ 
+### pmu_events 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| cpu_cycles | - | cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| instructions | - | instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| ipc | - | instructions per cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| cpi | - | cycles per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_store_ref | - | llc stroe hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_store_miss | - | llc stroe miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_load_ref | - | llc load hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_load_miss | - | llc load miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_rmiss_rate | - | llc load miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_wmiss_rate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_miss_rate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llc_cache_mpi | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
