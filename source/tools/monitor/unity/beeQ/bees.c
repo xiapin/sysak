@@ -36,11 +36,13 @@ void sig_handler(int num)
     }
 }
 
+char ** entry_argv; // for daemon process
 extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int main(int argc, char *argv[]) {
     struct beeQ* q;           //for proto-buf stream
     struct beeQ* proto_que;   //for trans c to proto-buf stream
 
+    entry_argv = argv;
     if (argc > 1) {
         g_yaml_file = argv[1];
     }

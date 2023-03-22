@@ -11,11 +11,13 @@ local system = require("common.system")
 local CpluginManager = require("collector.pluginManager")
 local calcJiffies = require("collector.guard.calcJiffies")
 local CguardSched = require("collector.guard.guardSched")
+local CguardDaemon = require("collector.guard.guardDaemon")
 
 local Cloop = class("loop")
 
 function Cloop:_init_(que, proto_q, fYaml, tid)
     local res = system:parseYaml(fYaml)
+    self._daemon = CguardDaemon.new(res)
 
     self._proto = CprotoData.new(que)
     self._tid = tid
@@ -50,6 +52,7 @@ function Cloop:work(t)
     self._soPlugins:proc(t, lines)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
+    self._daemon:feed()
 end
 
 return Cloop

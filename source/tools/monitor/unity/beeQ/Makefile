@@ -5,7 +5,7 @@ CFLAG := -g -I../beaver -I../collector/outline
 LDFLAG := -g -lm -ldl -lrt -lpthread -lluajit-5.1 -L./lib/ -lbeeQ -L../beaver -lbeaver -lcollectorApi -Lclock/ -llocalclock -L../collector/outline/ -loutline -L../collector/plugin/ -lproto_sender
 
 PRG=unity-mon
-OBJ=apps.o bees.o
+OBJ=apps.o bees.o daemon.o
 DEPMOD=lib rbtree clock ../beaver ../collector/native ../collector/interface ../collector/outline ../collector/plugin ../tsdb/native
 
 $(PRG): $(DEPMOD) $(OBJ)

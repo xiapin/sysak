@@ -10,6 +10,7 @@
 #include "beeQ.h"
 #include "apps.h"
 #include "clock/ee_clock.h"
+#include "daemon.h"
 #include <sys/syscall.h>
 #include <sys/prctl.h>
 
@@ -215,6 +216,14 @@ static int lua_local_clock(lua_State *L) {
     return 1;
 }
 
+static int lua_setup_daemon(lua_State *L) {
+    int fd;
+    int period = lua_tonumber(L, 1);
+    fd = setup_daemon(period);
+    lua_pushnumber(L, fd);
+    return 1;
+}
+
 int collector_qout(lua_State *L) {
     int ret;
     struct beeQ* q = (struct beeQ*) lua_topointer(L, 1);
@@ -259,6 +268,7 @@ static int app_collector_work(void* q, void* proto_q) {
 
     lua_register(L, "collector_qout", collector_qout);
     lua_register(L, "lua_local_clock", lua_local_clock);
+    lua_register(L, "lua_setup_daemon", lua_setup_daemon);
 
     // call init.
     lua_getglobal(L, "work");
