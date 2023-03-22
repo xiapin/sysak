@@ -241,3 +241,13 @@ This parser parses the stats from network devices. These stats includes events p
 | lib      | - | library |  | collector/proc\_statm.lua |
 | data     | - | data + stack |  | collector/proc\_statm.lua |
 | dt       | - | dirty pages |  | collector/proc\_statm.lua |
+
+## 混部指标
+
+-----------
+
+### cpu.stat 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| nr_throttled | - | total throttled number |  | collector/container/cg\_cpu\_stat.lua | 
+| throttled_time | ms | total throttled time |  | collector/container/cg\_cpu\_stat.lua | 
