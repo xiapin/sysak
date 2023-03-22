@@ -251,3 +251,25 @@ This parser parses the stats from network devices. These stats includes events p
 | :---   | --- | :---- | :---- | :--- |
 | nr_throttled | - | total throttled number |  | collector/container/cg\_cpu\_stat.lua | 
 | throttled_time | ms | total throttled time |  | collector/container/cg\_cpu\_stat.lua | 
+
+### cpuacct.proc_stat 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| user      | % | usr cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| nice      | % | nice cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| system    | % | system cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| idle      | % | idl cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| iowait    | % | iowait cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| irq       | % | irq cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| softirq   | % | softirq cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| steal     | % | steal cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
+| guest     | % | guest cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| load1min  | - | load of 1min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| load5min  | - | load of 5min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| load15min  | - | load of 15min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| r_load1min  | - | running load of 1min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| r_load5min  | - | running load of 5min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| r_load15min  | - | running  load of 15min |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| nr_running  | - | number of runable tasks |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+| nr_uninterruptible  | - | number of deep sleep tasks |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
+ 
