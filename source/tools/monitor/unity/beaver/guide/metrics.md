@@ -246,13 +246,13 @@ This parser parses the stats from network devices. These stats includes events p
 
 -----------
 
-### cpu.stat 表
+### cg_cpu_stat 表
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | nr_throttled | - | total throttled number |  | collector/container/cg\_cpu\_stat.lua | 
 | throttled_time | ms | total throttled time |  | collector/container/cg\_cpu\_stat.lua | 
 
-### cpuacct.proc_stat 表
+### cg_proc_stat 表
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | user      | % | usr cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
@@ -273,3 +273,29 @@ This parser parses the stats from network devices. These stats includes events p
 | nr_running  | - | number of runable tasks |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
 | nr_uninterruptible  | - | number of deep sleep tasks |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
  
+### cg_memfail_cnt 表
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| fail_cnt | - | number of mem fail counts |  | collector/container/cg\_memory\_fail\_cnt.lua | 
+ 
+### cg_memdrcm_latency 表
+This table show the hist of the latency of direct memory reclamation
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| memDrcm_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_5to10ms | - | times 5to10ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_10to100ms | - | times 10to100ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_100to500ms | - | times 100to500ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_500to1000ms | - | times 500msto1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+| memDrcm_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
+ 
+### cg_memmcmp_latency 表
+This table show the hist of the latency of direct memory compaction
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| memDcmp_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_5to10ms | - | times 5to10ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_10to100ms | - | times 10to100ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_100to500ms | - | times 100to500ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_500to1000ms | - | times 500msto1s |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
+| memDcmp_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
