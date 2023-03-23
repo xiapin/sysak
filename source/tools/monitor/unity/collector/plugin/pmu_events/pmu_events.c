@@ -9,7 +9,7 @@ long nr_cpus;
 double summary[NR_EVENTS];
 struct pcpu_hw_info *gpcpu_hwi;
 struct pmu_events *glb_pme;
-char *events_str[] = {"cpu_cycles", "instructions",
+char *events_str[] = {"cpu_cycles", "instructions", "ref_cycles",
 			"llc_load_ref", "llc_load_miss",
 			"llc_store_ref", "llc_store_miss"};
 char *value_str[] = {"cycles", "instructions", "CPI",
@@ -31,7 +31,7 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 
 int create_hw_events(struct pcpu_hw_info *pc_hwi)
 {
-	int cpu, i, j, idx_fail;
+	int cpu, i, j, group_last, idx_fail;
 	int ret, pid, group_leader;
 	struct hw_info *hwi, *leader;
 	unsigned long flags = 0;
@@ -49,10 +49,12 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 	leader = NULL;
 	group_leader = -1;
 	j = 0;
+	group_last = groupidx[0];
 	for (i = 0; i < NR_EVENTS; i++) {
 		/* The next PERF types */
-		if (i%2 == 0) {
+		if (groupidx[i] != group_last) {
 			group_leader = -1;
+			group_last = groupidx[i];
 		}
 		attr.type = hw_types[i];
 		attr.config = hw_configs[i];
@@ -326,7 +328,9 @@ void deinit(void)
 }
 
 #ifdef DEBUG
-//#if 1
+/*#if 1 */
+
+/* for dev/selftest */
 int call_debug(void)
 {
 	int i;
@@ -348,7 +352,9 @@ int main(int argc, char *argv[])
 		memset(summary, 0, sizeof(summary));
 		call_debug();
 		if (summary[INSTRUCTIONS])
-			printf("CPI=%f\n", summary[0]/summary[1]);
+			printf("CPI=%f\n", summary[CYCLES]/summary[INSTRUCTIONS]);
+		if (summary[INSTRUCTIONS])
+			printf("RCPI=%f\n", summary[REF_CYCLES]/summary[INSTRUCTIONS]);
 		if (summary[LLC_LOAD_REF])
 			printf("LLC_LOAD_MISS RATE =%f\n", summary[LLC_LOAD_MISS]/summary[LLC_LOAD_REF]);
 		if (summary[LLC_STORE_REF])
