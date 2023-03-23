@@ -1,8 +1,8 @@
 CC := gcc
 CFLAG := -g -fpic
 LDFLAG := -g -fpic -shared
-OBJS := pmu_cpi.o
-SO := libpmu_cpi.so
+OBJS := pmu_events.o
+SO := libpmu_events.so
 
 all: $(SO) install
 

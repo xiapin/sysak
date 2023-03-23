@@ -224,6 +224,11 @@ metrics:
     #head: value
     #help: "get pod alloc page used"
     #type: "gauge"
+  - title: sysak_pmu_events_percpu
+    from: pmu_events_percpu
+    head: value
+    help: "pmu events of percpu"
+    type: "gauge"
   - title: sysak_pmu_cpi
     from: pmu cpi
     head: value
