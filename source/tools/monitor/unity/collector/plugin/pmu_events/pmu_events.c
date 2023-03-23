@@ -1,4 +1,4 @@
-#include "pmu_cg.h"
+#include "pmu_events.h"
 
 struct pmu_events {
 	int nr_cpus;
@@ -12,7 +12,11 @@ struct pmu_events *pme;
 char *events_str[] = {"cpu_cycles", "instructions",
 			"llc_load_ref", "llc_load_miss",
 			"llc_store_ref", "llc_store_miss"};
-char origpath[]="/sys/fs/cgroup/perf_event/docker/";
+char *value_str[] = {"cycles", "instructions", "CPI",
+			"llc_load_ref", "llc_load_miss", "LLC_LMISS_RATE"
+			"llc_store_ref", "llc_store_miss", "LLC_SMIRSS_RATE"};
+/*char origpath[]="/mnt/host/sys/fs/cgroup/perf_event/system.slice/"; */
+char *origpath = NULL;	/* defalt to host events */
 
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 			   int cpu, int group_fd, unsigned long flags)
@@ -53,8 +57,8 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 		attr.config = hw_configs[i];
 #ifdef DEBUG
 		if (cpu == 0)
-		printf("cpu=%d, type=%d, conf=%llu, pid=%d, gld=%d, flags=%d\n",
-			cpu, attr.type, attr.config, pid, group_leader, flags);
+			printf("cpu=%d, type=%d, conf=%llu, pid=%d, gld=%d, flags=%d\n",
+				cpu, attr.type, attr.config, pid, group_leader, flags);
 #endif
 		hwi[i].fd = perf_event_open(&attr, pid, cpu, group_leader, flags);
 		if (hwi[i].fd <= 0) {
@@ -81,7 +85,6 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 		}
 	}
 }
-
 
 struct pmu_events *pme_new(int ncpu)
 {
@@ -178,24 +181,37 @@ void collect(struct pcpu_hw_info *phw, double *sum)
 #endif
 }
 
-int fill_line(struct unity_line *line)
+int fill_line(struct unity_line *line, double *summ)
 {
-	double cycles, instructions;
-	cycles = summary[0];
-	instructions = summary[1];
+	int i;
 
-	unity_set_value(line, 0, "cycles", cycles);
-	unity_set_value(line, 1, "instructions", instructions);
-	unity_set_value(line, 2, "ipc", instructions/cycles);
+	for (i = 0; i < NR_EVENTS; i++)
+		unity_set_value(line, i, events_str[i], summ[i]);
+	unity_set_value(line, i++, "CPI", summ[CYCLES]/summ[INSTRUCTIONS]);
+	unity_set_value(line, i++, "LLC_LOAD_MISS_RATE",
+		summ[LLC_LOAD_MISS]/summ[LLC_LOAD_REF]);
+	unity_set_value(line, i++, "LLC_STORE_MISS_RATE",
+		summ[LLC_STORE_MISS]/summ[LLC_STORE_REF]);
+	unity_set_value(line, i++, "LLC_MISS_RATE",
+		(summ[LLC_LOAD_MISS]+summ[LLC_STORE_MISS])/
+		(summ[LLC_LOAD_REF]+summ[LLC_STORE_REF]));
 }
 
-int call(int t, struct unity_lines* lines) {
+int call(int t, struct unity_lines* lines)
+{
+	int i;
 	struct unity_line* line;
+	double summ[NR_EVENTS];
+	struct pcpu_hw_info *pcp_hw;
 
+	pcp_hw = pme->pcpu_hwi;
+	for (i = 0; i < nr_cpus; i++) {
+		collect(&pcp_hw[i], summ);
+	}
 	unity_alloc_lines(lines, 1);
 	line = unity_get_line(lines, 0);
-	unity_set_table(line, "pmu_cpi");
-	fill_line(line);
+	unity_set_table(line, "pmu_events");
+	fill_line(line, summ);
 
 	return 0;
 }
@@ -224,7 +240,6 @@ void deinit(void)
 	pcp_hw = pme->pcpu_hwi;
 
 	for (i = 0; i < nr_cpus; i++) {
-	//for (i = 0; i < 1; i++) {
 		remove_events(&pcp_hw[i]);
 	}
 	if (pcp_hw)
