@@ -351,7 +351,7 @@ def memleak_check(total, kmem):
     return False
 
 def tcp_mem_check(used):
-    skcheck_bin = os.getenv("SYSAK_WORK_PATH");
+    skcheck_bin = os.getenv("SYSAK_WORK_PATH","");
     skcheck_bin += "/tools/skcheck -j /tmp/skcheck.json > /dev/null 2>&1"
     ret = os.popen(skcheck_bin).read()
     if not os.path.exists("/tmp/skcheck.json"):
@@ -670,11 +670,13 @@ def oom_get_max_task(num, oom_result):
     state = oom['state_mem']
     state['msg'] = []
     state['total_rss'] = 0
+    s_bra = 0
     for line in oom['oom_msg']:
         try:
             if 'rss' in line and 'oom_score_adj' in line and 'name' in line:
                 dump_task = True
                 state['msg'].append(line)
+                s_bra = line.count('[')
                 continue
             if not dump_task:
                 continue
@@ -682,7 +684,7 @@ def oom_get_max_task(num, oom_result):
                 break
             if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
                 break
-            if line.count('[') !=2 or line.count(']') !=2:
+            if line.count('[')  != s_bra:
                 break
             pid_idx = line.rfind('[')
             last_idx = line.rfind(']')
