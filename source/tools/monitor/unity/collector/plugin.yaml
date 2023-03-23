@@ -3,7 +3,7 @@ config:
   port: 8400  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
-  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg), env(need name arg)
     mode: curl
     url: "http://100.100.100.200/latest/meta-data/instance-id"
 #    name: test_specify
