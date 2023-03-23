@@ -193,7 +193,7 @@ function CLocalBeaver:write(fd, stream)
     local res
 
     sent, err, errno = socket.send(fd, stream)
-    if sent then
+    if sent ~= nil then
         if sent < #stream then  -- send buffer may full
             res = self._cffi.mod_fd(self._efd, fd, 1)  -- epoll write ev
             assert(res == 0)
@@ -204,6 +204,9 @@ function CLocalBeaver:write(fd, stream)
                     return nil
                 elseif e.ev_out then
                     stream = string.sub(stream, sent + 1)
+                    if stream == nil then
+                        return 1
+                    end
                     sent, err, errno = socket.send(fd, stream)
                     if sent == nil then
                         if errno == 11 then  -- EAGAIN ?

@@ -16,6 +16,9 @@ config:
   db:
     rotate: 7  # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
+  limit:
+    cpu: 30  # unit %
+    mem: 40  # unit mb
 
 outline:
   - /tmp/sysom
