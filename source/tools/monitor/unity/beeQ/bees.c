@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include "clock/ee_clock.h"
+#include "postQue/postQue.h"
 
 #define RUN_THREAD_MAX  8
 #define RUN_QUEUE_SIZE  32
@@ -55,6 +56,8 @@ int main(int argc, char *argv[]) {
         printf("calibrate_local_clock failed.\n");
         exit(1);
     }
+
+    postQue_init();
 
     q = beeQ_init(RUN_QUEUE_SIZE,
                   app_recv_setup,
