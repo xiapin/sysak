@@ -18,7 +18,7 @@ function CpluginManager:_init_(procffi, proto_q, resYaml, tid, jperiod)
 
     self._plugins = {}
     self._names = {}
-    self:setup(res.plugins, proto_q)
+    self:setup(res, proto_q)
     self._guardSched = CguardSched.new(tid, self._plugins, self._names, jperiod)
 end
 
@@ -29,13 +29,14 @@ function CpluginManager:_del_()
     end
 end
 
-function CpluginManager:setup(plugins, proto_q)
+function CpluginManager:setup(resYaml, proto_q)
     local pluginFFI = require("collector.native.plugincffi")
+    local plugins = resYaml.plugins
 
     for _, plugin in ipairs(plugins) do
         local so = plugin.so
         if so then
-            table.insert(self._plugins, Cplugin.new(pluginFFI, proto_q, so))
+            table.insert(self._plugins, Cplugin.new(resYaml, pluginFFI, proto_q, so))
             table.insert(self._names, so)
         end
     end

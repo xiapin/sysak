@@ -6,12 +6,14 @@
 
 require("common.class")
 local Cplugin = class("plugin")
+local dockerinfo = require("common.dockerinfo")
 
-function Cplugin:_init_(ffi, proto_q, so)
+function Cplugin:_init_(resYaml, ffi, proto_q, so)
     self._ffi = ffi
-
     self._cffi = self._ffi.load(so)
     self._cffi.init(proto_q)
+    self.proc_fs = resYaml.config["proc_path"] or "/"
+    self.fill_arg = {["podname"]="pid"}
 end
 
 function Cplugin:_del_()
@@ -19,12 +21,30 @@ function Cplugin:_del_()
 end
 
 function Cplugin:load_label(unity_line, line)
+
+    local c = #line.ls
+    local table_dict = {}
+
+    for i=0, 4 - 1 do
+        local name = self._ffi.string(unity_line.indexs[i].name)
+        local index = self._ffi.string(unity_line.indexs[i].index)
+        table_dict[name] = index
+    end
+
     for i=0, 4 - 1 do
         local name = self._ffi.string(unity_line.indexs[i].name)
         local index = self._ffi.string(unity_line.indexs[i].index)
 
         if #name > 0 then
-            table.insert(line.ls, {name = name, index = index})
+            c = c + 1
+            if index == "?" and self.fill_arg[name] and table_dict[self.fill_arg[name]] then
+                if name == "podname" then
+                    local podname = dockerinfo:get_podname_pid(table_dict[self.fill_arg[name]], self.proc_fs) 
+                    line.ls[c] = {name = name, index = podname}
+                end
+            else
+                line.ls[c] = {name = name, index = index}
+            end
         else
             return
         end
