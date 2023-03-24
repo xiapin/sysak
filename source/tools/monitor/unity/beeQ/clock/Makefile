@@ -1,8 +1,8 @@
 CC := gcc
 AR := ar
 CFLAG := -g
-OBJS := outline.o
-LIB := liboutline.a
+OBJS := ee_clock.o
+LIB := liblocalclock.a
 
 all: $(LIB)
 

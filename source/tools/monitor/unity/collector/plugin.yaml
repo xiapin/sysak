@@ -1,5 +1,6 @@
 config:
   freq: 20   # unit second
+  daemon: true
   port: 8400  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
@@ -15,6 +16,9 @@ config:
   db:
     rotate: 7  # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
+  limit:
+    cpu: 30  # unit %
+    mem: 40  # unit mb
 
 outline:
   - /tmp/sysom

@@ -5,7 +5,7 @@ OBJS := proto_sender.o
 LIB := libproto_sender.a
 
 
-DEPMOD=sample threads kmsg proc_schedstat proc_loadavg unity_nosched unity_irqoff cpudist net_health net_retrans netlink cpufreq gpuinfo pmu_events
+DEPMOD=sample threads kmsg proc_schedstat proc_loadavg unity_nosched unity_irqoff cpudist cpu_bled net_health net_retrans netlink cpufreq gpuinfo pmu_events
 
 
 all: $(LIB) $(DEPMOD)
