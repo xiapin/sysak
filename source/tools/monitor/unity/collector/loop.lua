@@ -13,6 +13,7 @@ local calcJiffies = require("collector.guard.calcJiffies")
 local CguardSched = require("collector.guard.guardSched")
 local CguardDaemon = require("collector.guard.guardDaemon")
 local CguardSelfStat = require("collector.guard.guardSelfStat")
+local postQue = require("beeQ.postQue.postQue")
 
 local Cloop = class("loop")
 
@@ -56,6 +57,11 @@ function Cloop:work(t)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
     self._daemon:feed()
+
+    local r = postQue.pull()
+    if r then
+        print(r)
+    end
 end
 
 return Cloop

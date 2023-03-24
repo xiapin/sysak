@@ -28,6 +28,7 @@ int postQue_pull(char *msg) {
         strcat(msg, que.msgs[i]);
         strcat(msg, "\n");
     }
+    que.num = 0;
     pthread_mutex_unlock(&que.mtx);
     if (ret) {  // strip last \n
         int len = strlen(msg);
@@ -37,7 +38,7 @@ int postQue_pull(char *msg) {
 }
 
 // post a message
-int postQue_post(char *msg) {
+int postQue_post(const char *msg) {
     int ret = 0;
     int len = strlen(msg);
     if (len >= UNITY_POSTQUE_MSG_SIZE) {

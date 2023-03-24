@@ -10,7 +10,7 @@
 #include <pthread.h>
 
 int postQue_pull(char *msg);
-int postQue_post(char *msg);
+int postQue_post(const char *msg);
 int postQue_init();
 
 #endif //UNITY_POSTQUE_H

@@ -9,16 +9,16 @@ local ffi = require("ffi")
 
 ffi.cdef [[
 int postQue_pull(char *msg);
-int postQue_post(char *msg);
+int postQue_post(const char *msg);
 ]]
 
 local cffi = ffi.load("postQue")
 
 function mod.pull()
-    local s = self.ffi.new("char[?]", 1024)
+    local s = ffi.new("char[?]", 1024)
     local ret = cffi.postQue_pull(s)
     if ret > 0 then
-        return s
+        return ffi.string(s)
     end
     return nil
 end
