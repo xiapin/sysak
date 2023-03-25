@@ -30,8 +30,12 @@ cp beaver/native/*.lua ${APP}/beaver/native
 
 mkdir ${APP}/beeQ/
 mkdir ${APP}/beeQ/lib
+mkdir ${APP}/beeQ/postQue
+mkdir ${APP}/beeQ/rbtree
 cp beeQ/lib/*.so* ${APP}/beeQ/lib/
 cp beeQ/*.lua ${APP}/beeQ/
+cp beeQ/postQue/*.lua ${APP}/beeQ/postQue/
+cp beeQ/rbtree/*.lua ${APP}/beeQ/rbtree/
 cp beeQ/unity-mon ${APP}/beeQ/
 cp beeQ/run.sh ${APP}/beeQ/
 
@@ -39,11 +43,13 @@ mkdir ${APP}/collector
 mkdir ${APP}/collector/native
 mkdir ${APP}/collector/guard
 mkdir ${APP}/collector/outline
+mkdir ${APP}/collector/postEngine
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
 cp collector/guard/*.lua ${APP}/collector/guard
 cp collector/outline/*.lua ${APP}/collector/outline
+cp collector/postEngine/*.lua ${APP}/collector/postEngine
 cp collector/plugin.yaml ${APP}/collector/
 
 mkdir ${APP}/common

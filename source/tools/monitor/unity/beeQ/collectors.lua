@@ -108,13 +108,27 @@ local function setupFreq(fYaml)
     end
 end
 
-function work(que, proto_q, yaml, tid)
-    local fYaml = yaml or "../collector/plugin.yaml"
-    checkSos()
+local function setupMainCollector(que, proto_q, fYaml, tid)
     local Cloop = require("collector.loop")
     local w = Cloop.new(que, proto_q, fYaml, tid)
     local unit = setupFreq(fYaml)
+    return w, unit
+end
+
+local function setupPostEngine(que, proto_q, fYaml, tid)
+    local Cengine = require("collector.postEngine.engine")
+    local w = Cengine.new(que, proto_q, fYaml, tid)
+    return w, 1
+end
+
+function work(que, proto_q, yaml, tid)
+    local fYaml = yaml or "../collector/plugin.yaml"
+    checkSos()
     local e = CrbEvent.new()
+
+    local w, unit = setupMainCollector(que, proto_q, fYaml, tid)
     e:addEvent("mainCollector", w, unit)
+    w, unit = setupPostEngine(que, proto_q, fYaml, tid)
+    e:addEvent("postEngine", w, unit)
     return e:proc()
 end
