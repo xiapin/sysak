@@ -116,5 +116,5 @@ function work(que, proto_q, yaml, tid)
     local unit = setupFreq(fYaml)
     local e = CrbEvent.new()
     e:addEvent("mainCollector", w, unit)
-    e:proc()
+    return e:proc()
 end
