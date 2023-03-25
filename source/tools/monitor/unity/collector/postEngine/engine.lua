@@ -5,22 +5,42 @@
 ---
 
 require("common.class")
-
+local CprotoData = require("common.protoData")
 local postQue = require("beeQ.postQue.postQue")
+local CvProto = require("collector.vproto")
+local pystring = require("common.pystring")
+local cjson = require("cjson.safe")
 
-local Cengine = class("engine")
+local Cengine = class("engine", CvProto)
 
 function Cengine:_init_(que, proto_q, fYaml, tid)
-    self._que = que
-    self._proto = proto_q
+    CvProto._init_(self, CprotoData.new(que))
     self._fYaml = fYaml
     self._tid = tid
 end
 
+function Cengine:proc(t, event, msgs)
+    local lines = self._proto:protoTable()
+
+    CvProto.proc(self, t)
+    --local logs = pystring:split(msgs, '\n')
+    local logList = {}
+
+    logList[1] = {
+        name = "post",
+        log = cjson.encode(msgs)
+    }
+    self:appendLine(self:_packProto("post_que", nil, nil, logList))
+    self:push(lines)
+
+    local bytes = self._proto:encode(lines)
+    self._proto:que(bytes)
+end
+
 function Cengine:work(t, event)
-    local r = postQue.pull()
-    if r then
-        print(r)
+    local msgs = postQue.pull()
+    if msgs then
+        self:proc(t, event, msgs)
     end
 end
 
