@@ -15,7 +15,7 @@ function CguardSched:_init_(tid, procs, names, jperiod)
     self._jperiod = jperiod
     self._procs = procs
     self._names = names
-    self._limit = 1e5
+    self._limit = 1e5   -- 200 ms
 end
 
 function CguardSched:proc(t, lines)
@@ -29,6 +29,7 @@ function CguardSched:proc(t, lines)
         obj:proc(t, lines)
         stop = lua_local_clock()
         if stop - start >= self._limit then   --
+            print(stop - start)
             local j2 = self._stat:jiffies()
             if j2 - j1 >= self._limit / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used bye plugin
                 table.insert(toRemove, i)
