@@ -9,8 +9,8 @@ require("common.class")
 local CtaskMons = require("collector.postPlugin.taskMons")
 local CpostPlugin = class("")
 
-function CpostPlugin:_init_(proto, pffi, mnt)
-    self.tasks = CtaskMons.new(proto, pffi, mnt)
+function CpostPlugin:_init_(proto, pffi, rYaml)
+    self.tasks = CtaskMons.new(proto, pffi, rYaml)
 end
 
 function CpostPlugin:proc(elapsed, lines)

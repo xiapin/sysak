@@ -10,10 +10,11 @@ local unistd = require("posix.unistd")
 local CvProto = require("collector.vproto")
 local CtaskMons = class("taskMons", CvProto)
 
-function CtaskMons:_init_(proto, pffi, mnt)
+function CtaskMons:_init_(proto, pffi, rYaml)
     CvProto._init_(self, proto)
     self._pffi = pffi
-    self._mnt = mnt
+    self._mnt = rYaml.config.proc_path
+    self._limit = rYaml.config.limit.tasks or 10
     self._taskList = {}
 end
 
@@ -21,7 +22,7 @@ function CtaskMons:add(pid, loop)
     local lines = self._proto:protoTable()
     CvProto.proc(self, 1)
 
-    if #self._taskList > 10 then
+    if #self._taskList >= self._limit then
         self:packLog("post_req", "post", "task pids already overflow.")
     else
         if self._taskList[pid] then  -- already in

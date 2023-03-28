@@ -19,6 +19,7 @@ config:
   limit:
     cpu: 30  # unit %
     mem: 40  # unit mb
+    tasks: 10  # monitor 10 pid max.
 
 outline:
   - /tmp/sysom

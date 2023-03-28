@@ -29,7 +29,7 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self._guardSched = CguardSched.new(tid, self._procs, self._names, jperiod)
     self._soPlugins = CpluginManager.new(procffi, proto_q, res, tid, jperiod)
     self._guardStat = CguardSelfStat.new(self._proto, procffi, "/", res, jperiod)
-    self.postPlugin = CpostPlugin.new(self._proto, procffi, res.config.proc_path)
+    self.postPlugin = CpostPlugin.new(self._proto, procffi, res)
 end
 
 function Cloop:loadLuaPlugin(res, proc_path)
