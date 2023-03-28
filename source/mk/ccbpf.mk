@@ -2,7 +2,7 @@ CLANG ?= clang
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= $(SRC)/lib/internal/ebpf/tools/bpftool
 prefix ?= /usr/local
-ARCH := $(shell uname -m | sed 's/x86_64/x86/')
+ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/')
 COOLBPF_OBJ := $(OBJ_LIB_PATH)/libbpf.a $(OBJ_LIB_PATH)/coolbpf.a
 CXX ?= g++
 
