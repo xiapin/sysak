@@ -4,7 +4,7 @@ CFLAG := -g
 OBJS := outline.o
 LIB := liboutline.a
 
-all: $(DEPMOD) $(LIB)
+all: $(LIB)
 
 
 %.o: %.c, %.h
@@ -14,4 +14,4 @@ $(LIB): $(OBJS)
 	$(AR) cr $@ $(OBJS)
 
 clean:
-	rm -f $(EXEC) $(OBJS)
+	rm -f $(LIB) $(OBJS)

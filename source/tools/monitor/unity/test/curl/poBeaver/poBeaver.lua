@@ -64,7 +64,7 @@ function CpoBeaver:_install_fd(port, ip, backlog)
 end
 
 local function fdNonBlocking(fd)
-    local res, err, errno
+    local res
     local flag, err, errno = fcntl.fcntl(fd, fcntl.F_GETFL)
     if flag then
         res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))

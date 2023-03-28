@@ -5,42 +5,17 @@
 ---
 
 require("common.class")
-local system = require("common.system")
+local CvProto = require("collector.vproto")
 
-local CvProc = class("collector.vproc")
+local CvProc = class("collector.vproc", CvProto)
 
 function CvProc:_init_(proto, pffi, mnt, pFile)
-    self._proto = proto
+    CvProto._init_(self, proto)
     self._cffi = pffi["cffi"]
     self._ffi = pffi["ffi"]
     mnt = mnt or "/"
     pFile = pFile or ""
     self.pFile = mnt .. pFile
-end
-
-function CvProc:proc(elapsed)
-    self._lines = self._proto:protoTable()
-end
-
-function CvProc:appendLine(line)
-    table.insert(self._lines["lines"], line)
-end
-
-function CvProc:copyLine(line)
-    self:appendLine(system:deepcopy(line))
-end
-
-function CvProc:push(lines)
-    local c = #lines["lines"]   -- not for #lines
-    for _, line in ipairs(self._lines["lines"]) do
-        c = c + 1
-        lines["lines"][c] = line
-    end
-    self._lines = nil
-end
-
-function CvProc:_packProto(head, labels, vs, log)
-    return {line = head, ls = labels, vs = vs, log = log}
 end
 
 return CvProc

@@ -9,6 +9,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include "clock/ee_clock.h"
+#include "postQue/postQue.h"
 
 #define RUN_THREAD_MAX  8
 #define RUN_QUEUE_SIZE  32
@@ -35,11 +37,13 @@ void sig_handler(int num)
     }
 }
 
+char ** entry_argv; // for daemon process
 extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int main(int argc, char *argv[]) {
     struct beeQ* q;           //for proto-buf stream
     struct beeQ* proto_que;   //for trans c to proto-buf stream
 
+    entry_argv = argv;
     if (argc > 1) {
         g_yaml_file = argv[1];
     }
@@ -47,6 +51,13 @@ int main(int argc, char *argv[]) {
     signal(SIGHUP, sig_handler);
     signal(SIGUSR1, sig_handler);
     signal(SIGINT, sig_handler);
+
+    if (calibrate_local_clock() < 0) {
+        printf("calibrate_local_clock failed.\n");
+        exit(1);
+    }
+
+    postQue_init();
 
     q = beeQ_init(RUN_QUEUE_SIZE,
                   app_recv_setup,

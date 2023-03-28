@@ -5,6 +5,8 @@
 #include "proto_sender.h"
 #define _GNU_SOURCE
 #include <unistd.h>
+#include <pthread.h>
+#include <sys/prctl.h>
 #include <sys/syscall.h>
 
 #define PROTO_QUEUE_SIZE  64
@@ -165,9 +167,11 @@ int proto_send_proc(void* msg, struct beeQ* q) {
     return ret;
 }
 
+// 这是接收外部非lua 推送队列的操作
 static int proto_recv_setup(struct beeQ* q) {
     lua_State *L;
     struct beeQ* pushQ = (struct beeQ*)(q->qarg);
+    prctl(PR_SET_NAME, (unsigned long)"proto_recv");
 
     L = proto_sender_lua(pushQ);
     if (L == NULL) {
