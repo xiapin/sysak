@@ -219,11 +219,11 @@ void collect(struct pcpu_hw_info *phw, double *sum)
 #endif
 }
 
-int fill_line_percpu(struct unity_line *line, double *summ, char *index)
+int fill_line_percpu(struct unity_line *line, double *summ, char *mode, char *index)
 {
 	int i;
 
-	unity_set_index(line, 0, "mode", index);
+	unity_set_index(line, 0, mode, index);
 	for (i = 0; i < NR_EVENTS; i++)
 		unity_set_value(line, i, events_str[i], summ[i]);
 	unity_set_value(line, i++, "cpi", summ[CYCLES]/summ[INSTRUCTIONS]);
@@ -239,11 +239,11 @@ int fill_line_percpu(struct unity_line *line, double *summ, char *index)
 		(summ[LLC_LOAD_REF]+summ[LLC_STORE_REF]));
 }
 
-int fill_line(struct unity_line *line, double *summ, char *index)
+int fill_line(struct unity_line *line, double *summ, char *mode, char *index)
 {
 	int i;
 
-	unity_set_index(line, 0, "mode", index);
+	unity_set_index(line, 0, mode, index);
 	for (i = 0; i < NR_EVENTS; i++)
 		unity_set_value(line, i, events_str[i], summ[i]);
 
@@ -282,13 +282,13 @@ int call(int t, struct unity_lines* lines)
 	unity_alloc_lines(lines, 1+nr_cpus);
 	line = unity_get_line(lines, 0);
 	unity_set_table(line, "pmu_events");
-	fill_line(line, summ, "node");
+	fill_line(line, summ, "mode", "node");
 
 	for (i = 0; i < nr_cpus; i++) {
 		line = unity_get_line(lines, 1+i);
 		unity_set_table(line, "pmu_events_percpu");
-		snprintf(index, sizeof(index), "percpu%d", i);
-		fill_line(line, pcp_hw[i].values, index);
+		snprintf(index, sizeof(index), "%d", i);
+		fill_line(line, pcp_hw[i].values, "core", index);
 	}
 	return 0;
 }

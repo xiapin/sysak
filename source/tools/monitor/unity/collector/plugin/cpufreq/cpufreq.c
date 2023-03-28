@@ -1,12 +1,21 @@
 //
 // Created by muya.
 //
-
 #include "cpufreq.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
+long nr_cpus;
 int init(void * arg) {
+	int ret;
+
+	nr_cpus = sysconf(_SC_NPROCESSORS_CONF);
+	if (nr_cpus < 0) {
+		ret = errno;
+		printf("WARN: cpufreq plugin install FAIL sysconf\n");
+		return ret;
+	}
     printf("cpufreq plugin install, proc: %s\n", get_unity_proc());
     return 0;
 }
@@ -16,14 +25,12 @@ int call(int t, struct unity_lines* lines) {
     int ret;
 	int num_line, cpu_hw, cpu_cur;
 	FILE *fp = NULL;
-	char value[16] = {0};
+	char cpu_name[16] = {0};
     char str[128];
     int len = 0;
     char result[16] = {0};
 
-    unity_alloc_lines(lines, 1);
-    line = unity_get_line(lines, 0);
-    unity_set_table(line, "cpufreq");
+    unity_alloc_lines(lines, nr_cpus*2);
 
     errno = 0;
     
@@ -44,8 +51,11 @@ int call(int t, struct unity_lines* lines) {
                 pLast++;
             }
             memcpy(result, pLast-len, len);
-		snprintf(value, sizeof(value), "hwfreq_cpu%d", cpu_hw++);
-            unity_set_value(line, num_line++ , value, atof(result)*1000);
+		snprintf(cpu_name, sizeof(cpu_name), "%d", cpu_hw++);
+    		line = unity_get_line(lines, num_line++);
+   		unity_set_table(line, "cpufreq");
+		unity_set_index(line, 0, "core", cpu_name);
+		unity_set_value(line, 0, "hwFreq", atof(result)*1000);
             memset(result, 0, 16);
             len = 0;
         } else {
@@ -59,8 +69,11 @@ int call(int t, struct unity_lines* lines) {
                     pLast2++;
                 }
                 memcpy(result, pLast2-len, len);
-		snprintf(value, sizeof(value), "curfreq_cpu%d", cpu_cur++);
-                unity_set_value(line, num_line++, value, atof(result));
+		snprintf(cpu_name, sizeof(cpu_name), "%d", cpu_cur++);
+    		line = unity_get_line(lines, num_line++);
+   		unity_set_table(line, "cpufreq");
+		unity_set_index(line, 0, "core", cpu_name);
+                unity_set_value(line, 0, "curFreq", atof(result));
                 memset(result, 0, 16);
                 len = 0;
                 //break;
