@@ -12,6 +12,8 @@ tar -xzf log4cpp-1.1.3.tar.gz -C ./
 cd log4cpp && ./configure && make && make install
 ```
 
+注意：arm 平台 configure 具体命令是： ./configure --build=aarch64-unknown-linux-gnu
+
 #### 安装rapidjson库
 
 ```
