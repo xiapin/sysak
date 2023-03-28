@@ -61,9 +61,9 @@ plugins:
   #-
   #  so: numainfo
   #  description: "collect numainfo"
-  # -
-  #   so: cpufreq
-  #   description: "collect cpufreq"
+  #-
+  #  so: cpufreq
+  #  description: "collect cpufreq"
   -
     so: gpuinfo
     description: "collect gpuinfo"
@@ -208,11 +208,11 @@ metrics:
   #  head: value
   #  help: "numainfo of system from /sys/devices/system/"
   #  type: "gauge"
-  # - title: sysak_proc_cpufreq
-  #   from: cpufreq
-  #   head: value
-  #   help: "cpufreq of system from /proc/cpuinfo"
-  #   type: "gauge"
+  #- title: sysak_proc_cpufreq
+  #  from: cpufreq
+  #  head: value
+  #  help: "cpufreq of system from /proc/cpuinfo"
+  #  type: "gauge"
   - title: sysak_gpuinfo
     from: gpuinfo
     head: value
