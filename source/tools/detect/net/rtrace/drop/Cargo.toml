@@ -19,6 +19,8 @@ utils = { path = "../utils" }
 eutils-rs = "0.1.6"
 builder = { path = "../builder" }
 chrono = "0.4.19"
+serde_json = "1.0"
+serde = {version = "1.0", features = ["derive"]}
 
 [build-dependencies]
 libbpf-cargo = "0.13"

@@ -7,9 +7,11 @@ use std::ops::Sub;
 use std::path::Path;
 use std::str::FromStr;
 
-#[derive(Default, Debug, Clone)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Snmp {
-    hm: HashMap<(String, String), isize>,
+    snmp: HashMap<String, isize>,
 }
 
 impl FromStr for Snmp {
@@ -66,7 +68,7 @@ impl Snmp {
     }
 
     pub fn insert(&mut self, k: (String, String), v: isize) {
-        self.hm.insert(k, v);
+        self.snmp.insert(format!("{}:{}", k.0, k.1), v);
     }
 }
 
@@ -100,11 +102,11 @@ impl DeltaSnmp {
     }
 
     fn delta(&self, key: &(String, String)) -> Option<isize> {
-        if let Some(x) = self.cursnmp.hm.get(&key) {
-            if let Some(y) = self.presnmp.hm.get(&key) {
-                return Some(*x - *y);
-            }
-        }
+        // if let Some(x) = self.cursnmp.hm.get(&key) {
+        //     if let Some(y) = self.presnmp.hm.get(&key) {
+        //         return Some(*x - *y);
+        //     }
+        // }
         None
     }
 
@@ -127,12 +129,12 @@ impl DeltaSnmp {
 
 impl fmt::Display for DeltaSnmp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (k, v) in &self.cursnmp.hm {
-            let pre_v = self.presnmp.hm.get(k).unwrap();
-            if v - pre_v != 0 {
-                write!(f, "{}:{} {} ", k.0, k.1, v - pre_v)?;
-            }
-        }
+        // for (k, v) in &self.cursnmp.hm {
+        //     let pre_v = self.presnmp.hm.get(k).unwrap();
+        //     if v - pre_v != 0 {
+        //         write!(f, "{}:{} {} ", k.0, k.1, v - pre_v)?;
+        //     }
+        // }
         Ok(())
     }
 }

@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::{read_to_string, File};
@@ -7,9 +8,9 @@ use std::ops::Sub;
 use std::path::Path;
 use std::str::FromStr;
 
-#[derive(Default, Debug, Clone)]
-struct Netstat {
-    hm: HashMap<(String, String), isize>,
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct Netstat {
+    netstat: HashMap<String, isize>,
 }
 
 impl FromStr for Netstat {
@@ -66,7 +67,7 @@ impl Netstat {
     }
 
     pub fn insert(&mut self, k: (String, String), v: isize) {
-        self.hm.insert(k, v);
+        self.netstat.insert(format!("{}:{}", k.0, k.1), v);
     }
 }
 
@@ -100,12 +101,12 @@ impl DeltaNetstat {
     }
 
     fn delta(&self, key: &(String, String)) -> Option<isize> {
-        if let Some(x) = self.curnetstat.hm.get(&key) {
-            if let Some(y) = self.prenetstat.hm.get(&key) {
-                return Some(*x - *y);
-                
-            }
-        }
+        // if let Some(x) = self.curnetstat.hm.get(&key) {
+        //     if let Some(y) = self.prenetstat.hm.get(&key) {
+        //         return Some(*x - *y);
+
+        //     }
+        // }
         None
     }
 
@@ -137,12 +138,18 @@ impl DeltaNetstat {
 
 impl fmt::Display for DeltaNetstat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (k, v) in &self.curnetstat.hm {
-            let pre_v = self.prenetstat.hm.get(k).unwrap();
-            if v - pre_v != 0 {
-                write!(f, "{}:{} {} ", k.0, k.1, v - pre_v)?;
-            }
-        }
+        // for (k, v) in &self.curnetstat.hm {
+        //     let pre_v = self.prenetstat.hm.get(k).unwrap();
+        //     if v - pre_v != 0 {
+        //         write!(f, "{}:{} {} ", k.0, k.1, v - pre_v)?;
+        //     }
+        // }
         Ok(())
     }
+}
+
+pub fn show_netstat_json() -> Result<()> {
+    let netstat = Netstat::from_file("/proc/net/netstat")?;
+    println!("{}", serde_json::to_string(&netstat)?);
+    Ok(())
 }
