@@ -10,6 +10,6 @@ local ChttpCli = require("httplib.httpCli")
 
 local cli = ChttpCli.new()
 local url = "http://127.0.0.1:8400/api/que"
-local req = {cmd = "mon_pid", pid = {24, 25}}
+local req = {cmd = "mon_pid", pid = 15789, loop = 3}
 local res = cli:postTable(url, req)
 system:dumps(res)

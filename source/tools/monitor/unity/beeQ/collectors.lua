@@ -126,9 +126,11 @@ function work(que, proto_q, yaml, tid)
     checkSos()
     local e = CrbEvent.new()
 
-    local w, unit = setupMainCollector(que, proto_q, fYaml, tid)
-    e:addEvent("mainCollector", w, unit)
-    w, unit = setupPostEngine(que, proto_q, fYaml, tid)
-    e:addEvent("postEngine", w, unit)
+    local main, engine, unit
+    main, unit = setupMainCollector(que, proto_q, fYaml, tid)
+    e:addEvent("mainCollector", main, unit)
+    engine, unit = setupPostEngine(que, proto_q, fYaml, tid)
+    engine:setTask(main.postPlugin.tasks)
+    e:addEvent("postEngine", engine, unit)
     return e:proc()
 end

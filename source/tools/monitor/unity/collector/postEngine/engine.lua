@@ -9,6 +9,7 @@ local CprotoData = require("common.protoData")
 local postQue = require("beeQ.postQue.postQue")
 local CvProto = require("collector.vproto")
 local pystring = require("common.pystring")
+local system = require("common.system")
 local cjson = require("cjson.safe")
 
 local Cengine = class("engine", CvProto)
@@ -16,7 +17,23 @@ local Cengine = class("engine", CvProto)
 function Cengine:_init_(que, proto_q, fYaml, tid)
     CvProto._init_(self, CprotoData.new(que))
     self._fYaml = fYaml
-    self._tid = tid
+    self._tid  = tid
+    self._task = nil
+end
+
+function Cengine:setTask(taskMons)
+    self._task = taskMons
+end
+
+function Cengine:pushTask(msgs)
+    local events = pystring:split(msgs, '\n')
+    for _, msg in ipairs(events) do
+        print(msg)
+        local res = cjson.decode(msg)
+        if res.cmd == "mon_pid" then
+            self._task:add(res.pid, res.loop)
+        end
+    end
 end
 
 function Cengine:proc(t, event, msgs)
@@ -35,6 +52,8 @@ function Cengine:proc(t, event, msgs)
 
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
+
+    self:pushTask(msgs)
 end
 
 function Cengine:work(t, event)

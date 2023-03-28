@@ -38,4 +38,14 @@ function CvProto:_packProto(head, labels, vs, log)
     return {line = head, ls = labels, vs = vs, log = log}
 end
 
+function CvProto:packLog(title, name, msg)
+    local logList = {}
+
+    logList[1] = {
+        name = name,
+        log = msg
+    }
+    self:appendLine(self:_packProto(title, nil, nil, logList))
+end
+
 return CvProto
