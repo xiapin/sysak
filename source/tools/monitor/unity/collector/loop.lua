@@ -13,6 +13,7 @@ local calcJiffies = require("collector.guard.calcJiffies")
 local CguardSched = require("collector.guard.guardSched")
 local CguardDaemon = require("collector.guard.guardDaemon")
 local CguardSelfStat = require("collector.guard.guardSelfStat")
+local CpostPlugin = require("collector.postPlugin.postPlugin")
 
 local Cloop = class("loop")
 
@@ -28,6 +29,7 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self._guardSched = CguardSched.new(tid, self._procs, self._names, jperiod)
     self._soPlugins = CpluginManager.new(procffi, proto_q, res, tid, jperiod)
     self._guardStat = CguardSelfStat.new(self._proto, procffi, "/", res, jperiod)
+    self.postPlugin = CpostPlugin.new(self._proto, procffi, res)
 end
 
 function Cloop:loadLuaPlugin(res, proc_path)
@@ -53,6 +55,8 @@ function Cloop:work(t)
     self._guardSched:proc(t, lines)
     self._soPlugins:proc(t, lines)
     self._guardStat:proc(t, lines)
+    self.postPlugin:proc(t, lines)
+
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
     self._daemon:feed()

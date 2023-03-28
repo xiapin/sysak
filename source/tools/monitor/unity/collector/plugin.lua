@@ -12,11 +12,13 @@ function Cplugin:_init_(resYaml, ffi, proto_q, so)
     self._ffi = ffi
     self._cffi = self._ffi.load(so)
     self._cffi.init(proto_q)
+    self._so = so
     self.proc_fs = resYaml.config["proc_path"] or "/"
     self.fill_arg = {["podname"]="pid"}
 end
 
 function Cplugin:_del_()
+    print("uninstall " .. self._so)
     self._cffi.deinit()
 end
 
