@@ -26,7 +26,7 @@ outline:
 
 container:
   mode: "pods"
-  luaPlugin: ["cg_cpu_stat", ]
+  luaPlugin: ["cg_cpu_stat_sample", ]
   directCgPath:
     - ""
     - "kubepods.slice"
