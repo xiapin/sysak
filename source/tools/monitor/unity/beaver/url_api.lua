@@ -25,8 +25,7 @@ end
 
 function CurlApi:que(tReq)
     local stat, tJson = pcall(self.getJson, self, tReq)
-    print(tJson)
-    if stat then
+    if stat and tJson then
         local s = self:jencode(tJson)
         if #s > 5 then
             postQue.post(s)
