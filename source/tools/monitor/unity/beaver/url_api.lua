@@ -18,15 +18,19 @@ function CurlApi:_init_(frame, fYaml)
     self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
     self._urlCb["/api/que"] = function(tReq) return self:que(tReq)  end
+    self._urlCb["/api/trig"] = function(tReq) return self:que(tReq)  end
     self:_install(frame)
     self:_setupQs(fYaml)
 end
 
 function CurlApi:que(tReq)
     local stat, tJson = pcall(self.getJson, self, tReq)
+    print(tJson)
     if stat then
         local s = self:jencode(tJson)
-        postQue.post(s)
+        if #s > 5 then
+            postQue.post(s)
+        end
         return tJson
     else
         return {}
