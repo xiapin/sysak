@@ -8,12 +8,17 @@ require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
 local unistd = require("posix.unistd")
+local system = require("common.system")
 
 local Cinterrupts = class("interrupts", CvProc)
 
 function Cinterrupts:_init_(proto, pffi, mnt, pFile)
     CvProc._init_(self, proto, pffi, mnt, pFile or "proc/interrupts")
-    self._cpus = unistd.sysconf(84)
+    local err, errno
+    self._cpus, err, errno = unistd.sysconf(84)
+    if err then
+        system:posixError("sysconf failed", err, errno)
+    end
 end
 
 function Cinterrupts:proc(elapsed, lines)

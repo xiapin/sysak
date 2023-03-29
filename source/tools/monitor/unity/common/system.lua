@@ -40,6 +40,13 @@ function system:dumps(t)
     print(serpent.block(t))
 end
 
+function system:reverseTable(t)
+    local n = #t
+    for i = 1, n / 2 do
+        t[i], t[n + 1 - i] = t[n + 1 - i], t[i]
+    end
+end
+
 function system:keyIsIn(tbl, key)
     if type(tbl) ~= "table" then
         return false

@@ -13,7 +13,6 @@ cd ../../beeQ || exit 1
 [ ! -d ../lib ] && mkdir ../lib
 cp ./lib/*.so ../lib
 cp ../tsdb/native/*.so ../lib
-rm -rf ../bin
 [ ! -d ../bin ] && mkdir ../bin
 cp unity-mon ../bin
 

@@ -1,9 +1,10 @@
 config:
   freq: 20   # unit second
+  daemon: true
   port: 8400  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
-  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg), env(need name arg)
     mode: curl
     url: "http://100.100.100.200/latest/meta-data/instance-id"
 #    name: test_specify
@@ -15,14 +16,27 @@ config:
   db:
     rotate: 7  # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
+  limit:
+    cpu: 30  # unit %
+    mem: 40  # unit mb
+    tasks: 10  # monitor 10 pid max.
 
 outline:
   - /tmp/sysom
 
 container:
   mode: "pods"
-  luaPlugin: ["cg_cpuacct_proc_stat", "cg_memory_dcmp_latency",  "cg_memory_fail_cnt",
-    "cg_cpu_stat",  "cg_cpuacct_wait_latency",  "cg_memory_drcm_latency"]
+  luaPlugin: ["cg_cpu_stat", ]
+  directCgPath:
+    - ""
+    - "kubepods.slice"
+    - "kubepods.slice/kubepods-besteffort.slice"
+    - "kubepods.slice/kubepods-burstable.slice"
+
+  indirectCgPath:
+    - "kubepods.slice"
+    - "kubepods.slice/kubepods-besteffort.slice"
+    - "kubepods.slice/kubepods-burstable.slice"
 
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",

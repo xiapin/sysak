@@ -3,6 +3,7 @@
 --- Created by liaozhaoyan.
 --- DateTime: 2022/12/26 11:26 PM
 ---
+package.cpath = package.cpath .. ";../lib/?.so"
 package.path = package.path .. ";../?.lua;"
 
 local dirent = require("posix.dirent")
@@ -10,7 +11,7 @@ local unistd = require("posix.unistd")
 local stat = require("posix.sys.stat")
 local bit = require("bit")
 local system = require("common.system")
-local ptime = require("posix.time")
+local CrbEvent = require("beeQ.rbtree.rbEvent")
 
 local srcPath = "../collector/native/"
 local dstPath = "../collector/lib/"
@@ -107,34 +108,29 @@ local function setupFreq(fYaml)
     end
 end
 
-local function calcSleep(hope, now)
-    if hope.tv_nsec >= now.tv_nsec then
-        return {tv_sec  = hope.tv_sec - now.tv_sec,
-                tv_nsec = hope.tv_nsec - now.tv_nsec}
-    else
-        return {tv_sec  = hope.tv_sec - now.tv_sec - 1,
-                tv_nsec = 1e9 + hope.tv_nsec - now.tv_nsec}
-    end
+local function setupMainCollector(que, proto_q, fYaml, tid)
+    local Cloop = require("collector.loop")
+    local w = Cloop.new(que, proto_q, fYaml, tid)
+    local unit = setupFreq(fYaml)
+    return w, unit
 end
 
-function work(que, proto_q, yaml)
+local function setupPostEngine(que, proto_q, fYaml, tid)
+    local Cengine = require("collector.postEngine.engine")
+    local w = Cengine.new(que, proto_q, fYaml, tid)
+    return w, 1
+end
+
+function work(que, proto_q, yaml, tid)
     local fYaml = yaml or "../collector/plugin.yaml"
     checkSos()
-    local Cloop = require("collector.loop")
-    local w = Cloop.new(que, proto_q, fYaml)
-    local unit = setupFreq(fYaml)
-    local tStart = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
-    while true do
-        w:work(unit)
-        local now = ptime.clock_gettime(ptime.CLOCK_MONOTONIC)
-        local hope = {tv_sec = tStart.tv_sec + unit, tv_nsec = tStart.tv_sec}
-        local diff = calcSleep(hope, now)
-        assert(diff.tv_sec >= 0)
-        local _, s, errno, _ = ptime.nanosleep(diff)
-        if errno then   -- interrupt by signal
-            print(string.format("new sleep stop. %d, %s", errno, s))
-            return 0
-        end
-        tStart = hope
-    end
+    local e = CrbEvent.new()
+
+    local main, engine, unit
+    main, unit = setupMainCollector(que, proto_q, fYaml, tid)
+    e:addEvent("mainCollector", main, unit)
+    engine, unit = setupPostEngine(que, proto_q, fYaml, tid)
+    engine:setTask(main.postPlugin.tasks)
+    e:addEvent("postEngine", engine, unit)
+    return e:proc()
 end

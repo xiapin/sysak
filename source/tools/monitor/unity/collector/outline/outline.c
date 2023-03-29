@@ -4,6 +4,8 @@
 
 #include "outline.h"
 #include <errno.h>
+#include <pthread.h>
+#include <sys/prctl.h>
 
 extern int lua_reg_errFunc(lua_State *L);
 extern int lua_check_ret(int ret);
@@ -125,6 +127,7 @@ static int outline_work(struct beeQ* q, char *fYaml) {
 static int outline_run(struct beeQ* q, void* arg) {
     int ret;
     char *fYaml = (char *)arg;
+    prctl(PR_SET_NAME, (unsigned long)"outline_run");
 
     while (1) {
         ret = outline_work(q, fYaml);

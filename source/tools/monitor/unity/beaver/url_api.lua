@@ -8,6 +8,8 @@ require("common.class")
 local system = require("common.system")
 local ChttpApp = require("httplib.httpApp")
 local CfoxTSDB = require("tsdb.foxTSDB")
+local postQue = require("beeQ.postQue.postQue")
+
 local CurlApi = class("urlApi", ChttpApp)
 
 function CurlApi:_init_(frame, fYaml)
@@ -15,8 +17,20 @@ function CurlApi:_init_(frame, fYaml)
     self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
     self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
+    self._urlCb["/api/que"] = function(tReq) return self:que(tReq)  end
     self:_install(frame)
     self:_setupQs(fYaml)
+end
+
+function CurlApi:que(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat then
+        local s = self:jencode(tJson)
+        postQue.post(s)
+        return tJson
+    else
+        return {}
+    end
 end
 
 function CurlApi:sum(tReq)

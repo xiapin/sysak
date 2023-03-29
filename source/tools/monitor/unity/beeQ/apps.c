@@ -9,7 +9,10 @@
 #include <errno.h>
 #include "beeQ.h"
 #include "apps.h"
+#include "clock/ee_clock.h"
+#include "daemon.h"
 #include <sys/syscall.h>
+#include <sys/prctl.h>
 
 #define gettidv1() syscall(__NR_gettid)
 extern char *g_yaml_file;
@@ -126,9 +129,11 @@ static lua_State * app_recv_init(void)  {
     return NULL;
 }
 
+// 这是接收队列初始化动作
 int app_recv_setup(struct beeQ* q) {
     lua_State *L;
 
+    prctl(PR_SET_NAME, (unsigned long)"app_recv");
     L = app_recv_init();
     if (L == NULL) {
         return -1;
@@ -205,6 +210,20 @@ int app_recv_proc(void* msg, struct beeQ* q) {
     return ret;
 }
 
+static int lua_local_clock(lua_State *L) {
+    clock_t t = get_local_clock();
+    lua_pushnumber(L, t);
+    return 1;
+}
+
+static int lua_setup_daemon(lua_State *L) {
+    int fd;
+    int period = lua_tonumber(L, 1);
+    fd = setup_daemon(period);
+    lua_pushnumber(L, fd);
+    return 1;
+}
+
 int collector_qout(lua_State *L) {
     int ret;
     struct beeQ* q = (struct beeQ*) lua_topointer(L, 1);
@@ -225,10 +244,13 @@ int collector_qout(lua_State *L) {
     return 1;   // return a value.
 }
 
+// 这是 collector 初始化操作
 static int app_collector_work(void* q, void* proto_q) {
     int ret;
     int err_func;
     lua_Number lret;
+
+    prctl(PR_SET_NAME, (unsigned long)"app_collector");
 
     /* create a state and load standard library. */
     lua_State *L = luaL_newstate();
@@ -245,13 +267,16 @@ static int app_collector_work(void* q, void* proto_q) {
     }
 
     lua_register(L, "collector_qout", collector_qout);
+    lua_register(L, "lua_local_clock", lua_local_clock);
+    lua_register(L, "lua_setup_daemon", lua_setup_daemon);
 
     // call init.
     lua_getglobal(L, "work");
     lua_pushlightuserdata(L, q);
     lua_pushlightuserdata(L, proto_q);
     lua_pushstring(L, g_yaml_file);
-    ret = lua_pcall(L, 3, 1, err_func);
+    lua_pushinteger(L, (int)gettidv1());
+    ret = lua_pcall(L, 4, 1, err_func);
     if (ret < 0) {
         lua_check_ret(ret);
         goto endCall;
@@ -281,6 +306,7 @@ static int app_collector_work(void* q, void* proto_q) {
     return -1;
 }
 
+
 int app_collector_run(struct beeQ* q, void* arg) {
     int ret = 0;
     struct beeQ* proto_que = (struct beeQ* )arg;
@@ -289,6 +315,7 @@ int app_collector_run(struct beeQ* q, void* arg) {
         ret = app_collector_work(q, proto_que);
         if (ret < 0) {
             perror("collect work run failed.");
+            exit(1);
             break;
         }
     }

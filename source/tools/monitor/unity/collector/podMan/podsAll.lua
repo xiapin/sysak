@@ -9,9 +9,10 @@ require("common.class")
 local ChttpCli = require("httplib.httpCli")
 local system = require("common.system")
 local pystring = require("common.pystring")
+local Cinotifies = require("common.inotifies")
 local unistd = require("posix.unistd")
 
-local CpodsApi = class("podsApi")
+local CpodsAll = class("podsApi")
 
 local function spiltConId(conId)
     local res = pystring:split(conId, "//", 1)
@@ -101,7 +102,7 @@ local function setupCons(res)
     return cons
 end
 
-local function setupPlugins(res, proto, pffi, mnt)
+local function setupPlugins(res, proto, pffi, mnt, ino)
     local c = 0
     local cons = setupCons(res)
     local plugins = {}
@@ -138,22 +139,36 @@ local function setupPlugins(res, proto, pffi, mnt)
             local CProcs = require("collector.container." .. plugin)
             c = c + 1
             plugins[c] = CProcs.new(proto, pffi, mnt, con.path, ls)
+            ino:add(plugins[c].pFile)
         end
     end
 
     return plugins
 end
 
-function CpodsApi:_init_(resYaml, proto, pffi, mnt)
-    self._plugins = setupPlugins(resYaml, proto, pffi, mnt)
+function CpodsAll:_init_(resYaml, proto, pffi, mnt)
+    self._monDir = mnt .. "sys/fs/cgroup/"
+    self._resYaml = resYaml
+    self._proto = proto
+    self._pffi = pffi
+    self._mnt = mnt
+
+    self._ino = Cinotifies.new()
+    self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
     print( "pods plugin add " .. #self._plugins)
 end
 
-function CpodsApi:proc(elapsed, lines)
+function CpodsAll:proc(elapsed, lines)
     local rec = {}
+    if self._ino:isChange() then
+        print("cgroup changed.")
+        self._ino = Cinotifies.new()
+        self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
+    end
     for i, plugin in ipairs(self._plugins) do
-        local res = plugin:proc(elapsed, lines)
-        if res == -1 then
+        --local res = plugin:proc(elapsed, lines)
+        local stat, res = pcall(plugin.proc, plugin, elapsed, lines)
+        if not stat or res == -1 then
             table.insert(rec, i)
         end
     end
@@ -163,4 +178,4 @@ function CpodsApi:proc(elapsed, lines)
     end
 end
 
-return CpodsApi
+return CpodsAll

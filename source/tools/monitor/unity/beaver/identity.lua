@@ -7,6 +7,7 @@
 require("common.class")
 local system = require("common.system")
 local socket = require("socket")
+local stdlib = require("posix.stdlib")
 
 local Cidentity = class("identity")
 
@@ -18,7 +19,8 @@ function Cidentity:_init_(fYaml)
         curl = function() return self:curl()  end,
         hostname = function() return self:hostname()  end,
         file = function() return self:file()  end,
-        specify = function() return self:specify()  end
+        specify = function() return self:specify()  end,
+        env = function() return self:env()  end
     }
 end
 
@@ -72,6 +74,15 @@ end
 function Cidentity:specify()
     if self._opts.name then
         return self._opts.name
+    else
+        return "None"
+    end
+end
+
+function Cidentity:env()
+    if self._opts.name then
+        local inst_name = stdlib.getenv(self._opts.name)
+        return inst_name
     else
         return "None"
     end

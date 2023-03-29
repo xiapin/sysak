@@ -7,12 +7,47 @@
 package.cpath = package.cpath .. ";../../beeQ/lib/?.so"
 package.path = package.path .. ";../../?.lua;"
 
-local CrbEvent = require("common/rbEvent")
+local CrbEvent = require("beeQ.rbtree.rbEvent")
+
+require("common.class")
+local tObj = class("tOjb")
+
+function tObj:_init_(title)
+    self._title = title
+end
+
+function tObj:work(t)
+    print("obj " .. self._title .. " work")
+end
+
+local tObjAdd = class("tObjAdd", tObj)
+
+function tObjAdd:_init_(title)
+    tObj._init_(self, title)
+    self._add = true
+    self._count = 0
+end
+
+function tObjAdd:work(t, tree)
+    if self._add then
+        local o3 = tObj.new("o3")
+        tree:addEvent("stop period 3", o3, 3, true, 10)
+        self._add = false
+    end
+    tObj.work(self, t)
+    self._count = self._count + 1
+    if self._count > 5 then
+        print("add Obj leave.")
+        return -1
+    end
+end
+
+local o1 = tObj.new("o1")
+local o2 = tObjAdd.new("o2")
 
 local e = CrbEvent.new()
 
-e:addEvent("test period 2", 2)
-e:addEvent("test period 3", 3)
-e:addEvent("stop period 3", 3, true, 10)
+e:addEvent("test period 2", o1, 2)
+e:addEvent("test period 3", o2, 3)
 
 e:proc()

@@ -242,6 +242,34 @@ This parser parses the stats from network devices. These stats includes events p
 | data     | - | data + stack |  | collector/proc\_statm.lua |
 | dt       | - | dirty pages |  | collector/proc\_statm.lua |
 
+
+## IO指标
+
+-------------
+
+### IOMonIndForDisksIO 表 
+统计磁盘级IO信息
+
+|  指标名         | 单位 | 标签说明 | 备注 | 源码路径 |
+|:---------------| ---: | :---- | :---- | :--- |
+| ioburstCnt     | 次 | 每分钟io burst（IO压力突发增大）次数 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| iodelayCnt     | 次 | 每分钟io延迟高次数 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| iohangCnt      | 次 | 每分钟io hang次数 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| bps            | kB | 磁盘bps | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| iops           | 个 | 磁盘iops | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| qusize         | 个 |  未完成io数 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| util           | 占比 | IO繁忙度 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| await          | ms |  平均每个IO的延迟 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+
+### IOMonIndForSystemIO 表 
+统计系统IO异常
+
+|  指标名         | 单位 | 标签说明 | 备注 | 源码路径 |
+|:---------------| ---: | :---- | :---- | :--- |
+| iowait         | 占比 |  系统等待IO的占比 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+| iowaithighCnt  | 次 |  每分钟iowait高次数 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
+
+
 ## 混部指标
 
 -----------

@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <pthread.h>
+#include <sys/prctl.h>
 
 #define KMSG_LINE 8192
 
@@ -34,6 +36,7 @@ static int kmsg_thread_func(struct beeQ* q, void * arg) {
     int fd;
     int ret;
     char buff[KMSG_LINE];
+    prctl(PR_SET_NAME, (unsigned long)"kmsg collector");
 
     fd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
     if (fd < 0) {

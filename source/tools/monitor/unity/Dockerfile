@@ -34,6 +34,7 @@ RUN source /opt/rh/devtoolset-9/enable && \
     luarocks install md5 && \
     luarocks install luaposix 35.1-1 && \
     luarocks install http && \
+    luarocks install inotify && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ && \
     cd ../beeQ/ && \
     make
