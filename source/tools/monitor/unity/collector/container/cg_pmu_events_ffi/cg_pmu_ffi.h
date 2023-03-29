@@ -17,7 +17,6 @@ struct static_arg {
 	__u64 config;
 	int group;
 } static_args [] = {
-#if 0
 	{
 		.type = PERF_TYPE_HARDWARE,
 		.config = PERF_COUNT_HW_CPU_CYCLES, 
@@ -61,7 +60,7 @@ struct static_arg {
 			(PERF_COUNT_HW_CACHE_RESULT_MISS << 16), 
 		.group = 0,
 	},
-#endif
+#if 0
 	{
 		.type = PERF_TYPE_SOFTWARE,
 		.config = PERF_COUNT_SW_CPU_CLOCK,
@@ -90,6 +89,7 @@ struct static_arg {
 		.type = PERF_TYPE_SOFTWARE,
 		.config = PERF_COUNT_SW_PAGE_FAULTS_MAJ,
 	},
+#endif
 };
 
 struct dyn_arg {
