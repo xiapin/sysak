@@ -40,16 +40,8 @@ function Cengine:proc(t, event, msgs)
     local lines = self._proto:protoTable()
 
     CvProto.proc(self, t)
-    --local logs = pystring:split(msgs, '\n')
-    local logList = {}
 
-    logList[1] = {
-        name = "post",
-        log = cjson.encode(msgs)
-    }
-    self:appendLine(self:_packProto("post_que", nil, nil, logList))
-    self:push(lines)
-
+    self:packLog("post_que", "post", cjson.encode(msgs))
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 
