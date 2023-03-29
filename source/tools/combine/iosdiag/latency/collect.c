@@ -75,6 +75,7 @@ static void iosdiag_store_result(void *ctx, int cpu, void *data, __u32 size)
 	if (over_threshold(iop)) {
 		set_check_time_date();
 		summary_convert_to_json(buf, iop);
+		//point_convert_to_json(buf + strlen(buf), iop);
 		delay_convert_to_json(buf + strlen(buf), iop);
 		write(fd, buf, strlen(buf));
 	}
