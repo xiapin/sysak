@@ -26,13 +26,20 @@ function CguardSched:proc(t, lines)
     local j1 = self._stat:jiffies()
 
     for i, obj in ipairs(self._procs) do
-        obj:proc(t, lines)
-        stop = lua_local_clock()
-        if stop - start >= self._limit then   --
-            print(stop - start)
-            local j2 = self._stat:jiffies()
-            if j2 - j1 >= self._limit / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used bye plugin
-                table.insert(toRemove, i)
+        local ret, overTime = obj:proc(t, lines)
+        if ret == -1 then
+            table.insert(toRemove, i)
+        else
+            stop = lua_local_clock()
+            if ret ~= 1 then
+                overTime = 0
+            end
+            if stop - start - overTime >= self._limit then   --
+                print(stop - start)
+                local j2 = self._stat:jiffies()
+                if j2 - j1 >= self._limit / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used bye plugin
+                    table.insert(toRemove, i)
+                end
             end
         end
         start = stop

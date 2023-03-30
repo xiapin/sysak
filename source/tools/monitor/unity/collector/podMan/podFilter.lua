@@ -110,12 +110,16 @@ function CpodFilter:walkTops(resYaml)
 end
 
 function CpodFilter:proc(elapsed, lines)
+    local ret, delta
     local rec = {}
     if self._ino:isChange() then
         print("cgroup changed.")
+        local start = lua_local_clock()
         self._ino = Cinotifies.new()
         self._dirs = self:walkTops(self._resYaml.container)
         self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
+        local stop = lua_local_clock()
+        ret, delta = 1, stop - start
     end
     for i, plugin in ipairs(self._plugins) do
         --local res = plugin:proc(elapsed, lines)
@@ -128,6 +132,7 @@ function CpodFilter:proc(elapsed, lines)
     for _, i in ipairs(rec) do  -- del bad plugin
         self._plugins[i] = nil
     end
+    return ret, delta
 end
 
 return CpodFilter
