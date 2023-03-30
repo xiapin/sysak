@@ -6,7 +6,7 @@ LDFLAG := -g -lm -ldl -lrt -lpthread -lluajit-5.1 -L./lib/ -lbeeQ -L../beaver -l
 
 PRG=unity-mon
 OBJ=apps.o bees.o daemon.o
-DEPMOD=lib rbtree clock postQue ../beaver ../collector/native ../collector/interface ../collector/outline ../collector/plugin ../tsdb/native
+DEPMOD=lib rbtree clock postQue ../beaver ../collector/native ../collector/interface ../collector/outline ../collector/plugin ../tsdb/native ../collector/container/cg_pmu_events_ffi
 
 $(PRG): $(DEPMOD) $(OBJ)
 	$(CC) $(LIB) -o $@ $(OBJ) $(LDFLAG)

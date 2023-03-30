@@ -52,7 +52,7 @@ local function setupPlugins(res, proto, pffi, mnt, dirs)
         for _, plugin in ipairs(res.container.luaPlugin) do
             local CProcs = require("collector.container." .. plugin)
             local plug = CProcs.new(proto, pffi, mnt, dir, ls)
-            if unistd.access(plug.pFile) then
+            if plug.pFile and unistd.access(plug.pFile) then
                 c = c + 1
                 plugins[c] = plug
             end
