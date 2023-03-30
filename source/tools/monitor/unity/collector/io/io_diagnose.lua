@@ -17,6 +17,10 @@ function CioDiagnose:_init_(que, proto_q, fYaml, tid)
     self.pFile = res.config.proc_path .. "proc/stat"
 end
 
+function CioDiagnose:proc(t)
+
+end
+
 function CioDiagnose:work(t)
 
 end

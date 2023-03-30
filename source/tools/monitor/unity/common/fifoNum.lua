@@ -42,13 +42,18 @@ function CfifoNum:min()
     return res, index
 end
 
-function CfifoNum:average()
-    assert(self._count > 0, "fifo count should > 0")
+function CfifoNum:sum()
     local sum = 0
 
     for _, v in pairs(self.list) do
         sum = sum + v
     end
+    return sum
+end
+
+function CfifoNum:average()
+    assert(self._count > 0, "fifo count should > 0")
+    local sum = self:sum()
 
     return sum / self._count
 end

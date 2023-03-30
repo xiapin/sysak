@@ -26,10 +26,11 @@ res, index = fifo:max()
 assert(res == 100)
 assert(index == 4)
 
+res = fifo:sum()
+assert(res == 394)
+
 res = fifo:average()
 assert(res == 98.5)
-print(fifo:max())
-print(fifo:average())
 
 local v = fifo:pop()
 while v do
