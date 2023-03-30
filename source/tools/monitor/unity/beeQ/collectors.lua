@@ -121,16 +121,26 @@ local function setupPostEngine(que, proto_q, fYaml, tid)
     return w, 1
 end
 
+local function setupIODiagnose(que, proto_q, fYaml, tid)
+    local CioDiagnose = require("collector.io.io_diagnose")
+    local w = CioDiagnose.new(que, proto_q, fYaml, tid)
+    return w, 1
+end
+
 function work(que, proto_q, yaml, tid)
     local fYaml = yaml or "../collector/plugin.yaml"
     checkSos()
     local e = CrbEvent.new()
 
-    local main, engine, unit
+    local main, engine, io, unit
     main, unit = setupMainCollector(que, proto_q, fYaml, tid)
     e:addEvent("mainCollector", main, unit)
+
     engine, unit = setupPostEngine(que, proto_q, fYaml, tid)
     engine:setTask(main.postPlugin.tasks)
     e:addEvent("postEngine", engine, unit)
+
+    io, unit = setupIODiagnose(que, proto_q, fYaml, tid)
+    e:addEvent("mainCollector", io, unit, true)
     return e:proc()
 end

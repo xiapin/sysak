@@ -18,7 +18,7 @@ function CvProto:proc(elapsed)
 end
 
 function CvProto:appendLine(line)
-    assert(not self._lines, "your class should call CvProto.proc at first.")
+    --assert(not self._lines, "your class should call CvProto.proc at first.")
     table.insert(self._lines["lines"], line)
 end
 
