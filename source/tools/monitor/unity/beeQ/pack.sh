@@ -45,6 +45,8 @@ mkdir ${APP}/collector/guard
 mkdir ${APP}/collector/outline
 mkdir ${APP}/collector/container
 mkdir ${APP}/collector/postEngine
+mkdir ${APP}/collector/postPlugin
+mkdir ${APP}/collector/podMan
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
@@ -52,6 +54,8 @@ cp collector/guard/*.lua ${APP}/collector/guard
 cp collector/outline/*.lua ${APP}/collector/outline
 cp collector/container/*.lua ${APP}/collector/container/
 cp collector/postEngine/*.lua ${APP}/collector/postEngine
+cp collector/postPlugin/*.lua ${APP}/collector/postPlugin
+cp collector/podMan/*.lua ${APP}/collector/podMan
 cp collector/plugin.yaml ${APP}/collector/
 
 
@@ -66,5 +70,5 @@ mkdir ${APP}/tsdb/native
 cp tsdb/native/*.so* ${APP}/tsdb/native/
 cp tsdb/native/*.lua ${APP}/tsdb/native/
 cp tsdb/*.lua ${APP}/tsdb
-
+cp /usr/local/lib/lua/5.1/* -R ${DIST}/lib/
 #tar zcv -f dist.tar.gz $DIST/

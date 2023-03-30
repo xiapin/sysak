@@ -7,7 +7,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../beaver/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../../install/
 
 export LUA_PATH="../../lua/?.lua;../../lua/?/init.lua;"
-export LUA_CPATH="../../lib/?.so;../../lib/loadall.so;"
+export LUA_CPATH="./lib/?.so;../../lib/?.so;../../lib/loadall.so;"
 
 yaml_path=$1
 [ ! $yaml_path ] && yaml_path="/etc/sysak/plugin.yaml"
