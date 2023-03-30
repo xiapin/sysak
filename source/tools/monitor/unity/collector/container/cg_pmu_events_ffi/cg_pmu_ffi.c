@@ -73,8 +73,7 @@ int create_hw_events(struct pcpu_hwi *hwi, int nr_cpus, char *origpath)
 		args.flags = PERF_FLAG_PID_CGROUP;
 		args.pid = cgfd;
 	} else {
-		args.flags = 0;
-		args.pid = -1;
+		return -errno;
 	}
 	for (i = 0; i < nr_cpus; i++) {
 		args.cpu = i;
