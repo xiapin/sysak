@@ -7,7 +7,7 @@
 require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
-local root = "sys/fs/cgroup/cpuacct"
+local root = "sys/fs/cgroup/cpuacct/"
 local dfile = "/cpuacct.wait_latency"
 
 local CgWaitLatency = class("cg_wait_latency", CvProc)

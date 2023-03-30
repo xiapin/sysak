@@ -7,7 +7,7 @@
 require("common.class")
 local pystring = require("common.pystring")
 local CvProc = require("collector.vproc")
-local root = "sys/fs/cgroup/cpuacct"
+local root = "sys/fs/cgroup/cpuacct/"
 local dfile = "/cpuacct.proc_stat"
 local procstat = "proc/stat"
 local system = require("common.system")
