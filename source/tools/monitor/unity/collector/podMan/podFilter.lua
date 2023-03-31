@@ -21,7 +21,10 @@ local dockerFilter = "^cri%-containerd%-*"
 
 local function listSrc(path)
     local res = {}
-    local files = dirent.files(path)
+    local ok, files = pcall(dirent.files, path)
+    if not ok then
+        return res
+    end
     local c = 1
     for f in files do
         if not pystring:startswith(f, ".") then
