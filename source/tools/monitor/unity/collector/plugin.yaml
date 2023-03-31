@@ -192,7 +192,7 @@ metrics:
     head: value
     help: "Diagnose log for IO exception"
     type: "gauge"
-  - title: sched_moni_jitter
+  - title: sysak_sched_moni_jitter
     from: sched_moni_jitter
     head: value
     help: "nosched/irqoff:sys and irqoff hold cpu and didn't scheduling"
