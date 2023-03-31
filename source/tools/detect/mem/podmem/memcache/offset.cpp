@@ -143,7 +143,7 @@ static int download_btf(void)
     cmd = "uname -r";
     do_cmd(cmd.c_str(), kernel, LEN);
     //printf("kernel:%s\n", kernel);
-    snprintf(dw, LEN + LEN, "wget -T 5 -t 2 -q -O /boot/vmlinux-%s https://netinfo-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
+    snprintf(dw, LEN + LEN, "wget -T 5 -t 2 -q -O /boot/vmlinux-%s https://sysom-cn-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
 
     do_cmd(dw, kernel, LEN);
     return 0;

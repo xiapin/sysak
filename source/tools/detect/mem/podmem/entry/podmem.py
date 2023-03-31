@@ -42,14 +42,14 @@ def get_container_info(podinfo, cid, con):
     if podinfo['runtime'] == "docker":
         con['fullid'] = res[0]['Id']
         con['type'] = 'docker'
-        if 'HostConfig' in res[0]:
+        if 'HostConfig' in res[0] and res[0]['HostConfig'] is not None:
             if 'CgroupParent' in res[0]['HostConfig']:
                 con['cparent'] = res[0]['HostConfig']['CgroupParent']
-        if 'Config' in res[0]:
+        if 'Config' in res[0] and res[0]['Config'] is not None:
             config = res[0]['Config']
-            if 'Labels' in config:
+            if 'Labels' in config and config['Labels'] is not None:
                 labels = config['Labels']
-                if 'io.kubernetes.pod.namespace' in labels:
+                if 'io.kubernetes.pod.namespace' in labels and labels['io.kubernetes.pod.namespace'] is not None:
                     con['ns'] = labels['io.kubernetes.pod.namespace']
                     con['uid'] = labels['io.kubernetes.pod.uid']
                     con['podname'] = labels['io.kubernetes.pod.name']
