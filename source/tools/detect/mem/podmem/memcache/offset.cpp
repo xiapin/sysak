@@ -11,12 +11,12 @@ extern "C" {
 #include <map>
 #include <string>
 using namespace std;
-void * handle;
+struct btf * handle;
 #define LEN (128)
 
 map <string, struct member_attribute *> struct_offset;
 
-int sym_init(const char *btf_name)
+int sym_init(char *btf_name)
 {
     handle = btf_load(btf_name);
 
@@ -48,7 +48,7 @@ struct member_attribute *get_offset(string struct_name,  string member_name)
     if (iter != struct_offset.end()) {
         return iter->second;
     } 
-    att = btf_find_struct_member((struct btf*)handle, struct_name.c_str(), member_name.c_str());
+    att = btf_find_struct_member(handle, (char*)struct_name.c_str(), (char*)member_name.c_str());
     if (!att) {
         //printf("get %s error \n", index.c_str());
         return NULL;
