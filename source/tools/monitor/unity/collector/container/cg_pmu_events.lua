@@ -39,6 +39,60 @@ function cgPmu:_compName()
 		"l3StoreMisRate", "l3MisRate"}
 end
 
+function cgPmu:fillCompValue(sum, values, index)
+	local csum = {}
+	local compNames = self:_compName()
+	local cpi, ipc, mpi, l3loadmisr, l3storemisr, l3misr
+	local CYC, INS, REFCYC, L3LOAD, L3LOADMS, L3STO, L3STOMS
+	CYC = 0
+	INS = 1
+	REFCYC = 2
+	L3LOAD = 3
+	L3LOADMS = 4
+	L3STO = 5
+	L3STOMS = 6
+	if sum[INS] ~= 0 then
+		table.insert(csum, tonumber(sum[CYC]/sum[INS]))
+		table.insert(csum, tonumber((sum[L3LOADMS]+sum[L3STOMS])/sum[INS]))
+	else
+		table.insert(csum, 0)
+		table.insert(csum, 0)
+	end
+
+	if sum[CYC] ~= 0 then
+		table.insert(csum, sum[INS]/sum[CYC])
+	else
+		table.insert(csum, 0)
+	end
+
+	if sum[L3LOAD] ~= 0 then
+		table.insert(csum, sum[L3LOADMS]/sum[L3LOAD])
+	else
+		table.insert(csum, 0)
+	end
+
+	if sum[L3STO] ~= 0 then
+		table.insert(csum, sum[L3STOMS]/sum[L3STO])
+	else
+		table.insert(csum, 0)
+	end
+
+	if (sum[L3LOAD]+sum[L3STO]) ~= 0 then
+		table.insert(csum, (sum[L3LOADMS]+sum[L3STOMS])/(sum[L3LOAD]+sum[L3STO]))
+	else
+		table.insert(csum, 0)
+	end
+	local c = index
+	--for i = 1, #compNames do
+	for k,v in ipairs(csum) do
+		values[c] = {
+			name = compNames[k],
+			value = v
+		}
+		c = c + 1
+	end
+end
+
 function cgPmu:proc(elapsed, lines)
 	CvProc.proc(self)
 	local c = 1
@@ -46,7 +100,6 @@ function cgPmu:proc(elapsed, lines)
 	local direcNames = self:_drcName()
 	self._cgpmuffi.collect_events(self.allCpuInfo, self.nr_cpus, self.summary)
 	local sum = self.summary
-	--local compNames = self:_compsName()
 	for i = 1, #direcNames do
 		values[c] = {
 			name = direcNames[i],
@@ -54,8 +107,16 @@ function cgPmu:proc(elapsed, lines)
 		}
 		c = c + 1
 	end
+
+	local compNames = self:_compName()
+	self:fillCompValue(sum, values, c)
+
 	self:appendLine(self:_packProto("pmu_cg_events", self.ls, values))
 	self:push(lines)
+end
+
+function cgPmu:_del_()
+	self._cgpmuffi.stop_events(self.allCpuInfo, self.nr_cpus)
 end
 
 return cgPmu
