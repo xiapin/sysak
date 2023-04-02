@@ -106,7 +106,7 @@ function ChttpHtml:pack(cType, keep, body)
         ["Content-Type"] = cType,
         ["Connection"] = (keep and "keep-alive") or "close"
     }
-    local headers = self:packHeaders(tHead, #body)
+    local headers = self:packServerHeaders(tHead, #body)
     local tHttp = {stat, headers, body}
     return pystring:join("\r\n", tHttp)
 end

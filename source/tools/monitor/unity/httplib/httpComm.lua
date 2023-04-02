@@ -4,6 +4,8 @@
 --- DateTime: 2022/12/19 10:46 PM
 ---
 
+--- refer to https://blog.csdn.net/a19881029/article/details/14002273
+
 require("common.class")
 local pystring = require("common.pystring")
 local sockerUrl = require("socket.url")
@@ -73,19 +75,19 @@ function ChttpComm:parsePath(path)
     return parseParams(res)
 end
 
-local function originHeader()
+local function originServerHeader()
     return {
         server = "beaver/0.0.2",
         date = os.date("%a, %d %b %Y %H:%M:%S %Z", os.time()),
     }
 end
 
-function ChttpComm:packHeaders(headTable, len) -- just for http out.
+function ChttpComm:packServerHeaders(headTable, len) -- just for http out.
     local lines = {}
     if not headTable["Content-Length"] then
         headTable["Content-Length"] = len
     end
-    local origin = originHeader()
+    local origin = originServerHeader()
 
     local c = 0
     for k, v in pairs(origin) do
@@ -101,7 +103,7 @@ function ChttpComm:packHeaders(headTable, len) -- just for http out.
 end
 
 local codeStrTable = codeTable()
-function ChttpComm:packStat(code)
+function ChttpComm:packStat(code)   -- only for server.
     local t = {"HTTP/1.1", code, codeStrTable[code]}
     return pystring:join(" ", t)
 end
