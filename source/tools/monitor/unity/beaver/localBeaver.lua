@@ -98,7 +98,7 @@ local function localBind(fd, tPort)
         system:posixError("set sock opt failed.");
     end
 
-    while try < 120 do
+    while try < 5 do
         res, err, errno = socket.bind(fd, tPort)
         if res then
             return 0
