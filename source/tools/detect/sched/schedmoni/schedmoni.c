@@ -361,6 +361,7 @@ int main(int argc, char **argv)
 	sw_mlinks = calloc(nr_cpus, sizeof(*sw_mlinks));
 	if (!sw_mlinks) {
 		fprintf(stderr, "failed to alloc sw_mlinks or rlinks\n");
+		free(ksyms);
 		return -ENOMEM;
 	}
 	hw_mlinks = calloc(nr_cpus, sizeof(*hw_mlinks));
