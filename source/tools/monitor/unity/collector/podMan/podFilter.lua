@@ -85,7 +85,7 @@ function CpodFilter:_init_(resYaml, proto, pffi, mnt)
 end
 
 function CpodFilter:walkTops(resYaml)
-    local topDirs = listSrc(self._top)
+    local topDirs = {"memory", "cpu", "cpuset", "blkio", "perf_event", "cpuacct"}
     local dirs = system:deepcopy(resYaml.directCgPath)
 
     for _, top in ipairs(topDirs) do
