@@ -99,12 +99,51 @@ function ChttpComm:packServerHeaders(headTable, len) -- just for http out.
         c = c + 1
         lines[c] = table.concat({k, v}, ": ")
     end
-    return pystring:join("\r\n", lines) .. "\r\n"
+
+    c = c + 1
+    lines[c] = ""
+    return pystring:join("\r\n", lines)
 end
 
 local codeStrTable = codeTable()
 function ChttpComm:packStat(code)   -- only for server.
     local t = {"HTTP/1.1", code, codeStrTable[code]}
+    return pystring:join(" ", t)
+end
+
+local function originCliHeader()
+    return {
+        ["User-Agent"] = "beaverCli/0.0.2",
+        Connection = "Keep-Alive",
+    }
+end
+
+function ChttpComm:packCliHeaders(headTable, len)
+    len = len or 0
+    local lines = {}
+    if not headTable["Content-Length"] and len > 0 then
+        headTable["Content-Length"] = len
+    end
+    local origin = originCliHeader()
+
+    local c = 0
+    for k, v in pairs(origin) do
+        c = c + 1
+        lines[c] = table.concat({k, v}, ": ")
+    end
+
+    for k, v in pairs(headTable) do
+        c = c + 1
+        lines[c] = table.concat({k, v}, ": ")
+    end
+
+    c = c + 1
+    lines[c] = ""
+    return pystring:join("\r\n", lines)
+end
+
+function ChttpComm:packCliHead(method, url)
+    local t = {method, url, "HTTP/1.1"}
     return pystring:join(" ", t)
 end
 

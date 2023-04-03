@@ -108,7 +108,7 @@ function CioDiagnose:work(t)
 
     self:readProc()
     local res = self:diff(t)
-    system:dumps(res)
+    --system:dumps(res)
     --system:dumps(self._disks)
     --system:dumps(self._disksLast)
     self:storeProc()
