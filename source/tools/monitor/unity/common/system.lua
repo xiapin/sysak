@@ -181,4 +181,13 @@ function system:posixError(msg, err, errno)
     error(s)
 end
 
+function system:Enum(tbl, index)
+    local eTbl = {};
+    index = index or 0;
+    for i, v in ipairs(tbl) do
+        eTbl[v] = index + i;
+    end
+    return eTbl;
+end
+
 return system

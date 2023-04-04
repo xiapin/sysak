@@ -8,6 +8,7 @@ package.path = package.path .. ";../../?.lua;"
 local system = require("common.system")
 local coHttpCli = require("httplib.coHttpCli")
 
-local cli = coHttpCli.new("pylcc.openanolis.cn", 5008)
---local cli = coHttpCli.new("cn.bing.com")
+--local cli = coHttpCli.new("pylcc.openanolis.cn", 5008)
+local cli = coHttpCli.new("cn.bing.com")
+cli:connect()
 cli:get()
