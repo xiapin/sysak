@@ -104,8 +104,9 @@ libnginx.a: $(OUTPUT)/nginx.o $(LIBBPF_OBJ) $(COMM_OBJ) | $(OUTPUT)
 build_bpf:
 	make -C bcc/
 	make -C libbpf/
+	cp -f libbpf/src/.github/actions/build-selftests/vmlinux.h vmlinux/vmlinux.h
 
-profile: oncpu.bpf.o offcpu.bpf.o user_slow.bpf.o ping_slow.bpf.o nginx.bpf.o build_bpf
+profile: build_bpf oncpu.bpf.o offcpu.bpf.o user_slow.bpf.o ping_slow.bpf.o nginx.bpf.o
 
 oncpu.bpf.o: oncpu.bpf.c profile.bpf.h $(VMLINUX)
 	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 $(BPFAPI) -c oncpu.bpf.c -o $@
