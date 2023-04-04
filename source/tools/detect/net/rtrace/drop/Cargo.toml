@@ -16,7 +16,7 @@ crossbeam-channel = "0.5"
 cenum-rs = { git = "https://github.com/chengshuyi/cenum-rs.git" }
 plain = "0.2"
 utils = { path = "../utils" }
-eutils-rs = "0.1.6"
+eutils-rs = { git = "https://github.com/chengshuyi/eutils-rs.git" }
 builder = { path = "../builder" }
 chrono = "0.4.19"
 serde_json = "1.0"
