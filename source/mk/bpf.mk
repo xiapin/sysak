@@ -4,7 +4,7 @@ BPFTOOL ?= $(SRC)/lib/internal/ebpf/tools/bpftool
 APPS_DIR := $(abspath .)
 prefix ?= /usr/local
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' )
-COOLBPF_OBJ += $(OBJ_LIB_PATH)/libbpf.a $(OBJ_LIB_PATH)/coolbpf.a
+COOLBPF_OBJ += $(OBJ_LIB_PATH)/lib/libcoolbpf.a
 
 ifeq ($(KERNEL_DEPEND), Y)
 TARGET_PATH := $(OBJ_TOOLS_PATH)
@@ -16,7 +16,7 @@ DEPEND := "prev{btf}"
 
 CFLAGS += $(EXTRA_CLFAGS) -g -O2 -Wall
 LDFLAGS += $(EXTRA_LDFLAGS)
-INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(TARGET_PATH) -I$(OBJ_LIB_PATH) -I$(SRC)/lib/internal/ebpf/coolbpf/third/libbpf/include/uapi -I$(SRC)/lib/uapi/include
+INCLUDES += $(EXTRA_INCLUDES) -I$(OBJPATH) -I$(SRC)/lib/internal/ebpf -I$(TARGET_PATH) -I$(OBJ_LIB_PATH)/include -I$(OBJ_LIB_PATH)/include/coolbpf -I$(SRC)/lib/internal/ebpf/coolbpf/third/libbpf/include/uapi -I$(SRC)/lib/uapi/include
 
 ifeq ($(V),1)
 	Q =
