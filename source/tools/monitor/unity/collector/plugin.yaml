@@ -38,6 +38,16 @@ container:
     - "kubepods.slice/kubepods-besteffort.slice"
     - "kubepods.slice/kubepods-burstable.slice"
 
+  indirectCgPath1:
+    - path: "/kubepods.slice"
+      child1: "/kubepods%-pod"
+      child2: "/cri%-containerd"
+    - path: "/kubepods.slice/kubepods-besteffort.slice"
+      child1: "/kubepods%-besteffort%-pod"
+      child2: "/cri%-containerd"
+    - path: "/kubepods.slice/kubepods-burstable.slice"
+      child1: "/kubepods%-burstable%-pod"
+
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
              "proc_uptime"]
