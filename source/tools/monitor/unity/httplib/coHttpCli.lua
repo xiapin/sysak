@@ -56,7 +56,7 @@ local function fdNonBlocking(fd)
     if flag then
         res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))
         if res then
-            return setTimeOut(fd)
+            return
         else
             print(string.format("fcntl set failed, report:%d, %s", err, errno))
             return -1
@@ -65,8 +65,6 @@ local function fdNonBlocking(fd)
         print(string.format("fcntl get failed, report:%d, %s", err, errno))
         return -1
     end
-
-
 end
 
 local function installFd(ip, port)
@@ -184,7 +182,7 @@ function CcoHttpCli:waitConnected(cffi, efd)
 end
 
 function CcoHttpCli:exit(cffi, efd, fd)
-    cffi.cffi.del_fd(efd, fd)  -- remove for epoll
+    cffi.del_fd(efd, fd)  -- remove for epoll
     unistd.close(fd)  -- closed
     self.co = nil
     self.fd = nil     -- do not use any more
@@ -437,7 +435,13 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
     end
 end
 
+function CcoHttpCli:checkTime()
+    return os.time() - self.online
+end
+
 function CcoHttpCli:work(cffi, efd)
+    self.online = os.time()
+
     if not self:connect() then  -- need to connect
         return
     end
@@ -454,6 +458,7 @@ function CcoHttpCli:work(cffi, efd)
         goto failed
     end
 
+    self.online = os.time()
     while true do
         local msg = coroutine.yield()
         print("--" .. msg)
@@ -467,7 +472,7 @@ function CcoHttpCli:work(cffi, efd)
         local tReq = self:result(fread)
         if tReq then
             self.status = enumStat.connected
-            --print(#tReq.data)
+            print("clid get " .. #tReq.data)
         else
             goto failed
         end
@@ -478,9 +483,10 @@ function CcoHttpCli:work(cffi, efd)
         end
     end
 
-    ::failed::
-    self.status = enumStat.closed
-    self:exit(cffi, efd, fd)
+    ::failed:: do
+        self.status = enumStat.closed
+        self:exit(cffi, efd, fd)
+    end
 end
 
 return CcoHttpCli

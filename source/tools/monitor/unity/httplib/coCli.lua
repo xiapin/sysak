@@ -45,7 +45,7 @@ local function coQueFunc(cli, cffi, efd)
             data = msg
         end
         if data then   --> has data to send.
-            if stat == enumStat.closed then  -- not active
+            if cli.co == nil and stat == enumStat.closed then  -- not active
                 local co = coroutine.create(function(c, o, fd) cli.work(c, o, fd)  end)
                 cli.co = co
                 coroutine.resume(co, cli, cffi, efd)
@@ -56,6 +56,16 @@ local function coQueFunc(cli, cffi, efd)
                 print(stat, enumStat.connected)
             end
         end
+    end
+end
+
+function CcoCli:checkOvertime(cli, co, ffi)
+    if cli.status == enumStat.connecting and cli:checkTime() >= 2 then
+        local e = ffi.new("native_event_t")
+        e.fd = cli.fd
+        e.ev_close = 1
+        coroutine.resume(cli.co, e)  --> to stop cli connecting
+        coroutine.resume(co, "")  --> notify que
     end
 end
 
@@ -71,7 +81,7 @@ function CcoCli:_pollFd(bfd, cli, nes, co)
                 coroutine.resume(co, "")
             end
         else
-            print("bad fd " .. fd)
+            print("bad fd " .. fd .. "use fd " .. cli.fd)
         end
     end
 end
@@ -98,6 +108,7 @@ function CcoCli:_poll(cli)
             print("start.")
             coroutine.resume(co, "hello." .. c)
             c = c + 1
+            self:checkOvertime(cli, co, ffi)
         end
     end
 end
