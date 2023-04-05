@@ -6,6 +6,7 @@
 
 require("common.class")
 local ChttpComm = require("httplib.httpComm")
+local enumStat = require("httplib.enumStat")
 local pystring = require("common.pystring")
 local socket = require("posix.sys.socket")
 local luaSocket = require("socket")
@@ -39,27 +40,43 @@ local function getIp(host)
     return ip
 end
 
+local function setTimeOut(fd)
+    local ok, errmsg = socket.setsockopt(fd, socket.SOL_SOCKET, socket.SO_SNDTIMEO, 1, 0)
+    if ok then
+        return
+    else
+        print("set sock time out failed " .. errmsg)
+        return -1
+    end
+end
+
 local function fdNonBlocking(fd)
     local res
     local flag, err, errno = fcntl.fcntl(fd, fcntl.F_GETFL)
     if flag then
         res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))
         if res then
-            return 0
+            return setTimeOut(fd)
         else
-            system:posixError("fcntl set failed", err, errno)
+            print(string.format("fcntl set failed, report:%d, %s", err, errno))
+            return -1
         end
     else
-        system:posixError("fcntl get failed", err, errno)
+        print(string.format("fcntl get failed, report:%d, %s", err, errno))
+        return -1
     end
+
+
 end
 
 local function installFd(ip, port)
     local fd, res, err, errno
     fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
-    fdNonBlocking(fd)
 
     if fd then  -- for socket
+        if fdNonBlocking(fd) then
+            return
+        end
         local tConn = {family=socket.AF_INET, addr=ip, port=port}
         res, err, errno = socket.connect(fd, tConn)
         if res then
@@ -68,31 +85,28 @@ local function installFd(ip, port)
             return fd, errno
         else
             unistd.close(fd)
-            system:posixError("socket connect failed", err, errno)
+            print(string.format("socket connect failed, report:%d, %s", err, errno))
             end
     else  -- socket failed
-        system:posixError("create socket failed", err, errno)
+        print(string.format("socket create failed, report:%d, %s", err, errno))
     end
 end
 
 local function setupSocket(host, port)
     local ip = getIp(host)
-    return installFd(ip, port)
+    if ip then
+        return installFd(ip, port)
+    else
+        print("get ip failed.")
+        return nil
+    end
 end
 
-local socketStatus = {
-    "connecting",
-    "connected",
-    "sending",
-    "receiving",
-    "closed"
-}
-
-function CcoHttpCli:_init_(host, port)
+function CcoHttpCli:_init_(host, port, persistent)
     self._host = host
     self._port = port or 80
-    self.enumStat = system:Enum(socketStatus)
-    self.status = self.enumStat.closed
+    self._persistent = persistent
+    self.status = enumStat.closed
 end
 
 function CcoHttpCli:_del_()
@@ -102,35 +116,18 @@ function CcoHttpCli:_del_()
 end
 
 function CcoHttpCli:connect()
-    local stat
-    self.fd, stat = setupSocket(self._host, self._port)
-    if stat == 0 then
-        self.status = self.enumStat.connected
-    else
-        self.status = self.enumStat.connecting
+    local fd, stat
+    fd, stat = setupSocket(self._host, self._port)
+    if fd then
+        self.fd = fd
+        if stat == 0 then
+            self.status = enumStat.connected
+        else
+            self.status = enumStat.connecting
+        end
+        return true
     end
-end
-
-function CcoHttpCli:write(stream)
-    local sent, err, errno
-
-    sent, err, errno = socket.send(self.fd, stream)
-    if sent then
-        return sent
-    else
-        system:posixError("socket send error.", err, errno)
-    end
-end
-
-function CcoHttpCli:read()
-    local res, err, errno
-
-    res, err, errno = socket.recv(self.fd, 8192)
-    if res then
-        return res
-    else
-        system:posixError("socket recv error.", err, errno)
-    end
+    return false
 end
 
 function CcoHttpCli:_get(url)
@@ -153,32 +150,43 @@ function CcoHttpCli:waitConnected(cffi, efd)
     local e
     local res
     local fd = self.fd
-    if self.status == self.enumStat.connecting then  -- need wait until connected
+    if self.status == enumStat.connecting then  -- need wait until connected
         res = cffi.mod_fd(efd, fd, 1)
-        assert(res >= 0)
+        if res < 0 then
+            print("mod_fd socket failed")
+            return false
+        end
 
         e = coroutine.yield()
         if e.ev_close > 0 then
+            print("socket closed.")
             return false
         elseif e.ev_out > 0 then  -- in flag
             local val, err, errno = socket.getsockopt(fd, socket.SOL_SOCKET, socket.SO_ERROR)
             if val == nil then
-                system:posixError("socket.getsockopt failed.", err, errno)
+                print(string.format("getsockopt failed, report:%d, %s", err, errno))
+                return false
             elseif val == 0 then
-                self.status = self.enumStat.connected
+                self.status = enumStat.connected
                 res = cffi.mod_fd(efd, fd, 0)  -- back to wait mod,
-                assert(res >= 0)
+                if res < 0 then
+                    print("mod_fd socket failed")
+                    return false
+                end
                 return true
             else
+                print("getsockopt value error.")
                 return false
             end
         end
     end
+    return true
 end
 
 function CcoHttpCli:exit(cffi, efd, fd)
     cffi.cffi.del_fd(efd, fd)  -- remove for epoll
     unistd.close(fd)  -- closed
+    self.co = nil
     self.fd = nil     -- do not use any more
 end
 
@@ -234,7 +242,6 @@ local function readChunks(fread, tReq)
     local ssize, size
     local len = 1
     local bodies, body
-    print("total " .. #s)
 
     while true do
         if len == 0 then
@@ -264,6 +271,7 @@ local function waitHttpRest(fread, tReq)
     if tReq.header["content-length"] then
         local lenData = #tReq.data
         local lenInfo = tonumber(tReq.header["content-length"])
+        print("len: " .. lenInfo)
 
         local rest = lenInfo - lenData
         if rest > 10 * 1024 * 1024 then  -- limit max data len
@@ -353,40 +361,6 @@ function CcoHttpCli:result(fread)
     return self:parse(fread, stream)
 end
 
-function CcoHttpCli:work(cffi, efd)
-    self:connect()   -- need to connect
-    local fd = self.fd
-
-    local res = cffi.add_fd(efd, fd)
-    assert(res >= 0)
-
-    if not self:waitConnected(cffi, efd) then
-        self.status = self.enumStat.closed
-        return self:exit(cffi, efd, fd)
-    end
-
-    while true do
-        local msg = coroutine.yield()
-        self.status = self.enumStat.sending
-        local s = self:_get()
-        if not self:coWrite(cffi, efd, fd, s) then
-            return self:exit(cffi, efd, fd)
-        end
-        self.status = self.enumStat.receiving
-        local fread = self:closureRead(fd)
-        local tReq = self:result(fread)
-        if tReq then
-            self.status = self.enumStat.connected
-            print(#tReq.data)
-        else
-            break
-        end
-    end
-
-    self.status = self.enumStat.closed
-    self:exit(cffi, efd, fd)
-end
-
 function CcoHttpCli:closureRead(fd, maxLen)
     maxLen = maxLen or 1 * 1024 * 1024  -- signal conversation accept 1M stream max
     local function readFd()
@@ -404,7 +378,8 @@ function CcoHttpCli:closureRead(fd, maxLen)
                     return nil
                 end
             else
-                system:posixError("socket recv error", err, errno)
+                print(string.format("socket recv failed, report:%d, %s", err, errno))
+                return nil
             end
         else
             print(system:dump(e))
@@ -422,7 +397,10 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
     if sent ~= nil then
         if sent < #stream then  -- send buffer may full
             res = cffi.mod_fd(efd, fd, 1)  -- epoll write ev
-            assert(res == 0)
+            if res < 0 then
+                print("mod_fd socket failed")
+                return false
+            end
 
             while sent < #stream do
                 local e = coroutine.yield()
@@ -438,7 +416,7 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
                         if errno == 11 then  -- EAGAIN ?
                             goto continue
                         end
-                        system:posixError("socket send error.", err, errno)
+                        print(string.format("socket send failed, report:%d, %s", err, errno))
                         return false
                     end
                 else  -- need to read ? may something error or closed.
@@ -447,13 +425,62 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
                 ::continue::
             end
             res = cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
-            assert(res == 0)
+            if res < 0 then
+                print("mod_fd socket failed")
+                return false
+            end
         end
         return true
     else
-        system:posixError("socket send error.", err, errno)
+        print(string.format("socket send failed, report:%d, %s", err, errno))
         return false
     end
+end
+
+function CcoHttpCli:work(cffi, efd)
+    if not self:connect() then  -- need to connect
+        return
+    end
+
+    local fd = self.fd
+
+    local res = cffi.add_fd(efd, fd)
+    if res < 0 then
+        print("add fd to epoll failed.")
+        goto failed
+    end
+
+    if not self:waitConnected(cffi, efd) then
+        goto failed
+    end
+
+    while true do
+        local msg = coroutine.yield()
+        print("--" .. msg)
+        self.status = enumStat.sending
+        local s = self:_get()
+        if not self:coWrite(cffi, efd, fd, s) then
+            goto failed
+        end
+        self.status = enumStat.receiving
+        local fread = self:closureRead(fd)
+        local tReq = self:result(fread)
+        if tReq then
+            self.status = enumStat.connected
+            --print(#tReq.data)
+        else
+            goto failed
+        end
+        if self._persistent then
+            print("continue.")
+        else
+            goto failed
+        end
+    end
+
+    ::failed::
+    self.status = enumStat.closed
+    self:exit(cffi, efd, fd)
 end
 
 return CcoHttpCli

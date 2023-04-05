@@ -5,7 +5,8 @@
 ---
 
 require("common.class")
-local socket = require("posix.sys.socket")
+local enumStat = require("httplib.enumStat")
+local system = require("common.system")
 local CcoCli = class("coFrame")
 
 function CcoCli:_init_(fd)
@@ -30,17 +31,47 @@ function CcoCli:_installFFI()
     return efd
 end
 
-function CcoCli:_pollFd(bfd, ofd, nes, co)
+local socketWakeTbl = {
+    enumStat.connected,
+    enumStat.closed,
+}
+
+local function coQueFunc(cli, cffi, efd)
+    local data
+    while true do
+        local msg = coroutine.yield()
+        local stat = cli.status
+        if #msg > 0 then
+            data = msg
+        end
+        if data then   --> has data to send.
+            if stat == enumStat.closed then  -- not active
+                local co = coroutine.create(function(c, o, fd) cli.work(c, o, fd)  end)
+                cli.co = co
+                coroutine.resume(co, cli, cffi, efd)
+            elseif stat == enumStat.connected then  --> already connected
+                coroutine.resume(cli.co, data)
+                data = nil
+            else  --> other stat, only record
+                print(stat, enumStat.connected)
+            end
+        end
+    end
+end
+
+function CcoCli:_pollFd(bfd, cli, nes, co)
     for i = 0, nes.num - 1 do
         local e = nes.evs[i];
         local fd = e.fd
         if fd == bfd then
             print("bfd worked.")
-        elseif fd == ofd then
-            coroutine.resume(co, e)
+        elseif fd == cli.fd then
+            coroutine.resume(cli.co, e)
+            if system:valueIsIn(socketWakeTbl, cli.status) then
+                coroutine.resume(co, "")
+            end
         else
-            print("time out.")
-            coroutine.resume(co, "hello.")
+            print("bad fd " .. fd)
         end
     end
 end
@@ -50,21 +81,23 @@ function CcoCli:_poll(cli)
     local efd = self._efd
     local ffi, cffi = self.ffi, self.cffi
 
-    local co = coroutine.create(function(c, o, efd) cli.work(c, o, efd)  end)
-    coroutine.resume(co, cli, cffi, efd)
+    local co = coroutine.create(coQueFunc)
+    coroutine.resume(co, cli, cffi, efd, co)
 
+    local c = 1
     while true do
         local nes = ffi.new("native_events_t")
-        local res = cffi.poll_fds(efd, 10, nes)
+        local res = cffi.poll_fds(efd, 1, nes)
 
         if res < 0 then
             return "end poll."
         end
         if nes.num > 0 then
-            self:_pollFd(bfd, cli.fd, nes, co)
+            self:_pollFd(bfd, cli, nes, co)
         else
-            print("time out.")
-            coroutine.resume(co, "hello.")
+            print("start.")
+            coroutine.resume(co, "hello." .. c)
+            c = c + 1
         end
     end
 end
