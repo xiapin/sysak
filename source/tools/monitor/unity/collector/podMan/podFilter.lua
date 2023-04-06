@@ -79,13 +79,51 @@ function CpodFilter:_init_(resYaml, proto, pffi, mnt)
     self._mnt = mnt
 
     self._ino = Cinotifies.new()
-    self._dirs = self:walkTops(self._resYaml.container)
+    self._dirs = self:walkTops1(self._resYaml.container)
     self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
     print("add " .. #self._plugins)
 end
 
+function CpodFilter:enum1LDirs(root, format, parent, dirs)
+	local alldirs = listSrc(root)
+	for _, file in ipairs(alldirs)
+	do
+		local destPath = root..'/'..file
+		local destentry = parent..'/'..file
+		if string.match('/'..file, format) then
+			self._ino:add(destPath)
+			addDirs(dirs, destentry)
+		end
+	end
+	return dirs
+end
+
+function CpodFilter:walkTops1(resYaml)
+	local cgroups = {"cpuacct", "memory", "blkio", "perf_event"}
+	local dirs = system:deepcopy(resYaml.directCgPath)
+
+	for i,cg in ipairs(cgroups) do
+		for _, value in ipairs(resYaml.indirectCgPath1) do
+			if nil == value.child1 then
+				goto continue
+			end
+			local level1 = {}
+			local root = self._top.."/"..cg
+			self:enum1LDirs(root..value.path, value.child1, value.path, level1)
+			for _, parent in ipairs(level1) do
+				addDirs(dirs, parent)
+				if nil ~= value.child2 then
+					self:enum1LDirs(root..parent, value.child2, parent, dirs)
+				end
+			end
+			::continue::
+		end
+	end
+	return dirs
+end
+
 function CpodFilter:walkTops(resYaml)
-    local topDirs = {"memory", "cpu", "cpuset", "blkio", "perf_event", "cpuacct"}
+    local topDirs = {"cpuacct", "memory", "blkio", "perf_event"}
     local dirs = system:deepcopy(resYaml.directCgPath)
 
     for _, top in ipairs(topDirs) do
@@ -119,7 +157,7 @@ function CpodFilter:proc(elapsed, lines)
         print("cgroup changed.")
         local start = lua_local_clock()
         self._ino = Cinotifies.new()
-        self._dirs = self:walkTops(self._resYaml.container)
+        self._dirs = self:walkTops1(self._resYaml.container)
         self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
         local stop = lua_local_clock()
         ret, delta = 1, stop - start
