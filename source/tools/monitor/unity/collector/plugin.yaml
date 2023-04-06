@@ -28,10 +28,10 @@ container:
   mode: "pods"
   luaPlugin: ["cg_cpu_stat_sample", ]
   directCgPath:
-    - ""
-    - "kubepods.slice"
-    - "kubepods.slice/kubepods-besteffort.slice"
-    - "kubepods.slice/kubepods-burstable.slice"
+    - "/"
+    - "/kubepods.slice"
+    - "/kubepods.slice/kubepods-besteffort.slice"
+    - "/kubepods.slice/kubepods-burstable.slice"
 
   indirectCgPath:
     - "kubepods.slice"

@@ -9,9 +9,9 @@ long nr_cpus;
 double summary[NR_EVENTS];
 struct pcpu_hw_info *gpcpu_hwi;
 struct pmu_events *glb_pme;
-char *events_str[] = {"cpu_cycles", "instructions", "ref_cycles",
-			"llc_load_ref", "llc_load_miss",
-			"llc_store_ref", "llc_store_miss"};
+char *events_str[] = {"cycles", "ins", "refCyc",
+			"llcLoad", "llcLoadMis",
+			"llcStore", "llcStoreMis"};
 char *value_str[] = {"cycles", "instructions", "CPI",
 			"llc_load_ref", "llc_load_miss", "LLC_LMISS_RATE"
 			"llc_store_ref", "llc_store_miss", "LLC_SMIRSS_RATE"};
@@ -101,6 +101,7 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 			}
 		}
 	}
+	return 0;
 fail_ioctl:
 	for (i = 0; i < idx_fail; i++) {
 		if ((hwi[i].leader == -1) && (hwi[i].fd > 0))
@@ -219,26 +220,6 @@ void collect(struct pcpu_hw_info *phw, double *sum)
 #endif
 }
 
-int fill_line_percpu(struct unity_line *line, double *summ, char *mode, char *index)
-{
-	int i;
-
-	unity_set_index(line, 0, mode, index);
-	for (i = 0; i < NR_EVENTS; i++)
-		unity_set_value(line, i, events_str[i], summ[i]);
-	unity_set_value(line, i++, "cpi", summ[CYCLES]/summ[INSTRUCTIONS]);
-	unity_set_value(line, i++, "ipc", summ[INSTRUCTIONS]/summ[CYCLES]);
-	unity_set_value(line, i++, "llc_cache_mpi", 
-		(summ[LLC_LOAD_MISS]+summ[LLC_STORE_MISS])/summ[INSTRUCTIONS]);
-	unity_set_value(line, i++, "llc_rmiss_rate",
-		summ[LLC_LOAD_MISS]/summ[LLC_LOAD_REF]);
-	unity_set_value(line, i++, "llc_wmiss_rate",
-		summ[LLC_STORE_MISS]/summ[LLC_STORE_REF]);
-	unity_set_value(line, i++, "llc_miss_rate",
-		(summ[LLC_LOAD_MISS]+summ[LLC_STORE_MISS])/
-		(summ[LLC_LOAD_REF]+summ[LLC_STORE_REF]));
-}
-
 int fill_line(struct unity_line *line, double *summ, char *mode, char *index)
 {
 	int i;
@@ -247,18 +228,18 @@ int fill_line(struct unity_line *line, double *summ, char *mode, char *index)
 	for (i = 0; i < NR_EVENTS; i++)
 		unity_set_value(line, i, events_str[i], summ[i]);
 
-	unity_set_value(line, i++, "cpi",
+	unity_set_value(line, i++, "CPI",
 		summ[INSTRUCTIONS]==0?0:summ[CYCLES]/summ[INSTRUCTIONS]);
-	unity_set_value(line, i++, "ipc",
+	unity_set_value(line, i++, "IPC",
 		summ[CYCLES]==0?0:summ[INSTRUCTIONS]/summ[CYCLES]);
-	unity_set_value(line, i++, "llc_cache_mpi", 
+	unity_set_value(line, i++, "MPI", 
 		summ[INSTRUCTIONS]==0?0:
 		(summ[LLC_LOAD_MISS]+summ[LLC_STORE_MISS])/summ[INSTRUCTIONS]);
-	unity_set_value(line, i++, "llc_rmiss_rate",
+	unity_set_value(line, i++, "l3LoadMisRate",
 		summ[LLC_LOAD_REF]==0?0:summ[LLC_LOAD_MISS]/summ[LLC_LOAD_REF]);
-	unity_set_value(line, i++, "llc_wmiss_rate",
+	unity_set_value(line, i++, "l3StoreMisRate",
 		summ[LLC_STORE_REF]==0?0:summ[LLC_STORE_MISS]/summ[LLC_STORE_REF]);
-	unity_set_value(line, i++, "llc_miss_rate",
+	unity_set_value(line, i++, "l3MisRate",
 		(summ[LLC_LOAD_REF]+summ[LLC_STORE_REF])==0?0:
 		(summ[LLC_LOAD_MISS]+summ[LLC_STORE_MISS])/
 		(summ[LLC_LOAD_REF]+summ[LLC_STORE_REF]));
@@ -328,8 +309,6 @@ void deinit(void)
 }
 
 #ifdef DEBUG
-/*#if 1 */
-
 /* for dev/selftest */
 int call_debug(void)
 {
