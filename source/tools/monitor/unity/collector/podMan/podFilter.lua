@@ -79,12 +79,7 @@ function CpodFilter:_init_(resYaml, proto, pffi, mnt)
     self._mnt = mnt
 
     self._ino = Cinotifies.new()
-    --local start = lua_local_clock()
     self._dirs = self:walkTops1(self._resYaml.container)
-    --self._dirs = self:walkTops(self._resYaml.container)
-    --[[local stop = lua_local_clock()
-    print("time="..(stop-start))
-    ]]--
     self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
     print("add " .. #self._plugins)
 end
@@ -94,43 +89,32 @@ function CpodFilter:enum1LDirs(root, format, parent, dirs)
 	for _, file in ipairs(alldirs)
 	do
 		local destPath = root..'/'..file
-		--[[local ok, pstat = pcall(stat.stat, destPath)
-		if not ok  then
-			goto skip2
-		end
-		if 0 == stat.S_ISDIR(pstat.st_mode) then
-			goto skip2
-		end]]--
 		local destentry = parent..'/'..file
 		if string.match('/'..file, format) then
 			self._ino:add(destPath)
 			addDirs(dirs, destentry)
 		end
-		::skip2::
 	end
 	return dirs
 end
 
 function CpodFilter:walkTops1(resYaml)
-	--local cgroups = {"memory", "cpu", "cpuset", "blkio", "perf_event", "cpuacct"}
 	local cgroups = {"cpuacct", "memory", "blkio", "perf_event"}
 	local dirs = system:deepcopy(resYaml.directCgPath)
 
 	for i,cg in ipairs(cgroups) do
 		for _, value in ipairs(resYaml.indirectCgPath1) do
-			local level1 = {}
-			local root = self._top.."/"..cg
-			--[[local pstat = stat.stat(root)
-			if nil == pstat then
+			if nil == value.child1 then
 				goto continue
 			end
-			if stat.S_ISDIR(pstat.st_mode) ~= 0 then
-				enum1LDirs(root..value.path, value.child1, value.path, level1)
-			end]]--
+			local level1 = {}
+			local root = self._top.."/"..cg
 			self:enum1LDirs(root..value.path, value.child1, value.path, level1)
 			for _, parent in ipairs(level1) do
 				addDirs(dirs, parent)
-				self:enum1LDirs(root..parent, value.child2, parent, dirs)
+				if nil ~= value.child2 then
+					self:enum1LDirs(root..parent, value.child2, parent, dirs)
+				end
 			end
 			::continue::
 		end
@@ -174,7 +158,6 @@ function CpodFilter:proc(elapsed, lines)
         local start = lua_local_clock()
         self._ino = Cinotifies.new()
         self._dirs = self:walkTops1(self._resYaml.container)
-        --self._dirs = self:walkTops(self._resYaml.container)
         self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
         local stop = lua_local_clock()
         ret, delta = 1, stop - start
