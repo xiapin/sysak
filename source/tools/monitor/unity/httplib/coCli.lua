@@ -106,7 +106,8 @@ function CcoCli:_poll(cli)
             self:_pollFd(bfd, cli, nes, co)
         else
             print("start.")
-            coroutine.resume(co, "hello." .. c)
+            local line = string.format('test,host=a count1=%d,count2=%d\ntlog,host=a logs="hello."', c, c + 2)
+            coroutine.resume(co, line)
             c = c + 1
             self:checkOvertime(cli, co, ffi)
         end

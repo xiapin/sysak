@@ -100,9 +100,10 @@ local function setupSocket(host, port)
     end
 end
 
-function CcoHttpCli:_init_(host, port, persistent)
+function CcoHttpCli:_init_(host, port, url, persistent)
     self._host = host
     self._port = port or 80
+    self._url = url or "/"
     self._persistent = persistent
     self.status = enumStat.closed
 end
@@ -128,20 +129,18 @@ function CcoHttpCli:connect()
     return false
 end
 
-function CcoHttpCli:_get(url)
-    url = url or "/"
-    local line = self:packCliHead('GET', url)
+function CcoHttpCli:echo(tReq)
+    print("clid get " .. #tReq.data)
+end
+
+function CcoHttpCli:pack(msg)
+    local line = self:packCliHead('GET', self._url)
     local head = {
         Host = self._host,
         ["Accept-Encoding"] = "null"
     }
     local heads = self:packCliHeaders(head)
     return pystring:join("\r\n", {line, heads, ""})
-end
-
-function CcoHttpCli:get(url)
-    local stream = self:_get(url)
-    self:write(stream)
 end
 
 function CcoHttpCli:waitConnected(cffi, efd)
@@ -463,7 +462,7 @@ function CcoHttpCli:work(cffi, efd)
         local msg = coroutine.yield()
         print("--" .. msg)
         self.status = enumStat.sending
-        local s = self:_get()
+        local s = self:pack(msg)
         if not self:coWrite(cffi, efd, fd, s) then
             goto failed
         end
@@ -472,7 +471,7 @@ function CcoHttpCli:work(cffi, efd)
         local tReq = self:result(fread)
         if tReq then
             self.status = enumStat.connected
-            print("clid get " .. #tReq.data)
+            self:echo(tReq)
         else
             goto failed
         end
