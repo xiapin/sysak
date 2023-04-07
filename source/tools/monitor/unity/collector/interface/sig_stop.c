@@ -28,19 +28,6 @@ void plugin_thread_stop(pthread_t tid) {
     }
 }
 
-static void stop_signal_handler(int no) {
-    ;
-}
-
-static void sig_register(void) {
-    struct sigaction action;
-
-    action.sa_handler = stop_signal_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-    sigaction(SIGUSR2, &action, NULL);
-}
-
 static void bump_memlock_rlimit1(void)
 {
     struct rlimit rlim_new = {
@@ -57,7 +44,6 @@ static void bump_memlock_rlimit1(void)
 void plugin_init(void) {
     bump_memlock_rlimit1();
     ksym_setup(1);
-    sig_register();
     working = 1;
 }
 
