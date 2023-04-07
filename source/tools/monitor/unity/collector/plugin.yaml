@@ -26,7 +26,7 @@ outline:
 
 container:
   mode: "pods"
-  luaPlugin: ["cg_cpu_stat_sample", ]
+  luaPlugin: ["cg_cpu_stat_sample", "cg_cpuacct_stat"]
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -287,4 +287,9 @@ metrics:
     from: cg_cpu_stat
     head: value
     help: "sysak_cg_cpu_stat"
+    type: "gauge"
+  - title: sysak_cg_cpuacct_stat
+    from: cg_cpuacct_stat
+    head: value
+    help: "cpuacct/cpuacct.stat"
     type: "gauge"
