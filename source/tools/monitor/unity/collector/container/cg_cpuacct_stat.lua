@@ -52,10 +52,10 @@ function CgCpuacctStat:proc(elapsed, lines)
 		name = cell[1]
 		local prev = self.values[c]
 		local now = tonumber(cell[num])
-		local rate = tonumber(((now - prev)*100.0) / self.hostCpuSum)
+		local rate = (100.00*tonumber((now - prev)))/ tonumber(self.hostCpuSum)
 		values[c] = {
 			name = name,
-			value = tonumber(rate)
+			value = rate
 		}
 		self.values[c] = now
 		self.conTotal = self.conTotal + (now - prev)
