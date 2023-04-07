@@ -2,6 +2,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
+#include <coolbpf.h>
 #include "../schedmoni.h"
 #include "../nosched.h"
 #include "schedmoni.bpf.h"
@@ -89,13 +90,7 @@ static inline int test_tsk_thread_flag_low(struct task_struct *tsk, int flag)
  * return ture if struct thread_info is in task_struct */
 static bool test_THREAD_INFO_IN_TASK(struct task_struct *p)
 {
-	volatile long *pstate;
-	size_t len;
-
-	pstate = &(p->state);
-
-	len = (u64)pstate - (u64)p;
-	return (len == sizeof(struct thread_info));
+	return bpf_core_task_struct_thread_info_exist(p);
 }
 
 static inline int test_tsk_need_resched(struct task_struct *tsk, int flag)
