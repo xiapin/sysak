@@ -30,6 +30,15 @@ local function match_ip(ip)
     return false
 end
 
+local function checkInt(errno, fd)
+    if errno == 4 then -- Interrupted system cal
+        if fd > 0 then
+            unistd.close(fd)
+        end
+        error("cli interrupt.")
+    end
+end
+
 local function getIp(host)
     local ip
     if match_ip(host) then
@@ -58,10 +67,12 @@ local function fdNonBlocking(fd)
         if res then
             return
         else
+            checkInt(errno, fd)
             print(string.format("fcntl set failed, report:%d, %s", err, errno))
             return -1
         end
     else
+        checkInt(errno, fd)
         print(string.format("fcntl get failed, report:%d, %s", err, errno))
         return -1
     end
@@ -82,10 +93,12 @@ local function installFd(ip, port)
         elseif errno == 115 then  -- in process
             return fd, errno
         else
+            checkInt(errno, fd)
             unistd.close(fd)
             print(string.format("socket connect failed, report:%d, %s", err, errno))
             end
     else  -- socket failed
+        checkInt(errno, 0)
         print(string.format("socket create failed, report:%d, %s", err, errno))
     end
 end
@@ -108,12 +121,6 @@ function CcoHttpCli:_init_(host, port, url, persistent)
     self.status = enumStat.closed
 end
 
-function CcoHttpCli:_del_()
-    if self.fd then
-        unistd.close(self.fd)
-    end
-end
-
 function CcoHttpCli:connect()
     local fd, stat
     fd, stat = setupSocket(self._host, self._port)
@@ -133,7 +140,11 @@ function CcoHttpCli:echo(tReq)
     print("clid get " .. #tReq.data)
 end
 
-function CcoHttpCli:pack(msg)
+function CcoHttpCli:trans(msgs, body, filter)
+    return ""
+end
+
+function CcoHttpCli:pack(body)
     local line = self:packCliHead('GET', self._url)
     local head = {
         Host = self._host,
@@ -149,6 +160,7 @@ function CcoHttpCli:waitConnected(cffi, efd)
     local fd = self.fd
     if self.status == enumStat.connecting then  -- need wait until connected
         res = cffi.mod_fd(efd, fd, 1)
+        checkInt(-res, fd)
         if res < 0 then
             print("mod_fd socket failed")
             return false
@@ -166,12 +178,14 @@ function CcoHttpCli:waitConnected(cffi, efd)
             elseif val == 0 then
                 self.status = enumStat.connected
                 res = cffi.mod_fd(efd, fd, 0)  -- back to wait mod,
+                checkInt(-res, fd)
                 if res < 0 then
                     print("mod_fd socket failed")
                     return false
                 end
                 return true
             else
+                checkInt(errno, fd)
                 print("getsockopt value error.")
                 return false
             end
@@ -181,8 +195,9 @@ function CcoHttpCli:waitConnected(cffi, efd)
 end
 
 function CcoHttpCli:exit(cffi, efd, fd)
-    cffi.del_fd(efd, fd)  -- remove for epoll
+    local  res = cffi.del_fd(efd, fd)  -- remove for epoll
     unistd.close(fd)  -- closed
+    checkInt(-res, fd)
     self.co = nil
     self.fd = nil     -- do not use any more
 end
@@ -375,6 +390,7 @@ function CcoHttpCli:closureRead(fd, maxLen)
                     return nil
                 end
             else
+                checkInt(errno, fd)
                 print(string.format("socket recv failed, report:%d, %s", err, errno))
                 return nil
             end
@@ -394,12 +410,14 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
     if sent ~= nil then
         if sent < #stream then  -- send buffer may full
             res = cffi.mod_fd(efd, fd, 1)  -- epoll write ev
+            checkInt(-res, fd)
             if res < 0 then
                 print("mod_fd socket failed")
                 return false
             end
 
             while sent < #stream do
+                print("send.", sent, #stream)
                 local e = coroutine.yield()
                 if e.ev_close > 0 then
                     return false
@@ -413,6 +431,7 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
                         if errno == 11 then  -- EAGAIN ?
                             goto continue
                         end
+                        checkInt(errno, fd)
                         print(string.format("socket send failed, report:%d, %s", err, errno))
                         return false
                     end
@@ -422,6 +441,7 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
                 ::continue::
             end
             res = cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
+            checkInt(-res, fd)
             if res < 0 then
                 print("mod_fd socket failed")
                 return false
@@ -429,6 +449,7 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
         end
         return true
     else
+        checkInt(errno, fd)
         print(string.format("socket send failed, report:%d, %s", err, errno))
         return false
     end
@@ -448,6 +469,7 @@ function CcoHttpCli:work(cffi, efd)
     local fd = self.fd
 
     local res = cffi.add_fd(efd, fd)
+    checkInt(-res, fd)
     if res < 0 then
         print("add fd to epoll failed.")
         goto failed
@@ -459,10 +481,10 @@ function CcoHttpCli:work(cffi, efd)
 
     self.online = os.time()
     while true do
-        local msg = coroutine.yield()
-        print("--" .. msg)
+        local body = coroutine.yield()
+        --print("-- " .. type(msg))
         self.status = enumStat.sending
-        local s = self:pack(msg)
+        local s = self:pack(body)
         if not self:coWrite(cffi, efd, fd, s) then
             goto failed
         end

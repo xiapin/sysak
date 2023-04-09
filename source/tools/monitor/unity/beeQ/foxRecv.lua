@@ -11,6 +11,7 @@ local system = require("common.system")
 local CfoxRecv = class("CfoxRecv")
 local unistd = require("posix.unistd")
 local fcntl = require("posix.fcntl")
+local struct = require("struct")
 
 local function setupCo(fYaml)
     local res = system:parseYaml(fYaml)
@@ -33,21 +34,32 @@ function CfoxRecv:_init_(fYaml)
     self._fox = CfoxTSDB.new(fYaml)
     self._fox:setupWrite()
     self.fdIn, self.fdOut = setupCo(fYaml)
+
+    if self.fdIn then
+        self._outFunc = function(stream) self:outToFd(stream)  end
+    else
+        self._outFunc = function(stream) self._fox:write(stream)  end
+    end
 end
 
 function CfoxRecv:_del_()
     if self.fdIn then
-        print("stop push thread 1.")
         lua_push_stop();
-        print("stop push thread 2.")
         unistd.close(self.fdIn)
         unistd.close(self.fdOut)
     end
 end
 
-function CfoxRecv:write(stream)
+function CfoxRecv:outToFd(stream)
+    local len = #stream
+    local s = struct.pack("<i", len)
+    unistd.write(self.fdOut, s)
     unistd.write(self.fdOut, stream)
     self._fox:write(stream)
+end
+
+function CfoxRecv:write(stream)
+    self._outFunc(stream)
 end
 
 return CfoxRecv

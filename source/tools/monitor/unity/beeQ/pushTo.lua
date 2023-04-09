@@ -6,18 +6,17 @@
 
 package.path = package.path .. ";../?.lua;"
 
+local coCli = require("httplib.coCli")
+local coInflux = require("httplib.coInflux")
 local unistd = require("posix.unistd")
+local system = require("common.system")
 
 function work(fd, fYaml)
-    while true do
-        local s, err, errno = unistd.read(fd, 1024 * 1024)
-        if s then
-            print(string.format("recv %d bytes.", #s))
-        else
-            print(err, errno)
-            break
-        end
-    end
+    local res = system:parseYaml(fYaml)
+    local pushTo = res.pushTo
+    local frame = coCli.new(fd)
+    local c = coInflux.new(pushTo.host, pushTo.port, pushTo.url)
+    frame:poll(c)
     print("end push.")
     return 0
 end

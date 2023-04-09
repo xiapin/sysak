@@ -18,14 +18,14 @@ static int socket_non_blocking(int sfd)
     flags = fcntl(sfd, F_GETFL);
     if (flags < 0) {
         perror("error : cannot get socket flags!\n");
-        return flags;
+        return -errno;
     }
 
     flags |= O_NONBLOCK;
     res    = fcntl(sfd, F_SETFL, flags);
     if (res < 0) {
         perror("error : cannot set socket flags!\n");
-        return res;
+        return -errno;
     }
 
     return 0;
@@ -41,6 +41,7 @@ static int epoll_add(int efd, int fd) {
     res = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event);
     if (res < 0) {
         perror("error : can not add event to epoll!\n");
+        return -errno;
     }
     return res;
 }
@@ -51,6 +52,7 @@ static int epoll_del(int efd, int fd) {
     res = epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
     if (res < 0) {
         perror("error : can not del event to epoll!\n");
+        return -errno;
     }
     return res;
 }
@@ -72,7 +74,7 @@ int init(int listen_fd) {
     return efd;
 
     end_epoll_add:
-    return res;
+    return -errno;
 }
 
 int add_fd(int efd, int fd) {
@@ -104,6 +106,7 @@ int mod_fd(int efd, int fd, int wr) {
     res = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &event);
     if (res < 0) {
         perror("error : can not add event to epoll!\n");
+        return -errno;
     }
     return res;
 }
@@ -123,7 +126,7 @@ int poll_fds(int efd, int tmo, native_events_t* nes) {
     res = epoll_wait(efd, events, NATIVE_EVENT_MAX, tmo * 1000);
     if (res < 0) {
         perror("error : epoll failed!\n");
-        return res;
+        return -errno;
     }
     nes->num = res;
     for (i = 0; i < res; i ++) {

@@ -7,11 +7,15 @@
 require("common.class")
 local enumStat = require("httplib.enumStat")
 local system = require("common.system")
+local unistd = require("posix.unistd")
+local CprotoData = require("common.protoData")
+require("struct")
 local CcoCli = class("coFrame")
 
 function CcoCli:_init_(fd)
     self._bfd = fd
     self._efd = self:_installFFI()
+    self._proto = CprotoData.new(nil)
 end
 
 function CcoCli:_del_()
@@ -36,49 +40,137 @@ local socketWakeTbl = {
     enumStat.closed,
 }
 
-local function coQueFunc(cli, cffi, efd)
-    local data
+function CcoCli:filterLines(cli, lines, body)
+    return cli:trans(lines, body, nil)
+end
+
+function CcoCli:coQueFunc(cli, cffi, efd)
+    local body
+    local ok, msg
     while true do
-        local msg = coroutine.yield()
+        local lines = coroutine.yield()
         local stat = cli.status
-        if #msg > 0 then
-            data = msg
+        if lines and #lines.lines > 0 then
+            body = self:filterLines(cli, lines, body)
         end
-        if data then   --> has data to send.
+        if body then   --> has data to send.
             if cli.co == nil and stat == enumStat.closed then  -- not active
                 local co = coroutine.create(function(c, o, fd) cli.work(c, o, fd)  end)
                 cli.co = co
-                coroutine.resume(co, cli, cffi, efd)
+                ok, msg = coroutine.resume(co, cli, cffi, efd)
+                if not ok then
+                    error(string.format("cli.co run failed %s", msg))
+                end
             elseif stat == enumStat.connected then  --> already connected
-                coroutine.resume(cli.co, data)
-                data = nil
+                ok, msg = coroutine.resume(cli.co, body)
+                if not ok then
+                    error(string.format("cli.co run failed %s", msg))
+                end
+                body = nil
             else  --> other stat, only record
-                print(stat, enumStat.connected)
+                print("http stat:", stat, enumStat.connected)
             end
         end
     end
 end
 
 function CcoCli:checkOvertime(cli, co, ffi)
+    local ok, msg
     if cli.status == enumStat.connecting and cli:checkTime() >= 2 then
         local e = ffi.new("native_event_t")
         e.fd = cli.fd
         e.ev_close = 1
-        coroutine.resume(cli.co, e)  --> to stop cli connecting
+        ok, msg = coroutine.resume(cli.co, e)  --> to stop cli connecting
+        if not ok then
+            error(string.format("cli.co run failed %s", msg))
+        end
         coroutine.resume(co, "")  --> notify que
+        if not ok then
+            error(string.format("coOut run failed %s", msg))
+        end
     end
 end
 
-function CcoCli:_pollFd(bfd, cli, nes, co)
+local function err_fd(e)
+    if e.ev_close > 0 then
+        error("pipe out closed, process need stop.")
+    end
+end
+
+local function pipe_error(err, errno)
+    error(string.format("read from pipe error: %s, %d", err, errno))
+end
+
+local function read_stream(fd)
+    local out
+    while true do
+        local e = coroutine.yield(out)
+        out = nil  -- clear out
+        err_fd(e)
+        local size, err, errno = unistd.read(fd, 4)
+        if size then
+            local c = 0
+            local len = struct.unpack("<i", size)
+            local ss_len = 0
+            local ss = {}
+
+            while ss_len < len do
+                local s
+                s, err, errno = unistd.read(fd, len - ss_len)
+                if s then
+                    c = c + 1
+                    ss[c] = s
+                    ss_len = ss_len + #s
+                    if ss_len == len then
+                        out = table.concat(ss)
+                    else
+                        e = coroutine.yield()
+                        err_fd(e)
+                    end
+                else
+                    pipe_error(err, errno)
+                end
+            end
+        else
+            pipe_error(err, errno)
+        end
+    end
+end
+
+function CcoCli:pushMsg(coOut, bytes)
+    local ok, msg
+    local lines = self._proto:decode(bytes)
+
+    ok, msg = coroutine.resume(coOut, lines)
+    if not ok then
+        error(string.format("coOut run failed %s", msg))
+    end
+end
+
+function CcoCli:_pollFd(bfd, cli, nes, coIn, coOut)
+    local ok, msg
     for i = 0, nes.num - 1 do
         local e = nes.evs[i];
         local fd = e.fd
         if fd == bfd then
-            print("bfd worked.")
+            ok, msg = coroutine.resume(coIn, e)
+            if ok then
+                if msg then
+                    self:pushMsg(coOut, msg)
+                end
+            else
+                error(string.format("coIn run failed %s", msg))
+            end
         elseif fd == cli.fd then
-            coroutine.resume(cli.co, e)
+            ok, msg = coroutine.resume(cli.co, e)
+            if not ok then
+                error(string.format("cli.co run failed %s", msg))
+            end
             if system:valueIsIn(socketWakeTbl, cli.status) then
-                coroutine.resume(co, "")
+                ok, msg = coroutine.resume(coOut, nil)
+                if not ok then
+                    error(string.format("coOut run failed %s", msg))
+                end
             end
         else
             print("bad fd " .. fd .. "use fd " .. cli.fd)
@@ -87,12 +179,22 @@ function CcoCli:_pollFd(bfd, cli, nes, co)
 end
 
 function CcoCli:_poll(cli)
+    local ok, msg
     local bfd = self._bfd
     local efd = self._efd
     local ffi, cffi = self.ffi, self.cffi
 
-    local co = coroutine.create(coQueFunc)
-    coroutine.resume(co, cli, cffi, efd, co)
+    local coOut = coroutine.create(self.coQueFunc)
+    ok, msg = coroutine.resume(coOut, self, cli, cffi, efd, coOut)
+    if not ok then
+        error(string.format("coOut run failed %s", msg))
+    end
+
+    local coIn = coroutine.create(read_stream)
+    ok, msg = coroutine.resume(coIn, bfd)
+    if not ok then
+        error(string.format("coIn run failed %s", msg))
+    end
 
     local c = 1
     while true do
@@ -103,13 +205,9 @@ function CcoCli:_poll(cli)
             return "end poll."
         end
         if nes.num > 0 then
-            self:_pollFd(bfd, cli, nes, co)
+            self:_pollFd(bfd, cli, nes, coIn, coOut)
         else
-            print("start.")
-            local line = string.format('test,host=a count1=%d,count2=%d\ntlog,host=a logs="hello."', c, c + 2)
-            coroutine.resume(co, line)
-            c = c + 1
-            self:checkOvertime(cli, co, ffi)
+            self:checkOvertime(cli, coOut, ffi)
         end
     end
 end
@@ -117,7 +215,6 @@ end
 function CcoCli:poll(cli)
     local _, msg = pcall(self._poll, self, cli)
     print(msg)
-
     return 0
 end
 

@@ -7,6 +7,7 @@
 require("common.class")
 local CcoHttpCli = require("httplib.coHttpCli")
 local pystring = require("common.pystring")
+local lineParse = require("common.lineParse")
 
 local CcoInflux = class("coInflux", CcoHttpCli)
 
@@ -18,15 +19,36 @@ function CcoInflux:echo(tReq)
     print(tReq.code, tReq.data)
 end
 
-function CcoInflux:pack(msg)
+function CcoInflux:trans(msgs, body, filter)
+    local res
+    local c = 0
+    local lines
+    local bodies = {}
+
+    lines = msgs.lines
+    for _, line in ipairs(lines) do
+        c = c + 1
+        bodies[c] = lineParse.packs(line)
+    end
+
+    res = pystring:join("\n", bodies)
+    if body and #body > 0 then
+        return pystring:join("\n", {body, res})
+    else
+        return res
+    end
+end
+
+function CcoInflux:pack(body)
+    print(#body)
     local line = self:packCliHead('POST', self._url)
     local head = {
         Host = self._host,
         ["Content-Type"] = "text/plain",
-        ["Content-Length"] = #msg,
+        ["Content-Length"] = #body,
     }
     local heads = self:packCliHeaders(head)
-    return pystring:join("\r\n", {line, heads, msg})
+    return pystring:join("\r\n", {line, heads, body})
 end
 
 return CcoInflux
