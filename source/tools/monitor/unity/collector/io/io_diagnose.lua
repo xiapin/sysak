@@ -15,11 +15,10 @@ local unistd = require("posix.unistd")
 
 local function ioWait(fStat)
     local data = procffi["ffi"].new("var_long_t")
-    for line in io.lines(fStat) do
-        local s = string.sub(line, 4)
-        assert(procffi["cffi"].var_input_long(procffi["ffi"].string(s), data) == 0)
-        break
-    end
+    local stat = io.open(fStat, "r")
+    local s = stat:read()
+    assert(procffi["cffi"].var_input_long(procffi["ffi"].string(s), data) == 0)
+    stat:close()
     local sum = 0
     for i = 0, data.no do
         sum = sum + tonumber(data.value[i])

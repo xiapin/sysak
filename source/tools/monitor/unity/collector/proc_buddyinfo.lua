@@ -23,7 +23,8 @@ function CprocBuddyinfo:proc(elapsed, lines)
     CvProc.proc(self)
     self._protoTable.vs = {}
     local buddyinfo = {}
-    for line in io.lines(self.pFile) do
+    local fInfo = io.open(self.pFile, "r")
+    for line in fInfo:lines() do
         if string.find(line,"Normal") then
             local subline = pystring:split(line,"Normal",1)[2]
             for num in string.gmatch(subline, "%d+") do
@@ -32,9 +33,11 @@ function CprocBuddyinfo:proc(elapsed, lines)
             break
         end
     end
+    fInfo:close()
 
     if #buddyinfo == 0 then
-        for line in io.lines(self.pFile) do
+        fInfo = io.open(self.pFile, "r")
+        for line in fInfo:lines() do
             if string.find(line,"DMA32") then
                 local subline = pystring:split(line,"DMA32",1)[2]
                 for num in string.gmatch(subline, "%d+") do
@@ -43,6 +46,7 @@ function CprocBuddyinfo:proc(elapsed, lines)
                 break
             end
         end
+        fInfo:close()
     end
 
     for k,v in pairs(buddyinfo) do
