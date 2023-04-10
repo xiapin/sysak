@@ -152,6 +152,18 @@ def get_k8s_path(podinfo, cid):
             cinfo['ino'] = get_file_ino(cpath)
     return None
                     
+def get_podman_path(podinfo, cid):
+    cinfo = podinfo['container'][cid]
+    pre = '/sys/fs/cgroup/memory/machine.slice'
+    cpath = pre +'/' +"libpod-" + cinfo['fullid'].strip() + '.scope'
+    if not os.path.exists(cpath):
+        cinfo['cgroup'] = ''
+        cinfo['ino'] = ''
+        return None
+    cinfo['cgroup'] = cpath
+    cinfo['ino'] = get_file_ino(cpath)
+    return True
+
 def get_docker_path(podinfo, cid):
     cinfo = podinfo['container'][cid]
     pre = '/sys/fs/cgroup/memory/system.slice'
@@ -366,6 +378,8 @@ def build_cgroup_info(podinfo, cid):
         get_k8s_path(podinfo, cid)
     elif ctype == 'docker':
         get_docker_path(podinfo, cid)
+        if podinfo['container'][cid]['cgroup'] == '':
+            get_podman_path(podinfo, cid)
     elif ctype == 'cgroup':
         get_cgroup_path(podinfo, cid)
     else:

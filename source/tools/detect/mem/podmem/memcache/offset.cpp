@@ -54,6 +54,7 @@ struct member_attribute *get_offset(string struct_name,  string member_name)
         return NULL;
     }
     //printf("%s:offset:%d, size:%d\n", index.c_str(),att->offset, att->size);
+    att->offset = att->offset/8;
     struct_offset[index] = att;          
     return att;
 }
