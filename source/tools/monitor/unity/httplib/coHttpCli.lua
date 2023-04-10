@@ -59,31 +59,12 @@ local function setTimeOut(fd)
     end
 end
 
-local function fdNonBlocking(fd)
-    local res
-    local flag, err, errno = fcntl.fcntl(fd, fcntl.F_GETFL)
-    if flag then
-        res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))
-        if res then
-            return
-        else
-            checkInt(errno, fd)
-            print(string.format("fcntl set failed, report:%d, %s", err, errno))
-            return -1
-        end
-    else
-        checkInt(errno, fd)
-        print(string.format("fcntl get failed, report:%d, %s", err, errno))
-        return -1
-    end
-end
-
 local function installFd(ip, port)
     local fd, res, err, errno
     fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
 
     if fd then  -- for socket
-        if fdNonBlocking(fd) then
+        if system:fdNonBlocking(fd) then
             return
         end
         local tConn = {family=socket.AF_INET, addr=ip, port=port}

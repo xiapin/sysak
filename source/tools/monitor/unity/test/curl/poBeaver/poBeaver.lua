@@ -63,22 +63,6 @@ function CpoBeaver:_install_fd(port, ip, backlog)
     end
 end
 
-local function fdNonBlocking(fd)
-    local res
-    local flag, err, errno = fcntl.fcntl(fd, fcntl.F_GETFL)
-    if flag then
-        res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))
-        if res then
-            return 0
-        else
-            posixError("fcntl set failed", err, errno)
-        end
-    else
-        posixError("fcntl get failed", err, errno)
-    end
-end
-
-
 function CpoBeaver:read(fd, maxLen)
     maxLen = maxLen or 1 * 1024 * 1024  -- signal conversation accept 1M stream max
     local function readFd()
@@ -203,7 +187,7 @@ function CpoBeaver:accept(fd, e)
     elseif e.IN then
         local nfd, err, errno = socket.accept(fd)
         if nfd then
-            fdNonBlocking(nfd)
+            system:fdNonBlocking(nfd)
             self:co_add(nfd)
         else
             posixError("accept new socket failed", err, errno)
