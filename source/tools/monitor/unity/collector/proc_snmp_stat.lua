@@ -17,10 +17,42 @@ function CprocSnmpStat:_init_(proto, pffi, mnt, pFile)
     self._rec = nil
 end
 
+function CprocSnmpStat:retransRate(titles, values)
+    for i = 1, titles.no do
+        local cell = self._ffi.string(titles.s[i])
+        if cell == "OutSegs" then
+            self._outSegs = tonumber(values.value[i - 1])
+        elseif cell == "RetransSegs" then
+            self._retransSegs = tonumber(values.value[i - 1])
+        end
+    end
+
+    if self._lastOutSegs then
+        local segs = self._outSegs - self._lastOutSegs
+        local rate = 0
+        local retrans = 0
+        if segs > 0 then
+            retrans = self._retransSegs - self._lastRetransSegs
+            rate = (self._retransSegs - self._lastRetransSegs) / segs * 100.0
+        end
+        local vs = {
+            { name = "rate", value = rate},
+            { name = "segs", value = segs},
+            { name = "retrans", value = retrans}
+        }
+        self:appendLine(self:_packProto("retrans", nil, vs))
+    end
+    self._lastOutSegs = self._outSegs
+    self._lastRetransSegs = self._retransSegs
+end
+
 function CprocSnmpStat:createTable(titles, values, now)
     local head = string.gsub(self._ffi.string(titles.s[0]), ":", "")
     assert(self._ffi.string(titles.s[0]), self._ffi.string(values.s))
-    for i=1, titles.no do
+    if head == "Tcp" then
+        self:retransRate(titles, values)
+    end
+    for i = 1, titles.no do
         local cell = self._ffi.string(titles.s[i])
         local low = string.lower(cell)
         for j, mon in ipairs(self._cellsMon) do
