@@ -21,7 +21,7 @@ function ChttpPlain:echo(tRet, keep)
         ["Connection"] = (keep and "keep-alive") or "close"
     }
     local body = tRet.text
-    local headers = self:packHeaders(tHead, #body)
+    local headers = self:packServerHeaders(tHead, #body)
     local tHttp = {stat, headers, body}
     return pystring:join("\r\n", tHttp)
 end

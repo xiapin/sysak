@@ -86,7 +86,7 @@ function CprocDiskstats:_calcDiff(disk_name, now, last, elapsed)
 
     cell = {
         name = "busy",
-        value = (now["time"] - now["time"]) / elapsed
+        value = (now["time"] - last["time"]) / elapsed
     }
     table.insert(protoTable.vs, cell)
     self:appendLine(protoTable)

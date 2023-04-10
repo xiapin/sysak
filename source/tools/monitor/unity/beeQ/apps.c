@@ -9,6 +9,7 @@
 #include <errno.h>
 #include "beeQ.h"
 #include "apps.h"
+#include "pushTo.h"
 #include "clock/ee_clock.h"
 #include "daemon.h"
 #include <sys/syscall.h>
@@ -66,6 +67,19 @@ int lua_load_do_file(lua_State *L, const char* path) {
     return lua_check_ret(ret);
 }
 
+static int lua_push_start(lua_State *L) {
+    int ret;
+    int fd = lua_tonumber(L, 1);
+    ret = pushTo_start(fd);
+    lua_pushnumber(L, ret);
+    return 1;
+}
+
+static int lua_push_stop(lua_State *L) {
+    pushTo_stop();
+    return 0;
+}
+
 static int call_init(lua_State *L, int err_func) {
     int ret;
     lua_Number lret;
@@ -110,6 +124,9 @@ static lua_State * app_recv_init(void)  {
     /* opens all standard Lua libraries into the given state. */
     luaL_openlibs(L);
     err_func = lua_reg_errFunc(L);
+
+    lua_register(L, "lua_push_start", lua_push_start);
+    lua_register(L, "lua_push_stop", lua_push_stop);
 
     ret = lua_load_do_file(L, "../beeQ/bees.lua");
     if (ret) {
@@ -261,14 +278,14 @@ static int app_collector_work(void* q, void* proto_q) {
     luaL_openlibs(L);
     err_func = lua_reg_errFunc(L);
 
+    lua_register(L, "collector_qout", collector_qout);
+    lua_register(L, "lua_local_clock", lua_local_clock);
+    lua_register(L, "lua_setup_daemon", lua_setup_daemon);
+
     ret = lua_load_do_file(L, "../beeQ/collectors.lua");
     if (ret) {
         goto endLoad;
     }
-
-    lua_register(L, "collector_qout", collector_qout);
-    lua_register(L, "lua_local_clock", lua_local_clock);
-    lua_register(L, "lua_setup_daemon", lua_setup_daemon);
 
     // call init.
     lua_getglobal(L, "work");

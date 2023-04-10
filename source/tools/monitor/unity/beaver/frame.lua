@@ -119,7 +119,7 @@ function Cframe:echo404()
         ["Content-Type"] = "text/plain",
     }
     local body = "Oops! The page may have flown to Mars!!!\n"
-    local headers = self:packHeaders(tHead, #body)
+    local headers = self:packServerHeaders(tHead, #body)
     local tHttp = {stat, headers, body}
     return pystring:join("\r\n", tHttp)
 end

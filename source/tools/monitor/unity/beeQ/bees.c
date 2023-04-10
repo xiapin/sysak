@@ -31,10 +31,21 @@ void sig_handler(int num)
             break;
         case SIGUSR1:   // to stop
             break;
+        case SIGUSR2:
+            break;
         default:
             printf("signal %d exit.\n", num);
             exit(1);
     }
+}
+
+static void sig_register(void) {
+    struct sigaction action;
+
+    action.sa_handler = sig_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    sigaction(SIGUSR2, &action, NULL);
 }
 
 char ** entry_argv; // for daemon process
@@ -51,6 +62,7 @@ int main(int argc, char *argv[]) {
     signal(SIGHUP, sig_handler);
     signal(SIGUSR1, sig_handler);
     signal(SIGINT, sig_handler);
+    sig_register();
 
     if (calibrate_local_clock() < 0) {
         printf("calibrate_local_clock failed.\n");
