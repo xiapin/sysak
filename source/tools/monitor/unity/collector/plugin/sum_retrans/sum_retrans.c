@@ -24,7 +24,6 @@ int init(void *arg)
     ret = LOAD_SKEL_OBJECT(sum_retrans, perf);
     inum_fd = coobpf_map_find(sum_retrans->obj, "inums");
     dip_fd = coobpf_map_find(sum_retrans->obj, "dips");
-    printf("inum_fd: %d %d\n", inum_fd, dip_fd);
     return ret;
 }
 
@@ -37,7 +36,6 @@ static int transIP(unsigned long lip, char *result, int size) {
 }
 
 static void pack_dip() {
-    int ret = 0;
     char ips[32];
     char buff[64];
     unsigned long value;
@@ -57,14 +55,12 @@ static void pack_dip() {
 
     ip = 0;
     while (coobpf_key_next(dip_fd, &ip, &ip_next) == 0) {
-        ret = bpf_map_delete_elem(dip_fd, &ip_next);
-        printf("ret2: %d\n", ret);
+        bpf_map_delete_elem(dip_fd, &ip_next);
         ip = ip_next;
     }
 }
 
 static void pack_inum() {
-    int ret;
     char buff[64];
     unsigned long value;
     unsigned int inum, inum_next;
@@ -74,16 +70,14 @@ static void pack_inum() {
     inum = 0;
     while (coobpf_key_next(inum_fd, &inum, &inum_next) == 0) {
         bpf_map_lookup_elem(inum_fd, &inum_next, &value);
-        printf("inum: %d, %ld\n", inum, value);
-        snprintf(buff, 64, "%d:%ld,", inum, value);
+        snprintf(buff, 64, "%u:%ld,", inum_next, value);
         strncat(log, buff, 4096);
         inum = inum_next;
     }
 
     inum = 0;
     while (coobpf_key_next(inum_fd, &inum, &inum_next) == 0) {
-        ret = bpf_map_delete_elem(inum_fd, &inum_next);
-        printf("ret inum: %d\n", ret);
+        bpf_map_delete_elem(inum_fd, &inum_next);
         inum = inum_next;
     }
 }
@@ -93,7 +87,6 @@ int call(int t, struct unity_lines *lines)
     struct unity_line* line;
 
     pack_dip();
-    printf("strlen: %ld\n", strlen(log));
     if (strlen(log) > 0) {
         unity_alloc_lines(lines, 2);    // 预分配好
 

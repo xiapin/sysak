@@ -16,14 +16,6 @@ static inline u32 read_ns_inum(struct sock *sk)
     return 0;
 }
 
-static inline u32 read_dip(struct sock *sk)
-{
-    if (sk) {
-        return BPF_CORE_READ(sk, __sk_common.skc_daddr);
-    }
-    return 0;
-}
-
 static void inc_value(struct bpf_map* maps, u32 k) {
     u64 *pv = bpf_map_lookup_elem(maps, &k);
     if (pv) {
@@ -34,16 +26,20 @@ static void inc_value(struct bpf_map* maps, u32 k) {
     }
 }
 
-SEC("kprobe/tcp_retransmit_skb")
-int j_tcp_retransmit_skb(struct pt_regs *ctx){
-    struct sock *sk;
-    u32 inum, ip;
-
-    sk = (struct sock *)PT_REGS_PARM1(ctx);
-    inum = read_ns_inum(sk);
-    ip = read_dip(sk);
-
-    bpf_printk("hello  inum: %u\n", inum);
+struct tcp_retrans_args {
+    u64 pad;
+    u64 skb;
+    u64 sk;
+    u16 sport;
+    u16 dport;
+    u32 sip;
+    u32 dip;
+};
+SEC("tracepoint/tcp/tcp_retransmit_skb")
+int tcp_retransmit_skb_hook(struct tcp_retrans_args *args){
+    struct sock *sk = (struct sock *)args->sk;
+    u32 inum = read_ns_inum(sk);
+    u32 ip = args->dip;
 
     inc_value((struct bpf_map *)&inums, inum);
     inc_value((struct bpf_map *)&dips,  ip);
