@@ -87,6 +87,7 @@ static int collect_pcpu_events(struct pcpu_hwi *hwi, double *sum)
 	struct event_info *ei;
 	int i, fd;
 
+	n = 0;
 	ei = hwi->ei;
 	for (i = 0; i < NR_EVENTS; i++) {
 		fd = ei[i].fd;
@@ -94,8 +95,10 @@ static int collect_pcpu_events(struct pcpu_hwi *hwi, double *sum)
 			n = read(fd, &ei[i].cnt, sizeof(__u64));
 			if (n < 0) {
 				enumo = errno;
+#ifdef DEBUG
 				printf(" read fd%d fail:%s \n", fd, strerror(enumo));
-				return n;
+#endif
+				return -enumo;
 			}
 			ei[i].delta = ei[i].cnt - ei[i].prev;
 			ei[i].prev = ei[i].cnt;
@@ -115,6 +118,8 @@ int collect_events(struct pcpu_hwi *hwi, int nr_cpus, double *sum)
 
 	for (i = 0; i < nr_cpus; i++) {
 		n = collect_pcpu_events(&hwi[i], sum);
+		if (n < 0)
+			printf("collect_pcpu_events cpu%d fail:%s\n", i, strerror(-n));
 	}
 }
 
