@@ -342,7 +342,6 @@ monitor() {
 				show_result $tmpfile
 			fi
 
-			datafile=${loadtask_dir}loadtask-`date "+%Y-%m-%d-%H-%M-%S"`.log
 			cat ${tmpfile} >> ${datafile}
 
 			if [ "$deamon" != "true" ];then
