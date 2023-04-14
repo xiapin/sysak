@@ -27,6 +27,7 @@ function cgPmu:_init_(proto, pffi, mnt, path, ls)
 	self.cpath = mnt..root..path
 	--print("cg_pmu_events: _init_:create_hw_events")
 	self._cgpmuffi.create_hw_events(self.allCpuInfo, self.nr_cpus, self.cpath)
+	self.stoped = 0
 end
 
 function cgPmu:_drcName()
@@ -115,8 +116,17 @@ function cgPmu:proc(elapsed, lines)
 	self:push(lines)
 end
 
+function cgPmu:releaseEvents()
+	local ret = self._cgpmuffi.stop_events(self.allCpuInfo, self.nr_cpus)
+	if ret == 0 then
+		self.stoped = 1
+	end
+end
+
 function cgPmu:_del_()
-	self._cgpmuffi.stop_events(self.allCpuInfo, self.nr_cpus)
+	if self.stoped ~= 1 then
+		self._cgpmuffi.stop_events(self.allCpuInfo, self.nr_cpus)
+	end
 end
 
 return cgPmu
