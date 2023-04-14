@@ -157,11 +157,9 @@ function CpodFilter:proc(elapsed, lines)
         print("cgroup changed.")
         local start = lua_local_clock()
         self._ino = Cinotifies.new()
-	for i, plugin in ipairs(self._plugins) do
-		pcall(plugin._del_, plugin)
-	end
         self._dirs = self:walkTops1(self._resYaml.container)
         self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
+        collectgarbage("collect")
         local stop = lua_local_clock()
         ret, delta = 1, stop - start
 	return ret,delta
