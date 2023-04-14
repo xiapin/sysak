@@ -11,6 +11,13 @@ combine---非单一功能，组合使用上述功能或者系统其它命令
 test  --  一些实验性质的功能，或者示例等
 
 2, 编译
+0) 安装基础依赖软件
+如 1）所属，sysAK包含了多个组件，根据编译组件的不同，编译时需要依赖的软件不同。但是建议首先安装如下基础依赖软件，减少编译过程报错。
+RPM系：
+    yum install kernel-devel elfutils-libelf-devel
+DEB系：
+    apt-get install linux-kernel-headers kernel-package libelf-dev
+    
 1) sysAK源码中包含了多个库和tools等组件，但不是所有组件在所有平台上都会支持，可以通过在编译之前指定configure的参数来达到指定组件编译的效果。
 ./configure -h
 Usage: configure [options]

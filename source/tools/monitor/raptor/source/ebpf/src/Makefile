@@ -11,6 +11,7 @@ LIBBPF_VERSION ?= v0.8.1
 # libbpf to avoid dependency on system-wide headers, which could be missing or
 # outdated
 INCLUDES := -I$(OUTPUT) -I../../libbpf/include/uapi -I$(dir $(VMLINUX))
+BPFAPI := -I./libbpf/lib/include
 CFLAGS := -g -Wall -fPIC
 MYCFLAGS := -ggdb -gdwarf -O2 -Wall -fpie -Wno-unused-variable -Wno-unused-function -I./lib/include
 ARCH := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/' | sed 's/ppc64le/powerpc/' | sed 's/mips.*/mips/')
@@ -103,24 +104,24 @@ libnginx.a: $(OUTPUT)/nginx.o $(LIBBPF_OBJ) $(COMM_OBJ) | $(OUTPUT)
 build_bpf:
 	make -C bcc/
 	make -C libbpf/
+	cp -f libbpf/src/.github/actions/build-selftests/vmlinux.h vmlinux/vmlinux.h
 
-profile: oncpu.bpf.o offcpu.bpf.o user_slow.bpf.o ping_slow.bpf.o nginx.bpf.o build_bpf
+profile: build_bpf oncpu.bpf.o offcpu.bpf.o user_slow.bpf.o ping_slow.bpf.o nginx.bpf.o
 
 oncpu.bpf.o: oncpu.bpf.c profile.bpf.h $(VMLINUX)
-	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 -I. -c oncpu.bpf.c -o $@
+	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 $(BPFAPI) -c oncpu.bpf.c -o $@
 
 offcpu.bpf.o: offcpu.bpf.c $(VMLINUX)
-	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 -I. -c offcpu.bpf.c -o $@
+	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 $(BPFAPI) -c offcpu.bpf.c -o $@
 
 user_slow.bpf.o: user_slow.bpf.c $(VMLINUX)
-	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 -I. -c user_slow.bpf.c -o $@
+	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 $(BPFAPI) -c user_slow.bpf.c -o $@
 
 ping_slow.bpf.o: ping_slow.bpf.c $(VMLINUX)
-	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 -I. -c ping_slow.bpf.c -o $@
+	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 $(BPFAPI) -c ping_slow.bpf.c -o $@
 
 nginx.bpf.o: nginx.bpf.c $(VMLINUX)
-	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 -I. -c nginx.bpf.c -o $@
-
+	$(CLANG) $(MYCFLAGS) -target bpf -D__TARGET_ARCH_x86 $(BPFAPI) -c nginx.bpf.c -o $@
 
 # delete failed targets
 .DELETE_ON_ERROR:

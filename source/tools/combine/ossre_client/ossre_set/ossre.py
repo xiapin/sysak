@@ -721,12 +721,12 @@ def check_io_indicator(ret):
                                else:
                                    try:
                                        line = line.split()
-                                       await = float(line[await_index])
+                                       await_t = float(line[await_index])
                                        qusize = float(line[qusize_index])
-                                       if (await > ossre_config['high_await_thresh'] or qusize > 10):
+                                       if (await_t > ossre_config['high_await_thresh'] or qusize > 10):
                                            highawait_num += 1
                                            if highawait_num<10:
-                                               io_sum += "时间:%s,await:%sms,qusize:%d\n"%(line[0],await,qusize)
+                                               io_sum += "时间:%s,await:%sms,qusize:%d\n"%(line[0],await_t,qusize)
                                    except:
                                        traceback.print_exc()
                                        pass

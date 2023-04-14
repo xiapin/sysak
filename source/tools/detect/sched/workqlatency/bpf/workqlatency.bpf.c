@@ -15,7 +15,7 @@ struct bpf_map_def SEC("maps") args_map = {
 	.max_entries = 1,
 };
 
-struct trace_event_raw_workqueue_activate_work {
+/*struct trace_event_raw_workqueue_activate_work {
         struct trace_entry ent;
         void *work;
         char __data[0];
@@ -25,7 +25,7 @@ struct trace_event_raw_workqueue_execute_end {
         struct trace_entry ent;
         void *work;
         char __data[0];
-};
+};*/
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);

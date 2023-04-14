@@ -12,10 +12,12 @@ libc = "0.2"
 libbpf-sys = { version = "1.0.3" }
 paste = "1.0.9"
 procfs = "0.14.0"
-eutils-rs = "0.1.6"
+eutils-rs = { git = "https://github.com/chengshuyi/eutils-rs.git" }
 cenum-rs = { path = "../cenum-rs" }
 num_cpus = "1.0"
 bincode = "2.0.0-rc.1"
 once_cell = "1.8.0"
 log = "0.4.17"
 byteorder = "1.4.3"
+serde_json = "1.0"
+serde = {version = "1.0", features = ["derive"]}

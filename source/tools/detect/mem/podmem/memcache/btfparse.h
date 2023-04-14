@@ -10,7 +10,7 @@
  * 
  * @btf_custom_path: path of btf file
  */
-void *btf_load(const char *btf_custom_path);
+struct btf *btf_load(char *btf_custom_path);
 typedef unsigned int uint32_t;
 
 struct member_attribute
@@ -30,7 +30,7 @@ struct member_attribute
  * 
  * Note: Remember to free pointer of struct member_attribute
  */
-struct member_attribute *btf_find_struct_member(void *btf, const char *struct_name, const char *member_name);
+struct member_attribute *btf_find_struct_member(struct btf *btf, char *struct_name, char *member_name);
 
 
 #endif

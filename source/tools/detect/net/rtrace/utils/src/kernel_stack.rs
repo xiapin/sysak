@@ -124,3 +124,8 @@ impl std::fmt::Display for KernelStack {
         write!(f, "")
     }
 }
+
+
+pub fn has_kernel_symbol(name: &str) -> bool {
+    GLOBAL_KALLSYMS.lock().unwrap().has_sym(name)
+}

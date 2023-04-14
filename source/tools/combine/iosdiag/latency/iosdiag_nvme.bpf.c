@@ -20,8 +20,8 @@ int kprobe_nvme_queue_rq(struct pt_regs *ctx)
 	return trace_io_driver_route(ctx, req, IO_ISSUE_DRIVER_POINT);
 }
 
-SEC("kprobe/blk_mq_complete_request")
-int kprobe_blk_mq_complete_request(struct pt_regs *ctx)
+SEC("kprobe/nvme_pci_complete_rq")
+int kprobe_nvme_pci_complete_rq(struct pt_regs *ctx)
 {
 	struct request *req = (struct request *)PT_REGS_PARM1(ctx);
 

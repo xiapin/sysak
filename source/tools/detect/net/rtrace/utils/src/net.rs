@@ -102,8 +102,8 @@ use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 
 pub struct Addrpair {
-    local: SocketAddr,
-    remote: SocketAddr,
+    pub local: SocketAddr,
+    pub remote: SocketAddr,
 }
 
 impl Default for Addrpair {

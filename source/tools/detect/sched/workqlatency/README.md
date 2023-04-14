@@ -11,7 +11,7 @@ example: sysak workqlatency -t 100  #trace work runtime and latency statistics
 ```
 
 
-使用示例：sysak worklatency -t 10 监控10‘s内内存直接回收规整情况
+使用示例：sysak worklatency -t 10 监控10‘s work latency和runtime情况
 ```
 Kwork Name                                              Cpu             Avg delay(ns)   Count           Max delay(ns)   Max delay start(s)      Max delay end(s)
 <0xffffffff9245ade0> blk_mq_timeout_work                1               6507            1               6507            2022-08-14 09:57:13     2022-08-14 09:57:13

@@ -24,6 +24,7 @@ struct drop_filter
     struct addr_pair ap;
 };
 
+#if 0
 struct drop_event
 {
     // Event Type
@@ -51,6 +52,15 @@ struct drop_event
     u32 hook;
 
     u64 location;
+};
+
+#endif
+
+struct drop_event
+{
+    u64 location;
+    u16 proto;
+    struct addr_pair ap;
 };
 
 #endif

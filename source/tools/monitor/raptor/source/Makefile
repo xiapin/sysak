@@ -9,8 +9,8 @@ RELEASE_GOVERSION := $(shell go version)
 RELEASE_AUTHOR := Dylane
 GOLDFLAGS :=
 
-EXTRA_CGO_CFLAGS := -I$(abspath ./profile/third/libbpf/lib/include) \
-	-I$(abspath ./ebpf/src/lib/include)
+EXTRA_CGO_CFLAGS := -I$(abspath ./ebpf/src/libbpf/lib/include) \
+	-I$(abspath ./ebpf/src/bcc/lib/include/bcc_syms)
 EXTRA_CGO_LDFLAGS := -L$(abspath ./ebpf/src/libbpf/lib/lib64) -lbpf \
 		-L$(abspath ./ebpf/src/bcc/lib/lib) -lbcc-syms -lstdc++ -lelf -lz \
 		-L$(abspath ./ebpf/src/lib) -lnginx
