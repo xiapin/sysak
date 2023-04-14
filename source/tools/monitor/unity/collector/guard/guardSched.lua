@@ -15,7 +15,7 @@ function CguardSched:_init_(tid, procs, names, jperiod)
     self._jperiod = jperiod
     self._procs = procs
     self._names = names
-    self._limit = 1e5   -- 200 ms
+    self._limit = 1e5*5   -- 500 ms
 end
 
 function CguardSched:proc(t, lines)

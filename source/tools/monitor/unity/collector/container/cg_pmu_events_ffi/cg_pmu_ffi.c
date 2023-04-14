@@ -145,6 +145,7 @@ int stop_events(struct pcpu_hwi *hwi, int nr_cpus)
 				sum[j] = sum[j] + ei[j].delta;
 				ioctl(fd, PERF_EVENT_IOC_DISABLE, 0);
 				close(fd);
+				ei[j].fd = -1;
 			} else {
 #ifdef DEBUG
 				printf("Fail: cpu%d %s fd=%d\n", i, events_str[j], fd);
