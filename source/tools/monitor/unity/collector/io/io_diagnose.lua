@@ -11,13 +11,14 @@ local CioDiagnose = class("ioDiagnose", CvProto)
 local system = require("common.system")
 local procffi = require("collector.native.procffi")
 local pystring = require("common.pystring")
+local CexceptCheck = require("collector.io.exceptCheck")
 local unistd = require("posix.unistd")
 
-local function ioWait(fStat)
-    local data = procffi["ffi"].new("var_long_t")
+local function readIoWait(fStat)
+    local data = procffi["ffi"].new("var_kvs_t")
     local stat = io.open(fStat, "r")
     local s = stat:read()
-    assert(procffi["cffi"].var_input_long(procffi["ffi"].string(s), data) == 0)
+    assert(procffi["cffi"].var_input_kvs(procffi["ffi"].string(s), data) == 0)
     stat:close()
     local sum = 0
     for i = 0, data.no do
@@ -36,7 +37,7 @@ local function distStat(fDisks)
     local disks = {}
     for line in io.lines(fDisks) do
         local s = pystring:split(line, nil, 3)[4]
-        local data = procffi["ffi"].new("var_kvs_t")
+        local data= procffi["ffi"].new("var_kvs_t")
         assert(procffi["cffi"].var_input_kvs(procffi["ffi"].string(s), data) == 0)
         local disk = procffi["ffi"].string(data.s)
         disks[disk] = data
@@ -46,10 +47,11 @@ end
 
 local function pickValue(value)
     return {
-        rws    = tonumber(value[1] + value[5]),
-        rwSecs = tonumber(value[3] + value[7]),
-        qusize = tonumber(value[11]),
-        rwTiks = tonumber(value[4] + value[8]),
+        iops   = tonumber(value[0] + value[4]),   -- 1 5
+        bps    = tonumber(value[2] + value[6]) * 512,   -- 3 7
+        qusize = tonumber(value[10]) / 1000.0,            -- 11
+        await  = tonumber(value[3] + value[7]),   -- 4 8
+        util   = tonumber(value[9]) / 10.0    -- 10
     }
 end
 
@@ -60,11 +62,12 @@ function CioDiagnose:_init_(que, proto_q, fYaml, tid)
     self.fStat = res.config.proc_path .. "proc/stat"
     self.fDiskStat = res.config.proc_path .. "proc/diskstats"
     self.dirSys = res.config.proc_path .. "sys/block/"
-    self._lastCpuTotal, self._lastCpuIO = ioWait(self.fStat)
+    self._lastCpuTotal, self._lastCpuIO = readIoWait(self.fStat)
     self._disks = {}
     self._disksLast = {}
     self:readProc()
     self:storeProc()
+    self._check = CexceptCheck.new()
 end
 
 function CioDiagnose:readProc()
@@ -85,14 +88,17 @@ function CioDiagnose:storeProc()
     self._disks = {}
 end
 
-function CioDiagnose:diff(t)
-    local res = {}
+function CioDiagnose:diff(t, iowait)
+    local res = {iowait = iowait}
     for disk, value in pairs(self._disks) do
         local vLast = self._disksLast[disk]
         if vLast then
             local vs = {}
             for k, v in pairs(value) do
                 vs[k] = (v - vLast[k]) / t
+            end
+            if vs.iops > 0 then
+                vs.await = vs.await / vs.iops
             end
             res[disk] = vs
         end
@@ -101,15 +107,13 @@ function CioDiagnose:diff(t)
 end
 
 function CioDiagnose:work(t)
-    local cpuTotal, cpuIO = ioWait(self.fStat)
-    --print( cpuTotal - self._lastCpuTotal, cpuIO - self._lastCpuIO)
+    local cpuTotal, cpuIO = readIoWait(self.fStat)
+    local iowait = (cpuIO - self._lastCpuIO) * 100 / (cpuTotal - self._lastCpuTotal) / t
     self._lastCpuTotal, self._lastCpuIO = cpuTotal, cpuIO
 
     self:readProc()
-    local res = self:diff(t)
-    --system:dumps(res)
-    --system:dumps(self._disks)
-    --system:dumps(self._disksLast)
+    local res = self:diff(t, iowait)
+    self._check:addValue(res)
     self:storeProc()
 end
 

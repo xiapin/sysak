@@ -60,8 +60,7 @@ function CrbEvent:addEvent(name, obj, period, delay, loop)
 end
 
 function CrbEvent:_proc(now, node)
-    --print(now .. ": node " .. node.name .. " work")
-    local ret
+    local ret = -1
     if node.obj.work then
         ret = node.obj:work(node.period, self)
     end
