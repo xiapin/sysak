@@ -118,9 +118,14 @@ int collect_events(struct pcpu_hwi *hwi, int nr_cpus, double *sum)
 
 	for (i = 0; i < nr_cpus; i++) {
 		n = collect_pcpu_events(&hwi[i], sum);
-		if (n < 0)
+		if (n < 0) {
 			printf("collect_pcpu_events cpu%d fail:%s\n", i, strerror(-n));
+			break;
+		}
 	}
+	if (n < 0)
+		return n;
+	return 0;
 }
 
 int stop_events(struct pcpu_hwi *hwi, int nr_cpus)
