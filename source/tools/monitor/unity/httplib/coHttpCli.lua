@@ -113,11 +113,18 @@ local function setupSocket(host, port)
     end
 end
 
-function CcoHttpCli:_init_(host, port, url, persistent)
-    self._host = host
-    self._port = port or 80
-    self._url = url or "/"
+function CcoHttpCli:_init_(fYaml, persistent)
+    local res = system:parseYaml(fYaml)
+    local pushTo = res.pushTo
+    self._host = pushTo.host
+    self._port = pushTo.port or 80
+    self._url = pushTo.url or "/"
     self._persistent = persistent
+
+    local Cidentity = require("beaver.identity")
+    local inst = Cidentity.new(fYaml)
+    self._instance = inst:id()
+
     self.status = enumStat.closed
 end
 
@@ -142,6 +149,31 @@ end
 
 function CcoHttpCli:trans(msgs, body, filter)
     return ""
+end
+
+function CcoHttpCli:addInstance(line)   -- add instance id for line index.
+    local cells = line.ls
+    local hasInstance = false
+
+    if cells then
+        for _, cell in ipairs(cells) do
+            if cell.name == "instance" then
+                hasInstance = true
+            end
+        end
+    end
+
+    if not hasInstance then
+        local cell = {
+            name = "instance",
+            index = self._instance
+        }
+        if cells then
+            table.insert(cells, cell)
+        else
+            line.ls = {cell}
+        end
+    end
 end
 
 function CcoHttpCli:pack(body)
@@ -497,9 +529,7 @@ function CcoHttpCli:work(cffi, efd)
         else
             goto failed
         end
-        if self._persistent then
-            print("continue.")
-        else
+        if not self._persistent then
             goto failed
         end
     end

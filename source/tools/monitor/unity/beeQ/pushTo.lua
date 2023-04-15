@@ -8,14 +8,10 @@ package.path = package.path .. ";../?.lua;"
 
 local coCli = require("httplib.coCli")
 local coInflux = require("httplib.coInflux")
-local unistd = require("posix.unistd")
-local system = require("common.system")
 
 function work(fd, fYaml)
-    local res = system:parseYaml(fYaml)
-    local pushTo = res.pushTo
     local frame = coCli.new(fd)
-    local c = coInflux.new(pushTo.host, pushTo.port, pushTo.url)
+    local c = coInflux.new(fYaml)
     frame:poll(c)
     print("end push.")
     return 0

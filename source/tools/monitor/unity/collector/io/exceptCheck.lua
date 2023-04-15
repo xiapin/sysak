@@ -80,7 +80,6 @@ function CexecptCheck:calcs()
         for _, key in ipairs(keys) do
             vs = self._fifo:values(disk, key)
             if vs then
-                system:dumps(item)
                 calc(item[key], vs)
             end
         end

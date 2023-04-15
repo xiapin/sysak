@@ -11,8 +11,8 @@ local lineParse = require("common.lineParse")
 
 local CcoInflux = class("coInflux", CcoHttpCli)
 
-function CcoInflux:_init_(host, port, url)
-    CcoHttpCli._init_(self, host, port, url)
+function CcoInflux:_init_(fYaml)
+    CcoHttpCli._init_(self, fYaml)
 end
 
 function CcoInflux:echo(tReq)
@@ -28,6 +28,7 @@ function CcoInflux:trans(msgs, body, filter)
     lines = msgs.lines
     for _, line in ipairs(lines) do
         c = c + 1
+        self:addInstance(line)
         bodies[c] = lineParse.packs(line)
     end
 

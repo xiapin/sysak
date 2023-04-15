@@ -1,6 +1,7 @@
 //
 // Created by 廖肇燕 on 2023/2/23.
 //
+#define BPF_NO_GLOBAL_DATA
 
 #include <vmlinux.h>
 #include <coolbpf.h>
@@ -11,7 +12,7 @@
 #define KERN_STACKID_FLAGS	(0 | BPF_F_FAST_STACK_CMP)
 
 #define PERIOD_TIME (10 * 1000 * 1000ULL)
-#define THRESHOLD_TIME (200 * 1000 * 1000ULL)
+#define THRESHOLD_TIME (150 * 1000 * 1000ULL)
 
 BPF_ARRAY(virtdist, u64, 20);
 BPF_PERF_OUTPUT(perf, 1024);
@@ -42,6 +43,7 @@ static inline void check_time(struct bpf_perf_event_data *ctx,
 
     if (last && delta > 2 * PERIOD_TIME) {
         delta -= PERIOD_TIME;
+        bpf_printk("delta %llu.\n", delta);
         hist10_push((struct bpf_map_def *)&virtdist, delta / PERIOD_TIME);
         if (delta >= THRESHOLD_TIME) {
             struct task_struct* task = (struct task_struct *)bpf_get_current_task();
@@ -52,6 +54,7 @@ static inline void check_time(struct bpf_perf_event_data *ctx,
             data.delta = delta;
             data.cpu = cpu();
             bpf_get_current_comm(&data.comm, TASK_COMM_LEN);
+            bpf_printk("delta %llu, pid:%d.\n", delta, data.pid);
 
             bpf_perf_event_output(ctx, event, BPF_F_CURRENT_CPU, &data, sizeof(data));
         }

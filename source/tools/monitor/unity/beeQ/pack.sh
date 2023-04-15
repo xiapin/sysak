@@ -43,13 +43,17 @@ mkdir ${APP}/collector
 mkdir ${APP}/collector/native
 mkdir ${APP}/collector/guard
 mkdir ${APP}/collector/outline
+mkdir ${APP}/collector/postPlugin
 mkdir ${APP}/collector/postEngine
+mkdir ${APP}/collector/io
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
 cp collector/guard/*.lua ${APP}/collector/guard
 cp collector/outline/*.lua ${APP}/collector/outline
+cp collector/postPlugin/*.lua ${APP}/collector/postPlugin
 cp collector/postEngine/*.lua ${APP}/collector/postEngine
+cp collector/io/*.lua ${APP}/collector/io
 cp collector/plugin.yaml ${APP}/collector/
 
 mkdir ${APP}/common
