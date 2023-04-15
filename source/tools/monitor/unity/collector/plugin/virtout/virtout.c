@@ -49,8 +49,6 @@ static void close_perf_fds(void) {
         if (perf_fds[i] > 0) {
             close(perf_fds[i]);
             perf_fds[i] = 0;
-        } else {
-            break;
         }
     }
 }
@@ -97,10 +95,14 @@ static int setup_perf_events(const char* func) {
     for (i = 0; i < nr_cpus; i ++) {
         perf_fds[i] = perf_event_open(&perf_attr, -1, i, -1, 0);
         if (perf_fds[i] < 0) {
-            perror("syscall failed.");
-            perf_fds[i] = 0;
-            close_perf_fds();
-            return -1;
+            if (errno == ENODEV) {
+                printf("skip offline cpu id: %d\n", i);
+                continue;
+            } else {
+                perror("syscall failed.");
+                close_perf_fds();
+                return -1;
+            }
         }
 
         link = bpf_program__attach_perf_event(*(progs->prog), perf_fds[i]);
