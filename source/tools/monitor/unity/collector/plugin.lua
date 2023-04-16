@@ -7,6 +7,8 @@
 require("common.class")
 local Cplugin = class("plugin")
 local dockerinfo = require("common.dockerinfo")
+local cjson = require("cjson.safe")
+local json = cjson.new()
 
 function Cplugin:_init_(resYaml, ffi, proto_q, so)
     self._ffi = ffi
@@ -73,7 +75,7 @@ function Cplugin:load_log(unity_line, line)
     if #name > 0 then
         local log = self._ffi.string(unity_line.logs[0].log)
         self._ffi.C.free(unity_line.logs[0].log)   -- should free from strdup
-        table.insert(line.log, {name = name, log = log})
+        table.insert(line.log, {name = name, log = json.encode(log)})
     end
 end
 

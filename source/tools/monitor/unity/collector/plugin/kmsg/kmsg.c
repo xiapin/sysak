@@ -79,6 +79,7 @@ static int kmsg_thread_func(struct beeQ* q, void * arg) {
             perror("kmsg read2 failed.");
             goto endRead;
         }
+        buff[ret -1] = '\0';
 
         unity_alloc_lines(lines, 1);
         line = unity_get_line(lines, 0);

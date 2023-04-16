@@ -8,6 +8,8 @@ require("common.class")
 
 local CprotoData = require("common.protoData")
 local CprotoQueue = class("loop")
+local cjson = require("cjson.safe")
+local json = cjson.new()
 local system = require("common.system")
 
 function CprotoQueue:_init_(que)
@@ -55,7 +57,7 @@ function CprotoQueue:load_log(unity_line, line)
     if #name > 0 then
         local log = self._ffi.string(unity_line.logs[0].log)
         self._ffi.C.free(unity_line.logs[0].log)   -- should free from strdup
-        table.insert(line.log, {name = name, log = log})
+        table.insert(line.log, {name = name, log = json.encode(log)})
     end
 end
 
