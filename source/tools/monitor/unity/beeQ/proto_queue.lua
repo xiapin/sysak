@@ -79,7 +79,6 @@ function CprotoQueue:_proc(unity_lines, lines)
 end
 
 function CprotoQueue:send(num, pline)
-    --print(string.format("proto que send a %d message.", num))
     local unity_lines = self._ffi.new("struct unity_lines")
     local lines = self._proto:protoTable()
     unity_lines.num = num
