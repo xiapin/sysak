@@ -47,21 +47,19 @@ function CpodFilter:setupPlugins(res, proto, pffi, mnt, dirs, old_dirs)
 
     for _, dir in ipairs(dirs) do
         if not system:valueIsIn(old_dirs, dir) then
-        local ls = {
-            {
-                name = "path",
-                index = dir,
+            local ls = {
+                {
+                    name = "path",
+                    index = dir,
+                }
             }
-        }
-        for _, plugin in ipairs(res.container.luaPlugin) do
-            local CProcs = require("collector.container." .. plugin)
-            local plug = CProcs.new(proto, pffi, mnt, dir, ls)
-            if plug.pFile and unistd.access(plug.pFile) then
-                table.insert(self._plugins, plug)
-                --c = c + 1
-                --plugins[c] = plug
+            for _, plugin in ipairs(res.container.luaPlugin) do
+                local CProcs = require("collector.container." .. plugin)
+                local plug = CProcs.new(proto, pffi, mnt, dir, ls)
+                if plug.pFile and unistd.access(plug.pFile) then
+                    table.insert(self._plugins, plug)
+                end
             end
-        end
         end
     end
 
