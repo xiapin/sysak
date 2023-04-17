@@ -41,11 +41,12 @@ local function addDirs(dirs, path)
     end
 end
 
-local function setupPlugins(res, proto, pffi, mnt, dirs)
+function CpodFilter:setupPlugins(res, proto, pffi, mnt, dirs, old_dirs)
     local c = 0
     local plugins = {}
 
     for _, dir in ipairs(dirs) do
+        if not system:valueIsIn(old_dirs, dir) then
         local ls = {
             {
                 name = "path",
@@ -56,13 +57,15 @@ local function setupPlugins(res, proto, pffi, mnt, dirs)
             local CProcs = require("collector.container." .. plugin)
             local plug = CProcs.new(proto, pffi, mnt, dir, ls)
             if plug.pFile and unistd.access(plug.pFile) then
-                c = c + 1
-                plugins[c] = plug
+                table.insert(self._plugins, plug)
+                --c = c + 1
+                --plugins[c] = plug
             end
+        end
         end
     end
 
-    return plugins
+    return self._plugins
 end
 
 function CpodFilter:_init_(resYaml, proto, pffi, mnt)
@@ -80,7 +83,9 @@ function CpodFilter:_init_(resYaml, proto, pffi, mnt)
 
     self._ino = Cinotifies.new()
     self._dirs = self:walkTops1(self._resYaml.container)
-    self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
+    local olddirs = {}
+    self._plugins = {}
+    self:setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs, olddirs)
     print("add " .. #self._plugins)
 end
 
@@ -99,7 +104,7 @@ function CpodFilter:enum1LDirs(root, format, parent, dirs)
 end
 
 function CpodFilter:walkTops1(resYaml)
-	local cgroups = {"cpuacct", "memory", "blkio", "perf_event"}
+	local cgroups = {"perf_event"}
 	local dirs = system:deepcopy(resYaml.directCgPath)
 
 	for i,cg in ipairs(cgroups) do
@@ -155,18 +160,25 @@ function CpodFilter:proc(elapsed, lines)
     local rec = {}
     if self._ino:isChange() then
         print("cgroup changed.")
-        local start = lua_local_clock()
         self._ino = Cinotifies.new()
-        self._dirs = self:walkTops1(self._resYaml.container)
-	for _, plugin in ipairs(self._plugins) do
-		pcall(plugin.releaseEvents, plugin)
-	end
-        self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._dirs)
+        local newdirs = self:walkTops1(self._resYaml.container)
+        --remove unacess able path
+        for i, plugin in ipairs(self._plugins) do
+            if (nil == plugin.pFile) or (not unistd.access(plugin.pFile)) then
+                --local stat, res = pcall(plugin.releaseEvents, plugin)
+                self._plugins[i] = nil
+            end
+        end
+
+        self:setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, newdirs, self._dirs)
+        self._dirs = newdirs
+
         collectgarbage("collect")
-        local stop = lua_local_clock()
-        ret, delta = 1, stop - start
-	return ret,delta
+        ret = 1
+        print("add ".. #self._plugins)
+        return ret, delta
     end
+
     for i, plugin in ipairs(self._plugins) do
         --local res = plugin:proc(elapsed, lines)
         local stat, res = pcall(plugin.proc, plugin, elapsed, lines)
@@ -174,7 +186,6 @@ function CpodFilter:proc(elapsed, lines)
             table.insert(rec, i)
         end
     end
-
     for _, i in ipairs(rec) do  -- del bad plugin
         self._plugins[i] = nil
     end
