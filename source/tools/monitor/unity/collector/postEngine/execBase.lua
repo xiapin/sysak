@@ -21,11 +21,7 @@ local function run(cmd, args)
         return pid
     elseif pid == 0 then   -- for child
         local errno
-        local execArgs = {}
-        for i, arg in ipairs(args) do
-            execArgs[i - 1] = arg   -- arguments (table can include index 0)
-        end
-        _, err, errno = unistd.exec(cmd, execArgs)
+        _, err, errno = unistd.exec(cmd, args)
         assert(not errno, "exec failed." .. err .. errno)
     else
         error("fork report" .. err)
@@ -45,15 +41,17 @@ function CexecBase:addEvents(e)
 end
 
 local function kill(pid)
-    signal.signal(self._pid, signal.SIGKILL)  -- force to kill task
-    pwait.wait(self._pid)                     -- wait task
+    signal.kill(pid, signal.SIGKILL)  -- force to kill task
+    pwait.wait(pid)                     -- wait task
 end
 
 function CexecBase:work()
     local cnt = self._cnt
     if cnt >= self._loop then
         local pid, stat, exit = pwait.wait(self._pid, pwait.WNOHANG)
-        assert(pid, "wait failed " .. stat .. exit)
+        if pid == nil then
+            error("wait failed " .. stat .. exit)
+        end
         if not exit then -- process not exit
             print("force to kill " .. self._pid)
             kill(self._pid)
