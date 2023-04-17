@@ -11,6 +11,7 @@ local CvProto = require("collector.vproto")
 local pystring = require("common.pystring")
 local system = require("common.system")
 local cjson = require("cjson.safe")
+local CexecBase = require("collector.postEngine.execBase")
 
 local Cengine = class("engine", CvProto)
 
@@ -25,13 +26,20 @@ function Cengine:setTask(taskMons)
     self._task = taskMons
 end
 
-function Cengine:pushTask(msgs)
+function Cengine:pushTask(e, msgs)
     local events = pystring:split(msgs, '\n')
     for _, msg in ipairs(events) do
         print(msg)
         local res = cjson.decode(msg)
-        if res.cmd == "mon_pid" then
+        local cmd = res.cmd
+        if cmd == "mon_pid" then
             self._task:add(res.pid, res.loop)
+        elseif cmd == "exec" then  -- exec a cmd
+            local execCmd = res.exec
+            local args = res.args or {}
+            local second = res.second or 1
+            local exec = CexecBase.new(execCmd, args, second)
+            exec:addEvents(e)
         end
     end
 end
@@ -45,7 +53,7 @@ function Cengine:proc(t, event, msgs)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 
-    self:pushTask(msgs)
+    self:pushTask(event, msgs)
 end
 
 function Cengine:work(t, event)

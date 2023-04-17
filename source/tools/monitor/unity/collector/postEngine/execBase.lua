@@ -7,36 +7,46 @@
 require("common.class")
 local unistd = require("posix.unistd")
 local pwait = require("posix.sys.wait")
-local signal = require(" posix.signal")
+local signal = require("posix.signal")
 local pystring = require("common.pystring")
 local system = require("common.system")
 
 local CexecBase = class("execBase")
 local interval = 5   --- poll for every 5 second
 
-function CexecBase:_init_(cmd, args, seconds)
-    self._pid = 0
-    self.cmd = cmd
-    self._args = args
-    self._cnt = 0
-    self._loop = seconds / interval
+local function run(cmd, args)
+    local pid, err = unistd.fork()
+    if pid > 0 then   -- for self
+        print("pid: " .. pid)
+        return pid
+    elseif pid == 0 then   -- for child
+        local errno
+        local execArgs = {}
+        for i, arg in ipairs(args) do
+            execArgs[i - 1] = arg   -- arguments (table can include index 0)
+        end
+        _, err, errno = unistd.exec(cmd, execArgs)
+        assert(not errno, "exec failed." .. err .. errno)
+    else
+        error("fork report" .. err)
+    end
 end
 
-function CexecBase:run()
-    local pid, err = unistd.fork()
-    assert(pid, "fork report" .. err)
-    if pid > 0 then
-        self._pid = pid
-        self._cnt = 0
-    else
-        local errno
-        _, err, errno = unistd.exec(self.cmd, self._args)
-        assert(not errno, "exec failed." .. err .. errno)
-    end
+function CexecBase:_init_(cmd, args, seconds)
+    self.cmd = cmd
+    self._cnt = 0
+    self._loop = seconds / interval
+
+    self._pid = run(cmd, args)
 end
 
 function CexecBase:addEvents(e)
     e:addEvent(self.cmd, self, interval, true, self._loop)
+end
+
+local function kill(pid)
+    signal.signal(self._pid, signal.SIGKILL)  -- force to kill task
+    pwait.wait(self._pid)                     -- wait task
 end
 
 function CexecBase:work()
@@ -45,9 +55,12 @@ function CexecBase:work()
         local pid, stat, exit = pwait.wait(self._pid, pwait.WNOHANG)
         assert(pid, "wait failed " .. stat .. exit)
         if not exit then -- process not exit
-            signal.signal(self._pid, signal.SIGKILL)  -- force to kill task
-            pwait.wait(self._pid)                     -- wait task
+            print("force to kill " .. self._pid)
+            kill(self._pid)
         end
+        return -1  -- delete from task list.
     end
     self._cnt = cnt + 1
 end
+
+return CexecBase
