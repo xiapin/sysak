@@ -163,7 +163,7 @@ function CpodFilter:proc(elapsed, lines)
         local newdirs = self:walkTops1(self._resYaml.container)
         --remove unacess able path
         for i, plugin in ipairs(self._plugins) do
-            if (nil == plugin.pFile) or (not unistd.access(plugin.pFile)) then
+            if not (plugin.pFile and unistd.access(plugin.pFile)) then
                 --local stat, res = pcall(plugin.releaseEvents, plugin)
                 self._plugins[i] = nil
             end
