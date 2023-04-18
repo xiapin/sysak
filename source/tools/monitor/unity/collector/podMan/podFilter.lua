@@ -158,6 +158,7 @@ function CpodFilter:proc(elapsed, lines)
     local rec = {}
     if self._ino:isChange() then
         print("cgroup changed.")
+	local start = lua_local_clock()
         self._ino = Cinotifies.new()
         local newdirs = self:walkTops1(self._resYaml.container)
         --remove unacess able path
@@ -173,7 +174,9 @@ function CpodFilter:proc(elapsed, lines)
 
         collectgarbage("collect")
         ret = 1
+	local stop = lua_local_clock()
         print("add ".. #self._plugins)
+	delta = stop - start
         return ret, delta
     end
 
