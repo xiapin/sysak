@@ -24,11 +24,11 @@ config:
 outline:
   - /tmp/sysom
 
-#pushTo:
-#  to: "Influx"
-#  host: "ld-wz9d17b514mg6kjkx-proxy-tsdb.lindorm.rds.aliyuncs.com"
-#  port: 8242
-#  url: "/api/v2/write?db=lua"
+pushTo:
+  to: "Influx"
+  host: "ld-wz9d17b514mg6kjkx-proxy-tsdb.lindorm.rds.aliyuncs.com"
+  port: 8242
+  url: "/api/v2/write?db=lua"
 
 container:
   mode: "pods"

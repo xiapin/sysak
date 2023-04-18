@@ -9,8 +9,8 @@ local ChttpCli = require("httplib.httpCli")
 
 local CinfluxCli = class("influxCli", ChttpCli)
 
-function CinfluxCli:_init_(url, db, user, pass, proxy)
-    self._url = string.format("%swrite?u=%s&p=%s&db=%s", url, user, pass, db)
+function CinfluxCli:_init_(url, proxy)
+    self._url = url
     ChttpCli._init_(self, proxy)
 end
 

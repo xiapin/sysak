@@ -213,7 +213,11 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
     for (i = 0; i < 128; i ++) {
         if (addr[i] > 0) {
             cell = ksym_search(addr[i]);
-            strncat(log, cell->func, LOG_MAX);
+            if (cell != NULL) {
+                strncat(log, cell->func, LOG_MAX);
+            } else {
+                strncat(log, "!nil", LOG_MAX);
+            }
             strncat(log, ",", LOG_MAX);
         } else {
             break;

@@ -10,6 +10,6 @@ local ChttpCli = require("httplib.httpCli")
 
 local cli = ChttpCli.new()
 local url = "http://127.0.0.1:8400/api/trig"
-local req = {cmd = "exec", exec = "/usr/bin/python", args = {"../test/curl/hello.py",}}
+local req = {cmd = "exec", exec = "/usr/bin/python", args = {"../test/curl/hello.py",}, }
 local res = cli:postTable(url, req)
 system:dumps(res)

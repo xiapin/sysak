@@ -15,6 +15,8 @@ local ChttpComm = class("httplib.httpComm")
 local cjson = require("cjson.safe")
 local json = cjson.new()
 
+json.encode_escape_forward_slash(false)
+
 local function codeTable()
     return {
         [100] = "Continue",

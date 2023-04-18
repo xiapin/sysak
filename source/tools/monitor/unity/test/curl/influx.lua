@@ -8,12 +8,6 @@ package.path = package.path .. ";../../?.lua;"
 local system = require("common.system")
 local CinfluxCli = require("httplib.influxCli")
 
-local cli = CinfluxCli.new("http://172.24.90.148:8086/", "lua", "xxx", "xxxxxx")
-
-local v = 1.1
-while true do
-    local s = string.format("test,label=a v=%f", v)
-    cli:puts(s)
-    v = v + 1
-    system:sleep(2)
-end
+local cli = CinfluxCli.new("http://ld-wz9d17b514mg6kjkx-proxy-tsdb.lindorm.rds.aliyuncs.com:8242/api/v2/write?db=lua")
+local res = cli:puts('virtout,instance=self log="task:0(swapper/13), cpu:13, delayed:162994631, callstack:mwait_idle_with_hints.constprop.0,intel_idle,cpuidle_enter_state,cpuidle_enter,cpuidle_idle_call,do_idle,cpu_startup_entry,secondary_startup_64_no_verify,"')
+system:dumps(res)

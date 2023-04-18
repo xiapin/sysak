@@ -10,6 +10,8 @@ local system = require("common.system")
 local module = {}
 local json = cjson.new()
 
+json.encode_escape_forward_slash(false)
+
 local function parseLabel(sls, ls)
     local lss = pystring:split(sls, ",")
     for _, cell in ipairs(lss) do
