@@ -514,7 +514,6 @@ function CcoHttpCli:work(cffi, efd)
     self.online = os.time()
     while true do
         local body = coroutine.yield()
-        --print("-- " .. type(msg))
         self.status = enumStat.sending
         local s = self:pack(body)
         if not self:coWrite(cffi, efd, fd, s) then

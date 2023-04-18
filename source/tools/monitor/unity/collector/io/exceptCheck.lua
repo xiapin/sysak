@@ -84,7 +84,6 @@ function CexecptCheck:calcs()
             end
         end
     end
-    system:dumps(self._diskItem)
 end
 
 function CexecptCheck:addValue(v)

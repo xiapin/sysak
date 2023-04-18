@@ -16,7 +16,9 @@ function CcoInflux:_init_(fYaml)
 end
 
 function CcoInflux:echo(tReq)
-    print(tReq.code, tReq.data)
+    if tReq.code ~= "204" then
+        print(tReq.code, tReq.data)
+    end
 end
 
 function CcoInflux:trans(msgs, body, filter)
@@ -41,7 +43,6 @@ function CcoInflux:trans(msgs, body, filter)
 end
 
 function CcoInflux:pack(body)
-    print(#body)
     local line = self:packCliHead('POST', self._url)
     local head = {
         Host = self._host,
