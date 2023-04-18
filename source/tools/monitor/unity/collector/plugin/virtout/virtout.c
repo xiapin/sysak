@@ -207,7 +207,7 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
     int id = e->stack_id;  //last stack
     struct ksym_cell* cell;
 
-    snprintf(log, LOG_MAX, "task:%d(%s), cpu:%d, delayed:%ld, callstack:", e->pid, e->comm, e->cpu, e->delta);
+    snprintf(log, LOG_MAX, "task:%d(%s);cpu:%d;delayed:%ld;callstack:", e->pid, e->comm, e->cpu, e->delta);
     coobpf_key_value(stack_fd, &id, &addr);
 
     for (i = 0; i < 128; i ++) {
@@ -223,7 +223,6 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
             break;
         }
     }
-    printf("log:%s\n", log);
     unity_set_table(line, "virtout_log");
     unity_set_log(line, "log", log);
     return 0;
