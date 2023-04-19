@@ -169,15 +169,13 @@ function CpodFilter:proc(elapsed, lines)
             end
         end
 
-        self:setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, newdirs, self._dirs)
+        self._plugins = self:setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, newdirs, self._dirs)
         self._dirs = newdirs
 
         collectgarbage("collect")
-        ret = 1
-	local stop = lua_local_clock()
+        local stop = lua_local_clock()
+	ret, delta = 1, stop - start
         print("add ".. #self._plugins)
-	delta = stop - start
-        return ret, delta
     end
 
     for i, plugin in ipairs(self._plugins) do
