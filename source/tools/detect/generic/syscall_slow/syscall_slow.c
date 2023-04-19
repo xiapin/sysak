@@ -53,7 +53,7 @@ const char argp_program_doc[] =
 "    syscall_slow -t 15      # detect with threshold 15ms (default 10ms)\n"
 "    syscall_slow -p 1100    # detect tid 1100 (use for threads only)\n"
 "    syscall_slow -c bash    # trace aplication who's name is bash\n"
-"    syscall_slow -n 101,102 # Exclude syscall 123 from tracing.\n"
+"    syscall_slow -n 101,102 # Exclude syscall 101 and 102 from tracing.\n"
 "    syscall_slow -f a.log   # log to a.log (default to ~sysak/syscall_slow.log)\n";
 
 static const struct argp_option opts[] = {
@@ -156,28 +156,43 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 			argp_usage(state);
 		}
 		errno = 0;
-		env.duration = strtol(arg, NULL, 10);
-		if (errno) {
-			ret = errno;
-			fprintf(stderr, "invalid duration\n");
-			argp_usage(state);
-			return ret;
-		}
-		break;
+		unsigned long val = strtoul(arg, &endptr, 10);
+
+        if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) ||
+            (errno != 0 && val == 0)) {
+            ret = errno;
+            fprintf(stderr, "invalid duration\n");
+            argp_usage(state);
+            return ret;
+        }
+
+        if (endptr == arg) {
+            ret = EINVAL;
+            fprintf(stderr, "invalid duration\n");
+            argp_usage(state);
+            return ret;
+        }
+
+        env.duration = val;
+        break;
 	default:
 		return ARGP_ERR_UNKNOWN;
 	}
-	if (!filep) {
-		filep = fopen(defaultfile, "w+");
-		if (!filep) {
-			ret = errno;
-			fprintf(stderr, "%s :fopen %s\n",
-				strerror(errno), defaultfile);
-			return ret;
-		}
-	}
 
 	return 0;
+}
+
+static int open_log_file(void) {
+    int ret = 0;
+    if (!filep) {
+        filep = fopen(defaultfile, "w+");
+        if (!filep) {
+            ret = errno;
+            fprintf(stderr, "%s :fopen %s\n", strerror(errno), defaultfile);
+            return ret;
+        }
+    }
+    return ret;
 }
 
 static void bump_memlock_rlimit(void)
@@ -328,9 +343,16 @@ int main(int argc, char **argv)
 		fprintf(stderr, "argp_parse fail\n");
 		return err;
 	}
-	libbpf_set_print(libbpf_print_fn);
 
-	bump_memlock_rlimit();
+    err = open_log_file();
+    if (err) {
+        fprintf(stderr, "Failed to open log file\n");
+        return err;
+    }
+
+    libbpf_set_print(libbpf_print_fn);
+
+    bump_memlock_rlimit();
 	err = load_kallsyms(&ksyms);
 	if (err) {
 		fprintf(stderr, "Failed to load kallsyms\n");
@@ -366,6 +388,8 @@ cleanup:
 	if (ksyms)
 		free(ksyms);
 
-	return err != 0;
+    if (filep) 
+		fclose(filep);
+    return err != 0;
 }
 
