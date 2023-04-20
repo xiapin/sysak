@@ -1,5 +1,5 @@
 mod bindings {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+    include!("bpf/bindings.rs");
 }
 
 mod skel {
