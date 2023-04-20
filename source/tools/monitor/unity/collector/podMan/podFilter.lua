@@ -42,9 +42,6 @@ local function addDirs(dirs, path)
 end
 
 function CpodFilter:setupPlugins(res, proto, pffi, mnt, dirs, old_dirs)
-    local c = 0
-    local plugins = {}
-
     for _, dir in ipairs(dirs) do
         if not system:valueIsIn(old_dirs, dir) then
             local ls = {
@@ -59,6 +56,13 @@ function CpodFilter:setupPlugins(res, proto, pffi, mnt, dirs, old_dirs)
                 if plug.pFile and unistd.access(plug.pFile) then
                     table.insert(self._plugins, plug)
                 end
+            end
+        end
+    end
+    if self._plugins then
+        for i, plug in ipairs(self._plugins) do
+            if plug == nil then
+                table.remove(self._plugins, i)
             end
         end
     end
@@ -156,6 +160,7 @@ end
 function CpodFilter:proc(elapsed, lines)
     local ret, delta
     local rec = {}
+    local recChange = {}
     if self._ino:isChange() then
         print("cgroup changed.")
 	local start = lua_local_clock()
@@ -164,12 +169,15 @@ function CpodFilter:proc(elapsed, lines)
         --remove unacess able path
         for i, plugin in ipairs(self._plugins) do
             if not (plugin.pFile and unistd.access(plugin.pFile)) then
-                --local stat, res = pcall(plugin.releaseEvents, plugin)
-                self._plugins[i] = nil
+                table.insert(recChange, i)
             end
         end
+        for i = #recChange, 1, -1 do
+            local k = recChange[i]
+            table.remove(self._plugins, k)
+        end
 
-        self._plugins = self:setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, newdirs, self._dirs)
+        self:setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, newdirs, self._dirs)
         self._dirs = newdirs
 
         collectgarbage("collect")
@@ -185,8 +193,9 @@ function CpodFilter:proc(elapsed, lines)
             table.insert(rec, i)
         end
     end
-    for _, i in ipairs(rec) do  -- del bad plugin
-        self._plugins[i] = nil
+    for i = #rec, 1, -1 do    -- del bad plugin
+        local k = rec[i]
+        table.remove(self._plugins, k)
     end
     return ret, delta
 end
