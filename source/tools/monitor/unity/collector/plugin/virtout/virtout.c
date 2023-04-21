@@ -198,7 +198,7 @@ void deinit(void)
     DESTORY_SKEL_BOJECT(virtout);
 }
 
-#define LOG_MAX 256
+#define LOG_MAX 4096
 static char log[LOG_MAX];
 
 int proc(int stack_fd, struct data_t *e, struct unity_line *line) {

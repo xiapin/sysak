@@ -58,16 +58,21 @@ end
 function CioDiagnose:_init_(que, proto_q, fYaml, tid)
     CvProto._init_(self, CprotoData.new(que))
     self._tid  = tid
+
     local res = system:parseYaml(fYaml)
-    self.fStat = res.config.proc_path .. "proc/stat"
-    self.fDiskStat = res.config.proc_path .. "proc/diskstats"
-    self.dirSys = res.config.proc_path .. "sys/block/"
+    local proc_path = res.config.proc_path
+    self.fStat = proc_path .. "proc/stat"
+    self.fDiskStat = proc_path .. "proc/diskstats"
+    self.dirSys = proc_path .. "sys/block/"
+
     self._lastCpuTotal, self._lastCpuIO = readIoWait(self.fStat)
     self._disks = {}
     self._disksLast = {}
     self:readProc()
     self:storeProc()
-    self._check = CexceptCheck.new()
+
+    local diag = res.ioDiagnose
+    self._check = CexceptCheck.new(diag)
 end
 
 function CioDiagnose:readProc()
@@ -112,6 +117,7 @@ function CioDiagnose:work(t)
     self._lastCpuTotal, self._lastCpuIO = cpuTotal, cpuIO
 
     self:readProc()
+    self._check:checks()
     local res = self:diff(t, iowait)
     self._check:addValue(res)
     self:storeProc()

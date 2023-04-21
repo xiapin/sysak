@@ -30,6 +30,7 @@ local function addItem()
             curWinMinVal = 1e9,
             curWinMaxVal = 0,
             moveAvg = 0,
+            last = 0,
             thresh = 0
         },
         compensation = {
@@ -55,24 +56,128 @@ local function addItems()
     return ret
 end
 
-function CexecptCheck:_init_()
+function CexecptCheck:_init_(diag)
+    self._diag = diag
+
     self._fifo = CdiskFifo.new(fifoSize)
     self._waitItem = addItem()
     self._diskItem = {}
+
+    self._cpuStatIowait = {sum = 0, iowait = 0}
+    self._uploadInter = 0
+    self._exceptionStat = {system = {['IOwait-High'] = {cur = 0, max = 0}}}
+    self._dataStat = {system = {iowait= 0}}
+
+    self._diagSwitch = {
+        diagIowait = { sw = self._diag.cfg.diagIowait,
+                       esi = 'IOwait-High'},
+        diagIoburst = { sw = self._diag.cfg.diagIoburst,
+                        esi ='IO-Delay'},
+        diagIolat = {sw = self._diag.cfg.diagIolat,
+                      esi = 'IO-Burst'},
+        diagIohang = {sw = self._diag.cfg.diagIohang,
+                       esi = 'IO-Hang'}
+    }
 end
 
-local function calc(item, vs)
+local function calcBase(item, vs)
     local bt = item.baseThresh
-    bt.curWinMinVal = vs.min
-    bt.curWinMaxVal = vs.max
-    bt.moveAvg      = vs.arg
-    bt.nrSample     = vs.count
+
+    local min, max, avg, nr = vs.min, vs.max, vs.avg, vs.nr
+
+    bt.nrSample     = nr
+    bt.curWinMinVal = math.min(min, bt.curWinMinVal)
+    bt.curWinMaxVal = math.max(max, bt.curWinMaxVal)
+    bt.last         = vs.last
+
+    local nrThreshSample = nr + 1 - fifoSize
+    local thresh = math.max(max - avg, avg - min)
+    local threshAvg = (bt.thresh * (nrThreshSample - 1) + thresh) / nrThreshSample
+    bt.thresh  = threshAvg
+    bt.moveAvg = avg
+
+    local usedWin = item.usedWin
+    usedWin = usedWin + 1
+    if usedWin >= fifoSize then
+        bt.curWinMinVal = 1e9
+        bt.curWinMaxVal = 0
+        item.usedWin = 0
+    else
+        item.usedWin = usedWin
+    end
+    return thresh
+end
+
+local function calcStableThresh(ct, curBaseThresh, curThresh)
+    local avg = ct.decRangeThreshAvg
+
+    if (curThresh - avg) < ((curBaseThresh - avg) / 10.0) then
+        local nrStableThreshSample = ct.nrStableThreshSample
+
+        local tSum = ct.stableThreshAvg * ct.nrStableThreshSample + curThresh
+        nrStableThreshSample = nrStableThreshSample + 1
+
+        ct.nrStableThreshSample = nrStableThreshSample
+        ct.stableThreshAvg = tSum / nrStableThreshSample
+        ct.minStableThresh = math.min(ct.minStableThresh, curThresh)
+        ct.maxStableThresh = math.max(ct.maxStableThresh, curThresh)
+
+        if nrStableThreshSample > fifoSize * 1.5 then
+            ct.thresh = math.max(ct.stableThreshAvg - ct.minStableThresh,
+                                    ct.maxStableThresh - ct.stableThreshAvg)
+            ct.shouldUpdThreshComp = false
+            ct.minStableThresh = 1e9
+            ct.maxStableThresh = 0
+            ct.stableThreshAvg, ct.decRangeThreshAvg = 0, 0
+            ct.nrStableThreshSample, ct.decRangeCnt = 0, 0
+        end
+    end
+end
+
+local function calcCompThresh(item, lastBaseThresh, curThresh)
+    local curBaseThresh = item.baseThresh.thresh
+    local ct = item.compensation
+
+    if ct.shouldUpdThreshComp and (ct.thresh < curThresh or item.usedWin == 0) then
+        ct.thresh = curThresh
+    end
+
+    if curBaseThresh < lastBaseThresh then
+        local decRangeCnt = ct.decRangeCnt
+        local decRangeThreshAvg = ct.decRangeThreshAvg
+        local tSum = decRangeThreshAvg * decRangeCnt + curThresh
+
+        decRangeCnt = decRangeCnt + 1
+        ct.decRangeThreshAvg = tSum / decRangeCnt
+        ct.decRangeCnt = decRangeCnt
+
+        if decRangeCnt >= fifoSize * 1.5 then
+            calcStableThresh(ct, curBaseThresh, curThresh)
+        else
+            ct.minStableThresh = 1e9
+            ct.maxStableThresh = 0
+            ct.stableThreshAvg, ct.decRangeThreshAvg = 0, 0
+            ct.nrStableThreshSample, ct.decRangeCnt = 0, 0
+        end
+    end
+end
+
+local function updateDynThresh(item, vs)
+    local bt = item.baseThresh
+    local ct = item.compensation
+    local lastBaseThresh = bt.thresh
+    local curThresh = calcBase(item, vs)
+
+    calcCompThresh(item, lastBaseThresh, curThresh)
+    item.dynTresh = bt.thresh + bt.moveAvg + ct.thresh
+    --print("thresh: ", item.dynTresh)
 end
 
 function CexecptCheck:calcs()
     local iowaits = self._fifo:iowait()
     if iowaits then
-        calc(self._waitItem, iowaits)
+        updateDynThresh(self._waitItem, iowaits)
+        self:checkIOwaitException(self._waitItem)
     end
 
     local vs
@@ -80,7 +185,7 @@ function CexecptCheck:calcs()
         for _, key in ipairs(keys) do
             vs = self._fifo:values(disk, key)
             if vs then
-                calc(item[key], vs)
+                updateDynThresh(item[key], vs)
             end
         end
     end
@@ -101,6 +206,47 @@ function CexecptCheck:addValue(v)
     end
     self._fifo:push(v)
     self:calcs()
+end
+
+local function disableThreshComp(item)
+    local ct = item.compensation
+    local bt = item.baseThresh
+    if ct.shouldUpdThreshComp then
+        ct.shouldUpdThreshComp = false
+        item.dynTresh = bt.thresh + bt.moveAvg
+        ct.thresh = 0.000001
+    end
+end
+
+function CexecptCheck:checkIOwaitException(item)
+    local iowait = item.baseThresh.last
+    local dataStat = self._dataStat.system
+    local es = self._exceptionStat.system['IOwait-High']
+    local uploadInter = self._uploadInter
+
+    if iowait >= self._diag.cfg.iowait then
+        disableThreshComp(item)
+    end
+
+    dataStat.iowait = (dataStat.iowait * (uploadInter - 1) + iowait) / uploadInter
+
+    local minThresh = self._diag.cfg.iowait
+    local iowaitThresh = math.max(item.dynTresh, minThresh)
+    if minThresh >= iowaitThresh then
+        es.cur = es.cur + 1
+        local diagSW = self._diagSwitch.diagIowait
+        local rDiagValid = nil
+    end
+end
+
+function CexecptCheck:checks()
+    local uploadInter = self._uploadInter
+
+    if uploadInter % fifoSize == 0 then
+        self._uploadInter = 1
+    else
+        self._uploadInter = uploadInter + 1
+    end
 end
 
 return CexecptCheck

@@ -21,8 +21,12 @@ config:
     mem: 40  # unit mb
     tasks: 10  # monitor 10 pid max.
 
+ioDiagnose:
+  cfg:
+    iowait: 10.0
+
 outline:
-  - /tmp/sysom
+  - /var/sysom/outline
 
 pushTo:
   to: "Influx"

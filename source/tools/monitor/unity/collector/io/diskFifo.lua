@@ -5,29 +5,42 @@
 ---
 
 require("common.class")
+local system = require("common.system")
 local Cfifo = require("common.fifo")
 
 local CdiskFifo = class("diskFifo", Cfifo)
 
 function CdiskFifo:_init_(maxLen)
     Cfifo._init_(self, maxLen)
+    self._nr = 0
+end
+
+function CdiskFifo:push(v)
+    Cfifo.push(self, v)
+    self._nr = self._nr + 1
 end
 
 function CdiskFifo:iowait()
     local sum = 0
     local value
     local cells = {}
-    local count = self._count
+    local len = self:len()
+    local c = 0
 
-    if #self.list < count then
+    if len < self:capacity() then
         return
     end
 
-    for i, v in ipairs(self.list) do
+    for _, v in pairs(self.list) do
+        c = c + 1
         value = v.iowait
-        cells[i], sum = value, sum + value
+        cells[c], sum = value, sum + value
     end
-    return {max = math.max(unpack(cells)), min = math.min(unpack(cells)), count = count, avg = sum / count}
+    return {max = math.max(unpack(cells)),
+            min = math.min(unpack(cells)),
+            nr = self._nr,
+            avg = sum / len,
+            last = value}
 end
 
 function CdiskFifo:values(disk, key)
@@ -35,14 +48,14 @@ function CdiskFifo:values(disk, key)
     local sum = 0
     local value
     local cells = {}
-    local count = self._count
+    local len = self:len()
 
-    if #self.list < count then
+    if len < self:capacity() then
         return
     end
 
     local d
-    for _, v in ipairs(self.list) do
+    for _, v in pairs(self.list) do
         d = v[disk]
         if d then
             value = d[key]
@@ -52,7 +65,11 @@ function CdiskFifo:values(disk, key)
             return
         end
     end
-    return {max = math.max(unpack(cells)), min = math.min(unpack(cells)), count = count, avg = sum / count}
+    return {max = math.max(unpack(cells)),
+            min = math.min(unpack(cells)),
+            nr = self._nr,
+            avg = sum / len,
+            last = value}
 end
 
 return CdiskFifo

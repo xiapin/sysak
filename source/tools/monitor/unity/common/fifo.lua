@@ -46,6 +46,10 @@ function Cfifo:len()
     return self._count
 end
 
+function Cfifo:capacity()
+    return self._max
+end
+
 function Cfifo:value(index)
     index = index + self._head - 1
     return self.list[index]
