@@ -147,6 +147,7 @@ disable_latency() {
 		pid=`ps -ef | grep "\$latency_bin" | grep -v "grep" | awk '{print $2}'`
 	fi
 
+	comm=`cat /proc/$pid/comm 2>/dev/null`
 	if [ "$comm" = "latency" ]
 	then
 		kill -9 $pid 2>/dev/null
