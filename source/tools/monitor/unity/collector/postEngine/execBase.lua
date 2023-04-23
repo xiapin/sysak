@@ -21,6 +21,7 @@ local function run(cmd, args)
         return pid
     elseif pid == 0 then   -- for child
         local errno
+        prctl_death_kill()
         _, err, errno = unistd.exec(cmd, args)
         assert(not errno, "exec failed." .. err .. errno)
     else

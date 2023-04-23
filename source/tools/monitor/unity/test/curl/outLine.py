@@ -1,7 +1,7 @@
 import os
 import socket
 
-PIPE_PATH = "/var/sysom/line"
+PIPE_PATH = "/var/sysom/outline"
 MAX_BUFF = 128 * 1024
 
 

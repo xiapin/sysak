@@ -121,21 +121,18 @@ local function setupPostEngine(que, proto_q, fYaml, tid)
     return w, 1
 end
 
-
-
 function work(que, proto_q, yaml, tid)
     local fYaml = yaml or "../collector/plugin.yaml"
     checkSos()
     local e = CrbEvent.new()
 
-    local main, engine, io, unit
+    local main, engine, unit
     main, unit = setupMainCollector(que, proto_q, fYaml, tid)
     e:addEvent("mainCollector", main, unit)
 
     engine, unit = setupPostEngine(que, proto_q, fYaml, tid)
     engine:setTask(main.postPlugin.tasks)
     e:addEvent("postEngine", engine, unit)
-
 
     return e:proc()
 end

@@ -14,6 +14,7 @@ local CguardSched = require("collector.guard.guardSched")
 local CguardDaemon = require("collector.guard.guardDaemon")
 local CguardSelfStat = require("collector.guard.guardSelfStat")
 local CpostPlugin = require("collector.postPlugin.postPlugin")
+local CforkRun = require("collector.execEngine.forkRun")
 
 local Cloop = class("loop")
 
@@ -24,6 +25,7 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self._proto = CprotoData.new(que)
     self._tid = tid
     self:loadLuaPlugin(res, res.config.proc_path)
+    self:forkRun(res)
     local jperiod = calcJiffies.calc(res.config.proc_path, procffi)  --
 
     self._guardSched = CguardSched.new(tid, self._procs, self._names, jperiod)
@@ -47,6 +49,16 @@ function Cloop:loadLuaPlugin(res, proc_path)
         end
     end
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
+end
+
+function Cloop:forkRun(res)
+    local runs = res.forkRun
+    local c = system:keyCount(self._procs)
+    for _, run in ipairs(runs) do
+        c = c + 1
+        self._procs[c] = CforkRun.new(run, self._proto, procffi)
+        self._names[c] = run.cmd
+    end
 end
 
 function Cloop:work(t)

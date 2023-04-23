@@ -162,7 +162,7 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
 end
 
 function CLocalBeaver:read(fd, maxLen)
-    maxLen = maxLen or 1 * 1024 * 1024  -- signal conversation accept 1M stream max
+    maxLen = maxLen or 2 * 1024 * 1024  -- signal conversation accept 2M stream max
     local function readFd()
         local e = coroutine.yield()
         if e.ev_close > 0 then

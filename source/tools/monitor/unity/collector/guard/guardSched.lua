@@ -24,9 +24,16 @@ function CguardSched:proc(t, lines)
     local start = lua_local_clock()  -- unit us
     local stop = 0
     local j1 = self._stat:jiffies()
+    local ret
 
     for i, obj in ipairs(self._procs) do
-        obj:proc(t, lines)
+        ret = obj:proc(t, lines)
+
+        if ret == -1 then
+            table.insert(toRemove, i)
+            goto continue
+        end
+
         stop = lua_local_clock()
         if stop - start >= self._limit then   --
             local j2 = self._stat:jiffies()
@@ -35,6 +42,8 @@ function CguardSched:proc(t, lines)
             end
         end
         start = stop
+
+        ::continue::
     end
 
     if #toRemove > 0 then
