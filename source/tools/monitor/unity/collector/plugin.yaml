@@ -21,14 +21,19 @@ config:
     mem: 40  # unit mb
     tasks: 10  # monitor 10 pid max.
 
-outline:
-  - /tmp/sysom
+forkRun:
+  -
+    cmd: "/usr/bin/python"
+    args: ["../test/curl/forkRun.py"]
 
-#pushTo:
-#  to: "Influx"
-#  host: "ld-wz9d17b514mg6kjkx-proxy-tsdb.lindorm.rds.aliyuncs.com"
-#  port: 8242
-#  url: "/api/v2/write?db=lua"
+outline:
+  - /var/sysom/outline
+
+pushTo:
+  to: "Influx"
+  host: "ld-wz9d17b514mg6kjkx-proxy-tsdb.lindorm.rds.aliyuncs.com"
+  port: 8242
+  url: "/api/v2/write?db=lua"
 
 container:
   mode: "pods"

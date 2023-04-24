@@ -5,6 +5,7 @@
 #ifndef UNITY_BEAVER_H
 #define UNITY_BEAVER_H
 
-int beaver_init(char *fYaml);
+#include "../beeQ/beeQ.h"
+int beaver_init(struct beeQ* q, char *fYaml);
 
 #endif //UNITY_BEAVER_H

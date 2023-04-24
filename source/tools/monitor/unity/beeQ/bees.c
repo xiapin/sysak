@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
     if (pid_outline == 0) {
         exit(1);
     }
-    beaver_init(g_yaml_file);
+    beaver_init(q, g_yaml_file);
 
     fprintf(stderr, "loop exit.");
     beeQ_stop(q);

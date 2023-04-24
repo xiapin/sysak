@@ -9,6 +9,8 @@ package.path = package.path .. ";../../?.lua;"
 local Cping = require("common.ping")
 
 local p = Cping.new("8.8.8.8", "eth0")
-p:ping()
+print(p:ping())
 p = Cping.new("1.2.3.4", "eth0")
-p:ping()
+print(p:ping())
+p = Cping.new("172.16.0.253", "eth0")
+print(p:ping())

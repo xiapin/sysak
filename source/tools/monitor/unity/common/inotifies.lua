@@ -9,7 +9,6 @@ require("common.class")
 local Cinotifies = class("inotifies")
 local dirent = require("posix.dirent")
 local pstat = require("posix.sys.stat")
-local fcntl = require("posix.fcntl")
 local system = require("common.system")
 local inotify = require('inotify')
 
@@ -24,21 +23,6 @@ local function walk_dirs(path, dirs)
                 walk_dirs(full, dirs)
             end
         end
-    end
-end
-
-local function fdNonBlocking(fd)
-    local res
-    local flag, err, errno = fcntl.fcntl(fd, fcntl.F_GETFL)
-    if flag then
-        res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))
-        if res then
-            return 0
-        else
-            system:posixError("fcntl set failed", err, errno)
-        end
-    else
-        system:posixError("fcntl get failed", err, errno)
     end
 end
 
@@ -60,7 +44,7 @@ local function mon_dirs(path)
         end
     end
 
-    fdNonBlocking(handle:getfd())
+    system:fdNonBlocking(handle:getfd())
     return handle, ws
 end
 

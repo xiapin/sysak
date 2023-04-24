@@ -41,12 +41,12 @@ static int kmsg_thread_func(struct beeQ* q, void * arg) {
     fd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
     if (fd < 0) {
         goto endOpen;
-    }
+    }/*
     ret = lseek(fd, 0, SEEK_DATA);
     if (ret < 0) {
         perror("kmsg seek error");
         goto endLseek;
-    }
+    }*/
 
     ret = 1;   // strip old message.
     while (ret > 0) {
@@ -79,6 +79,7 @@ static int kmsg_thread_func(struct beeQ* q, void * arg) {
             perror("kmsg read2 failed.");
             goto endRead;
         }
+        buff[ret -1] = '\0';
 
         unity_alloc_lines(lines, 1);
         line = unity_get_line(lines, 0);

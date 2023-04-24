@@ -14,8 +14,9 @@ function ChttpPlain:_init_(frame)
     ChttpBase._init_(self)
 end
 
-function ChttpPlain:echo(tRet, keep)
-    local stat = self:packStat(200)
+function ChttpPlain:echo(tRet, keep, code)
+    code = code or 200
+    local stat = self:packStat(code)
     local tHead = {
         ["Content-Type"] = "text/plain",
         ["Connection"] = (keep and "keep-alive") or "close"

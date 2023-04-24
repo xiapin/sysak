@@ -6,11 +6,28 @@
 
 local socket = require("socket")
 local serpent = require("common.serpent")
-
 local system = {}
 
 function system:sleep(t)
     socket.select(nil, nil, t)
+end
+
+function system:fdNonBlocking(fd)
+    local res
+    local fcntl = require("posix.fcntl")
+    local bit = require("bit")
+
+    local flag, err, errno = fcntl.fcntl(fd, fcntl.F_GETFL)
+    if flag then
+        res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))
+        if res then
+            return 0
+        else
+            system:posixError("fcntl set failed", err, errno)
+        end
+    else
+        system:posixError("fcntl get failed", err, errno)
+    end
 end
 
 function system:deepcopy(object)

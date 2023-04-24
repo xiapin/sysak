@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <signal.h>
 #include "beeQ.h"
 #include "apps.h"
 #include "pushTo.h"
@@ -241,6 +242,11 @@ static int lua_setup_daemon(lua_State *L) {
     return 1;
 }
 
+static int prctl_death_kill(lua_State *L) {
+    prctl(PR_SET_PDEATHSIG, SIGKILL);
+    return 0;
+}
+
 int collector_qout(lua_State *L) {
     int ret;
     struct beeQ* q = (struct beeQ*) lua_topointer(L, 1);
@@ -281,6 +287,7 @@ static int app_collector_work(void* q, void* proto_q) {
     lua_register(L, "collector_qout", collector_qout);
     lua_register(L, "lua_local_clock", lua_local_clock);
     lua_register(L, "lua_setup_daemon", lua_setup_daemon);
+    lua_register(L, "prctl_death_kill", prctl_death_kill);
 
     ret = lua_load_do_file(L, "../beeQ/collectors.lua");
     if (ret) {

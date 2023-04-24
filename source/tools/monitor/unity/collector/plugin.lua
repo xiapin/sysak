@@ -7,6 +7,8 @@
 require("common.class")
 local Cplugin = class("plugin")
 local dockerinfo = require("common.dockerinfo")
+local cjson = require("cjson.safe")
+local json = cjson.new()
 
 function Cplugin:_init_(resYaml, ffi, proto_q, so)
     self._ffi = ffi

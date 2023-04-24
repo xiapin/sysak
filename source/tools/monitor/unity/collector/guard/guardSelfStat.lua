@@ -34,6 +34,21 @@ function CguardSelfStat:_init_(proto, pffi, mnt, resYaml, jperiod)
     self._memLimit = resYaml.config.limit.mem * 1024 * 1024
 end
 
+local function rssRssAnon()
+    local anon = 0
+
+    local f = io.open("/proc/self/status")
+    for line in f:lines() do
+        if pystring:startswith(line, "RssAnon:") then
+            local res = pystring:split(line)
+            anon = tonumber(res[2]) * 1024
+        end
+    end
+    f:close()
+
+    return anon
+end
+
 function CguardSelfStat:proc(elapsed, lines)
     CvProc.proc(self)
 
@@ -46,7 +61,9 @@ function CguardSelfStat:proc(elapsed, lines)
         print("last cpu usage overflow." .. cpus)
         os.exit(1)
     end
-    if rss * 4096 > self._memLimit then
+
+    local anon = rssRssAnon()
+    if anon > self._memLimit then
         print("last mem usage overflow." .. rss)
         os.exit(1)
     end
@@ -62,12 +79,15 @@ function CguardSelfStat:proc(elapsed, lines)
         {
             name = "vsize",
             value = vsize
-        }
-        ,
+        },
         {
             name = "rss",
             value = rss * 4096
-        }
+        },
+        {
+            name = "anon",
+            value = anon,
+        },
     }
     self:appendLine(self:_packProto("self_stat", nil, vs))
     self:push(lines)

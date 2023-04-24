@@ -8,6 +8,8 @@ require("common.class")
 
 local CprotoData = require("common.protoData")
 local CprotoQueue = class("loop")
+local cjson = require("cjson.safe")
+local json = cjson.new()
 local system = require("common.system")
 
 function CprotoQueue:_init_(que)
@@ -77,7 +79,6 @@ function CprotoQueue:_proc(unity_lines, lines)
 end
 
 function CprotoQueue:send(num, pline)
-    --print(string.format("proto que send a %d message.", num))
     local unity_lines = self._ffi.new("struct unity_lines")
     local lines = self._proto:protoTable()
     unity_lines.num = num

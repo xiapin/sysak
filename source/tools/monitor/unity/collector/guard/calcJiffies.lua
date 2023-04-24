@@ -56,7 +56,7 @@ function mod.calc(mnt, procffi)
     local comp = delta1 / delta2
 
     if comp >= 1.1 or comp < 0.9 then
-        errno("calculate jiffies failed.")
+        error("calculate jiffies failed.")
     end
 
     return (delta1 + delta2) * 2.5 / nproc()

@@ -19,13 +19,12 @@ local CbaseQuery = require("beaver.query.baseQuery")
 
 local lb = nil
 
-function init(fYaml)
+function init(que, fYaml)
     fYaml = fYaml or "../collector/plugin.yaml"
-    print(fYaml)
     local web = Cframe.new()
 
     CurlIndex.new(web)
-    CurlApi.new(web, fYaml)
+    CurlApi.new(web, que, fYaml)
     CurlRpc.new(web)
     CurlGuide.new(web)
     CbaseQuery.new(web, fYaml)
