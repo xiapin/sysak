@@ -64,6 +64,7 @@ uint64_t g_max_phy_addr;
 unsigned long vmemmap_base = 0xffffea0000000000UL;
 unsigned long page_offset_base = 0xffff880000000000UL;
 unsigned long memstart_addr = 0x0;
+unsigned long page_shift = 0;
 
 /*
  * Routines of kpageflags, i.e., /proc/kpageflags
@@ -346,6 +347,21 @@ static void cleanup(void)
 	kcore_exit();
 }
 
+static int get_pageshift()
+{
+    int page_size = getpagesize();
+
+    if(page_size <= 0 )
+    {
+        LOG_ERROR("failed to get page size\n");
+        return -1;
+    }
+    while (page_size > 1) {
+        page_size >>= 1;
+        page_shift++;
+    }
+    return 0;
+}
 
 static void show_usage(void)
 {
@@ -410,6 +426,12 @@ int main(int argc, char *argv[])
 	if (getuid()) {
 		LOG_ERROR("must be root\n");
 		ret = -EPERM;
+		goto out;
+	}
+
+	ret = get_pageshift();
+	if (ret != 0) {
+		LOG_ERROR("failed to page shift\n");
 		goto out;
 	}
 

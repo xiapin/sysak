@@ -11,9 +11,9 @@
 #include <stdio.h>
 #include <linux/version.h>
 
+extern unsigned long page_shift;
 #define MAX_ORDER		11
-#define PAGE_SHIT		12
-#define PAGE_SIZE		(1UL << PAGE_SHIT)
+#define PAGE_SIZE		(1UL << page_shift)
 #define HUGE_SIZE		(PAGE_SIZE * HUGE_PAGE_NR)
 #define BUFF_MAX		4096
 #define SIZE_KB			(1UL << 10)
@@ -51,10 +51,10 @@ extern unsigned long memstart_addr;
 #define _PAGE_OFFSET(va)    (-((unsigned long )(1) << (va)))
 #define PAGE_OFFSET     (_PAGE_OFFSET(VA_BITS))
 #define VMEMMAP_SIZE ((_PAGE_END(VA_BITS_MIN) - PAGE_OFFSET) \
-        >> (PAGE_SHIT - STRUCT_PAGE_MAX_SHIFT))
+        >> (page_shift - STRUCT_PAGE_MAX_SHIFT))
 #define PHYS_OFFSET     (memstart_addr)
 #define VMEMMAP_START       (-VMEMMAP_SIZE - SZ_2M)
-#define vmemmap         (VMEMMAP_START - (memstart_addr >> PAGE_SHIT)*PAGE_STRUCT_SIZE)
+#define vmemmap         (VMEMMAP_START - (memstart_addr >> page_shift)*PAGE_STRUCT_SIZE)
 
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 9)/*kernel 419*/
 #define VA_BITS (48)
@@ -63,9 +63,9 @@ extern unsigned long memstart_addr;
 #define PAGE_OFFSET     ((unsigned long )(0xffffffffffffffff) - \
     ((unsigned long )(1) << (VA_BITS - 1)) + 1)
 #define STRUCT_PAGE_MAX_SHIFT (6)
-#define VMEMMAP_SIZE ((unsigned long )(1) << (VA_BITS - PAGE_SHIT - 1 + STRUCT_PAGE_MAX_SHIFT))
+#define VMEMMAP_SIZE ((unsigned long )(1) << (VA_BITS - page_shift - 1 + STRUCT_PAGE_MAX_SHIFT))
 #define VMEMMAP_START       (PAGE_OFFSET - VMEMMAP_SIZE)
-#define vmemmap         (VMEMMAP_START - (memstart_addr >> PAGE_SHIT)*PAGE_STRUCT_SIZE)
+#define vmemmap         (VMEMMAP_START - (memstart_addr >> page_shift)*PAGE_STRUCT_SIZE)
 
 #else /*others*/
 #define SZ_64K              0x00010000
@@ -74,12 +74,12 @@ extern unsigned long memstart_addr;
 #define vmemmap         ((struct page *)(VMALLOC_END + SZ_64K))
 
 #endif /*end to check ver, arm arch*/
-#define PFN_TO_VIRT(pfn)    (((unsigned long)((pfn) - PHYS_OFFSET) | PAGE_OFFSET) + ((pfn) << PAGE_SHIT))
+#define PFN_TO_VIRT(pfn)    (((unsigned long)((pfn) - PHYS_OFFSET) | PAGE_OFFSET) + ((pfn) << page_shift))
 #define PFN_TO_PAGE(pfn)    (vmemmap + (pfn) * PAGE_STRUCT_SIZE)
 #define is_kvaddr(kvaddr) (!!(kvaddr >= PAGE_OFFSET))
 #else /*x86 arch*/
 
-#define PFN_TO_VIRT(pfn)    (page_offset_base + ((pfn) << PAGE_SHIT))
+#define PFN_TO_VIRT(pfn)    (page_offset_base + ((pfn) << page_shift))
 #define PFN_TO_PAGE(pfn)    (vmemmap_base + (pfn) * PAGE_STRUCT_SIZE)
 #define is_kvaddr(kvaddr) (!!(kvaddr >= page_offset_base))
 #endif
