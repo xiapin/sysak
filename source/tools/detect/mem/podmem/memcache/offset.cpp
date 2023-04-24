@@ -128,7 +128,7 @@ static int download_btf(void)
     char arch[LEN] = {0};
     char kernel[LEN] = {0};
     char dw[LEN+LEN] = {0};
-    char sysak_path[LEN+LEN] = "/boot";
+    string sysak_path = "/boot"
     string timeout = "-internal";
     string cmd = "curl -s --connect-timeout 2 http://100.100.100.200/latest/meta-data/region-id 2>&1";
 
@@ -147,9 +147,12 @@ static int download_btf(void)
     //printf("kernel:%s\n", kernel);
 
     if(getenv("SYSAK_WORK_PATH") != NULL)
-        strcpy(sysak_path,getenv("SYSAK_WORK_PATH"));
+    {
+        sysak_path = getenv("SYSAK_WORK_PATH") ;
+        sysak_path += "/tools"
+    }
 
-    snprintf(dw, LEN + LEN, "wget -T 5 -t 2 -q -O %s/tools/%s/vmlinux-%s https://sysom-cn-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",sysak_path, kernel, kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
+    snprintf(dw, LEN + LEN + LEN, "wget -T 5 -t 2 -q -O %s/%s/vmlinux-%s https://sysom-cn-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",sysak_path.c_str(), kernel, kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
 
     do_cmd(dw, kernel, LEN);
     return 0;
