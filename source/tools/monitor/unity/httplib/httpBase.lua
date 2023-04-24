@@ -25,7 +25,7 @@ function ChttpBase:_installRe(path, frame)
     frame:registerRe(path, self)
 end
 
-function ChttpBase:echo(tRet, keep)
+function ChttpBase:echo(tRet, keep, code)
     error("ChttpBase:echo is a virtual function.")
 end
 
@@ -48,8 +48,8 @@ end
 
 function ChttpBase:call(tReq)
     local keep = checkKeep(tReq)
-    local tRet = self._urlCb[tReq.path](tReq)
-    local res = self:echo(tRet, keep)
+    local tRet, code = self._urlCb[tReq.path](tReq)
+    local res = self:echo(tRet, keep, code)
 
     return res, keep
 end

@@ -9,17 +9,29 @@ local system = require("common.system")
 local ChttpApp = require("httplib.httpApp")
 local CfoxTSDB = require("tsdb.foxTSDB")
 local postQue = require("beeQ.postQue.postQue")
+local CpushLine = require("beaver.pushLine")
 
 local CurlApi = class("urlApi", ChttpApp)
 
-function CurlApi:_init_(frame, fYaml)
+function CurlApi:_init_(frame, que, fYaml)
     ChttpApp._init_(self)
+    self._pushLine = CpushLine.new(que)
     self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
     self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
     self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
+    self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
     self:_install(frame)
     self:_setupQs(fYaml)
+end
+
+function CurlApi:line(tReq)
+    local stat, _ = pcall(self._pushLine.procLines, self._pushLine, tReq.data)
+    if stat then
+        return "ok"
+    else
+        return "bad line " .. tReq.data, 400
+    end
 end
 
 function CurlApi:trig(tReq)

@@ -61,4 +61,12 @@ function ChttpCli:postTable(Url, t)
     return self:post(Url, req, headers)
 end
 
+function ChttpCli:postLine(Url, line)
+    local headers = {
+        ["Content-Type"] = "text/plain",
+        ["Content-Length"] = #line,
+    }
+    return self:post(Url, line, headers)
+end
+
 return ChttpCli

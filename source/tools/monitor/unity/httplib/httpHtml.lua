@@ -100,8 +100,9 @@ local function htmlPack(title, content)
     return pystring:join("", bodies)
 end
 
-function ChttpHtml:pack(cType, keep, body)
-    local stat = self:packStat(200)
+function ChttpHtml:pack(cType, keep, body, code)
+    code = code or 200
+    local stat = self:packStat(code)
     local tHead = {
         ["Content-Type"] = cType,
         ["Connection"] = (keep and "keep-alive") or "close"
@@ -111,11 +112,11 @@ function ChttpHtml:pack(cType, keep, body)
     return pystring:join("\r\n", tHttp)
 end
 
-function ChttpHtml:echo(tRet, keep)
+function ChttpHtml:echo(tRet, keep, code)
     local cType = tRet.type or "text/html"
     local body = htmlPack(tRet.title, tRet.content)
 
-    return self:pack(cType, keep, body)
+    return self:pack(cType, keep, body, code)
 end
 
 return ChttpHtml
