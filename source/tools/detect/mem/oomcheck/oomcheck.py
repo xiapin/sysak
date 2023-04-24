@@ -415,6 +415,10 @@ def oom_is_memleak(oom, oom_result):
             res["tcp_task"] = tcp["top_task"]
             res["tcp_mem"] = tcp["tcp_mem"]
         summary = "allocpage memleak, usage:%dkb\n"%(used)
+    if memleak_check(total, meminfo['pagetables']):
+        res['leaktype'] = 'pagetables'
+        res['leakusage'] = meminfo['pagetables']
+        summary += "pagetables usage:%dkb indicates lots of processes or lots of mmaps\n"%(meminfo['pagetables'])
     if len(summary) != 0 and  len(tcp) != 0:
         summary += "tcp_task:%s tcp_mem:%sKB\n"%(tcp["top_task"][0], tcp["tcp_mem"])
     if len(summary) != 0:
