@@ -1,5 +1,10 @@
 #!/bin/bash
 
+DIR=$( cd "$(dirname "${BASH_SOURCE[0]}")" && pwd);
+echo $DIR
+cd $DIR
+ulimit -c unlimited
+
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:./lib/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../tsdb/native/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:../collector/native/

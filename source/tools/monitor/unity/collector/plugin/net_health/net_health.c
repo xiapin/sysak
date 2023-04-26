@@ -71,7 +71,7 @@ static int cal_dist(unsigned long* values) {
 static int get_count(unsigned long* values) {
     int key;
     static unsigned long rec[2];
-    unsigned long now[2];
+    unsigned long now[2] = {0, 0};
 
     key = 0;
     coobpf_key_value(cnt_fd, &key, &now[0]);

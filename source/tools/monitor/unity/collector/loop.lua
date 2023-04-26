@@ -8,6 +8,7 @@ require("common.class")
 local CprotoData = require("common.protoData")
 local procffi = require("collector.native.procffi")
 local system = require("common.system")
+local CbtfLoader = require("collector.btfLoader")
 local CpluginManager = require("collector.pluginManager")
 local calcJiffies = require("collector.guard.calcJiffies")
 local CguardSched = require("collector.guard.guardSched")
@@ -19,9 +20,9 @@ local CforkRun = require("collector.execEngine.forkRun")
 local Cloop = class("loop")
 
 function Cloop:_init_(que, proto_q, fYaml, tid)
+    CbtfLoader.new("../../../..")  -- setup btf
     local res = system:parseYaml(fYaml)
     self._daemon = CguardDaemon.new(res)
-
     self._proto = CprotoData.new(que)
     self._tid = tid
     self:loadLuaPlugin(res, res.config.proc_path)
@@ -54,10 +55,12 @@ end
 function Cloop:forkRun(res)
     local runs = res.forkRun
     local c = system:keyCount(self._procs)
-    for _, run in ipairs(runs) do
-        c = c + 1
-        self._procs[c] = CforkRun.new(run, self._proto, procffi)
-        self._names[c] = run.cmd
+    if runs then
+        for _, run in ipairs(runs) do
+            c = c + 1
+            self._procs[c] = CforkRun.new(run, self._proto, procffi)
+            self._names[c] = run.cmd
+        end
     end
 end
 
