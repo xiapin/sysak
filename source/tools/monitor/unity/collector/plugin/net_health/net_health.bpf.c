@@ -4,7 +4,7 @@
 #include <vmlinux.h>
 #include <coolbpf.h>
 
-BPF_HASH(outCnt, int, u64, 2);
+BPF_ARRAY(outCnt, u64, 2);
 BPF_ARRAY(netHist, u64, 20);
 
 SEC("kprobe/tcp_validate_incoming")
@@ -19,4 +19,3 @@ int j_tcp_validate_incoming(struct pt_regs *ctx) {
     }
     return 0;
 }
-
