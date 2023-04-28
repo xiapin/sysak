@@ -108,6 +108,18 @@ cmd_log()
     res=$?
     return $res
 }
+
+install_depends() {
+	rpm -q perf &> /dev/null
+    if [ $? -ne 0 ]; then
+        yum install -y perf &> /dev/null
+    fi
+	rpm -q perl &> /dev/null
+	if [ $? -ne 0 ]; then
+        yum install -y perl &> /dev/null
+    fi
+}
+
 ## run perf record to generate perf.data
 run_perf_record() {
 	local cmd="perf record -F 49 ${cpu_arg} -g -o ${perf_data} sleep ${duration}"
@@ -136,10 +148,14 @@ convert_svg() {
 ## collect flamegraph
 collect_framegraph() {
 	local PERF="perf"
+	local PERL="perl"
 	local CMD_TYPE="cpu_flamegraph"
 	## check perf command exist or not
+	install_depends
 	if_command_exist ${PERF}
 	[ $? -eq $fail ] && msg "${PERF} command not found" && return $fail
+	if_command_exist ${PERL}
+	[ $? -eq $fail ] && msg "${PERL} command not found" && return $fail
 	## run perf record
 	run_perf_record 
 	[ $? -eq $fail ] && msg "perf record failed" && return $fail
