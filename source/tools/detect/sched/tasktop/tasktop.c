@@ -12,20 +12,18 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+// #define DEBUG 1
 #define FILE_PATH_LEN 256
 #define MAX_COMM_LEN 16
 #define PEROID 3
 #define LIMIT 20
 #define BUF_SIZE 512
-
-// #define DEBUG 1
 #define DEBUG_LOG "./log/debug.log"
-char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
-char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
-
 #define PIDMAX_PATH "/proc/sys/kernel/pid_max"
 #define PROC_STAT_PATH "/proc/stat"
 
+char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
+char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
 time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
@@ -169,16 +167,17 @@ static error_t parse_arg(int key, char* arg, struct argp_state* state) {
             break;
         case 'd':
             err = parse_long(arg, &val);
-            if (err) {
+            if (err || val <= 0) {
                 fprintf(stderr, "Failed parse delay.\n");
                 argp_usage(state);
             }
+
             env.delay = val;
             break;
         case 'i':
             err = parse_long(arg, &val);
-            if (err) {
-                fprintf(stderr, "Failed parse pid.\n");
+            if (err || val <= 0) {
+                fprintf(stderr, "Failed parse iteration-num.\n");
                 argp_usage(state);
             }
             env.nr_iter = val;
@@ -339,9 +338,7 @@ static int read_proc(pid_t pid, pid_t tid, struct cpu_time_t** prev, struct cpu_
     struct cpu_time_t* data;
     FILE* fp = 0;
     int err = 0;
-#ifdef DEBUG
-    // printf("read proc pid =%d tid=%d\n", pid, tid);
-#endif
+
     if (tid != -1) {
         snprintf(proc_path, FILE_PATH_LEN, "/proc/%d/task/%d/stat", pid, tid);
         pid = tid;
@@ -361,10 +358,7 @@ static int read_proc(pid_t pid, pid_t tid, struct cpu_time_t** prev, struct cpu_
 
     fp = fopen(proc_path, "r");
     if (!fp) {
-#ifdef DEBUG
-        // fprintf(stderr, "Failed open proc stat. Process-[%s] is exit.\n", now[pid]->comm);
-#endif
-        // err = errno;
+        /* task maybe exit, this is not error*/
         if (prev[pid]) free(prev[pid]);
         if (now[pid]) free(now[pid]);
 
@@ -395,7 +389,7 @@ static int read_proc(pid_t pid, pid_t tid, struct cpu_time_t** prev, struct cpu_
     if (prev[pid] && !strcmp(prev[pid]->comm, now[pid]->comm)) {
         long udelta = now[pid]->utime - prev[pid]->utime;
         long sdelta = now[pid]->stime - prev[pid]->stime;
-        long base = PEROID * sysconf(_SC_CLK_TCK);
+        long base = env.delay * sysconf(_SC_CLK_TCK);
 
         if (base != 0) {
             /* only process cpu utilization > 0 */
@@ -418,9 +412,6 @@ cleanup:
 }
 
 static void sort_records(struct record_t** records, int proc_num, enum sort_type sort) {
-#ifdef DEBUG
-    // printf("sort_records procnum=%d\n", proc_num);
-#endif
     int i, j;
     for (i = 0; i < proc_num; i++) {
         for (j = i + 1; j < proc_num; j++) {
@@ -430,9 +421,6 @@ static void sort_records(struct record_t** records, int proc_num, enum sort_type
                 continue;
             } else if (!records[i] && records[j]) {
                 swap_record(&records[i], &records[j]);
-#ifdef DEBUG
-                // printf("swap record i=%d j=%d\n", i, j);
-#endif
             } else {
                 double lth, rth;
                 switch (sort) {
@@ -455,9 +443,6 @@ static void sort_records(struct record_t** records, int proc_num, enum sort_type
 
                 if (lth < rth) {
                     swap_record(&records[i], &records[j]);
-#ifdef DEBUG
-                    // printf("swap record i=%d j=%d\n", i, j);
-#endif
                 }
             }
         }
@@ -465,9 +450,7 @@ static void sort_records(struct record_t** records, int proc_num, enum sort_type
 }
 
 static void output(struct record_t** records, int proc_num, FILE* dest) {
-#ifndef DEBUG
     system("clear");
-#endif
     time_t now = time(0);
     struct tm* t;
     t = gmtime(&now);
@@ -482,7 +465,7 @@ static void output(struct record_t** records, int proc_num, FILE* dest) {
             fprintf(dest, "%18s %6s %6s %10s %6s %6s %6s\n", "COMMAND", "PID", "PPID", "RUNTIME",
                     "%UTIME", "%STIME", "%CPU");
         }
-        
+
         fprintf(dest, "%18s %6d %6d %10d %6.2f %6.2f %6.2f\n", records[i]->comm, records[i]->pid,
                 records[i]->ppid, records[i]->runtime, records[i]->user_cpu_rate,
                 records[i]->system_cpu_rate, records[i]->all_cpu_rate);
@@ -521,7 +504,6 @@ static int make_records(struct id_pair_t* pids, int proc_num, struct record_t***
                         struct cpu_time_t** prev, struct cpu_time_t** now) {
     struct record_t** records = *res;
     int err = 0;
-    // todo 可以优化一下真正读到的record 降低排序耗时
     u_int64_t i;
     for (i = 0; i < proc_num; i++) {
         struct id_pair_t* id = &pids[i];
@@ -610,6 +592,7 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
+/* debug for test the program performance */
 #ifdef DEBUG
     FILE* debug_fp = fopen(DEBUG_LOG, "w");
     if (!debug_fp) fprintf(stderr, "Failed open debug log file.\n");
@@ -646,6 +629,7 @@ int main(int argc, char** argv) {
 
         /* update old info and free nonexist process info */
         now_to_prev(pids, proc_num, pidmax, prev, now);
+
 #ifdef DEBUG
         err = gettimeofday(&end, 0);
         if (err) fprintf(stderr, "Failed get time.\n");
