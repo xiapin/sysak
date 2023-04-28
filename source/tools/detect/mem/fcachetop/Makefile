@@ -1,3 +1,3 @@
 target := fcachetop
-DEPEND := "python-dep{python2}"
+DEPEND := "python-dep{all}"
 include $(SRC)/mk/py.mk
