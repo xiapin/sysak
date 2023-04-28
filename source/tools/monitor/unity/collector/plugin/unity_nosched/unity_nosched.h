@@ -14,7 +14,7 @@ struct args {
 struct latinfo {
 	unsigned long long last_seen_need_resched_ns;
 	unsigned long long last_perf_event;
-	int ticks_without_resched;
+	int recorded, ticks_without_resched;
 };
 
 #ifndef __VMLINUX_H__
