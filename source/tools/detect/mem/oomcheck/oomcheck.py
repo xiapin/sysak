@@ -16,13 +16,13 @@ import argparse
 import getopt
 import traceback
 
-OOM_REASON_CGROUP = 'cgroup memory limit',
-OOM_REASON_PCGROUP = 'parent cgroup memory limit',
-OOM_REASON_HOST = 'host memory limit',
-OOM_REASON_MEMLEAK = 'host memory limit,may caused by memory leak',
+OOM_REASON_CGROUP = 'cgroup memory limit'
+OOM_REASON_PCGROUP = 'parent cgroup memory limit'
+OOM_REASON_HOST = 'host memory limit'
+OOM_REASON_MEMLEAK = 'host memory limit,may caused by memory leak'
 OOM_REASON_NODEMASK = 'mempolicy not allowed process to use all the memory of NUMA system'
-OOM_REASON_NODE = 'cpuset cgroup not allowed process to use all the memory of NUMA system',
-OOM_REASON_MEMFRAG = 'memory fragment',
+OOM_REASON_NODE = 'cpuset cgroup not allowed process to use all the memory of NUMA system'
+OOM_REASON_MEMFRAG = 'memory fragment'
 OOM_REASON_SYSRQ = 'sysrq',
 OOM_REASON_OTHER = 'other'
 
@@ -30,6 +30,7 @@ OOM_REASON_OTHER = 'other'
 OOM_BEGIN_KEYWORD = "invoked oom-killer"
 OOM_END_KEYWORD = "Killed process"
 OOM_END_KEYWORD_4_19 = "reaped process"
+OOM_END_KEYWORD_5_10 = "oom-kill:constraint"
 OOM_CGROUP_KEYWORD = "Task in /"
 OOM_NORMAL_MEM_KEYWORD = "Normal: "
 OOM_PID_KEYWORD = "[ pid ]"
@@ -154,8 +155,12 @@ def oom_is_host_oom(reason):
 def oom_get_pid(oom_result, line, num):
     if OOM_END_KEYWORD in line:
         split_line = OOM_END_KEYWORD
-    else:
+    elif OOM_END_KEYWORD_4_19 in line:
         split_line = OOM_END_KEYWORD_4_19
+    else:
+        pid = line.split("pid=")[1].split(",")[0] 
+        oom_result['sub_msg'][num]['pid'] = pid
+        return
     pid = line.strip().split(split_line)[1].strip().split()[0]
     oom_result['sub_msg'][num]['pid'] = pid
 
@@ -210,20 +215,30 @@ def oom_get_cgroup_shmem(oom_result, line, num):
     oom_result['sub_msg'][num]['cg_anon'] = anon;
     oom_result['sub_msg'][num]['cg_rss'] = rss;
 
-def oom_get_cgroup_name(oom_result, line, num):
+def oom_get_cgroup_name(oom_result, line, num, is_510 = 0):
     is_host = False
-    if "limit of host" in line:
-        is_host = True
-    if is_host == False:
-        oom_result['sub_msg'][num]['reason'] = OOM_REASON_CGROUP
-        oom_result['sub_msg'][num]['type'] = 'cgroup'
-    task_list = line.strip().split("Task in")[1].strip().split()
-    cgroup = task_list[0]
-    pcgroup = task_list[-1]
-    if is_host == False and cgroup != pcgroup:
-       #cgroup = pcgroup
-       oom_result['sub_msg'][num]['reason'] = OOM_REASON_PCGROUP
-    oom_result['sub_msg'][num]['cg_name'] = cgroup
+    if is_510:
+        if "CONSTRAINT_MEMCG" in line :
+            oom_result['sub_msg'][num]['reason'] = OOM_REASON_CGROUP
+            oom_result['sub_msg'][num]['type'] = 'cgroup'
+            cgroup = line.split("task_memcg=")[1].split(",")[0]
+            pcgroup = line.split("oom_memcg=")[1].split(",")[0]
+            if pcgroup != cgroup:
+                oom_result['sub_msg'][num]['reason'] = OOM_REASON_PCGROUP
+            oom_result['sub_msg'][num]['cg_name'] = cgroup
+    else:
+        if "limit of host" in line :
+            is_host = True
+        if is_host == False:
+            oom_result['sub_msg'][num]['reason'] = OOM_REASON_CGROUP
+            oom_result['sub_msg'][num]['type'] = 'cgroup'
+        task_list = line.strip().split("Task in")[1].strip().split()
+        cgroup = task_list[0]
+        pcgroup = task_list[-1]
+        if is_host == False and cgroup != pcgroup:
+            #cgroup = pcgroup
+            oom_result['sub_msg'][num]['reason'] = OOM_REASON_PCGROUP
+        oom_result['sub_msg'][num]['cg_name'] = cgroup
 
 def oom_get_order(oom_result, line, num):
     order = int(line.strip().split("order=")[1].split()[0][:-1])
@@ -318,6 +333,7 @@ def oom_get_rmem(oom_result, line, num):
     rmem = line.strip().split()[-3]
     rmem = int(rmem)*4
     oom_result['sub_msg'][num]['meminfo']['rmem'] = rmem
+    oom_result['sub_msg'][num]['meminfo']['total_mem'] -= rmem
 
 def oom_is_cgroup_oom(cgroup):
     return cgroup == OOM_REASON_PCGROUP or cgroup == OOM_REASON_CGROUP
@@ -399,6 +415,10 @@ def oom_is_memleak(oom, oom_result):
             res["tcp_task"] = tcp["top_task"]
             res["tcp_mem"] = tcp["tcp_mem"]
         summary = "allocpage memleak, usage:%dkb\n"%(used)
+    if memleak_check(total, meminfo['pagetables']):
+        res['leaktype'] = 'pagetables'
+        res['leakusage'] = meminfo['pagetables']
+        summary += "pagetables usage:%dkb indicates lots of processes or lots of mmaps\n"%(meminfo['pagetables'])
     if len(summary) != 0 and  len(tcp) != 0:
         summary += "tcp_task:%s tcp_mem:%sKB\n"%(tcp["top_task"][0], tcp["tcp_mem"])
     if len(summary) != 0:
@@ -589,6 +609,28 @@ def oom_get_k8spod(oom_result,num):
     res['containerID'] = oom['containerID']
     return summary
 
+def oom_get_memstat(oom_result, line, num, key, lines):
+    oom = oom_result['sub_msg'][num]
+    tmp = {}
+    while(key < len(lines)):
+        if "] anon " in lines[key]:
+            gp  = re.search("\] (\S*) (\d*)$",lines[key])
+        else:
+            gp  = re.match("^(\S*) (\d*)$",lines[key])
+        if not gp:
+            break
+        tmp[gp.group(1)] = int(gp.group(2))/1024
+        key += 1
+    cg_usage = int(oom['cg_usage'][:-2])
+    try:
+        thresh =  0.85*(cg_usage - tmp['inactive_anon'] - tmp['active_anon'])
+        for i in tmp:
+            if tmp[i] >= thresh:
+                oom['cgroup_major_used'] = {'name':i, 'value':tmp[i]}
+                break
+    except:
+        pass
+
 def oom_init_json(oom_result, num):
     oom = oom_result['sub_msg'][num]
     oom['json'] = {}
@@ -620,6 +662,7 @@ def oom_output_msg(oom_result,num, summary):
     res['cg_name'] = oom['cg_name']
     res['host_free'] = oom.get('host_free',0)
     res['host_low'] = oom.get('host_low',0)
+    res['cgroup_major_used'] = oom.get('cgroup_major_used', {})
     reason = ''
     #print("oom time = {} spectime = {}".format(oom['time'], oom_result['spectime']))
     task = oom['task_name']
@@ -682,7 +725,7 @@ def oom_get_max_task(num, oom_result):
                 continue
             if 'Out of memory' in line:
                 break
-            if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
+            if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line or OOM_END_KEYWORD_5_10 in line:
                 break
             if line.count('[')  != s_bra:
                 break
@@ -736,6 +779,10 @@ def oom_reason_analyze(num, oom_result, summary):
                 line = lines[key]
                 if "invoked oom-killer" in line:
                     oom_get_order(oom_result, line, num)
+                elif OOM_END_KEYWORD_5_10 in line:
+                    oom_get_cgroup_name(oom_result, line, num, 1)
+                    oom_get_task_mem(oom_result, line, num)
+                    oom_get_pid(oom_result, line, num)
                 if 'nodemask' in line:
                     oom_get_nodemask(oom_result, line, num)
                 if "mems_allowed=" in line:
@@ -758,6 +805,8 @@ def oom_reason_analyze(num, oom_result, summary):
                     if oom_is_node_num(line):
                         node_num += 1
                     oom_get_hugepage(oom_result, line, num)
+                elif "] anon " in line:
+                    oom_get_memstat(oom_result, line, num, key, lines)
                 elif OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
                     oom_get_task_mem(oom_result, line, num)
                     oom_get_pid(oom_result, line, num)
@@ -765,6 +814,8 @@ def oom_reason_analyze(num, oom_result, summary):
                 sys.stderr.write("oom_reason_analyze loop err {} lines {}\n".format(err, traceback.print_exc()))
                 continue
         oom_result['node_num'] = node_num
+        if 'cgroup_major_used' in oom_result['sub_msg'][num]:
+            oom_result['sub_msg'][num]['reason'] = '%s, %s used over 85%% memory (%dKB)' %(oom_result['sub_msg'][num]['reason'],oom_result['sub_msg'][num]['cgroup_major_used']['name'],oom_result['sub_msg'][num]['cgroup_major_used']['value'])
         summary = oom_output_msg(oom_result, num, summary)
         oom_result['sub_msg'][num]['summary'] = summary
         if oom_result['json'] == 1:
@@ -797,6 +848,8 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = []
                 oom_result['sub_msg'][oom_result['oom_total_num']]['time'] = 0
                 oom_result['sub_msg'][oom_result['oom_total_num']]['cg_name'] = 'unknow'
+                oom_result['sub_msg'][oom_result['oom_total_num']]['cg_usage'] = 0
+                oom_result['sub_msg'][oom_result['oom_total_num']]['cg_limit'] = 0
                 oom_result['sub_msg'][oom_result['oom_total_num']]['task_name'] = task_name
                 oom_result['sub_msg'][oom_result['oom_total_num']]['pid'] = "0"
                 oom_result['sub_msg'][oom_result['oom_total_num']]['killed_task_mem'] = 0
@@ -811,13 +864,18 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                 oom_result['time'].append(oom_result['sub_msg'][oom_result['oom_total_num']]['time'])
             if oom_getting == 1:
                 oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'].append(line)
-                if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
+                if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line or OOM_END_KEYWORD_5_10 in line:
                     if OOM_END_KEYWORD_4_19 in line:
                         OOM_END_KEYWORD_real = OOM_END_KEYWORD_4_19
-                    if OOM_END_KEYWORD in line:
+                    elif OOM_END_KEYWORD_5_10 in line:
+                        OOM_END_KEYWORD_real = OOM_END_KEYWORD_5_10
+                    elif OOM_END_KEYWORD in line:
                         OOM_END_KEYWORD_real = OOM_END_KEYWORD
                     oom_getting = 0
-                    task_name = line.split(OOM_END_KEYWORD_real)[1].split()[1].strip(',')
+                    if OOM_END_KEYWORD_real == OOM_END_KEYWORD_5_10:
+                        task_name = "(" + line.split(OOM_END_KEYWORD_real)[1].split("task=")[1].split(",")[0] + ")"
+                    else:
+                        task_name = line.split(OOM_END_KEYWORD_real)[1].split()[1].strip(',')
                     oom_result['sub_msg'][oom_result['oom_total_num']]['task_name'] = task_name
                     if task_name not in oom_result['task']:
                         oom_result['task'][task_name] = 1
@@ -832,8 +890,18 @@ def oom_dmesg_analyze(dmesgs, oom_result):
                         oom_result['cgroup'][cgroup_name] = 1
                     else:
                         oom_result['cgroup'][cgroup_name] += 1
+                if OOM_END_KEYWORD_5_10 in line:
+                    cgroup_name = line.split('task_memcg=')[1].split(",")[0]
+                    oom_result['sub_msg'][oom_result['oom_total_num']]['cgroup_name'] = cgroup_name
+                    #print cgroup_name
+                    if cgroup_name not in oom_result['cgroup']:
+                        oom_result['cgroup'][cgroup_name] = 1
+                    else:
+                        oom_result['cgroup'][cgroup_name] += 1
 
     except Exception as err:
+        import traceback
+        traceback.print_exc()
         sys.stderr.write("oom_dmesg_analyze failed {}\n".format(err))
 
 def oom_read_dmesg(data, mode, filename):

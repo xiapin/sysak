@@ -63,6 +63,8 @@ uint64_t g_max_phy_addr;
  */
 unsigned long vmemmap_base = 0xffffea0000000000UL;
 unsigned long page_offset_base = 0xffff880000000000UL;
+unsigned long memstart_addr = 0x0;
+unsigned long page_shift = 0;
 
 /*
  * Routines of kpageflags, i.e., /proc/kpageflags
@@ -168,8 +170,9 @@ static int kcore_elf_init(void)
 
 static int kcore_init(void)
 {
-	unsigned long vmemmap_symbol_addr;
-	unsigned long page_offset_symbol_addr;
+    unsigned long vmemmap_symbol_addr;
+    unsigned long page_offset_symbol_addr;
+    unsigned long memstart_addr_addr;
 	int size;
 
 	if ((kcore_fd = open("/proc/kcore", O_RDONLY)) < 0) {
@@ -200,6 +203,15 @@ static int kcore_init(void)
 			goto failed;
 	}
 
+	memstart_addr_addr = lookup_kernel_symbol("memstart_addr");
+	if (memstart_addr_addr == (unsigned long)-1) {
+		LOG_WARN("continue to use default memstart_addr_base: 0x%lx\n",
+				memstart_addr);
+	} else {
+		size = kcore_readmem(memstart_addr_addr, &memstart_addr, 8);
+		if (size < 8)
+			goto failed;
+	}
 	return 0;
 
 failed:
@@ -335,6 +347,21 @@ static void cleanup(void)
 	kcore_exit();
 }
 
+static int get_pageshift()
+{
+    int page_size = getpagesize();
+
+    if(page_size <= 0 )
+    {
+        LOG_ERROR("failed to get page size\n");
+        return -1;
+    }
+    while (page_size > 1) {
+        page_size >>= 1;
+        page_shift++;
+    }
+    return 0;
+}
 
 static void show_usage(void)
 {
@@ -399,6 +426,12 @@ int main(int argc, char *argv[])
 	if (getuid()) {
 		LOG_ERROR("must be root\n");
 		ret = -EPERM;
+		goto out;
+	}
+
+	ret = get_pageshift();
+	if (ret != 0) {
+		LOG_ERROR("failed to page shift\n");
 		goto out;
 	}
 

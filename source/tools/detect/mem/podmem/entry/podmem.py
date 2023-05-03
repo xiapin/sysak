@@ -4,6 +4,7 @@ import sys
 import json
 import  getopt
 import copy
+from pagealloc import page_mem
 
 def get_runtime(podinfo):
     if 'runtime' in podinfo.keys():
@@ -396,7 +397,7 @@ def handle_args(podinfo, argv):
     cmdline['output'] = 'stdio'
     cmdline['top'] = 10
     try:
-        opts, args = getopt.getopt(argv,"hj:r:sap:c:f:t:")
+        opts, args = getopt.getopt(argv,"hmj:r:sap:c:f:t:")
     except getopt.GetoptError:
         print('get opt error')
         sys.exit(2)
@@ -411,6 +412,7 @@ def handle_args(podinfo, argv):
             print("-j: dump result to json file (sysak podmem -s -j ./test.json)")
             print("-r: set sample rate ,default set to 1 (sysak podmem -s -r 2)")
             print("-t: output filecache top ,default for top 10 (sysak podmem -s -t 20)")
+            print("-m: analysis pod recv-Q memory")
             sys.exit(2) 
         elif opt == '-r':
             cmdline['rate'] = int(arg)
@@ -427,6 +429,9 @@ def handle_args(podinfo, argv):
             cmdline['mode'] = 'system'
         elif opt == '-a':
             cmdline['mode'] = 'allcgroup'
+        elif opt == '-m':
+            page_mem()
+            sys.exit(2) 
         elif opt == '-t':
             cmdline['top'] = int(arg)
         elif opt == '-j':

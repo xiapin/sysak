@@ -11,17 +11,17 @@ fn main() {
         .build_and_generate(&out)
         .unwrap();
     
-    let bindings = bindgen::Builder::default()
-        .header(HDR)
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
-        .generate()
-        .expect("Unable to generate bindings for retran crate");
+    // let bindings = bindgen::Builder::default()
+    //     .header(HDR)
+    //     .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+    //     .generate()
+    //     .expect("Unable to generate bindings for retran crate");
 
-    out.pop();
-    out.push("bindings.rs");
-    bindings
-        .write_to_file(&out)
-        .expect("Couldn't write bindings for retran crate!");
+    // out.pop();
+    // out.push("bindings.rs");
+    // bindings
+    //     .write_to_file(&out)
+    //     .expect("Couldn't write bindings for retran crate!");
     
     println!("cargo:rerun-if-changed={}", SRC);
     println!("cargo:rerun-if-changed={}", HDR);

@@ -252,9 +252,9 @@ do
         exit 0
         ;;
     -p) [[ -z $2 ]] && die usage
-        [[ -z $3 ]] && die usgae
+        [[ -z $4 ]] && die usgae
         OLD_VERSION_1=$2
-        OLD_VERSION_2=$2
+        OLD_VERSION_2=$4
         echo "$OLD_VERSION"
         let LEN_1=${#OLD_VERSION_1}-2
         let LEN_2=${#OLD_VERSION_2}-2

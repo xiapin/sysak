@@ -85,7 +85,7 @@ int BPF_KPROBE(tcp_drop, struct sock *sk, struct sk_buff *skb)
 	event.proto = bpf_ntohs(event.proto);
 	bp = PT_REGS_FP(ctx);
 
-	bpf_probe_read(&event.location, sizeof(event.location), bp+8);
+	bpf_probe_read(&event.location, sizeof(event.location), (void *)(bp+8));
 	fill_event(ctx, &event, skb);
 	return 0;
 }
