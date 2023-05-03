@@ -95,7 +95,7 @@ class iowaitClass():
                 self.expression.append('r:r_%s_0 %s%s' % (kprobe, kprobe, commArgs))
                 self.kprobe.append('r_%s_0' % kprobe)
         if len(self.kprobe) == 0:
-            print "not available kprobe"
+            print("%s" % ("not available kprobe"))
             sys.exit(0)
 
     def config(self):
@@ -115,7 +115,10 @@ class iowaitClass():
         echoFile(self.tracingDir+"/trace", "")
         echoFile(self.tracingDir+"/tracing_on", "1")
         with open("/proc/stat") as fStat:
-            cpuStatList = map(long, fStat.readline().split()[1:])
+            try:
+                cpuStatList = list(map(long, fStat.readline().split()[1:]))
+            except Exception:
+                cpuStatList = list(map(int, fStat.readline().split()[1:]))
             self.cpuStatIowait['sum'] = sum(cpuStatList)
             self.cpuStatIowait['iowait'] = cpuStatList[4]
 
@@ -182,7 +185,10 @@ class iowaitClass():
         commArgs = self.ftracePaserCommArgs
 
         with open("/proc/stat") as fStat:
-            statList = map(long, fStat.readline().split()[1:])
+            try:
+                statList = list(map(long, fStat.readline().split()[1:]))
+            except Exception:
+                statList = list(map(int, fStat.readline().split()[1:]))
         gloabIowait = float(format(
             (statList[4]-self.cpuStatIowait['iowait'])*100.0 /
             (sum(statList)-self.cpuStatIowait['sum']), '.2f'))
@@ -253,7 +259,7 @@ class iowaitClass():
 
         if self.json == False:
             head = str(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime()))+' -> global iowait%: '+str(gloabIowait)
-            print head
+            print(head)
 
         if stat:
             stat = OrderedDict(sorted(stat.items(), key=lambda e: e[1]["timeout"], reverse=True))
@@ -298,7 +304,7 @@ class iowaitClass():
 
 def main():
     if os.geteuid() != 0:
-        print "This program must be run as root. Aborting."
+        print("%s" % ("This program must be run as root. Aborting."))
         sys.exit(0)
     examples = """e.g.
   ./iowaitstat.py
