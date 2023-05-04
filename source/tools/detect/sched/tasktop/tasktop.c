@@ -85,15 +85,21 @@ struct env {
     pid_t tid;
     long nr_iter;
     enum sort_type rec_sort;
-} env = {
-    .thread_mode = false, .delay = 3, .tid = -1, .rec_sort = SORT_CPU, .nr_iter = LONG_MAX - 1};
+    int limit;
+} env = {.thread_mode = false,
+         .delay = 3,
+         .tid = -1,
+         .rec_sort = SORT_CPU,
+         .nr_iter = LONG_MAX - 1,
+         .limit = INT_MAX};
 
 const char* argp_program_version = "tasktop 0.1";
 const char argp_program_doc[] =
     "A light top, display the process/thread cpu utilization in peroid.\n"
     "\n"
 
-    "USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] [-f LOGFILE]\n"
+    "USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] [-f LOGFILE] [-l "
+    "LIMIT]\n"
     "\n"
 
     "EXAMPLES:\n"
@@ -102,6 +108,7 @@ const char argp_program_doc[] =
     "    tasktop -p 1100    # only display task with pid 1100.\n"
     "    tasktop -d 5       # modify the sample interval.\n"
     "    tasktop -i 3       # output 3 times then exit.\n"
+    "    tasktop -l 20      # limit the records number no more than 20.\n"
     "    tasktop -f a.log   # log to a.log (default to /var/log/sysak/tasktop/tasktop.log)\n";
 
 static const struct argp_option opts[] = {
@@ -113,7 +120,7 @@ static const struct argp_option opts[] = {
      "Logfile for result, default /var/log/sysak/tasktop/tasktop.log"},
     {"sort", 's', "SORT", 0,
      "Sort the result, available options are user, sys and cpu, default is cpu"},
-
+    {"limit", 'l', "LIMIT", 0, "Specify the top-LIMIT tasks to display"},
     {NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
     {},
 };
@@ -197,6 +204,14 @@ static error_t parse_arg(int key, char* arg, struct argp_state* state) {
                 fprintf(stderr, "Invalid sort type.\n");
                 argp_usage(state);
             }
+            break;
+        case 'l':
+            err = parse_long(arg, &val);
+            if (err || val <= 0) {
+                fprintf(stderr, "Failed parse limit-num.\n");
+                argp_usage(state);
+            }
+            env.limit = val;
             break;
         case ARGP_KEY_ARG:
             break;
@@ -466,6 +481,7 @@ static void output(struct record_t** records, int proc_num, FILE* dest) {
                     "%UTIME", "%STIME", "%CPU");
         }
 
+        if (i >= env.limit) break;
         fprintf(dest, "%18s %6d %6d %10d %6.2f %6.2f %6.2f\n", records[i]->comm, records[i]->pid,
                 records[i]->ppid, records[i]->runtime, records[i]->user_cpu_rate,
                 records[i]->system_cpu_rate, records[i]->all_cpu_rate);
