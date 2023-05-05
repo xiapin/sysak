@@ -230,6 +230,7 @@ static int check_on_cpu(int cpu, struct perf_event_attr *attr)
 	pmufds[cpu] = pmu_fd;
 	assert(bpf_map_update_elem(map_fd[0], &cpu, &pmu_fd, BPF_ANY) == 0);
 	assert(ioctl(pmu_fd, PERF_EVENT_IOC_ENABLE, 0) == 0);
+#if 0
 	sleep(1);
 	/* Check the value */
 	if (bpf_map_lookup_elem(map_fd[1], &cpu, &value)) {
@@ -239,6 +240,7 @@ static int check_on_cpu(int cpu, struct perf_event_attr *attr)
 	} else {
 		fprintf(stderr, "CPU %d: %llu\n", cpu, value);
 	}
+#endif
 	return 0;
 
 on_exit:
@@ -436,17 +438,24 @@ int main(int argc, char **argv)
 	}
 
 	test_bpf_perf_event();
+
 	while (!exiting) {
 		sleep(1);
+	}
+
+	{
+		__u64 sum = 0;
 		for (cpu = 0; cpu < nr_cpus; cpu++) {
 			if (bpf_map_lookup_elem(map_fd[1], &cpu, &value)) {
 				fprintf(stderr, "Value missing for CPU %d\n", cpu);
 				err = 1;
 				goto cleanup;
 			} else {
-				fprintf(stderr, "CPU %d: %llu\n", cpu, value);
+				/*fprintf(stderr, "CPU %d: %llu\n", cpu, value);*/
+				sum = sum+value;
 			}
 		}
+		fprintf(stderr, "count = %llu\n", sum);
 	}
 
 cleanup:

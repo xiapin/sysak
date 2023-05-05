@@ -28,6 +28,13 @@ struct {
 } pid_counter SEC(".maps");
 
 struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+	__uint(max_entries, 512);
+	__type(key, u32);
+	__type(value, u64);
+} cgid_counter SEC(".maps");
+
+struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, sizeof(u32));
