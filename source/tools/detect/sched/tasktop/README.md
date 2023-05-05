@@ -2,7 +2,7 @@
 tasktop实现对task的cpu利用率进行监控
 # 使用说明
 ```
-USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] [-f LOGFILE]
+USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] [-f LOGFILE] [-l LIMIT]
 
   -d, --delay=DELAY          采样的周期 默认采样区间为3秒
   -f, --logfile=LOGFILE      日志文件 默认为/var/log/sysak/tasktop/tasktop.log 指定为/dev/stdout每次输出前会刷屏 用于实时监控
@@ -10,6 +10,7 @@ USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] [-f LO
   -p, --pid=TID              指定监控的TID 如果是子线程ID 需要-t开启线程模式
   -s, --sort=SORT            采样结果的排序方式 可选项为user（用户态）、sys（内核态）、cpu（用户态+内核态）默认为cpu
   -t, --thread               线程模式 监控线程级的CPU利用率 默认为进程级
+  -l, --limit=LIMIT          每次输出只显示的top-LIMIT个task 默认为所有CPU利用率大于0的task
 ```
 
 # 使用举例
