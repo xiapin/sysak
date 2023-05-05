@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python3
 # -*- coding: UTF-8 -*-
 
 import os, sys, getopt, signal, threading
