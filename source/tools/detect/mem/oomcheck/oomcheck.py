@@ -33,7 +33,8 @@ OOM_END_KEYWORD_4_19 = "reaped process"
 OOM_END_KEYWORD_5_10 = "oom-kill:constraint"
 OOM_CGROUP_KEYWORD = "Task in /"
 OOM_NORMAL_MEM_KEYWORD = "Normal: "
-OOM_PID_KEYWORD = "[ pid ]"
+OOM_PID_KEYWORD = "[  pid  ]"
+pid_pattern = re.compile("\[\d+\]\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\S+")
 WEEK_LIST = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
 CWEEK_LIST = ['一','二','三','四','五','六','日']
 MONTH_LIST = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -229,6 +230,7 @@ def oom_get_cgroup_name(oom_result, line, num, is_510 = 0):
     else:
         if "limit of host" in line :
             is_host = True
+            oom_result['sub_msg'][num]['type'] = 'host'
         if is_host == False:
             oom_result['sub_msg'][num]['reason'] = OOM_REASON_CGROUP
             oom_result['sub_msg'][num]['type'] = 'cgroup'
@@ -713,7 +715,9 @@ def oom_get_max_task(num, oom_result):
     state = oom['state_mem']
     state['msg'] = []
     state['total_rss'] = 0
-    s_bra = 0
+    s_bra = 2
+    if 'oom_score_adj' not in '\n'.join(oom['oom_msg']):
+        dump_task = True
     for line in oom['oom_msg']:
         try:
             if 'rss' in line and 'oom_score_adj' in line and 'name' in line:
@@ -829,7 +833,98 @@ def oom_reason_analyze(num, oom_result, summary):
         sys.stderr.write("oom_reason_analyze err {} lines {}\n".format(err, traceback.print_exc()))
         return ""
 
+def init_oomresult(oomresult_sub):
+    oomresult_sub['oom_msg'] = []
+    oomresult_sub['time'] = 0
+    oomresult_sub['cg_name'] = 'unknow'
+    oomresult_sub['podName'] = 'unknow'
+    oomresult_sub['containerID'] = 'unknow'
+    oomresult_sub['cg_usage'] = 0
+    oomresult_sub['cg_limit'] = 0
+    oomresult_sub['task_name'] = '-unknow-'
+    oomresult_sub['pid'] = "0"
+    oomresult_sub['killed_task_mem'] = 0
+    oomresult_sub['state_mem'] = {}
+    oomresult_sub['meminfo'] = {}
+    oomresult_sub['type'] = 'unknow'
+    oomresult_sub['root'] = 'unknow'
+    oomresult_sub['reason'] = ''
+    oomresult_sub['summary'] = ''
+
 def oom_dmesg_analyze(dmesgs, oom_result):
+    try:
+        meet_start = False
+        meet_end = False
+        start_i = -1
+        end_i = 0
+        dmesg = dmesgs.splitlines()
+        task_name = "-unknow-"
+        if task_name not in oom_result['task']:
+            oom_result['task'][task_name] = 0
+        for line in dmesg:
+            line = line.strip()
+            if OOM_BEGIN_KEYWORD in line:
+                if meet_start:
+                    oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = dmesg[start_i: dmesg.index(line)]
+                meet_start = True
+                start_i = dmesg.index(line)
+                oom_result['oom_total_num'] += 1
+                oom_result['sub_msg'][oom_result['oom_total_num']] = {}
+                init_oomresult(oom_result['sub_msg'][oom_result['oom_total_num']])
+            if OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line or OOM_END_KEYWORD_5_10 in line:
+                if start_i >= 0:
+                    oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = dmesg[start_i:dmesg.index(line)+1]
+                elif dmesg.index(line) - end_i < 10:
+                    meet_start = False
+                    start_i = -1
+                    end_i = dmesg.index(line)
+                    continue
+                else:
+                    oom_result['oom_total_num'] += 1
+                    oom_result['sub_msg'][oom_result['oom_total_num']] = {}
+                    init_oomresult(oom_result['sub_msg'][oom_result['oom_total_num']])
+                    oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = dmesg[end_i + 1: dmesg.index(line)+1]
+                meet_start = False
+                start_i = -1
+                end_i = dmesg.index(line)
+                if OOM_END_KEYWORD_4_19 in line:
+                    OOM_END_KEYWORD_real = OOM_END_KEYWORD_4_19
+                elif OOM_END_KEYWORD_5_10 in line:
+                    OOM_END_KEYWORD_real = OOM_END_KEYWORD_5_10
+                elif OOM_END_KEYWORD in line:
+                    OOM_END_KEYWORD_real = OOM_END_KEYWORD
+                if OOM_END_KEYWORD_5_10 in line:
+                    task_name = "(" + line.split(OOM_END_KEYWORD_real)[1].split("task=")[1].split(",")[0] + ")"
+                    cgroup_name = line.split('task_memcg=')[1].split(",")[0]
+                    oom_result['sub_msg'][oom_result['oom_total_num']]['cgroup_name'] = cgroup_name
+                    #print cgroup_name
+                    if cgroup_name not in oom_result['cgroup']:
+                        oom_result['cgroup'][cgroup_name] = 1
+                    else:
+                        oom_result['cgroup'][cgroup_name] += 1
+                else:
+                    task_name = line.split(OOM_END_KEYWORD_real)[1].split()[1].strip(',')
+                oom_result['sub_msg'][oom_result['oom_total_num']]['task_name'] = task_name
+                if task_name not in oom_result['task']:
+                    oom_result['task'][task_name] = 1
+                else:
+                    oom_result['task'][task_name] += 1
+            if OOM_CGROUP_KEYWORD in line:
+                cgroup_name = line.split('Task in')[1].split()[0]
+                oom_result['sub_msg'][oom_result['oom_total_num']]['cgroup_name'] = cgroup_name
+                #print cgroup_name
+                if cgroup_name not in oom_result['cgroup']:
+                    oom_result['cgroup'][cgroup_name] = 1
+                else:
+                    oom_result['cgroup'][cgroup_name] += 1
+        if meet_start:
+                oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = dmesg[start_i:]
+    except Exception as err:
+        import traceback
+        traceback.print_exc()
+        sys.stderr.write("oom_dmesg_analyze failed {}\n".format(err))
+
+def oom_dmesg_analyze2(dmesgs, oom_result):
     try:
         OOM_END_KEYWORD_real = OOM_END_KEYWORD
         if OOM_BEGIN_KEYWORD not in dmesgs:
@@ -932,7 +1027,7 @@ def oom_diagnose(sn, data, mode):
         oom_result['max'] = {'rss':0,'task':"",'score':0,'pid':0}
         oom_result['max_total'] = {'rss':0,'task':"",'score':0,'cnt':0}
         dmesgs = data['dmesg']
-        if OOM_BEGIN_KEYWORD in dmesgs:
+        if OOM_BEGIN_KEYWORD in dmesgs or  pid_pattern.search(dmesgs) is not None:
             oom_dmesg_analyze(dmesgs, oom_result)
             oom_result['summary'] += "total oom: %s\n"%oom_result['oom_total_num']
 
