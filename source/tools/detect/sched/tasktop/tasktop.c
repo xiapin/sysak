@@ -7,11 +7,16 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include "tasktop.h"
+#include <bpf/libbpf.h>
+#include <bpf/bpf.h> /* bpf_obj_pin */
+#include "procstate.h"
+#include "bpf/tasktop.skel.h"
 
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
@@ -165,7 +170,6 @@ static error_t parse_arg(int key, char* arg, struct argp_state* state) {
 static int read_btime() {
     int err = 0;
     char buf[BUF_SIZE];
-    char* endptr;
     long val;
     FILE* fp = fopen(PROC_STAT_PATH, "r");
     if (!fp) {
@@ -206,9 +210,6 @@ int swap(void* lhs, void* rhs, size_t sz) {
 static int read_stat(struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys,
                      struct sys_record_t* sys_rec) {
     int err = 0;
-    char buf[BUF_SIZE];
-    char* endptr;
-    long val;
     FILE* fp = fopen(PROC_STAT_PATH, "r");
     if (!fp) {
         fprintf(stderr, "Failed open stat file.\n");
@@ -217,9 +218,9 @@ static int read_stat(struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_s
     }
 
     /*now only read first line, maybe future will read more info*/
-    fscanf(fp, "%s %d %d %d %d %d %d %d %d %d %d\n", now_sys->cpu, &now_sys->usr, &now_sys->nice,
-           &now_sys->sys, &now_sys->idle, &now_sys->iowait, &now_sys->irq, &now_sys->softirq,
-           &now_sys->steal, &now_sys->guest, &now_sys->guest_nice);
+    fscanf(fp, "%s %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n", now_sys->cpu, &now_sys->usr,
+           &now_sys->nice, &now_sys->sys, &now_sys->idle, &now_sys->iowait, &now_sys->irq,
+           &now_sys->softirq, &now_sys->steal, &now_sys->guest, &now_sys->guest_nice);
 
     if (prev_sys->usr == 0) goto cleanup;
     int now_time = now_sys->usr + now_sys->sys + now_sys->nice + now_sys->idle + now_sys->iowait +
@@ -252,7 +253,7 @@ static u_int64_t read_pid_max() {
         return err;
     }
 
-    fscanf(fp, "%ul", &pidmax);
+    fscanf(fp, "%lu", &pidmax);
 
     if (fp) fclose(fp);
     return err;
@@ -264,7 +265,6 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
     DIR* dir = NULL;
     DIR* task_dir = NULL;
     u_int64_t proc_num = 0;
-    char* endptr;
     struct dirent* proc_de = NULL;
     struct dirent* task_de = NULL;
     long val;
@@ -289,7 +289,7 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
             pids[proc_num++].tid = -1;
         } else {
             char taskpath[FILE_PATH_LEN];
-            snprintf(taskpath, FILE_PATH_LEN, "/proc/%ld/task", pid);
+            snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
             task_dir = opendir(taskpath);
             if (!task_dir) {
                 if (errno == ENOENT) {
@@ -436,7 +436,7 @@ static void sort_records(struct record_t* rec, int proc_num, enum sort_type sort
                         break;
                     default:
                         fprintf(stderr, "Unknown SORT_TYPE\n");
-                        break;
+                        return;
                 }
 
                 if (lth < rth) {
@@ -449,7 +449,7 @@ static void sort_records(struct record_t* rec, int proc_num, enum sort_type sort
 
 static void output(struct record_t* rec, int proc_num, FILE* dest) {
     struct task_record_t** records = rec->tasks;
-    system("clear");
+    // system("clear");
     time_t now = time(0);
     struct tm* t;
     t = gmtime(&now);
@@ -457,10 +457,10 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
     int i;
     strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
 
-    fprintf(dest, "%8s %6s %6s %6s %6s %6s %6s \n", "System", "usr", "sys", "iowait", "R", "D",
-            "fork");
-    fprintf(dest, "%8s %6.1f %6.1f %6d %6d %6d\n", "", rec->sys.usr, rec->sys.sys,
-            rec->sys.iowait, rec->sys.nr_R, rec->sys.nr_D, rec->sys.nr_fork);
+    fprintf(dest, "%8s %6s %6s %6s %6s %6s %6s %6s \n", "System", "usr", "sys", "iowait", "load1",
+            "R", "D", "fork");
+    fprintf(dest, "%8s %6.1f %6.1f %6.1f %6.1f %6d %6d %6d\n", "", rec->sys.usr, rec->sys.sys,
+            rec->sys.iowait, rec->sys.load1, rec->sys.nr_R, rec->sys.nr_D, rec->sys.nr_fork);
 
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
@@ -472,19 +472,11 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
         }
 
         if (i >= env.limit) break;
-        fprintf(dest, "%18s %6d %6d %10d %6.1f %6.1f %6.1f\n", records[i]->comm, records[i]->pid,
+        fprintf(dest, "%18s %6d %6d %10ld %6.1f %6.1f %6.1f\n", records[i]->comm, records[i]->pid,
                 records[i]->ppid, records[i]->runtime, records[i]->user_cpu_rate,
                 records[i]->system_cpu_rate, records[i]->all_cpu_rate);
     }
     fflush(dest);
-}
-
-static void clean_prev_table(int pidmax, struct task_cputime_t** prev,
-                             struct task_cputime_t** now) {
-    int i;
-    for (i = 0; i < pidmax; i++) {
-        if (prev[i]) free(prev[i]);
-    }
 }
 
 static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
@@ -558,13 +550,47 @@ static FILE* open_logfile() {
     return stat_log;
 }
 
+static int libbpf_print_fn(enum libbpf_print_level level, const char* format, va_list args) {
+    return vfprintf(stderr, format, args);
+}
+
+static int bump_memlock_rlimit(void) {
+    struct rlimit rlim_new = {
+        .rlim_cur = RLIM_INFINITY,
+        .rlim_max = RLIM_INFINITY,
+    };
+
+    return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
+}
+
+static int look_fork(int mfd, struct sys_record_t* sys_rec) {
+    static long local_prev_val = 0;
+    int err = 0;
+    int key = 0;
+    long val = 0;
+    err = bpf_map_lookup_elem(mfd, &key, &val);
+    if (err) {
+        // fprintf(stderr, "Failed read fork from map.\n");
+        return err;
+    }
+    // printf("fork times = %d\n", val);
+    sys_rec->nr_fork = val - local_prev_val;
+    // sys_rec->nr_fork = val;
+    local_prev_val = val;
+    return err;
+}
+
 int main(int argc, char** argv) {
     int err = 0;
-    FILE* stat_log;
-    struct id_pair_t* pids;
-    struct task_cputime_t **prev_task, **now_task;
-    struct sys_cputime_t *prev_sys, *now_sys;
-    struct record_t* rec;
+    int map_fd = -1;
+    FILE* stat_log = 0;
+    struct tasktop_bpf* skel = 0;
+    struct id_pair_t* pids = 0;
+    struct task_cputime_t **prev_task = 0, **now_task = 0;
+    struct sys_cputime_t *prev_sys = 0, *now_sys = 0;
+    struct record_t* rec = 0;
+
+    /* parse args */
     static const struct argp argp = {
         .options = opts,
         .parser = parse_arg,
@@ -577,6 +603,10 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
+    libbpf_set_print(libbpf_print_fn);
+    bump_memlock_rlimit();
+
+    /* init pid_max and btime */
     err = read_pid_max();
     if (err) {
         fprintf(stderr, "Failed read pid max.\n");
@@ -602,14 +632,36 @@ int main(int argc, char** argv) {
     }
 
     prepare_directory(log_dir);
-
     stat_log = open_logfile();
     if (!stat_log) {
         fprintf(stderr, "Failed open stat log file.\n");
         goto cleanup;
     }
 
+    skel = tasktop_bpf__open();
+    if (!skel) {
+        err = 1;
+        fprintf(stderr, "Failed to open BPF skeleton\n");
+        goto cleanup;
+    }
+
+    err = tasktop_bpf__load(skel);
+    if (err) {
+        fprintf(stderr, "Failed to load BPF skeleton\n");
+        goto cleanup;
+    }
+
+    map_fd = bpf_map__fd(skel->maps.fork);
+    err = tasktop_bpf__attach(skel);
+    if (err) {
+        fprintf(stderr, "Failed to attach BPF skeleton\n");
+        goto cleanup;
+    }
+
     while (env.nr_iter--) {
+        look_fork(map_fd, &rec->sys);
+        runnable_proc(&rec->sys);
+        unint_proc(&rec->sys);
         /* get all process now */
         u_int64_t proc_num;
         err = read_all_pids(pids, &proc_num);
@@ -640,10 +692,11 @@ int main(int argc, char** argv) {
     }
 
 cleanup:
+    tasktop_bpf__destroy(skel);
     if (pids) free(pids);
     u_int64_t i;
     if (prev_task) {
-        for (0; i < pidmax; i++) {
+        for (i = 0; i < pidmax; i++) {
             if (prev_task[i]) free(prev_task[i]);
         }
         free(prev_task);
