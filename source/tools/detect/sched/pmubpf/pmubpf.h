@@ -24,4 +24,9 @@ struct args {
 	pid_t pad;
 };
 
+struct cg_key {
+	int cpu;
+	__u64 cgid;
+};
+
 #endif /* __PMUBPF_H */

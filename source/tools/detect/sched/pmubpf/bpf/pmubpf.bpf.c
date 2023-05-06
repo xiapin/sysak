@@ -18,7 +18,7 @@ struct {
 	__uint(max_entries, 128);
 	__type(key, u32);
 	__type(value, u64);
-} counter SEC(".maps");
+} pid_start SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
@@ -28,11 +28,18 @@ struct {
 } pid_counter SEC(".maps");
 
 struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 512);
-	__type(key, u32);
+	__type(key, struct cg_key);
 	__type(value, u64);
-} cgid_counter SEC(".maps");
+} cg_start SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 512);
+	__type(key, struct cg_key);
+	__type(value, u64);
+} cg_counter SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
@@ -75,12 +82,33 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 	s64 error;
 	int cpu;
 
+	{
+		int cpuid;
+		u64 *valp, *last, val;
+		struct cg_key key;
+
+		__builtin_memset(&key, 0, sizeof(struct cg_key));
+		key.cpu = bpf_get_smp_processor_id();
+		key.cgid = bpf_get_current_cgroup_id();	/* cgroup that will switch-out */
+
+		last = bpf_map_lookup_elem(&cg_start, &key);
+		if (last && (*last != 0)) {
+			val = bpf_perf_event_read(&event, key.cpu);
+			delta = val - *last;
+			valp = bpf_map_lookup_elem(&cg_counter, &key);
+			if (valp)
+				*valp = *valp + delta;
+			else
+				bpf_map_update_elem(&cg_counter, &key, &delta, 0);
+		}
+	}
+
 	prev_pid = ctx->prev_pid;
 	next_pid = ctx->next_pid;
 	pid = GETARG_FROM_ARRYMAP(argmap, argp, u64, targ_pid);
 	cpu = bpf_get_smp_processor_id();
 	if (prev_pid == pid) {	/* switch out */
-		prevp = bpf_map_lookup_elem(&counter, &cpu);
+		prevp = bpf_map_lookup_elem(&pid_start, &cpu);
 		if (prevp && (*prevp != 0)) {
 			this = bpf_perf_event_read(&event, cpu);
 			countp = bpf_map_lookup_elem(&pid_counter, &cpu);
@@ -97,7 +125,7 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 
 	if (next_pid == pid) {	/* switch in */
 		/* record the current counter of this cpu */
-		prevp = bpf_map_lookup_elem(&counter, &cpu);
+		prevp = bpf_map_lookup_elem(&pid_start, &cpu);
 		if (prevp) {
 			this = bpf_perf_event_read(&event, cpu);
 			error = (s64)this;
@@ -106,11 +134,17 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 			*prevp = this;
 		} else {
 			this = bpf_perf_event_read(&event, cpu);
-			bpf_map_update_elem(&counter, &cpu, &this, 0);
+			bpf_map_update_elem(&pid_start, &cpu, &this, 0);
 		}
 	}
 
 	return 0;
 }
+
+#if 0
+/* switch in */
+SEC("kprobe/finish_task_switch")
+
+#endif
 
 char LICENSE[] SEC("license") = "GPL";

@@ -213,7 +213,7 @@ sys_perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 
 static int check_on_cpu(int cpu, struct perf_event_attr *attr)
 {
-	__u64 value;
+	/* __u64 value; */
 	int pmu_fd, error = 0;
 	cpu_set_t set;
 
