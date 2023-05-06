@@ -142,8 +142,11 @@ int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
 				bpf_get_current_comm(&event.comm, sizeof(event.comm));
 				event.ret = bpf_get_stackid(ctx, &stackmap, KERN_STACKID_FLAGS);
 				latp->last_perf_event = now;
-				bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
+				if (latp->recorded == 0) {
+					bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU,
 							&event, sizeof(event));
+					latp->recorded = 1;
+				}
 			}
 		}
 	} else {
