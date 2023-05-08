@@ -2,6 +2,8 @@
 #ifndef __TASKTOP_H
 #define __TASKTOP_H
 #include <sys/types.h>
+#include "common.h"
+
 
 #define FILE_PATH_LEN 256
 #define MAX_COMM_LEN 16
@@ -87,6 +89,7 @@ struct sys_record_t {
     int nr_R;
     int nr_D;
     int nr_fork;
+    struct proc_fork_info_t most_fork_info;
 };
 
 struct record_t {
