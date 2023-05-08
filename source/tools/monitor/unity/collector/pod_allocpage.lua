@@ -238,7 +238,7 @@ function CPodAlloc:proc(elapsed, lines)
     self.inode_link = {}
     self.link_pid = {}
     self.allpods = {}
-    if self.cgroup_count > 1000 then self.cgroup_pod = {} end
+    if self.cgroup_count > 1000 then self.cgroup_pod = {} self.cgroup_count = 0 end
     self.total = 0
 
     self:get_link()
