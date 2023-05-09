@@ -11,6 +11,9 @@ void loop_fork() {
         int pid[128];
         for (int i = 0; i < 128; i++) {
             if ((pid[i] = fork()) == 0) {
+                int a = 0;
+                int b = 1;
+                int c = a + b;
                 exit(0);
             }
             // printf("fork.\n");

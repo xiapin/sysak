@@ -12,11 +12,12 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include "tasktop.h"
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h> /* bpf_obj_pin */
-#include "procstate.h"
 #include "bpf/tasktop.skel.h"
+#include "procstate.h"
+#include "tasktop.h"
+#include "common.h"
 
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
@@ -455,12 +456,14 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
     t = gmtime(&now);
     char time_str[BUF_SIZE];
     int i;
+    struct proc_fork_info_t* info = &(rec->sys.most_fork_info);
     strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
 
-    fprintf(dest, "%8s %6s %6s %6s %6s %6s %6s %6s \n", "System", "usr", "sys", "iowait", "load1",
-            "R", "D", "fork");
-    fprintf(dest, "%8s %6.1f %6.1f %6.1f %6.1f %6d %6d %6d\n", "", rec->sys.usr, rec->sys.sys,
+    fprintf(dest, "%8s %6s %6s %6s %6s %6s %6s %6s:%6s \n", "System", "usr", "sys", "iowait",
+            "load1", "R", "D", "fork", "proc");
+    fprintf(dest, "%8s %6.1f %6.1f %6.1f %6.1f %6d %6d %6d", "", rec->sys.usr, rec->sys.sys,
             rec->sys.iowait, rec->sys.load1, rec->sys.nr_R, rec->sys.nr_D, rec->sys.nr_fork);
+    fprintf(dest, ":  %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid, info->ppid, info->fork);
 
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
@@ -563,26 +566,41 @@ static int bump_memlock_rlimit(void) {
     return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
-static int look_fork(int mfd, struct sys_record_t* sys_rec) {
-    static long local_prev_val = 0;
-    int err = 0;
-    int key = 0;
-    long val = 0;
-    err = bpf_map_lookup_elem(mfd, &key, &val);
-    if (err) {
-        // fprintf(stderr, "Failed read fork from map.\n");
-        return err;
+static int look_fork(int cnt_map_fd, int fork_map_fd, struct sys_record_t* sys_rec) {
+    int fd;
+    int err;
+    u_int64_t total = 0;
+    u_int64_t lookup_key = -1, next_key;
+    struct proc_fork_info_t info;
+
+    fd = fork_map_fd;
+    int max_fork = 0;
+    while (!bpf_map_get_next_key(fd, &lookup_key, &next_key)) {
+        err = bpf_map_lookup_elem(fd, &next_key, &info);
+
+        err = bpf_map_delete_elem(fd, &next_key);
+        if (err < 0) {
+            fprintf(stderr, "failed to delete elem: %d\n", err);
+            return -1;
+        }
+        lookup_key = next_key;
+
+        if (!next_key) continue;
+
+        total = total + info.fork;  // for debug
+
+        if (max_fork < info.fork) {
+            max_fork = info.fork;
+            sys_rec->most_fork_info = info;
+        }
     }
-    // printf("fork times = %d\n", val);
-    sys_rec->nr_fork = val - local_prev_val;
-    // sys_rec->nr_fork = val;
-    local_prev_val = val;
+    sys_rec->nr_fork = total;
     return err;
 }
 
 int main(int argc, char** argv) {
     int err = 0;
-    int map_fd = -1;
+    int cnt_map_fd = -1, fork_map_fd = -1;
     FILE* stat_log = 0;
     struct tasktop_bpf* skel = 0;
     struct id_pair_t* pids = 0;
@@ -651,7 +669,8 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
-    map_fd = bpf_map__fd(skel->maps.fork);
+    cnt_map_fd = bpf_map__fd(skel->maps.cnt_map);
+    fork_map_fd = bpf_map__fd(skel->maps.fork_map);
     err = tasktop_bpf__attach(skel);
     if (err) {
         fprintf(stderr, "Failed to attach BPF skeleton\n");
@@ -659,9 +678,10 @@ int main(int argc, char** argv) {
     }
 
     while (env.nr_iter--) {
-        look_fork(map_fd, &rec->sys);
+        look_fork(cnt_map_fd, fork_map_fd, &rec->sys);
         runnable_proc(&rec->sys);
         unint_proc(&rec->sys);
+
         /* get all process now */
         u_int64_t proc_num;
         err = read_all_pids(pids, &proc_num);
@@ -669,6 +689,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "Failed read all pids.\n");
             goto cleanup;
         }
+
         rec->tasks = calloc(proc_num, sizeof(struct task_record_t*));
         /* if prev process info exist produce record*/
         err = make_records(pids, proc_num, rec, prev_task, now_task, prev_sys, now_sys);
@@ -693,6 +714,7 @@ int main(int argc, char** argv) {
 
 cleanup:
     tasktop_bpf__destroy(skel);
+
     if (pids) free(pids);
     u_int64_t i;
     if (prev_task) {

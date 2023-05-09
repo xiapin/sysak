@@ -2,6 +2,8 @@
 #ifndef __TASKTOP_H
 #define __TASKTOP_H
 #include <sys/types.h>
+#include "common.h"
+
 
 #define FILE_PATH_LEN 256
 #define MAX_COMM_LEN 16
@@ -13,7 +15,8 @@
 #define PIDMAX_PATH "/proc/sys/kernel/pid_max"
 #define PROC_STAT_PATH "/proc/stat"
 
-enum sort_type { SORT_SYSTEM, SORT_USER, SORT_CPU };
+enum sort_type { SORT_SYSTEM, 
+SORT_USER, SORT_CPU };
 
 struct id_pair_t {
     pid_t pid;
@@ -87,6 +90,7 @@ struct sys_record_t {
     int nr_R;
     int nr_D;
     int nr_fork;
+    struct proc_fork_info_t most_fork_info;
 };
 
 struct record_t {
