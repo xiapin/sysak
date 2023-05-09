@@ -68,7 +68,8 @@ function CcoCli:coQueFunc(cli, cffi, efd)
                 end
                 body = nil
             else  --> other stat, only record
-                print("http stat:", stat, enumStat.connected)
+                ok = nil
+                --print("http stat:", stat, enumStat.connected)
             end
         end
     end

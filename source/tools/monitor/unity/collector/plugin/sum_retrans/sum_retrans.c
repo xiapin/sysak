@@ -27,6 +27,7 @@ int init(void *arg)
     return ret;
 }
 
+#define BUFF_SIZE 64
 #define LOG_MAX 4096
 static char log[LOG_MAX];
 
@@ -37,7 +38,7 @@ static int transIP(unsigned long lip, char *result, int size) {
 
 static void pack_dip() {
     char ips[32];
-    char buff[64];
+    char buff[BUFF_SIZE];
     unsigned long value;
     unsigned int ip, ip_next;
 
@@ -48,8 +49,8 @@ static void pack_dip() {
         ip = ip_next;
 
         transIP(ip, ips, 32);
-        snprintf(buff, 64, "%s:%ld,", ips, value);
-        strncat(log, buff, 4096);
+        snprintf(buff, BUFF_SIZE, "%s:%ld,", ips, value);
+        strncat(log, buff, LOG_MAX - 1 - strlen(log));
         ip = ip_next;
     }
 
@@ -61,7 +62,7 @@ static void pack_dip() {
 }
 
 static void pack_inum() {
-    char buff[64];
+    char buff[BUFF_SIZE];
     unsigned long value;
     unsigned int inum, inum_next;
 
@@ -70,8 +71,8 @@ static void pack_inum() {
     inum = 0;
     while (coobpf_key_next(inum_fd, &inum, &inum_next) == 0) {
         bpf_map_lookup_elem(inum_fd, &inum_next, &value);
-        snprintf(buff, 64, "%u:%ld,", inum_next, value);
-        strncat(log, buff, 4096);
+        snprintf(buff, BUFF_SIZE, "%u:%ld,", inum_next, value);
+        strncat(log, buff, LOG_MAX - 1 - strlen(log));
         inum = inum_next;
     }
 

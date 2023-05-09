@@ -91,7 +91,6 @@ int call(int t, struct unity_lines *lines) {
     for (i = 0; i < NET_RETRANS_TYPE_MAX; i ++) {
         unity_set_value(line, i, net_title[i], values[i]);
     }
-
     return 0;
 }
 
@@ -101,9 +100,7 @@ void deinit(void)
     DESTORY_SKEL_BOJECT(net_retrans);
 }
 
-#define LOG_MAX 256
-static char log[LOG_MAX];
-
+#define LOG_MAX 1024
 static int transIP(unsigned long lip, char *result, int size) {
     inet_ntop(AF_INET, (void *) &lip, result, size);
     return 0;
@@ -169,6 +166,7 @@ static const char * resetActive(int stack_fd, struct data_t *e){
 int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
     char sip[32];
     char dip[32];
+    char log[LOG_MAX];
 
     transIP(e->ip_src, sip, 32);
     transIP(e->ip_dst, dip, 32);
@@ -182,30 +180,30 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
         case NET_RETRANS_TYPE_SYN:
         case NET_RETRANS_TYPE_SYN_ACK:
         {
-            char buf[LOG_MAX - 1];
-            snprintf(buf, LOG_MAX - 1, "rcv_nxt:%u, rcv_wup:%u, snd_nxt:%u, snd_una:%u, copied_seq:%u, "
+            char buf[LOG_MAX/2];
+            snprintf(buf, LOG_MAX/2, "rcv_nxt:%u, rcv_wup:%u, snd_nxt:%u, snd_una:%u, copied_seq:%u, "
                                    "snd_wnd:%u, rcv_wnd:%u, lost_out:%u, packets_out:%u, retrans_out:%u, "
                                    "sacked_out:%u, reordering:%u",
                      e->rcv_nxt, e->rcv_wup, e->snd_nxt, e->snd_una, e->copied_seq,
                      e->snd_wnd, e->rcv_wnd, e->lost_out, e->packets_out, e->retrans_out,
                      e->sacked_out, e->reordering
             );
-            strncat(log, buf, LOG_MAX -1);
+            strncat(log, buf, LOG_MAX - 1 - strlen(log));
         }
             break;
         case NET_RETRANS_TYPE_RST:
-            strncat(log, "noport", LOG_MAX - 1);
+            strncat(log, "noport", LOG_MAX - 1 - strlen(log));
             break;
         case NET_RETRANS_TYPE_RST_SK:
         {
             const char *type = resetSock(stack_fd, e);
-            strncat(log, type, LOG_MAX - 1);
+            strncat(log, type, LOG_MAX - 1 - strlen(log));
         }
             break;
         case NET_RETRANS_TYPE_RST_ACTIVE:
         {
             const char *type = resetActive(stack_fd, e);
-            strncat(log, type, LOG_MAX - 1);
+            strncat(log, type, LOG_MAX - 1 - strlen(log));
         }
             break;
         default:

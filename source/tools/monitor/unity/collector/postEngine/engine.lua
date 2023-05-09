@@ -15,11 +15,16 @@ local CexecBase = require("collector.postEngine.execBase")
 
 local Cengine = class("engine", CvProto)
 
+local diagExec = {
+    io_hang = {block = 60, time = 15, cmd = "../../../iosdiag"}
+}
+
 function Cengine:_init_(que, proto_q, fYaml, tid)
     CvProto._init_(self, CprotoData.new(que))
     self._fYaml = fYaml
     self._tid  = tid
     self._task = nil
+    self._diags = {}
 end
 
 function Cengine:setTask(taskMons)
@@ -40,6 +45,20 @@ function Cengine:pushTask(e, msgs)
             local second = res.second or 1
             local exec = CexecBase.new(execCmd, args, second)
             exec:addEvents(e)
+        elseif cmd == "diag" then
+            cmd = res.exec
+            local diag = diagExec[cmd]
+            if diag then
+                if self._diags[cmd] then
+                    print("cmd " .. cmd .. " is blocking.")
+                else
+                    local args = res.args
+                    local second = res.second or diag.time
+                    local exec = CexecBase.new(diag.cmd, args, second)
+                    exec:addEvents(e)
+                    self._diags[cmd] = diag.block
+                end
+            end
         end
     end
 end
@@ -56,11 +75,26 @@ function Cengine:proc(t, event, msgs)
     self:pushTask(event, msgs)
 end
 
+function Cengine:checkDiag()
+    local toDel = {}
+    for k, v in pairs(self._diags) do
+        if v > 0 then
+            self._diags[k] = v - 1
+        else
+            table.insert(toDel, k)
+        end
+    end
+    for _, k in ipairs(toDel) do
+        self._diags[k] = nil
+    end
+end
+
 function Cengine:work(t, event)
     local msgs = postQue.pull()
     if msgs then
         self:proc(t, event, msgs)
     end
+    self:checkDiag()
 end
 
 return Cengine
