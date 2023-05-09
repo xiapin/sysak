@@ -15,7 +15,8 @@
 #define PIDMAX_PATH "/proc/sys/kernel/pid_max"
 #define PROC_STAT_PATH "/proc/stat"
 
-enum sort_type { SORT_SYSTEM, SORT_USER, SORT_CPU };
+enum sort_type { SORT_SYSTEM, 
+SORT_USER, SORT_CPU };
 
 struct id_pair_t {
     pid_t pid;
