@@ -11,73 +11,13 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
-
-// #define DEBUG 1
-#define FILE_PATH_LEN 256
-#define MAX_COMM_LEN 16
-#define PEROID 3
-#define LIMIT 20
-#define BUF_SIZE 512
-#define DEBUG_LOG "./log/debug.log"
-#define PIDMAX_PATH "/proc/sys/kernel/pid_max"
-#define PROC_STAT_PATH "/proc/stat"
+#include "tasktop.h"
 
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
 time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
-
-enum sort_type { SORT_SYSTEM, SORT_USER, SORT_CPU };
-
-struct id_pair_t {
-    pid_t pid;
-    pid_t tid;
-};
-
-struct proc_stat_t {
-    int pid;
-    char comm[16];
-    char state;
-    int ppid;
-    int pgrp;
-    int session;
-    int tty_nr;
-    int tpgid;
-    unsigned int flags;
-    u_int64_t minflt;
-    u_int64_t cminflt;
-    u_int64_t majflt;
-    u_int64_t cmajflt;
-    u_int64_t utime;
-    u_int64_t stime;
-    int64_t cutime;
-    int64_t cstime;
-    int64_t priority;
-    int64_t nice;
-    int64_t num_threads;
-    int64_t itrealvalue;
-    unsigned long long starttime;
-};
-
-struct cpu_time_t {
-    int pid;
-    int ppid;
-    char comm[MAX_COMM_LEN];
-    u_int64_t stime;
-    u_int64_t utime;
-    u_int64_t starttime;
-};
-
-struct record_t {
-    u_int64_t pid;
-    u_int64_t ppid;
-    char comm[MAX_COMM_LEN];
-    time_t runtime;
-    double system_cpu_rate;
-    double user_cpu_rate;
-    double all_cpu_rate;
-};
 
 struct env {
     bool thread_mode;
@@ -250,17 +190,59 @@ cleanup:
     return err;
 }
 
-static void swap_cpu_time(struct cpu_time_t** lth, struct cpu_time_t** rth) {
-    struct cpu_time_t* tmp = *lth;
-    *lth = *rth;
-    *rth = tmp;
+int swap(void* lhs, void* rhs, size_t sz) {
+    void* temp = malloc(sz);
+    if (!temp) return -1;
+
+    memcpy(temp, lhs, sz);
+    memcpy(lhs, rhs, sz);
+    memcpy(rhs, temp, sz);
+
+    free(temp);
+
+    return 0;
 }
 
-static void swap_record(struct record_t** lth, struct record_t** rth) {
-    struct record_t* tmp = *lth;
-    *lth = *rth;
-    *rth = tmp;
-}
+static int read_stat(struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys,
+                     struct sys_record_t* sys_rec) {
+    int err = 0;
+    char buf[BUF_SIZE];
+    char* endptr;
+    long val;
+    FILE* fp = fopen(PROC_STAT_PATH, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed open stat file.\n");
+        err = errno;
+        goto cleanup;
+    }
+
+    /*now only read first line, maybe future will read more info*/
+    fscanf(fp, "%s %d %d %d %d %d %d %d %d %d %d\n", now_sys->cpu, &now_sys->usr, &now_sys->nice,
+           &now_sys->sys, &now_sys->idle, &now_sys->iowait, &now_sys->irq, &now_sys->softirq,
+           &now_sys->steal, &now_sys->guest, &now_sys->guest_nice);
+
+    if (prev_sys->usr == 0) goto cleanup;
+    int now_time = now_sys->usr + now_sys->sys + now_sys->nice + now_sys->idle + now_sys->iowait +
+                   now_sys->irq + now_sys->softirq + now_sys->steal + now_sys->guest +
+                   now_sys->guest_nice;
+    int prev_time = prev_sys->usr + prev_sys->sys + prev_sys->nice + prev_sys->idle +
+                    prev_sys->iowait + prev_sys->irq + prev_sys->softirq + prev_sys->steal +
+                    prev_sys->guest + prev_sys->guest_nice;
+    int all_time = now_time - prev_time;
+    // int all_time = (sysconf(_SC_NPROCESSORS_ONLN) * env.delay * sysconf(_SC_CLK_TCK));
+
+    /* all_time can't not calculate by delay * ticks * online-cpu-num, because there is error
+     * between process waked up and running, when sched delay occur , the sum of cpu rates more than
+     * 100%. */
+
+    sys_rec->usr = (double)(now_sys->usr - prev_sys->usr) * 100 / all_time;
+    sys_rec->sys = (double)(now_sys->sys - prev_sys->sys) * 100 / all_time;
+    sys_rec->iowait = (double)(now_sys->iowait - prev_sys->iowait) * 100 / all_time;
+
+cleanup:
+    if (fp) fclose(fp);
+    return err;
+};
 
 static u_int64_t read_pid_max() {
     int err = 0;
@@ -346,11 +328,11 @@ cleanup:
     return err;
 }
 
-static int read_proc(pid_t pid, pid_t tid, struct cpu_time_t** prev, struct cpu_time_t** now,
-                     struct record_t** rec) {
+static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
+                     struct task_cputime_t** now, struct task_record_t** rec) {
     struct proc_stat_t proc_info;
     char proc_path[FILE_PATH_LEN];
-    struct cpu_time_t* data;
+    struct task_cputime_t* data;
     FILE* fp = 0;
     int err = 0;
 
@@ -362,7 +344,7 @@ static int read_proc(pid_t pid, pid_t tid, struct cpu_time_t** prev, struct cpu_
     }
 
     if (!now[pid]) {
-        now[pid] = calloc(1, sizeof(struct cpu_time_t));
+        now[pid] = calloc(1, sizeof(struct task_cputime_t));
         if (!now[pid]) {
             fprintf(stderr, "Failed calloc memory.\n");
             err = errno;
@@ -409,7 +391,7 @@ static int read_proc(pid_t pid, pid_t tid, struct cpu_time_t** prev, struct cpu_
         if (base != 0) {
             /* only process cpu utilization > 0 */
             if (udelta + sdelta > 0) {
-                *rec = calloc(1, sizeof(struct record_t));
+                *rec = calloc(1, sizeof(struct task_record_t));
                 (*rec)->pid = now[pid]->pid;
                 (*rec)->ppid = now[pid]->ppid;
                 (*rec)->runtime = run_time;
@@ -426,7 +408,8 @@ cleanup:
     return err;
 }
 
-static void sort_records(struct record_t** records, int proc_num, enum sort_type sort) {
+static void sort_records(struct record_t* rec, int proc_num, enum sort_type sort) {
+    struct task_record_t** records = rec->tasks;
     int i, j;
     for (i = 0; i < proc_num; i++) {
         for (j = i + 1; j < proc_num; j++) {
@@ -435,7 +418,7 @@ static void sort_records(struct record_t** records, int proc_num, enum sort_type
             } else if (records[i] && !records[j]) {
                 continue;
             } else if (!records[i] && records[j]) {
-                swap_record(&records[i], &records[j]);
+                swap(&records[i], &records[j], sizeof(struct task_record_t*));
             } else {
                 double lth, rth;
                 switch (sort) {
@@ -457,14 +440,15 @@ static void sort_records(struct record_t** records, int proc_num, enum sort_type
                 }
 
                 if (lth < rth) {
-                    swap_record(&records[i], &records[j]);
+                    swap(&records[i], &records[j], sizeof(struct task_record_t*));
                 }
             }
         }
     }
 }
 
-static void output(struct record_t** records, int proc_num, FILE* dest) {
+static void output(struct record_t* rec, int proc_num, FILE* dest) {
+    struct task_record_t** records = rec->tasks;
     system("clear");
     time_t now = time(0);
     struct tm* t;
@@ -472,6 +456,12 @@ static void output(struct record_t** records, int proc_num, FILE* dest) {
     char time_str[BUF_SIZE];
     int i;
     strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
+
+    fprintf(dest, "%8s %6s %6s %6s %6s %6s %6s \n", "System", "usr", "sys", "iowait", "R", "D",
+            "fork");
+    fprintf(dest, "%8s %6.1f %6.1f %6d %6d %6d\n", "", rec->sys.usr, rec->sys.sys,
+            rec->sys.iowait, rec->sys.nr_R, rec->sys.nr_D, rec->sys.nr_fork);
+
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
 
@@ -482,27 +472,29 @@ static void output(struct record_t** records, int proc_num, FILE* dest) {
         }
 
         if (i >= env.limit) break;
-        fprintf(dest, "%18s %6d %6d %10d %6.2f %6.2f %6.2f\n", records[i]->comm, records[i]->pid,
+        fprintf(dest, "%18s %6d %6d %10d %6.1f %6.1f %6.1f\n", records[i]->comm, records[i]->pid,
                 records[i]->ppid, records[i]->runtime, records[i]->user_cpu_rate,
                 records[i]->system_cpu_rate, records[i]->all_cpu_rate);
     }
     fflush(dest);
 }
 
-static void clean_prev_table(int pidmax, struct cpu_time_t** prev, struct cpu_time_t** now) {
+static void clean_prev_table(int pidmax, struct task_cputime_t** prev,
+                             struct task_cputime_t** now) {
     int i;
     for (i = 0; i < pidmax; i++) {
         if (prev[i]) free(prev[i]);
     }
 }
 
-static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax, struct cpu_time_t** prev,
-                        struct cpu_time_t** now) {
+static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
+                        struct task_cputime_t** prev_task, struct task_cputime_t** now_task,
+                        struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys) {
     int i;
     for (i = 0; i < pidmax; i++) {
-        if (prev[i]) {
-            free(prev[i]);
-            prev[i] = NULL;
+        if (prev_task[i]) {
+            free(prev_task[i]);
+            prev_task[i] = NULL;
         }
     }
 
@@ -512,13 +504,16 @@ static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax, struct
             pid = pids[i].tid;
         else
             pid = pids[i].pid;
-        swap_cpu_time(&prev[pid], &now[pid]);
+        swap(&prev_task[pid], &now_task[pid], sizeof(struct task_cputime_t*));
     }
+
+    swap(prev_sys, now_sys, sizeof(struct sys_cputime_t));
 }
 
-static int make_records(struct id_pair_t* pids, int proc_num, struct record_t*** res,
-                        struct cpu_time_t** prev, struct cpu_time_t** now) {
-    struct record_t** records = *res;
+static int make_records(struct id_pair_t* pids, int proc_num, struct record_t* rec,
+                        struct task_cputime_t** prev_task, struct task_cputime_t** now_task,
+                        struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys) {
+    struct task_record_t** records = rec->tasks;
     int err = 0;
     u_int64_t i;
     for (i = 0; i < proc_num; i++) {
@@ -532,17 +527,19 @@ static int make_records(struct id_pair_t* pids, int proc_num, struct record_t***
             }
         }
 
-        err = read_proc(id->pid, id->tid, prev, now, &records[i]);
+        err = read_proc(id->pid, id->tid, prev_task, now_task, &records[i]);
         if (err) {
             fprintf(stderr, "Failed read proc\n");
             return err;
         }
     }
+    read_stat(prev_sys, now_sys, &rec->sys);
 
     return err;
 }
 
-static void free_records(struct record_t** records, int proc_num) {
+static void free_records(struct record_t* rec, int proc_num) {
+    struct task_record_t** records = rec->tasks;
     int i;
     for (i = 0; i < proc_num; i++) {
         if (records[i]) free(records[i]);
@@ -565,8 +562,9 @@ int main(int argc, char** argv) {
     int err = 0;
     FILE* stat_log;
     struct id_pair_t* pids;
-    struct cpu_time_t **prev, **now;
-
+    struct task_cputime_t **prev_task, **now_task;
+    struct sys_cputime_t *prev_sys, *now_sys;
+    struct record_t* rec;
     static const struct argp argp = {
         .options = opts,
         .parser = parse_arg,
@@ -591,10 +589,13 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
+    rec = calloc(1, sizeof(struct record_t));
     pids = calloc(pidmax, sizeof(struct id_pair_t));
-    prev = calloc(pidmax, sizeof(struct cpu_time_t*));
-    now = calloc(pidmax, sizeof(struct cpu_time_t*));
-    if (!prev || !now) {
+    prev_task = calloc(pidmax, sizeof(struct task_cputime_t*));
+    now_task = calloc(pidmax, sizeof(struct task_cputime_t*));
+    prev_sys = calloc(1, sizeof(struct sys_cputime_t));
+    now_sys = calloc(1, sizeof(struct sys_cputime_t));
+    if (!prev_task || !now_task) {
         err = errno;
         fprintf(stderr, "Failed calloc prev and now\n");
         goto cleanup;
@@ -608,18 +609,7 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
-/* debug for test the program performance */
-#ifdef DEBUG
-    FILE* debug_fp = fopen(DEBUG_LOG, "w");
-    if (!debug_fp) fprintf(stderr, "Failed open debug log file.\n");
-#endif
-
     while (env.nr_iter--) {
-#ifdef DEBUG
-        struct timeval start, end;
-        err = gettimeofday(&start, 0);
-        if (err) fprintf(stderr, "Failed get time.\n");
-#endif
         /* get all process now */
         u_int64_t proc_num;
         err = read_all_pids(pids, &proc_num);
@@ -627,51 +617,43 @@ int main(int argc, char** argv) {
             fprintf(stderr, "Failed read all pids.\n");
             goto cleanup;
         }
-        struct record_t** records = calloc(proc_num, sizeof(struct recotd_t*));
+        rec->tasks = calloc(proc_num, sizeof(struct task_record_t*));
         /* if prev process info exist produce record*/
-        err = make_records(pids, proc_num, &records, prev, now);
+        err = make_records(pids, proc_num, rec, prev_task, now_task, prev_sys, now_sys);
         if (err) {
             fprintf(stderr, "Failed make records.\n");
             goto cleanup;
         }
 
         /* sort record by sort type */
-        sort_records(records, proc_num, env.rec_sort);
+        sort_records(rec, proc_num, env.rec_sort);
 
         /* output record */
-        output(records, proc_num, stat_log);
+        output(rec, proc_num, stat_log);
 
-        free_records(records, proc_num);
+        free_records(rec, proc_num);
 
         /* update old info and free nonexist process info */
-        now_to_prev(pids, proc_num, pidmax, prev, now);
+        now_to_prev(pids, proc_num, pidmax, prev_task, now_task, prev_sys, now_sys);
 
-#ifdef DEBUG
-        err = gettimeofday(&end, 0);
-        if (err) fprintf(stderr, "Failed get time.\n");
-        suseconds_t interval = end.tv_usec - start.tv_usec;
-        fprintf(debug_fp, "scan %d process, time=%d us(%.3f ms)\n", proc_num, interval,
-                (double)interval / 1000);
-        fflush(debug_fp);
-#endif
         if (env.nr_iter) sleep(env.delay);
     }
 
 cleanup:
     if (pids) free(pids);
     u_int64_t i;
-    if (prev) {
+    if (prev_task) {
         for (0; i < pidmax; i++) {
-            if (prev[i]) free(prev[i]);
+            if (prev_task[i]) free(prev_task[i]);
         }
-        free(prev);
+        free(prev_task);
     }
 
-    if (now) {
+    if (now_task) {
         for (i = 0; i < pidmax; i++) {
-            if (now[i]) free(now[i]);
+            if (now_task[i]) free(now_task[i]);
         }
-        free(now);
+        free(now_task);
     }
 
     if (stat_log) fclose(stat_log);
