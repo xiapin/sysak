@@ -26,7 +26,10 @@ outline:
 
 container:
   mode: "pods"
-  luaPlugin: ["cg_cpu_stat_sample", "cg_cpuacct_stat"]
+  #"cg_cpuacct_stat" is a substitute of cg_cpuacct_proc_stat
+  luaPlugin: ["cg_cpu_stat", "cg_cpuacct_proc_stat", "cg_cpuacct_wait_latency",
+              "cg_memory_dcmp_latency", "cg_memory_drcm_latency", "cg_memory_fail_cnt", "cg_memory_util",
+              "cg_pmu_events"]
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -258,38 +261,43 @@ metrics:
     head: value
     help: "pmu events of percpu"
     type: "gauge"
+  - title: sysak_cg_memory_util
+    from: cg_memory_util
+    head: value
+    help: "sysak_cg_memory_util"
+    type: "gauge"
   - title: sysak_cg_memfail_cnt
     from: cg_memfail_cnt
     head: value
-    help: "sysak_cg_memFail_cnt"
+    help: "sysak_cg_memfail_cnt"
     type: "gauge"
-  - title: sysak_cg_memdrcm_latency
+  - title: sysak_cg_mem_drcm_latency
     from: cg_memdrcm_latency
     head: value
-    help: "sysak_cg_memdrcm_latency"
+    help: "sysak_cg_mem_drcm_latency"
     type: "gauge"
-  - title: sysak_cg_memmcmp_latency
-    from: cg_memmcmp_latency
+  - title: sysak_cg_mem_dcmp_latency
+    from: cg_memdcmp_latency
     head: value
-    help: "sysak_cg_memmcmp_latency"
+    help: "sysak_cg_mem_dcmp_latency"
     type: "gauge"
-  - title: sysak_cg_wait_latency
+  - title: sysak_cg_cpuacct_wait_latency
     from: cg_wait_latency
     head: value
-    help: "sysak_cg_wait_latency"
+    help: "sysak_cg_cpuacct_wait_latency"
     type: "gauge"
   - title: sysak_cg_cpuacct_proc_stat
     from: cg_cpuacct_proc_stat
     head: value
     help: "sysak_cg_cpuacct_proc_stat"
     type: "gauge"
+#  - title: sysak_cg_cpuacct_stat
+#    from: cg_cpuacct_stat
+#    head: value
+#    help: "sysak_cg_cpuacct_stat, this is substitute of cg_cpuacct_proc_stat"
+#    type: "gauge"
   - title: sysak_cg_cpu_stat
     from: cg_cpu_stat
     head: value
     help: "sysak_cg_cpu_stat"
-    type: "gauge"
-  - title: sysak_cg_cpuacct_stat
-    from: cg_cpuacct_stat
-    head: value
-    help: "cpuacct/cpuacct.stat"
     type: "gauge"

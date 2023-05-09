@@ -37,7 +37,7 @@ function CgMemDcmpLatency:proc(elapsed, lines)
         }
         c = c + 1
     end
-    self:appendLine(self:_packProto("cg_memmcmp_latency", self.ls, values))
+    self:appendLine(self:_packProto("cg_memdcmp_latency", self.ls, values))
     self:push(lines)
 end
 

@@ -12,7 +12,7 @@ local dfile = "/cpuacct.proc_stat"
 local procstat = "proc/stat"
 local system = require("common.system")
 
-local CgProcStat = class("cg_proc_stat", CvProc)
+local CgProcStat = class("cg_cpuacct_proc_stat", CvProc)
 
 --ls{}, (pod_name and docker_name
 function CgProcStat:_init_(proto, pffi, mnt, path, ls)
@@ -111,7 +111,7 @@ function CgProcStat:proc(elapsed, lines)
 	name = "total",
 	value = tonumber((self.conTotal*100.0)/self.hostCpuSum)
 	}
-    self:appendLine(self:_packProto("cg_proc_stat", self.ls, values))
+    self:appendLine(self:_packProto("cg_cpuacct_proc_stat", self.ls, values))
     self:push(lines)
 end
 
