@@ -6,7 +6,7 @@ local dfile = "/cpuacct.stat"
 local procstat = "proc/stat"
 local system = require("common.system")
 
-local CgCpuacctStat = class("cg_proc_stat", CvProc)
+local CgCpuacctStat = class("cg_cpuacct_stat", CvProc)
 
 --ls{}, (pod_name and docker_name
 function CgCpuacctStat:_init_(proto, pffi, mnt, path, ls)
