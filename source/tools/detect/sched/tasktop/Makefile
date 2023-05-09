@@ -1,6 +1,8 @@
+
+newdirs := $(shell find ./ -type d)
+
+bpfsrcs := $(wildcard bpf/*.bpf.c)
+csrcs := $(wildcard *.c)
 target := tasktop
-mods := tasktop.o
 
-# LDFLAGS += -lpthread
-
-include $(SRC)/mk/csrc.mk
+include $(SRC)/mk/bpf.mk

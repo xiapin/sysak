@@ -1,4 +1,8 @@
 // #define DEBUG 1
+#ifndef __TASKTOP_H
+#define __TASKTOP_H
+#include <sys/types.h>
+
 #define FILE_PATH_LEN 256
 #define MAX_COMM_LEN 16
 #define PEROID 3
@@ -65,8 +69,8 @@ struct sys_cputime_t {
 };
 
 struct task_record_t {
-    u_int64_t pid;
-    u_int64_t ppid;
+    int pid;
+    int ppid;
     char comm[MAX_COMM_LEN];
     time_t runtime;
     double system_cpu_rate;
@@ -74,10 +78,12 @@ struct task_record_t {
     double all_cpu_rate;
 };
 
+
 struct sys_record_t {
     double usr;
     double sys;
     double iowait;
+    float load1;
     int nr_R;
     int nr_D;
     int nr_fork;
@@ -87,3 +93,5 @@ struct record_t {
     struct task_record_t **tasks;
     struct sys_record_t sys;
 };
+
+#endif
