@@ -26,7 +26,9 @@ outline:
 
 container:
   mode: "pods"
-  luaPlugin: ["cg_cpu_stat_sample", "cg_cpuacct_stat"]
+  luaPlugin: ["cg_cpu_stat", "cg_cpuacct_stat", "cg_cpuacct_proc_stat", "cg_cpuacct_wait_latency",
+              "cg_memory_dcmp_latency", "cg_memory_drcm_latency", "cg_memory_fail_cnt", "cg_memory_util",
+              "cg_pmu_events"]
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -258,10 +260,15 @@ metrics:
     head: value
     help: "pmu events of percpu"
     type: "gauge"
+  - title: sysak_cg_memory_util
+    from: cg_memory_util
+    head: value
+    help: "sysak_cg_memory_util"
+    type: "gauge"
   - title: sysak_cg_memfail_cnt
     from: cg_memfail_cnt
     head: value
-    help: "sysak_cg_memFail_cnt"
+    help: "sysak_cg_memfail_cnt"
     type: "gauge"
   - title: sysak_cg_memdrcm_latency
     from: cg_memdrcm_latency
