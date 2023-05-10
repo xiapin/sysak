@@ -112,24 +112,25 @@ static bool allow_record(struct task_struct *t)
 	return true;
 }
 
+struct sched_switch_tp_args {
+	struct trace_entry ent;
+	char prev_comm[16];
+	pid_t prev_pid;
+	int prev_prio;
+	long int prev_state;
+	char next_comm[16];
+	pid_t next_pid;
+	int next_prio;
+	char __data[0];
+};
 
-#define task_pt_regs(task) \
-({                                                                      \
-        unsigned long __ptr = (unsigned long)(task->tack);     \
-        __ptr += THREAD_SIZE - 0;             \
-        ((struct pt_regs *)__ptr) - 1;                                  \
-})
-
-
-
-SEC("raw_tracepoint/sched_switch")
-//SEC("kprobe/context_switch")
-//int BPF_KPROBE(account_process_tick, struct task_struct *p, int user_tick)
-int raw_tp__sched_switch(struct bpf_raw_tracepoint_args *ctx)
+//SEC("raw_tracepoint/sched_switch")
+//int raw_tp__sched_switch(struct bpf_raw_tracepoint_args *ctx)
+SEC("tp/sched/sched_switch")
+int tp__sched_switch(struct sched_switch_tp_args *ctx)
 {
-	bool preempt = (bool)ctx->args[0];
-	struct task_struct *prev = (void *)ctx->args[1];
-	struct task_struct *next = (void *)ctx->args[2];
+	struct task_struct *prev = (void *)bpf_get_current_task();
+	//struct task_struct *next = (void *)ctx->args[2];
 	struct internal_key *i_keyp, i_key;
 	struct val_t *valp, val;
 	s64 delta;
@@ -164,7 +165,8 @@ int raw_tp__sched_switch(struct bpf_raw_tracepoint_args *ctx)
 		bpf_map_update_elem(&info, &i_key.key, &val, BPF_NOEXIST);
 	}
 
-	pid = _(next->pid);
+	//pid = _(next->pid);
+	pid = ctx->next_pid;
 	i_keyp = bpf_map_lookup_elem(&start, &pid);
 	if (!i_keyp)
 		return 0;
