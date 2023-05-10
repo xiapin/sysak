@@ -199,10 +199,9 @@ void deinit(void)
 }
 
 #define LOG_MAX 4096
-static char log[LOG_MAX];
-
 int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
     int i;
+    char log[LOG_MAX] = {'\0'};
     unsigned long addr[128];
     int id = e->stack_id;  //last stack
     struct ksym_cell* cell;

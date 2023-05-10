@@ -17,41 +17,120 @@ function CprocSnmpStat:_init_(proto, pffi, mnt, pFile)
     self._rec = nil
 end
 
-function CprocSnmpStat:retransRate(titles, values)
+local ipHeads = {"InReceives", "OutRequests"}
+function CprocSnmpStat:ipCount(titles, values)
+    local vs = {}
     for i = 1, titles.no do
         local cell = self._ffi.string(titles.s[i])
-        if cell == "OutSegs" then
-            self._outSegs = tonumber(values.value[i - 1])
-        elseif cell == "RetransSegs" then
-            self._retransSegs = tonumber(values.value[i - 1])
+        if cell == "Forwarding" then
+            table.insert(vs, {name = cell, value = tonumber(values.value[i - 1])})
+        elseif system:valueIsIn(ipHeads, cell) then
+            local name = "v_ip" .. cell
+            local v = tonumber(values.value[i - 1])
+            if self[name] then
+                table.insert(vs, {name = cell, value = v - self[name]})
+            end
+            self[name] = v
         end
     end
+    self:appendLine(self:_packProto("net_ip_count", nil, vs))
+end
 
-    if self._lastOutSegs then
-        local segs = self._outSegs - self._lastOutSegs
-        local rate = 0
-        local retrans = 0
-        if segs > 0 then
-            retrans = self._retransSegs - self._lastRetransSegs
-            rate = (self._retransSegs - self._lastRetransSegs) / segs * 100.0
+local icmpHeads = {"InMsgs", "InErrors", "OutMsgs", "OutErrors"}
+function CprocSnmpStat:icmpCount(titles, values)
+    local vs = {}
+    for i = 1, titles.no do
+        local cell = self._ffi.string(titles.s[i])
+        if system:valueIsIn(icmpHeads, cell) then
+            local name = "v_icmp" .. cell
+            local v = tonumber(values.value[i - 1])
+            if self[name] then
+                table.insert(vs, {name = cell, value = v - self[name]})
+            end
+            self[name] = v
         end
-        local vs = {
-            { name = "rate", value = rate},
-            { name = "segs", value = segs},
-            { name = "retrans", value = retrans}
-        }
-        self:appendLine(self:_packProto("retrans", nil, vs))
     end
-    self._lastOutSegs = self._outSegs
-    self._lastRetransSegs = self._retransSegs
+    if #vs > 0 then
+        self:appendLine(self:_packProto("net_icmp_count", nil, vs))
+    end
+end
+
+local udpHeads = {"InDatagrams", "InErrors", "OutDatagrams",
+                    "RcvbufErrors", "SndbufErrors", "NoPorts"}
+function CprocSnmpStat:udpCount(titles, values)
+    local vs = {}
+    for i = 1, titles.no do
+        local cell = self._ffi.string(titles.s[i])
+        if system:valueIsIn(udpHeads, cell) then
+            local name = "v_udp" .. cell
+            local v = tonumber(values.value[i - 1])
+            if self[name] then
+                table.insert(vs, {name = cell, value = v - self[name]})
+            end
+            self[name] = v
+        end
+    end
+    if #vs > 0 then
+        self:appendLine(self:_packProto("net_udp_count", nil, vs))
+    end
+end
+
+local tcpHeads = {"InSegs", "OutMsgs", "RetransSegs", "InErrs", "CurrEstab"}
+function CprocSnmpStat:tcpCount(titles, values)
+    local vs = {}
+    for i = 1, titles.no do
+        local cell = self._ffi.string(titles.s[i])
+        if system:valueIsIn(tcpHeads, cell) then
+            local name = "v_tcp" .. cell
+            local v = tonumber(values.value[i - 1])
+            if self[name] then
+                table.insert(vs, {name = cell, value = v - self[name]})
+            end
+            self[name] = v
+        end
+    end
+    if #vs > 0 then
+        self:appendLine(self:_packProto("net_tcp_count", nil, vs))
+    end
+end
+
+local tcpExtHeads = {"TCPSynRetrans", "ListenDrops", "ListenOverflows",
+                     "SyncookiesSent", "SyncookiesRecv", "SyncookiesFailed",
+                     "ActiveOpens", "PassiveOpens"}
+function CprocSnmpStat:tcpExtCount(titles, values)
+    local vs = {}
+    for i = 1, titles.no do
+        local cell = self._ffi.string(titles.s[i])
+        if system:valueIsIn(tcpExtHeads, cell) then
+            local name = "v_tcpExt" .. cell
+            local v = tonumber(values.value[i - 1])
+            if self[name] then
+                table.insert(vs, {name = cell, value = v - self[name]})
+            end
+            self[name] = v
+        end
+    end
+    if #vs > 0 then
+        self:appendLine(self:_packProto("net_tcp_ext_count", nil, vs))
+    end
 end
 
 function CprocSnmpStat:createTable(titles, values, now)
     local head = string.gsub(self._ffi.string(titles.s[0]), ":", "")
     assert(self._ffi.string(titles.s[0]), self._ffi.string(values.s))
+
     if head == "Tcp" then
-        self:retransRate(titles, values)
+        self:tcpCount(titles, values)
+    elseif head == "Udp" then
+        self:udpCount(titles, values)
+    elseif head == "Ip" then
+        self:ipCount(titles, values)
+    elseif head == "Icmp" then
+        self:icmpCount(titles, values)
+    elseif head == "TcpExt" then
+        self:tcpExtCount(titles, values)
     end
+
     for i = 1, titles.no do
         local cell = self._ffi.string(titles.s[i])
         local low = string.lower(cell)

@@ -10,6 +10,7 @@ local ChttpCli = require("httplib.httpCli")
 
 local cli = ChttpCli.new()
 local url = "http://127.0.0.1:8400/api/trig"
-local req = {cmd = "diag", exec = "io_hang", args = {"hangdetect", "vda"}}
+--local req = {cmd = "diag", exec = "io_hang", args = {"hangdetect", "vda"}}
+local req = {cmd = "diag", exec = "net_edge", args = {"hangdetect", "vda"}}
 local res = cli:postTable(url, req)
 system:dumps(res)

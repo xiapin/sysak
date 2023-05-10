@@ -12,11 +12,11 @@ local pystring = require("common.pystring")
 local system = require("common.system")
 local cjson = require("cjson.safe")
 local CexecBase = require("collector.postEngine.execBase")
-
 local Cengine = class("engine", CvProto)
 
 local diagExec = {
-    io_hang = {block = 60, time = 15, cmd = "../../../iosdiag"}
+    io_hang = {block = 60, time = 15, cmd = "../../../iosdiag"},
+    net_edge = {block = 5 * 60, time = 60, so = {virtiostat = 5 * 3}},
 }
 
 function Cengine:_init_(que, proto_q, fYaml, tid)
@@ -27,8 +27,28 @@ function Cengine:_init_(que, proto_q, fYaml, tid)
     self._diags = {}
 end
 
+function Cengine:setMainloop(main)
+    self._main = main
+end
+
 function Cengine:setTask(taskMons)
     self._task = taskMons
+end
+
+function Cengine:run(e, res, diag)
+    local args = res.args
+    local second = res.second or diag.time
+    if diag.cmd then
+        local exec = CexecBase.new(diag.cmd, args, second)
+        exec:addEvents(e)
+    end
+    local so = diag.so
+    if so then
+        for plugin, loop in pairs(so) do
+            self._main.soPlugins:add(plugin, loop)
+        end
+    end
+    self._diags[res.exec] = diag.block
 end
 
 function Cengine:pushTask(e, msgs)
@@ -46,17 +66,13 @@ function Cengine:pushTask(e, msgs)
             local exec = CexecBase.new(execCmd, args, second)
             exec:addEvents(e)
         elseif cmd == "diag" then
-            cmd = res.exec
-            local diag = diagExec[cmd]
+            local exec = res.exec
+            local diag = diagExec[exec]
             if diag then
-                if self._diags[cmd] then
-                    print("cmd " .. cmd .. " is blocking.")
+                if self._diags[exec] then
+                    print("cmd " .. exec .. " is blocking.")
                 else
-                    local args = res.args
-                    local second = res.second or diag.time
-                    local exec = CexecBase.new(diag.cmd, args, second)
-                    exec:addEvents(e)
-                    self._diags[cmd] = diag.block
+                    self:run(e, res, diag)
                 end
             end
         end

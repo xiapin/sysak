@@ -18,21 +18,30 @@ int init(void *arg)
     return ret;
 }
 
-void walk_virtio(void) {
+#define BUF_MAX 128
+#define LOG_MAX 4096
+void walk_virtio(struct unity_lines *lines) {
+    struct unity_line *line;
     unsigned long key, next;
     struct virtio_stat stat;
+    char log[LOG_MAX] = {'\0'};
 
     key = 0;
     while (coobpf_key_next(stats_fd, &key, &next) == 0) {
+        char buf[BUF_MAX];
         bpf_map_lookup_elem(stats_fd, &next, &stat);
         key = next;
-        printf("driver:%s dev:%s, name:%s, in:%d, out:%d\n", stat.driver, stat.dev, stat.vqname, stat.in_sgs, stat.out_sgs);
+        snprintf(buf, BUF_MAX, "driver:%s,dev:%s,name:%s,in:%d,out:%d;", stat.driver, stat.dev, stat.vqname, stat.in_sgs, stat.out_sgs);
+        strncat(log, buf, LOG_MAX - 1 - strlen(log));
     }
+    unity_alloc_lines(lines, 1);
+    line = unity_get_line(lines, 0);
+    unity_set_table(line, "virtios");
+    unity_set_log(line, "log", log);
 }
 
 int call(int t, struct unity_lines *lines) {
-    printf("call 2.\n");
-    walk_virtio();
+    walk_virtio(lines);
     return 0;
 }
 
