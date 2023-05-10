@@ -1,0 +1,21 @@
+[package]
+name = "bpfskel"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+syn = "1.0"
+quote = "1.0"
+anyhow = "1.0.57"
+paste = "1.0"
+structopt = "0.3.26"
+libbpf-cargo = "0.13"
+libbpf-rs = "0.19"
+libbpf-sys = { version = "1.0.3" }
+memmap2 = "0.5"
+scroll = "0.11"
+scroll_derive = "0.11"
+num_enum = "0.5"
+tempfile = "3.3.0"

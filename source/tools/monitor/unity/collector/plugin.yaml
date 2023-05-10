@@ -1,0 +1,223 @@
+config:
+  freq: 20   # unit second
+  port: 8400  # bind port
+  bind_addr: 0.0.0.0 # bind ip
+  backlog: 32  # listen backlog
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+    mode: curl
+    url: "http://100.100.100.200/latest/meta-data/instance-id"
+#    name: test_specify
+#    mode: hostip
+#  real_timestamps: true
+#  unix_socket: "/tmp/sysom_unity.sock"
+  proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+#  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  db:
+    rotate: 7  # tsdb file retention time, unit day
+    budget: 200 # max query buffer from tsdb.
+
+outline:
+  - /tmp/sysom
+
+container:
+  mode: "pods"
+  luaPlugin: ["cg_cpuacct_proc_stat", "cg_memory_dcmp_latency",  "cg_memory_fail_cnt",
+    "cg_cpu_stat",  "cg_cpuacct_wait_latency",  "cg_memory_drcm_latency"]
+
+luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
+            "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
+             "proc_uptime"]
+
+plugins:
+  - so: kmsg
+    description: "collect dmesg info."
+  -
+    so: sample
+    description: "just a example."
+  -
+    so: sample_threads
+    description: "threads example."
+  -
+    so: bpfsample2
+    description: "bpf threads example."
+
+  -
+    so: proc_schedstat
+    description: "collect schedule stat info of percpu"
+  -
+    so: proc_loadavg
+    description: "collect load avg"
+
+  -
+    so: unity_nosched
+    description: "nosched:sys hold cpu and didn't scheduling"
+  - so: net_health
+    description: "tcp net health."
+  - so: net_retrans
+    description: "tcp retrans monitor."
+  -
+    so: unity_irqoff
+    description: "irqoff:detect irq turned off and can't response"
+  #-
+  #  so: numainfo
+  #  description: "collect numainfo"
+  # -
+  #   so: cpufreq
+  #   description: "collect cpufreq"
+  -
+    so: gpuinfo
+    description: "collect gpuinfo"
+
+metrics:
+  -
+    title: sysak_proc_cpu_total
+    from: cpu_total
+    head: mode
+    help: "cpu usage info for total."
+    type: "gauge"
+  - title: sysak_proc_cpus
+    from: cpus
+    head: mode
+    help: "cpu usage info for per-cpu."
+    type: "gauge"
+  - title: sysak_proc_sirq
+    from: sirq
+    head: type
+    help: "system soft irq times."
+    type: "gauge"
+  - title: sysak_proc_stat_counters
+    from: stat_counters
+    head: counter
+    help: "system state counter."
+    type: "gauge"
+  - title: sysak_proc_meminfo
+    from: meminfo
+    head: value
+    help: "meminfo from /proc/meminfo."
+    type: "gauge"
+  - title: sysak_proc_vmstat
+    from: vmstat
+    head: value
+    help: "vmstat info from /proc/vmstat."
+    type: "gauge"
+  - title: sysak_proc_self_statm
+    from: self_statm
+    head: value
+    help: "statm info from /proc/self/statm."
+    type: "gauge"
+  - title: sysak_proc_networks
+    from: networks
+    head: counter
+    help: "networks info from /proc/net/dev."
+    type: "gauge"
+  - title: sysak_proc_disks
+    from: disks
+    head: counter
+    help: "disk info from /proc/diskstats."
+    type: "gauge"
+  - title: sysak_proc_pkt_status
+    from: pkt_status
+    head: counter
+    help: "net status info from /proc/net/snmp and /proc/net/status."
+    type: "gauge"
+  - title: sysak_fs_stat
+    from: fs_stat
+    head: counter
+    help: "file system information."
+    type: "gauge"
+  - title: sysak_sock_stat
+    from: sock_stat
+    head: value
+    help: "sock stat counters from /proc/net/sockstat"
+    type: "gauge"
+  - title: sysak_sample_tbl1
+    from: sample_tbl1
+    head: value
+    help: "example1 for develop."
+    type: "gauge"
+  - title: sysak_sample_tbl2
+    from: sample_tbl2
+    head: value
+    help: "example2 for develop."
+    type: "gauge"
+  - title: sysak_sample_bpfsample2
+    from: bpfsample2
+    head: value
+    help: "example for bpfsample2"
+    type: "gauge"
+  - title: sysak_proc_schedstat
+    from: proc_schedstat
+    head: value
+    help: "schedule state of percpu."
+    type: "gauge"
+  - title: sysak_proc_loadavg
+    from: proc_loadavg
+    head: value
+    help: "loadavg of system from /proc/loadavg"
+    type: "gauge"
+  - title: sysak_proc_buddyinfo
+    from: buddyinfo
+    head: value
+    help: "buddyinfo of system from /proc/buddyinfo"
+    type: "gauge"
+  - title: sysak_IOMonIndForDisksIO
+    from: IOMonIndForDisksIO
+    head: value
+    help: "Disk IO indicators and abnormal events"
+    type: "gauge"
+  - title: sysak_IOMonIndForSystemIO
+    from: IOMonIndForSystemIO
+    head: value
+    help: "System indicators and abnormal events about IO"
+    type: "gauge"
+  - title: sysak_IOMonDiagLog
+    from: IOMonDiagLog
+    head: value
+    help: "Diagnose log for IO exception"
+    type: "gauge"
+  - title: sched_moni_jitter
+    from: sched_moni_jitter
+    head: value
+    help: "nosched/irqoff:sys and irqoff hold cpu and didn't scheduling"
+    type: "gauge"
+  - title: sysak_cpu_dist
+    from: cpu_dist
+    head: value
+    help: "task cpu sched dist."
+    type: "gauge"
+  - title: sysak_net_health_hist
+    from: net_health_hist
+    head: value
+    help: "net_health_hist"
+    type: "gauge"
+  - title: sysak_net_health_count
+    from: net_health_count
+    head: value
+    help: "net_health_count"
+    type: "gauge"
+  - title: sysak_net_retrans_count
+    from: net_retrans_count
+    head: value
+    help: "net_retrans_count"
+    type: "gauge"
+  #- title: sysak_numainfo
+  #  from: numainfo
+  #  head: value
+  #  help: "numainfo of system from /sys/devices/system/"
+  #  type: "gauge"
+  # - title: sysak_proc_cpufreq
+  #   from: cpufreq
+  #   head: value
+  #   help: "cpufreq of system from /proc/cpuinfo"
+  #   type: "gauge"
+  - title: sysak_gpuinfo
+    from: gpuinfo
+    head: value
+    help: "gpuinfo of system from nvidia-smi"
+    type: "gauge"
+
+    #- title: sysak_pod_alloc
+    #from: pod_alloc
+    #head: value
+    #help: "get pod alloc page used"
+    #type: "gauge"
