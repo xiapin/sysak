@@ -43,6 +43,7 @@ type CPU struct {
 	AKSE            string `def:"akse" desc:"SLS AccessKeySecret" mapstructure:"akse"`
 	Project         string `def:"akid" desc:"SLS Project" mapstructure:"project"`
 	Logstore        string `def:"akid" desc:"SLS Logstore" mapstructure:"logstore"`
+	Encrypt         string `def:"base64" desc:"Encryte ak/sk" mapstructure:"encrypt"`
 	//KubernetesNode     string `def:"" desc:"Set to current k8s Node.nodeName for service discovery and labeling" mapstructure:"kubernetes-node"`
 	//OnlyServices       bool   `def:"false" desc:"Ignore processes unknown to service discovery" mapstructure:"only-services"`
 }
@@ -68,10 +69,11 @@ type NET struct {
 	Delay           int               `def:"100" desc:"User take packet delay(ms)." mapstructure:"delay"`
 	ExitTime        int               `def:"2" desc:"time of days the profiling to exit, default 2 days" mapstructure:"exitTime"`
 	SymbolCacheSize int               `def:"256" desc:"max size of symbols cache" mapstructure:"symbol-cache-size"`
-	SLS             string            `def:"unuser" desc:"producer/consumer data to/from SLS" mapstructure:"sls"`
+	SLS             string            `def:"unuser" desc:"producer/consumer/produceraw data to/from SLS" mapstructure:"sls"`
 	Endpoint        string            `def:"endpoint" desc:"SLS Endpoint" mapstructure:"endpoint"`
 	AKID            string            `def:"akid" desc:"SLS AccessKeyID" mapstructure:"akid"`
 	AKSE            string            `def:"akse" desc:"SLS AccessKeySecret" mapstructure:"akse"`
 	Project         string            `def:"akid" desc:"SLS Project" mapstructure:"project"`
 	Logstore        string            `def:"logstore" desc:"SLS Logstore" mapstructure:"logstore"`
+	Encrypt         string            `def:"base64" desc:"Encryte ak/sk" mapstructure:"encrypt"`
 }

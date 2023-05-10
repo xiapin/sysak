@@ -118,6 +118,12 @@ func oncpuSpy(cfg *config.CPU) *cobra.Command {
 		Args:  cobra.NoArgs,
 
 		RunE: cli.CreateCmdRunFn(cfg, vpr, func(_ *cobra.Command, _ []string) error {
+			if cfg.Encrypt != "base64" {
+				encrypt := sls.SLSEncrypt(cfg.Encrypt)
+				fmt.Printf("Text Encrypted by base64 is:\n%s\nOrigion text is:\n%s\n", encrypt,
+					sls.SLSDecrypt(encrypt))
+				return nil
+			}
 			return RunONCPU(cfg)
 		}),
 	}
