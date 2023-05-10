@@ -461,12 +461,12 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
 
     fprintf(dest, "%s\n", time_str);
     fprintf(dest, "UTIL&LOAD\n");
-    fprintf(dest, "%6s %6s %6s %6s %6s %6s %6s :%6s \n", "usr", "sys", "iowait", "load1", "R", "D",
+    fprintf(dest, "%6s %6s %6s %6s %6s %6s %6s :%5s \n", "usr", "sys", "iowait", "load1", "R", "D",
             "fork", "proc");
 
     fprintf(dest, "%6.1f %6.1f %6.1f %6.1f %6d %6d %6d", rec->sys.usr, rec->sys.sys,
             rec->sys.iowait, rec->sys.load1, rec->sys.nr_R, rec->sys.nr_D, rec->sys.nr_fork);
-    fprintf(dest, " :  %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid, info->ppid, info->fork);
+    fprintf(dest, " : %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid, info->ppid, info->fork);
 
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
