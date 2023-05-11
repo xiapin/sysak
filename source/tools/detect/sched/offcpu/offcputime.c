@@ -196,6 +196,87 @@ static void sig_handler(int sig)
 {
 }
 
+static void print_map_fold(struct ksyms *ksyms, struct syms_cache *syms_cache,
+		      struct offcputime_bpf *obj)
+{
+	struct key_t lookup_key = {}, next_key;
+	const struct ksym *ksym;
+	const struct syms *syms;
+	const struct sym *sym;
+	int err, i, ifd, sfd, kern, usr;
+	__u64 *ip, *ip_k;
+	struct val_t val;
+
+	ip = calloc(env.perf_max_stack_depth, sizeof(*ip));
+	if (!ip) {
+		fprintf(stderr, "failed to alloc ip\n");
+		return;
+	}
+	ip_k = calloc(env.perf_max_stack_depth, sizeof(*ip));
+	if (!ip_k) {
+		fprintf(stderr, "failed to alloc ip_k\n");
+		free(ip);
+		return;
+	}
+	kern = usr = 0;
+	ifd = bpf_map__fd(obj->maps.info);
+	sfd = bpf_map__fd(obj->maps.stackmap);
+	while (!bpf_map_get_next_key(ifd, &lookup_key, &next_key)) {
+		err = bpf_map_lookup_elem(ifd, &next_key, &val);
+		if (err < 0) {
+			fprintf(stderr, "failed to lookup info: %d\n", err);
+			goto cleanup;
+		}
+		lookup_key = next_key;
+		if (val.delta == 0)
+			continue;
+
+		printf("%s;", val.comm);
+		if (next_key.user_stack_id == -1)
+			goto print_kstack;
+
+		if (bpf_map_lookup_elem(sfd, &next_key.user_stack_id, ip) != 0) {
+			printf("[Missed User Stack];");
+			printf("-");
+			goto print_kstack;
+		}
+
+		syms = syms_cache__get_syms(syms_cache, next_key.tgid);
+		if (!syms) {
+			//fprintf(stderr, "failed to get syms\n");
+			goto print_kstack;
+		}
+		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
+		}
+		usr = i - 1;
+
+		for (i = usr; i >= 0; i--) {
+			sym = syms__map_addr(syms, ip[i]);
+			if (sym)
+				printf("%s;", sym->name);
+			else
+				printf("[unknown];");
+		}
+		printf("-;");
+print_kstack:
+		if (bpf_map_lookup_elem(sfd, &next_key.kern_stack_id, ip_k) != 0) {
+			printf("[Missed Kernel Stack];");
+			goto skip_kstack;
+		}
+		for (i = 0; i < env.perf_max_stack_depth && ip_k[i]; i++) {
+		}
+		kern = i - 1;
+		for (i = kern; i >= 0; i--) {
+			ksym = ksyms__map_addr(ksyms, ip_k[i]);
+			printf("%s;", ksym ? ksym->name : "Unknown");
+		}
+skip_kstack:
+		printf(" %lld\n", val.delta);
+	}
+cleanup:
+	free(ip);
+}
+
 static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
 		      struct offcputime_bpf *obj)
 {
@@ -341,7 +422,7 @@ int main(int argc, char **argv)
 	 */
 	sleep(env.duration);
 
-	print_map(ksyms, syms_cache, obj);
+	print_map_fold(ksyms, syms_cache, obj);
 
 cleanup:
 	offcputime_bpf__destroy(obj);
