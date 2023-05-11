@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h> /* bpf_obj_pin */
@@ -24,6 +25,7 @@ char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
 time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
+static volatile sig_atomic_t exiting;
 
 struct env {
     bool thread_mode;
@@ -667,6 +669,8 @@ static int look_fork(int cnt_map_fd, int fork_map_fd, struct sys_record_t* sys_r
     return err;
 }
 
+static void sigint_handler(int signo) { exiting = 1; }
+
 int main(int argc, char** argv) {
     int err = 0;
     int cnt_map_fd = -1, fork_map_fd = -1;
@@ -676,6 +680,11 @@ int main(int argc, char** argv) {
     struct task_cputime_t **prev_task = 0, **now_task = 0;
     struct sys_cputime_t *prev_sys = 0, *now_sys = 0;
     struct record_t* rec = 0;
+
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        fprintf(stderr, "Failed set signal handler.\n");
+        return -errno;
+    }
 
     /* parse args */
     static const struct argp argp = {
@@ -747,7 +756,7 @@ int main(int argc, char** argv) {
     }
 
     bool first = true;
-    while (env.nr_iter--) {
+    while (env.nr_iter-- && !exiting) {
         look_fork(cnt_map_fd, fork_map_fd, &rec->sys);
         runnable_proc(&rec->sys);
         unint_proc(&rec->sys);
