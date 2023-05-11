@@ -32,9 +32,11 @@ struct env {
     long nr_iter;
     enum sort_type rec_sort;
     int limit;
+    bool human;
 } env = {.thread_mode = false,
          .delay = 3,
          .tid = -1,
+         .human = false,
          .rec_sort = SORT_CPU,
          .nr_iter = LONG_MAX - 1,
          .limit = INT_MAX};
@@ -58,6 +60,7 @@ const char argp_program_doc[] =
     "    tasktop -f a.log   # log to a.log (default to /var/log/sysak/tasktop/tasktop.log)\n";
 
 static const struct argp_option opts[] = {
+    {"human", 'H', 0, 0, "Output human-readable time info."},
     {"thread", 't', 0, 0, "Thread mode, default process"},
     {"pid", 'p', "TID", 0, "Specify thread TID"},
     {"delay", 'd', "DELAY", 0, "Sample peroid, default is 3 seconds"},
@@ -158,6 +161,9 @@ static error_t parse_arg(int key, char* arg, struct argp_state* state) {
                 argp_usage(state);
             }
             env.limit = val;
+            break;
+        case 'H':
+            env.human = true;
             break;
         case ARGP_KEY_ARG:
             break;
@@ -380,6 +386,7 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
     data->ppid = proc_info.ppid;
     data->starttime = proc_info.starttime;
     data->pid = proc_info.pid;
+
     strcpy(data->comm, proc_info.comm);
 
     time_t run_time = time(0) - btime - (now[pid]->starttime / sysconf(_SC_CLK_TCK));
@@ -396,6 +403,7 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
                 (*rec)->pid = now[pid]->pid;
                 (*rec)->ppid = now[pid]->ppid;
                 (*rec)->runtime = run_time;
+                (*rec)->begin_ts = btime + now[pid]->starttime / sysconf(_SC_CLK_TCK);
                 (*rec)->user_cpu_rate = (double)udelta * 100 / base;
                 (*rec)->system_cpu_rate = (double)sdelta * 100 / base;
                 (*rec)->all_cpu_rate = (double)(udelta + sdelta) * 100 / base;
@@ -448,18 +456,60 @@ static void sort_records(struct record_t* rec, int proc_num, enum sort_type sort
     }
 }
 
+static char* ts2str(time_t ts, char* buf, int size) {
+    // __builtin_memset(buf, 0, size;
+    struct tm* t = gmtime(&ts);
+    strftime(buf, size, "%Y-%m-%d %H:%M:%S", t);
+    return buf;
+}
+
+static void build_str(int day, int hour, int min, int sec, char* buf) {
+    char tmp[32];
+    if (day > 0) {
+        snprintf(tmp, 32, "%dd,", day);
+        strcat(buf, tmp);
+    }
+
+    if (hour > 0) {
+        snprintf(tmp, 32, "%dh,", hour);
+        strcat(buf, tmp);
+    }
+    if (min > 0) {
+        snprintf(tmp, 32, "%dm,", min);
+        strcat(buf, tmp);
+    }
+    if (sec > 0) {
+        snprintf(tmp, 32, "%ds", sec);
+        strcat(buf, tmp);
+    }
+}
+static char* second2str(time_t ts, char* buf, int size) {
+#define MINUTE 60
+#define HOUR (MINUTE * 60)
+#define DAY (HOUR * 24)
+    int day = (int)ts / DAY;
+    ts = ts % DAY;
+    int hour = (int)ts / HOUR;
+    ts = ts % HOUR;
+    int minute = (int)ts / MINUTE;
+    ts = ts % MINUTE;
+
+    memset(buf, 0, size);
+    build_str(day, hour, minute, ts, buf);
+    return buf;
+}
+
 static void output(struct record_t* rec, int proc_num, FILE* dest) {
     struct task_record_t** records = rec->tasks;
     // system("clear");
     time_t now = time(0);
-    struct tm* t;
-    t = gmtime(&now);
-    char time_str[BUF_SIZE];
+
+    char stime_str[BUF_SIZE] = {0};
+    char rtime_str[BUF_SIZE] = {0};
     int i;
     struct proc_fork_info_t* info = &(rec->sys.most_fork_info);
-    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
 
-    fprintf(dest, "%s\n", time_str);
+    fprintf(dest, "%s\n", ts2str(now, stime_str, BUF_SIZE));
     fprintf(dest, "UTIL&LOAD\n");
     fprintf(dest, "%6s %6s %6s %6s %6s %6s %6s :%5s \n", "usr", "sys", "iowait", "load1", "R", "D",
             "fork", "proc");
@@ -471,16 +521,32 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
 
-        if (i == 0) {
-            fprintf(dest, "TASKTOP\n");
-            fprintf(dest, "%18s %6s %6s %10s %6s %6s %6s\n", "COMMAND", "PID", "PPID", "RUNTIME",
-                    "%UTIME", "%STIME", "%CPU");
-        }
+        if (env.human) {
+            if (i == 0) {
+                fprintf(dest, "TASKTOP\n");
+                fprintf(dest, "%18s %6s %6s %20s %15s %6s %6s %6s\n", "COMMAND", "PID", "PPID",
+                        "START", "RUN", "%UTIME", "%STIME", "%CPU");
+            }
 
-        if (i >= env.limit) break;
-        fprintf(dest, "%18s %6d %6d %10ld %6.1f %6.1f %6.1f\n", records[i]->comm, records[i]->pid,
-                records[i]->ppid, records[i]->runtime, records[i]->user_cpu_rate,
-                records[i]->system_cpu_rate, records[i]->all_cpu_rate);
+            if (i >= env.limit) break;
+            fprintf(dest, "%18s %6d %6d %20s %15s %6.1f %6.1f %6.1f\n", records[i]->comm,
+                    records[i]->pid, records[i]->ppid,
+                    ts2str(records[i]->begin_ts, stime_str, BUF_SIZE),
+                    second2str(records[i]->runtime, rtime_str, BUF_SIZE), records[i]->user_cpu_rate,
+                    records[i]->system_cpu_rate, records[i]->all_cpu_rate);
+        } else {
+            if (i == 0) {
+                fprintf(dest, "TASKTOP\n");
+                fprintf(dest, "%18s %6s %6s %10s %10s %6s %6s %6s\n", "COMMAND", "PID", "PPID",
+                        "START", "RUN", "%UTIME", "%STIME", "%CPU");
+            }
+
+            if (i >= env.limit) break;
+            fprintf(dest, "%18s %6d %6d %10ld %10ld %6.1f %6.1f %6.1f\n", records[i]->comm,
+                    records[i]->pid, records[i]->ppid, records[i]->begin_ts, records[i]->runtime,
+                    records[i]->user_cpu_rate, records[i]->system_cpu_rate,
+                    records[i]->all_cpu_rate);
+        }
     }
     fflush(dest);
 }
