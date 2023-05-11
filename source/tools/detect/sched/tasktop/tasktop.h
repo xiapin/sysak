@@ -4,7 +4,6 @@
 #include <sys/types.h>
 #include "common.h"
 
-
 #define FILE_PATH_LEN 256
 #define MAX_COMM_LEN 16
 #define PEROID 3
@@ -15,8 +14,7 @@
 #define PIDMAX_PATH "/proc/sys/kernel/pid_max"
 #define PROC_STAT_PATH "/proc/stat"
 
-enum sort_type { SORT_SYSTEM, 
-SORT_USER, SORT_CPU };
+enum sort_type { SORT_SYSTEM, SORT_USER, SORT_CPU };
 
 struct id_pair_t {
     pid_t pid;
@@ -76,16 +74,18 @@ struct task_record_t {
     int ppid;
     char comm[MAX_COMM_LEN];
     time_t runtime;
+    time_t begin_ts;
     double system_cpu_rate;
     double user_cpu_rate;
     double all_cpu_rate;
 };
 
-
 struct sys_record_t {
+    /* util */
     double usr;
     double sys;
     double iowait;
+    /* load */
     float load1;
     int nr_R;
     int nr_D;
