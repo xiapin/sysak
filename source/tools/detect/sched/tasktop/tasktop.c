@@ -20,6 +20,8 @@
 #include "tasktop.h"
 #include "common.h"
 
+#define DEBUG
+
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
 time_t btime = 0;
@@ -526,6 +528,12 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
             sys->cpu[0].iowait, sys->load1, sys->nr_R, sys->nr_D, sys->nr_fork);
     fprintf(dest, " : %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid, info->ppid, info->fork);
 
+#ifdef DEBUG
+    for (i = 1; i <= nr_cpu; i++) {
+        fprintf(dest, "%6.1f %6.1f %6.1f\n", sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].iowait);
+    }
+
+#endif
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
 
