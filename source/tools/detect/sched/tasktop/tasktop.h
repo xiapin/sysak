@@ -80,18 +80,23 @@ struct task_record_t {
     double all_cpu_rate;
 };
 
-struct sys_record_t {
-    /* util */
+typedef struct cpu_util_t {
     double usr;
     double sys;
     double iowait;
+} cpu_util_t;
+
+typedef struct sys_record_t {
+    /* util */
+    cpu_util_t *cpu;
+
     /* load */
     float load1;
     int nr_R;
     int nr_D;
     int nr_fork;
     struct proc_fork_info_t most_fork_info;
-};
+} sys_record_t;
 
 struct record_t {
     struct task_record_t **tasks;
