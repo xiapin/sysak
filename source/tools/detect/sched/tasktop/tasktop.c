@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h> /* bpf_obj_pin */
@@ -19,11 +20,15 @@
 #include "tasktop.h"
 #include "common.h"
 
+#define DEBUG
+
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
 time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
+int nr_cpu;
+static volatile sig_atomic_t exiting;
 
 struct env {
     bool thread_mode;
@@ -217,36 +222,39 @@ int swap(void* lhs, void* rhs, size_t sz) {
 static int read_stat(struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys,
                      struct sys_record_t* sys_rec) {
     int err = 0;
+    int i = 0;
     FILE* fp = fopen(PROC_STAT_PATH, "r");
     if (!fp) {
         fprintf(stderr, "Failed open stat file.\n");
         err = errno;
         goto cleanup;
     }
+    for (i = 0; i <= nr_cpu; i++) {
+        /*now only read first line, maybe future will read more info*/
+        fscanf(fp, "%s %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n", now_sys[i].cpu, &now_sys[i].usr,
+               &now_sys[i].nice, &now_sys[i].sys, &now_sys[i].idle, &now_sys[i].iowait,
+               &now_sys[i].irq, &now_sys[i].softirq, &now_sys[i].steal, &now_sys[i].guest,
+               &now_sys[i].guest_nice);
 
-    /*now only read first line, maybe future will read more info*/
-    fscanf(fp, "%s %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n", now_sys->cpu, &now_sys->usr,
-           &now_sys->nice, &now_sys->sys, &now_sys->idle, &now_sys->iowait, &now_sys->irq,
-           &now_sys->softirq, &now_sys->steal, &now_sys->guest, &now_sys->guest_nice);
+        if (prev_sys[i].usr == 0) continue;
 
-    if (prev_sys->usr == 0) goto cleanup;
-    int now_time = now_sys->usr + now_sys->sys + now_sys->nice + now_sys->idle + now_sys->iowait +
-                   now_sys->irq + now_sys->softirq + now_sys->steal + now_sys->guest +
-                   now_sys->guest_nice;
-    int prev_time = prev_sys->usr + prev_sys->sys + prev_sys->nice + prev_sys->idle +
-                    prev_sys->iowait + prev_sys->irq + prev_sys->softirq + prev_sys->steal +
-                    prev_sys->guest + prev_sys->guest_nice;
-    int all_time = now_time - prev_time;
-    // int all_time = (sysconf(_SC_NPROCESSORS_ONLN) * env.delay * sysconf(_SC_CLK_TCK));
+        int now_time = now_sys[i].usr + now_sys[i].sys + now_sys[i].nice + now_sys[i].idle +
+                       now_sys[i].iowait + now_sys[i].irq + now_sys[i].softirq + now_sys[i].steal +
+                       now_sys[i].guest + now_sys[i].guest_nice;
+        int prev_time = prev_sys[i].usr + prev_sys[i].sys + prev_sys[i].nice + prev_sys[i].idle +
+                        prev_sys[i].iowait + prev_sys[i].irq + prev_sys[i].softirq +
+                        prev_sys[i].steal + prev_sys[i].guest + prev_sys[i].guest_nice;
+        int all_time = now_time - prev_time;
+        // int all_time = (sysconf(_SC_NPROCESSORS_ONLN) * env.delay * sysconf(_SC_CLK_TCK));
 
-    /* all_time can't not calculate by delay * ticks * online-cpu-num, because there is error
-     * between process waked up and running, when sched delay occur , the sum of cpu rates more than
-     * 100%. */
+        /* all_time can't not calculate by delay * ticks * online-cpu-num, because there is error
+         * between process waked up and running, when sched delay occur , the sum of cpu rates more
+         * than 100%. */
 
-    sys_rec->usr = (double)(now_sys->usr - prev_sys->usr) * 100 / all_time;
-    sys_rec->sys = (double)(now_sys->sys - prev_sys->sys) * 100 / all_time;
-    sys_rec->iowait = (double)(now_sys->iowait - prev_sys->iowait) * 100 / all_time;
-
+        sys_rec->cpu[i].usr = (double)(now_sys[i].usr - prev_sys[i].usr) * 100 / all_time;
+        sys_rec->cpu[i].sys = (double)(now_sys[i].sys - prev_sys[i].sys) * 100 / all_time;
+        sys_rec->cpu[i].iowait = (double)(now_sys[i].iowait - prev_sys[i].iowait) * 100 / all_time;
+    }
 cleanup:
     if (fp) fclose(fp);
     return err;
@@ -483,6 +491,7 @@ static void build_str(int day, int hour, int min, int sec, char* buf) {
         strcat(buf, tmp);
     }
 }
+
 static char* second2str(time_t ts, char* buf, int size) {
 #define MINUTE 60
 #define HOUR (MINUTE * 60)
@@ -500,24 +509,31 @@ static char* second2str(time_t ts, char* buf, int size) {
 }
 
 static void output(struct record_t* rec, int proc_num, FILE* dest) {
-    struct task_record_t** records = rec->tasks;
     // system("clear");
-    time_t now = time(0);
-
+    struct task_record_t** records = rec->tasks;
+    struct sys_record_t* sys = &rec->sys;
+    struct proc_fork_info_t* info = &(sys->most_fork_info);
     char stime_str[BUF_SIZE] = {0};
     char rtime_str[BUF_SIZE] = {0};
-    int i;
-    struct proc_fork_info_t* info = &(rec->sys.most_fork_info);
+
+    time_t now = time(0);
+    int i = 0;
 
     fprintf(dest, "%s\n", ts2str(now, stime_str, BUF_SIZE));
     fprintf(dest, "UTIL&LOAD\n");
     fprintf(dest, "%6s %6s %6s %6s %6s %6s %6s :%5s \n", "usr", "sys", "iowait", "load1", "R", "D",
             "fork", "proc");
 
-    fprintf(dest, "%6.1f %6.1f %6.1f %6.1f %6d %6d %6d", rec->sys.usr, rec->sys.sys,
-            rec->sys.iowait, rec->sys.load1, rec->sys.nr_R, rec->sys.nr_D, rec->sys.nr_fork);
+    fprintf(dest, "%6.1f %6.1f %6.1f %6.1f %6d %6d %6d", sys->cpu[0].usr, sys->cpu[0].sys,
+            sys->cpu[0].iowait, sys->load1, sys->nr_R, sys->nr_D, sys->nr_fork);
     fprintf(dest, " : %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid, info->ppid, info->fork);
 
+#ifdef DEBUG
+    for (i = 1; i <= nr_cpu; i++) {
+        fprintf(dest, "%6.1f %6.1f %6.1f\n", sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].iowait);
+    }
+
+#endif
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
 
@@ -571,12 +587,11 @@ static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
         swap(&prev_task[pid], &now_task[pid], sizeof(struct task_cputime_t*));
     }
 
-    swap(prev_sys, now_sys, sizeof(struct sys_cputime_t));
+    swap(prev_sys, now_sys, sizeof(struct sys_cputime_t) * (nr_cpu + 1));
 }
 
 static int make_records(struct id_pair_t* pids, int proc_num, struct record_t* rec,
-                        struct task_cputime_t** prev_task, struct task_cputime_t** now_task,
-                        struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys) {
+                        struct task_cputime_t** prev_task, struct task_cputime_t** now_task) {
     struct task_record_t** records = rec->tasks;
     int err = 0;
     u_int64_t i;
@@ -597,7 +612,6 @@ static int make_records(struct id_pair_t* pids, int proc_num, struct record_t* r
             return err;
         }
     }
-    read_stat(prev_sys, now_sys, &rec->sys);
 
     return err;
 }
@@ -667,6 +681,8 @@ static int look_fork(int cnt_map_fd, int fork_map_fd, struct sys_record_t* sys_r
     return err;
 }
 
+static void sigint_handler(int signo) { exiting = 1; }
+
 int main(int argc, char** argv) {
     int err = 0;
     int cnt_map_fd = -1, fork_map_fd = -1;
@@ -676,6 +692,13 @@ int main(int argc, char** argv) {
     struct task_cputime_t **prev_task = 0, **now_task = 0;
     struct sys_cputime_t *prev_sys = 0, *now_sys = 0;
     struct record_t* rec = 0;
+
+    nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
+
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        fprintf(stderr, "Failed set signal handler.\n");
+        return -errno;
+    }
 
     /* parse args */
     static const struct argp argp = {
@@ -707,11 +730,12 @@ int main(int argc, char** argv) {
     }
 
     rec = calloc(1, sizeof(struct record_t));
+    rec->sys.cpu = calloc(nr_cpu + 1, sizeof(struct cpu_util_t));
     pids = calloc(pidmax, sizeof(struct id_pair_t));
     prev_task = calloc(pidmax, sizeof(struct task_cputime_t*));
     now_task = calloc(pidmax, sizeof(struct task_cputime_t*));
-    prev_sys = calloc(1, sizeof(struct sys_cputime_t));
-    now_sys = calloc(1, sizeof(struct sys_cputime_t));
+    prev_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t));
+    now_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t));
     if (!prev_task || !now_task) {
         err = errno;
         fprintf(stderr, "Failed calloc prev and now\n");
@@ -747,10 +771,11 @@ int main(int argc, char** argv) {
     }
 
     bool first = true;
-    while (env.nr_iter--) {
+    while (env.nr_iter-- && !exiting) {
         look_fork(cnt_map_fd, fork_map_fd, &rec->sys);
         runnable_proc(&rec->sys);
         unint_proc(&rec->sys);
+        read_stat(prev_sys, now_sys, &rec->sys);
 
         /* get all process now */
         u_int64_t proc_num;
@@ -762,7 +787,7 @@ int main(int argc, char** argv) {
 
         rec->tasks = calloc(proc_num, sizeof(struct task_record_t*));
         /* if prev process info exist produce record*/
-        err = make_records(pids, proc_num, rec, prev_task, now_task, prev_sys, now_sys);
+        err = make_records(pids, proc_num, rec, prev_task, now_task);
         if (err) {
             fprintf(stderr, "Failed make records.\n");
             goto cleanup;

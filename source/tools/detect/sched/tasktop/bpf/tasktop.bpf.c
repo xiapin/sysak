@@ -14,7 +14,7 @@
         bpf_probe_read(&val, sizeof(val), &P); \
         val;                                   \
     })
-    
+
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 4096);
@@ -37,7 +37,7 @@ struct trace_event_sched_process_fork_args {
     pid_t child_pid;
 };
 
-static void update_cnt_map() {
+static __always_inline void update_cnt_map() {
     u32 zero = 0;
     u64 *value = 0;
 
@@ -47,7 +47,7 @@ static void update_cnt_map() {
     }
 }
 
-static void update_fork_map() {
+static __always_inline void update_fork_map() {
     u32 ppid, pid, zero = 0;
     struct task_struct *task;
     struct proc_fork_info_t *prev_info;
