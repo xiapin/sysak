@@ -36,9 +36,9 @@ class ioMonCfgClass(object):
             cfg['iops'] = int(cfg['iops']) if cfg['iops'] else 150
             cfg['bps'] = int(cfg['bps']) if cfg['bps'] else 31457280
             cfg['cycle'] = int(cfg['cycle']) if cfg['cycle'] else 1000
-            cfg['diagIowait'] = cfg['diagIowait'] if cfg['diagIowait'] else 'on'
-            cfg['diagIoburst'] = cfg['diagIoburst'] if cfg['diagIoburst'] else 'on'
-            cfg['diagIolat'] = cfg['diagIolat'] if cfg['diagIolat'] else 'on'
+            cfg['diagIowait'] = cfg['diagIowait'] if cfg['diagIowait'] else 'off'
+            cfg['diagIoburst'] = cfg['diagIoburst'] if cfg['diagIoburst'] else 'off'
+            cfg['diagIolat'] = cfg['diagIolat'] if cfg['diagIolat'] else 'off'
             cfg['diagIohang'] = cfg['diagIohang'] if cfg['diagIohang'] else 'off'
             self._updateCfg(cfg)
             return
