@@ -29,7 +29,7 @@ container:
   #"cg_cpuacct_stat" is a substitute of cg_cpuacct_proc_stat
   luaPlugin: ["cg_cpu_stat", "cg_cpuacct_proc_stat", "cg_cpuacct_wait_latency",
               "cg_memory_dcmp_latency", "cg_memory_drcm_latency", "cg_memory_fail_cnt", "cg_memory_util",
-              "cg_pmu_events"]
+              "cg_pmu_events", "cg_cpu_cfs_quota"]
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -300,4 +300,9 @@ metrics:
     from: cg_cpu_stat
     head: value
     help: "sysak_cg_cpu_stat"
+    type: "gauge"
+  - title: sysak_cg_cpu_quota
+    from: cgCpuQuota
+    head: value
+    help: "quota_us,peroid_us and quota/period"
     type: "gauge"
