@@ -131,7 +131,7 @@ local function setupPlugins(res, proto, pffi, mnt, ino)
             },
             {
                 name = "con_id",
-                index = con.id,
+                index = string.sub(con.id, 1, 12)
             },
         }
 
