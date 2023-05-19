@@ -15,7 +15,7 @@ int j_tcp_validate_incoming(struct pt_regs *ctx) {
     if (ms > 0) {
         add_hist((struct bpf_map_def *)&outCnt, 0, ms);
         add_hist((struct bpf_map_def *)&outCnt, 1, 1);
-        hist10_push((struct bpf_map_def *)&netHist, ms);
+        hist10_push((struct bpf_map_def *)&netHist, ms * 10);
     }
     return 0;
 }

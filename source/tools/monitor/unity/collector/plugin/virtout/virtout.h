@@ -10,6 +10,7 @@
 struct data_t {
     int pid;
     int cpu;
+    unsigned long us;
     unsigned int stack_id;
     unsigned  long delta;
     char comm[TASK_COMM_LEN];

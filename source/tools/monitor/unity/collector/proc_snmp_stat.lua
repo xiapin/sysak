@@ -75,12 +75,14 @@ function CprocSnmpStat:udpCount(titles, values)
     end
 end
 
-local tcpHeads = {"InSegs", "OutMsgs", "RetransSegs", "InErrs", "CurrEstab"}
+local tcpHeads = {"InSegs", "OutSegs", "RetransSegs", "InErrs"}
 function CprocSnmpStat:tcpCount(titles, values)
     local vs = {}
     for i = 1, titles.no do
         local cell = self._ffi.string(titles.s[i])
-        if system:valueIsIn(tcpHeads, cell) then
+        if cell == "CurrEstab" then
+            table.insert(vs, {name = cell, value = tonumber(values.value[i - 1])})
+        elseif system:valueIsIn(tcpHeads, cell) then
             local name = "v_tcp" .. cell
             local v = tonumber(values.value[i - 1])
             if self[name] then

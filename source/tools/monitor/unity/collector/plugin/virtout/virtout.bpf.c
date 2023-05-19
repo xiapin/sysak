@@ -43,8 +43,8 @@ static inline void check_time(struct bpf_perf_event_data *ctx,
 
     if (last && delta > 2 * PERIOD_TIME) {
         delta -= PERIOD_TIME;
-        bpf_printk("delta %llu.\n", delta);
-        hist10_push((struct bpf_map_def *)&virtdist, delta / PERIOD_TIME);
+        int res = delta / PERIOD_TIME;
+        hist10_push((struct bpf_map_def *)&virtdist, res * 10);
         if (delta >= THRESHOLD_TIME) {
             struct task_struct* task = (struct task_struct *)bpf_get_current_task();
             struct data_t data = {};
@@ -52,10 +52,9 @@ static inline void check_time(struct bpf_perf_event_data *ctx,
             data.pid = pid();
             data.stack_id = bpf_get_stackid(ctx, &stack, KERN_STACKID_FLAGS);
             data.delta = delta;
+            data.us = t / 1000;
             data.cpu = cpu();
             bpf_get_current_comm(&data.comm, TASK_COMM_LEN);
-            bpf_printk("delta %llu, pid:%d.\n", delta, data.pid);
-
             bpf_perf_event_output(ctx, event, BPF_F_CURRENT_CPU, &data, sizeof(data));
         }
     }

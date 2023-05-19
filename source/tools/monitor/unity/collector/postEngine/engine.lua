@@ -12,15 +12,20 @@ local pystring = require("common.pystring")
 local system = require("common.system")
 local cjson = require("cjson.safe")
 local CexecBase = require("collector.postEngine.execBase")
+local CexecDiag = require("collector.postEngine.execDiag")
 local Cengine = class("engine", CvProto)
 
 local diagExec = {
-    io_hang = {block = 60, time = 15, cmd = "../../../iosdiag"},
+    io_hang = {block = 60, time = 15, cmd = "../../../iosdiag",
+               report = {title = "iosdiag",
+                         files = {"/var/log/sysak/iosdiag/hangdetect/result.log.stat",
+                                  "/var/log/sysak/iosdiag/hangdetect/result.log.seq"}}},
     net_edge = {block = 5 * 60, time = 60, so = {virtiostat = 5 * 3}},
 }
 
 function Cengine:_init_(que, proto_q, fYaml, tid)
     CvProto._init_(self, CprotoData.new(que))
+    self._que = que
     self._fYaml = fYaml
     self._tid  = tid
     self._task = nil
@@ -39,7 +44,7 @@ function Cengine:run(e, res, diag)
     local args = res.args
     local second = res.second or diag.time
     if diag.cmd then
-        local exec = CexecBase.new(diag.cmd, args, second)
+        local exec = CexecDiag.new(diag.cmd, args, second, self._que, diag.report, res.uid)
         exec:addEvents(e)
     end
     local so = diag.so

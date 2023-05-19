@@ -5,6 +5,59 @@
 ---
 
 require("common.class")
+local system = require("common.system")
 local unistd = require("posix.unistd")
-local pwait = require("posix.sys.wait")
-local signal = require("posix.signal")
+local cjson = require("cjson.safe")
+local CprotoData = require("common.protoData")
+local CexecBase = require("collector.postEngine.execBase")
+
+local CexecDiag = class("execDiag", CexecBase)
+
+function CexecDiag:_init_(cmd, args, seconds, que, report, uid)
+    CexecBase._init_(self, cmd, args, seconds)
+    self._proto = CprotoData.new(que)
+    self._report = report
+    if uid then
+        self._uid = uid
+    else
+        self._uid = system:guid()
+    end
+end
+
+function CexecDiag:work()
+    local ret, exit = CexecBase.work(self)
+    if ret == -1 and exit and self._report then  -- need to report
+        local c = 0
+        local ss = {}
+        for _, fName in ipairs(self._report.files) do
+            if unistd.access(fName) then
+                c = c + 1
+                local f = io.open(fName, 'r')
+                ss[c] = f:read("*a")
+            end
+        end
+
+        local stream = table.concat(ss)
+        local logs = {
+            {
+                name = "uid",
+                log = cjson.encode(self._uid),
+            }, {
+               name = "diag",
+               log = cjson.encode(stream)
+            }
+        }
+        local line = {line = self._report.title, log = logs}
+
+        local lines = self._proto:protoTable()
+        table.insert(lines.lines, line)
+        system:dumps(lines)
+
+        local bytes = self._proto:encode(lines)
+        print(#bytes)
+        self._proto:que(bytes)
+    end
+    return ret
+end
+
+return CexecDiag

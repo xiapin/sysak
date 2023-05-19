@@ -7,17 +7,40 @@
 require("common.class")
 local exec = require("common.exec")
 local pwait = require("posix.sys.wait")
+local unistd = require("posix.unistd")
 local pystring = require("common.pystring")
 local system = require("common.system")
 
 local CexecBase = class("execBase")
 local interval = 5   --- poll for every 5 second
 
+local function checkChild(ppid, pid)
+    local path = "/proc/" .. pid .. "/status"
+    local ret = false
+    if unistd.access(path) then
+        local f = io.open(path)
+
+        for line in f:lines() do
+            if pystring:startswith(line, "PPid:") then
+                local _, s = pystring:split(line, ":", 1)
+                if tonumber(pystring:strip(s)) == ppid then
+                    ret = true
+                end
+                break
+            end  -- end startswith
+        end  -- end for
+
+        f:close()
+    end
+    return ret
+end
+
 function CexecBase:_init_(cmd, args, seconds)
     self.cmd = cmd
     self._cnt = 0
     self._loop = seconds / interval
 
+    self._ppid = unistd.getpid()
     self._pid = exec.run(cmd, args)
 end
 
@@ -27,16 +50,22 @@ end
 
 function CexecBase:work()
     local cnt = self._cnt
+    local pid, stat, exit = pwait.wait(self._pid, pwait.WNOHANG)
+
+    if exit then
+        return -1, exit
+    end
     if cnt >= self._loop then
-        local pid, stat, exit = pwait.wait(self._pid, pwait.WNOHANG)
         if pid == nil then
             error("wait failed " .. stat .. exit)
         end
         if not exit then -- process not exit
             print("force to kill " .. self._pid)
-            exec.kill(self._pid)
+            if checkChild(self._ppid, self._ppid) then  -- confirm child process
+                exec.kill(self._pid)
+            end
         end
-        return -1  -- delete from task list.
+        return -1, nil  -- delete from task list.
     end
     self._cnt = cnt + 1
 end

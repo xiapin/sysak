@@ -142,8 +142,8 @@ static int get_dist(unsigned long *locals) {
     key = 0;
     while (coobpf_key_next(dist_fd, &key, &key_next) == 0) {
         coobpf_key_value(dist_fd, &key_next, &value);
-        locals[i ++] = value;
-        if (i > DIST_ARRAY_SIZE) {
+        locals[key] = value;
+        if (key > DIST_ARRAY_SIZE) {
             break;
         }
         key = key_next;
@@ -155,7 +155,7 @@ static int cal_dist(unsigned long* values) {
     int i, j;
     int size;
     static unsigned long rec[DIST_ARRAY_SIZE] = {0};
-    unsigned long locals[DIST_ARRAY_SIZE];
+    unsigned long locals[DIST_ARRAY_SIZE] = {0};
 
     size = get_dist(locals);
     for (i = 0; i < CPU_DIST_INDEX - 1; i ++) {
@@ -206,7 +206,7 @@ int proc(int stack_fd, struct data_t *e, struct unity_line *line) {
     int id = e->stack_id;  //last stack
     struct ksym_cell* cell;
 
-    snprintf(log, LOG_MAX, "task:%d(%s);cpu:%d;delayed:%ld;callstack:", e->pid, e->comm, e->cpu, e->delta);
+    snprintf(log, LOG_MAX, "task:%d(%s);us:%ld;cpu:%d;delayed:%ld;callstack:", e->pid, e->comm, e->us, e->cpu, e->delta);
     coobpf_key_value(stack_fd, &id, &addr);
 
     for (i = 0; i < 128; i ++) {

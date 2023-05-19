@@ -56,9 +56,17 @@ int init(void *arg)
 
 static int get_count(unsigned long *locals) {
     int i = 0;
+    unsigned long value = 0;
+    int key, key_next;
 
-    for (i = 0; i < NET_RETRANS_TYPE_MAX; i ++) {
-        coobpf_key_value(cnt_fd, &i, &locals[i]);
+    key = 0;
+    while (coobpf_key_next(cnt_fd, &key, &key_next) == 0) {
+        coobpf_key_value(cnt_fd, &key_next, &value);
+        locals[i ++] = value;
+        if (i > NET_RETRANS_TYPE_MAX) {
+            break;
+        }
+        key = key_next;
     }
     return i;
 }
@@ -69,7 +77,7 @@ static int cal_retrans(unsigned long *values) {
     unsigned long locals[NET_RETRANS_TYPE_MAX];
 
     get_count(locals);
-    for (i = 0; i < NET_RETRANS_TYPE_MAX; i ++) {
+    for (i = NET_RETRANS_TYPE_RTO; i < NET_RETRANS_TYPE_MAX; i ++) {
         values[i] = locals[i] - rec[i];
         rec[i] = locals[i];
     }
@@ -78,7 +86,7 @@ static int cal_retrans(unsigned long *values) {
 
 int call(int t, struct unity_lines *lines) {
     int i;
-    unsigned long values[NET_RETRANS_TYPE_MAX];
+    unsigned long values[NET_RETRANS_TYPE_MAX] = {0};
     struct unity_line* line;
 
     budget = t;   //release log budget
@@ -88,8 +96,8 @@ int call(int t, struct unity_lines *lines) {
     unity_set_table(line, "net_retrans_count");
 
     cal_retrans(values);
-    for (i = 0; i < NET_RETRANS_TYPE_MAX; i ++) {
-        unity_set_value(line, i, net_title[i], values[i]);
+    for (i = NET_RETRANS_TYPE_RTO; i < NET_RETRANS_TYPE_MAX; i ++) {
+        unity_set_value(line, i - NET_RETRANS_TYPE_RTO, net_title[i], values[i]);
     }
     return 0;
 }
