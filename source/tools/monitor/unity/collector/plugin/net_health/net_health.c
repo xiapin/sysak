@@ -20,8 +20,10 @@ int init(void *arg)
     int ret;
     printf("net_health plugin install.\n");
     ret = LOAD_SKEL_OBJECT(net_health, perf);
-    cnt_fd = coobpf_map_find(net_health->obj, "outCnt");
-    dist_fd = coobpf_map_find(net_health->obj, "netHist");
+    if (ret >= 0) {
+        cnt_fd = coobpf_map_find(net_health->obj, "outCnt");
+        dist_fd = coobpf_map_find(net_health->obj, "netHist");
+    }
     return ret;
 }
 

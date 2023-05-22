@@ -14,7 +14,9 @@ int init(void *arg)
     int ret;
     printf("virtiostat plugin install.\n");
     ret = LOAD_SKEL_OBJECT(virtiostat, perf);
-    stats_fd = coobpf_map_find(virtiostat->obj, "stats");
+    if (ret >= 0) {
+        stats_fd = coobpf_map_find(virtiostat->obj, "stats");
+    }
     return ret;
 }
 

@@ -49,8 +49,10 @@ int init(void *arg)
     printf("net_retrans plugin install.\n");
 
     ret = LOAD_SKEL_OBJECT(net_retrans, perf);
-    cnt_fd = coobpf_map_find(net_retrans->obj, "outCnt");
-    stack_fd = coobpf_map_find(net_retrans->obj, "stack");
+    if (ret >= 0) {
+        cnt_fd = coobpf_map_find(net_retrans->obj, "outCnt");
+        stack_fd = coobpf_map_find(net_retrans->obj, "stack");
+    }
     return ret;
 }
 

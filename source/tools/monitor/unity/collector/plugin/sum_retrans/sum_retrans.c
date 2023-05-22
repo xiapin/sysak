@@ -22,8 +22,10 @@ int init(void *arg)
     int ret;
     printf("sum_retrans plugin install.\n");
     ret = LOAD_SKEL_OBJECT(sum_retrans, perf);
-    inum_fd = coobpf_map_find(sum_retrans->obj, "inums");
-    dip_fd = coobpf_map_find(sum_retrans->obj, "dips");
+    if (ret >= 0) {
+        inum_fd = coobpf_map_find(sum_retrans->obj, "inums");
+        dip_fd = coobpf_map_find(sum_retrans->obj, "dips");
+    }
     return ret;
 }
 
