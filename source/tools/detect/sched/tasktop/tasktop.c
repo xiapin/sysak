@@ -784,6 +784,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "Failed read all pids.\n");
             goto cleanup;
         }
+        printf("procnum=%lu\n", proc_num);
 
         rec->tasks = calloc(proc_num, sizeof(struct task_record_t*));
         /* if prev process info exist produce record*/
