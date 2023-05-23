@@ -1,11 +1,10 @@
-
-
-#ifndef BPF_SAMPLE_H
-#define BPF_SAMPLE_H
+#ifndef BPF_UNITY_NOSCHED_H
+#define BPF_UNITY_NOSCHED_H
 
 #define MAX_MONI_NR	1024
-
+#define MAX_NOSCHED_ELEM	1024
 #define PERF_MAX_STACK_DEPTH	32
+
 struct args {
 	int flag;
 	unsigned long long thresh;
@@ -88,5 +87,8 @@ int call(int t, struct unity_lines *lines);
 void deinit(void);
 
 #endif
-
+struct ksym {
+	long addr;
+	char *name;
+};
 #endif
