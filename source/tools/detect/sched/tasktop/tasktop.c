@@ -28,6 +28,7 @@ time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
 int nr_cpu;
+int* prev_delay;
 static volatile sig_atomic_t exiting;
 
 struct env {
@@ -51,7 +52,8 @@ const char argp_program_doc[] =
     "A light top, display the process/thread cpu utilization in peroid.\n"
     "\n"
 
-    "USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] [-f LOGFILE] [-l "
+    "USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] "
+    "[-f LOGFILE] [-l "
     "LIMIT]\n"
     "\n"
 
@@ -62,7 +64,8 @@ const char argp_program_doc[] =
     "    tasktop -d 5       # modify the sample interval.\n"
     "    tasktop -i 3       # output 3 times then exit.\n"
     "    tasktop -l 20      # limit the records number no more than 20.\n"
-    "    tasktop -f a.log   # log to a.log (default to /var/log/sysak/tasktop/tasktop.log)\n";
+    "    tasktop -f a.log   # log to a.log (default to "
+    "/var/log/sysak/tasktop/tasktop.log)\n";
 
 static const struct argp_option opts[] = {
     {"human", 'H', 0, 0, "Output human-readable time info."},
@@ -73,7 +76,8 @@ static const struct argp_option opts[] = {
     {"logfile", 'f', "LOGFILE", 0,
      "Logfile for result, default /var/log/sysak/tasktop/tasktop.log"},
     {"sort", 's', "SORT", 0,
-     "Sort the result, available options are user, sys and cpu, default is cpu"},
+     "Sort the result, available options are user, sys and cpu, default is "
+     "cpu"},
     {"limit", 'l', "LIMIT", 0, "Specify the top-LIMIT tasks to display"},
     {NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
     {},
@@ -97,7 +101,8 @@ static int parse_long(const char* str, long* retval) {
     long val = strtol(str, &endptr, 10);
 
     /* Check for various possible errors */
-    if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) || (errno != 0 && val == 0)) {
+    if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) ||
+        (errno != 0 && val == 0)) {
         fprintf(stderr, "Failed parse val.\n");
         err = errno;
         return err;
@@ -219,7 +224,44 @@ int swap(void* lhs, void* rhs, size_t sz) {
     return 0;
 }
 
-static int read_stat(struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys,
+static int check_delay(struct sys_record_t* sys_rec) {
+    FILE* fp = fopen(SCHEDSTAT_PATH, "r");
+    int err = 0;
+    if (!fp) {
+        fprintf(stderr, "Failed open stat file.\n");
+        err = errno;
+        goto cleanup;
+    }
+
+    unsigned long long ph;
+    unsigned long long delay;
+    char name[64];
+    char buf[BUF_SIZE];
+    while (fscanf(fp, "%s ", name) != EOF) {
+        if (!strncmp(name, "cpu", 3)) {
+            fscanf(fp, "%llu %llu %llu %llu %llu %llu %llu %llu %llu", &ph, &ph,
+                   &ph, &ph, &ph, &ph, &ph, &delay, &ph);
+
+            int cpu_id = atoi(name + 3);
+            // #ifdef DEBUG
+            //             fprintf(stderr, "cpu_id = %d delay=%llu\n", cpu_id,
+            //             delay);
+            // #endif
+            sys_rec->percpu_sched_delay[cpu_id] = delay - prev_delay[cpu_id];
+            prev_delay[cpu_id] = delay;
+        } else {
+            fgets(buf, BUF_SIZE, fp);
+        }
+    }
+
+cleanup:
+    if (fp) fclose(fp);
+    return err;
+    return 0;
+}
+
+static int read_stat(struct sys_cputime_t* prev_sys,
+                     struct sys_cputime_t* now_sys,
                      struct sys_record_t* sys_rec) {
     int err = 0;
     int i = 0;
@@ -231,29 +273,37 @@ static int read_stat(struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_s
     }
     for (i = 0; i <= nr_cpu; i++) {
         /*now only read first line, maybe future will read more info*/
-        fscanf(fp, "%s %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n", now_sys[i].cpu, &now_sys[i].usr,
-               &now_sys[i].nice, &now_sys[i].sys, &now_sys[i].idle, &now_sys[i].iowait,
-               &now_sys[i].irq, &now_sys[i].softirq, &now_sys[i].steal, &now_sys[i].guest,
-               &now_sys[i].guest_nice);
+        fscanf(fp, "%s %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n",
+               now_sys[i].cpu, &now_sys[i].usr, &now_sys[i].nice,
+               &now_sys[i].sys, &now_sys[i].idle, &now_sys[i].iowait,
+               &now_sys[i].irq, &now_sys[i].softirq, &now_sys[i].steal,
+               &now_sys[i].guest, &now_sys[i].guest_nice);
 
         if (prev_sys[i].usr == 0) continue;
 
-        int now_time = now_sys[i].usr + now_sys[i].sys + now_sys[i].nice + now_sys[i].idle +
-                       now_sys[i].iowait + now_sys[i].irq + now_sys[i].softirq + now_sys[i].steal +
+        int now_time = now_sys[i].usr + now_sys[i].sys + now_sys[i].nice +
+                       now_sys[i].idle + now_sys[i].iowait + now_sys[i].irq +
+                       now_sys[i].softirq + now_sys[i].steal +
                        now_sys[i].guest + now_sys[i].guest_nice;
-        int prev_time = prev_sys[i].usr + prev_sys[i].sys + prev_sys[i].nice + prev_sys[i].idle +
-                        prev_sys[i].iowait + prev_sys[i].irq + prev_sys[i].softirq +
-                        prev_sys[i].steal + prev_sys[i].guest + prev_sys[i].guest_nice;
+        int prev_time = prev_sys[i].usr + prev_sys[i].sys + prev_sys[i].nice +
+                        prev_sys[i].idle + prev_sys[i].iowait +
+                        prev_sys[i].irq + prev_sys[i].softirq +
+                        prev_sys[i].steal + prev_sys[i].guest +
+                        prev_sys[i].guest_nice;
         int all_time = now_time - prev_time;
-        // int all_time = (sysconf(_SC_NPROCESSORS_ONLN) * env.delay * sysconf(_SC_CLK_TCK));
+        // int all_time = (sysconf(_SC_NPROCESSORS_ONLN) * env.delay *
+        // sysconf(_SC_CLK_TCK));
 
-        /* all_time can't not calculate by delay * ticks * online-cpu-num, because there is error
-         * between process waked up and running, when sched delay occur , the sum of cpu rates more
-         * than 100%. */
+        /* all_time can't not calculate by delay * ticks * online-cpu-num,
+         * because there is error between process waked up and running, when
+         * sched delay occur , the sum of cpu rates more than 100%. */
 
-        sys_rec->cpu[i].usr = (double)(now_sys[i].usr - prev_sys[i].usr) * 100 / all_time;
-        sys_rec->cpu[i].sys = (double)(now_sys[i].sys - prev_sys[i].sys) * 100 / all_time;
-        sys_rec->cpu[i].iowait = (double)(now_sys[i].iowait - prev_sys[i].iowait) * 100 / all_time;
+        sys_rec->cpu[i].usr =
+            (double)(now_sys[i].usr - prev_sys[i].usr) * 100 / all_time;
+        sys_rec->cpu[i].sys =
+            (double)(now_sys[i].sys - prev_sys[i].sys) * 100 / all_time;
+        sys_rec->cpu[i].iowait =
+            (double)(now_sys[i].iowait - prev_sys[i].iowait) * 100 / all_time;
     }
 cleanup:
     if (fp) fclose(fp);
@@ -315,7 +365,8 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
             }
 
             while ((task_de = readdir(task_dir)) != NULL) {
-                if (task_de->d_type != DT_DIR || !strcmp(task_de->d_name, ".") ||
+                if (task_de->d_type != DT_DIR ||
+                    !strcmp(task_de->d_name, ".") ||
                     !strcmp(task_de->d_name, ".."))
                     continue;
                 err = parse_long(task_de->d_name, &val);
@@ -382,11 +433,13 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
     fscanf(fp,
            "%d %s %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld "
            "%ld %ld %ld %llu",
-           &proc_info.pid, &proc_info.comm[0], &proc_info.state, &proc_info.ppid, &proc_info.pgrp,
-           &proc_info.session, &proc_info.tty_nr, &proc_info.tpgid, &proc_info.flags,
-           &proc_info.minflt, &proc_info.cminflt, &proc_info.majflt, &proc_info.cmajflt,
-           &proc_info.utime, &proc_info.stime, &proc_info.cutime, &proc_info.cstime,
-           &proc_info.priority, &proc_info.nice, &proc_info.num_threads, &proc_info.itrealvalue,
+           &proc_info.pid, &proc_info.comm[0], &proc_info.state,
+           &proc_info.ppid, &proc_info.pgrp, &proc_info.session,
+           &proc_info.tty_nr, &proc_info.tpgid, &proc_info.flags,
+           &proc_info.minflt, &proc_info.cminflt, &proc_info.majflt,
+           &proc_info.cmajflt, &proc_info.utime, &proc_info.stime,
+           &proc_info.cutime, &proc_info.cstime, &proc_info.priority,
+           &proc_info.nice, &proc_info.num_threads, &proc_info.itrealvalue,
            &proc_info.starttime);
 
     data->utime = proc_info.utime;
@@ -397,7 +450,8 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
 
     strcpy(data->comm, proc_info.comm);
 
-    time_t run_time = time(0) - btime - (now[pid]->starttime / sysconf(_SC_CLK_TCK));
+    time_t run_time =
+        time(0) - btime - (now[pid]->starttime / sysconf(_SC_CLK_TCK));
 
     if (prev[pid] && !strcmp(prev[pid]->comm, now[pid]->comm)) {
         long udelta = now[pid]->utime - prev[pid]->utime;
@@ -411,7 +465,8 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
                 (*rec)->pid = now[pid]->pid;
                 (*rec)->ppid = now[pid]->ppid;
                 (*rec)->runtime = run_time;
-                (*rec)->begin_ts = btime + now[pid]->starttime / sysconf(_SC_CLK_TCK);
+                (*rec)->begin_ts =
+                    btime + now[pid]->starttime / sysconf(_SC_CLK_TCK);
                 (*rec)->user_cpu_rate = (double)udelta * 100 / base;
                 (*rec)->system_cpu_rate = (double)sdelta * 100 / base;
                 (*rec)->all_cpu_rate = (double)(udelta + sdelta) * 100 / base;
@@ -425,7 +480,8 @@ cleanup:
     return err;
 }
 
-static void sort_records(struct record_t* rec, int proc_num, enum sort_type sort) {
+static void sort_records(struct record_t* rec, int proc_num,
+                         enum sort_type sort) {
     struct task_record_t** records = rec->tasks;
     int i, j;
     for (i = 0; i < proc_num; i++) {
@@ -457,7 +513,8 @@ static void sort_records(struct record_t* rec, int proc_num, enum sort_type sort
                 }
 
                 if (lth < rth) {
-                    swap(&records[i], &records[j], sizeof(struct task_record_t*));
+                    swap(&records[i], &records[j],
+                         sizeof(struct task_record_t*));
                 }
             }
         }
@@ -521,18 +578,23 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
 
     fprintf(dest, "%s\n", ts2str(now, stime_str, BUF_SIZE));
     fprintf(dest, "UTIL&LOAD\n");
-    fprintf(dest, "%6s %6s %6s %6s %6s %6s %6s :%5s \n", "usr", "sys", "iowait", "load1", "R", "D",
-            "fork", "proc");
+    fprintf(dest, "%6s %6s %6s %6s %6s %6s %6s :%5s \n", "usr", "sys", "iowait",
+            "load1", "R", "D", "fork", "proc");
 
-    fprintf(dest, "%6.1f %6.1f %6.1f %6.1f %6d %6d %6d", sys->cpu[0].usr, sys->cpu[0].sys,
-            sys->cpu[0].iowait, sys->load1, sys->nr_R, sys->nr_D, sys->nr_fork);
-    fprintf(dest, " : %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid, info->ppid, info->fork);
+    fprintf(dest, "%6.1f %6.1f %6.1f %6.1f %6d %6d %6d", sys->cpu[0].usr,
+            sys->cpu[0].sys, sys->cpu[0].iowait, sys->load1, sys->nr_R,
+            sys->nr_D, sys->nr_fork);
+    fprintf(dest, " : %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid,
+            info->ppid, info->fork);
 
 #ifdef DEBUG
+    fprintf(dest, "[ cpu ] %6s %6s %6s %10s\n", "usr", "sys", "iowait",
+            "delay(ns)");
     for (i = 1; i <= nr_cpu; i++) {
-        fprintf(dest, "%6.1f %6.1f %6.1f\n", sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].iowait);
+        fprintf(dest, "[cpu-%d] %6.1f %6.1f %6.1f %10.1d\n", i - 1,
+                sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].iowait,
+                sys->percpu_sched_delay[i - 1]);
     }
-
 #endif
     for (i = 0; i < proc_num; i++) {
         if (!records[i]) break;
@@ -540,26 +602,30 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
         if (env.human) {
             if (i == 0) {
                 fprintf(dest, "TASKTOP\n");
-                fprintf(dest, "%18s %6s %6s %20s %15s %6s %6s %6s\n", "COMMAND", "PID", "PPID",
-                        "START", "RUN", "%UTIME", "%STIME", "%CPU");
+                fprintf(dest, "%18s %6s %6s %20s %15s %6s %6s %6s\n", "COMMAND",
+                        "PID", "PPID", "START", "RUN", "%UTIME", "%STIME",
+                        "%CPU");
             }
 
             if (i >= env.limit) break;
-            fprintf(dest, "%18s %6d %6d %20s %15s %6.1f %6.1f %6.1f\n", records[i]->comm,
-                    records[i]->pid, records[i]->ppid,
+            fprintf(dest, "%18s %6d %6d %20s %15s %6.1f %6.1f %6.1f\n",
+                    records[i]->comm, records[i]->pid, records[i]->ppid,
                     ts2str(records[i]->begin_ts, stime_str, BUF_SIZE),
-                    second2str(records[i]->runtime, rtime_str, BUF_SIZE), records[i]->user_cpu_rate,
-                    records[i]->system_cpu_rate, records[i]->all_cpu_rate);
+                    second2str(records[i]->runtime, rtime_str, BUF_SIZE),
+                    records[i]->user_cpu_rate, records[i]->system_cpu_rate,
+                    records[i]->all_cpu_rate);
         } else {
             if (i == 0) {
                 fprintf(dest, "TASKTOP\n");
-                fprintf(dest, "%18s %6s %6s %10s %10s %6s %6s %6s\n", "COMMAND", "PID", "PPID",
-                        "START", "RUN", "%UTIME", "%STIME", "%CPU");
+                fprintf(dest, "%18s %6s %6s %10s %10s %6s %6s %6s\n", "COMMAND",
+                        "PID", "PPID", "START", "RUN", "%UTIME", "%STIME",
+                        "%CPU");
             }
 
             if (i >= env.limit) break;
-            fprintf(dest, "%18s %6d %6d %10ld %10ld %6.1f %6.1f %6.1f\n", records[i]->comm,
-                    records[i]->pid, records[i]->ppid, records[i]->begin_ts, records[i]->runtime,
+            fprintf(dest, "%18s %6d %6d %10ld %10ld %6.1f %6.1f %6.1f\n",
+                    records[i]->comm, records[i]->pid, records[i]->ppid,
+                    records[i]->begin_ts, records[i]->runtime,
                     records[i]->user_cpu_rate, records[i]->system_cpu_rate,
                     records[i]->all_cpu_rate);
         }
@@ -568,8 +634,10 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
 }
 
 static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
-                        struct task_cputime_t** prev_task, struct task_cputime_t** now_task,
-                        struct sys_cputime_t* prev_sys, struct sys_cputime_t* now_sys) {
+                        struct task_cputime_t** prev_task,
+                        struct task_cputime_t** now_task,
+                        struct sys_cputime_t* prev_sys,
+                        struct sys_cputime_t* now_sys) {
     int i;
     for (i = 0; i < pidmax; i++) {
         if (prev_task[i]) {
@@ -590,8 +658,9 @@ static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
     swap(prev_sys, now_sys, sizeof(struct sys_cputime_t) * (nr_cpu + 1));
 }
 
-static int make_records(struct id_pair_t* pids, int proc_num, struct record_t* rec,
-                        struct task_cputime_t** prev_task, struct task_cputime_t** now_task) {
+static int make_records(struct id_pair_t* pids, int proc_num,
+                        struct record_t* rec, struct task_cputime_t** prev_task,
+                        struct task_cputime_t** now_task) {
     struct task_record_t** records = rec->tasks;
     int err = 0;
     u_int64_t i;
@@ -636,7 +705,8 @@ static FILE* open_logfile() {
     return stat_log;
 }
 
-static int libbpf_print_fn(enum libbpf_print_level level, const char* format, va_list args) {
+static int libbpf_print_fn(enum libbpf_print_level level, const char* format,
+                           va_list args) {
     return vfprintf(stderr, format, args);
 }
 
@@ -649,7 +719,7 @@ static int bump_memlock_rlimit(void) {
     return setrlimit(RLIMIT_MEMLOCK, &rlim_new);
 }
 
-static int look_fork(int cnt_map_fd, int fork_map_fd, struct sys_record_t* sys_rec) {
+static int check_fork(int fork_map_fd, struct sys_record_t* sys_rec) {
     int fd;
     int err;
     u_int64_t total = 0;
@@ -663,7 +733,7 @@ static int look_fork(int cnt_map_fd, int fork_map_fd, struct sys_record_t* sys_r
 
         err = bpf_map_delete_elem(fd, &next_key);
         if (err < 0) {
-            fprintf(stderr, "failed to delete elem: %d\n", err);
+            fprintf(stderr, "Failed to delete elem: %d\n", err);
             return -1;
         }
         lookup_key = next_key;
@@ -685,13 +755,15 @@ static void sigint_handler(int signo) { exiting = 1; }
 
 int main(int argc, char** argv) {
     int err = 0;
-    int cnt_map_fd = -1, fork_map_fd = -1;
+    int fork_map_fd = -1;
     FILE* stat_log = 0;
     struct tasktop_bpf* skel = 0;
     struct id_pair_t* pids = 0;
     struct task_cputime_t **prev_task = 0, **now_task = 0;
     struct sys_cputime_t *prev_sys = 0, *now_sys = 0;
     struct record_t* rec = 0;
+
+    prev_delay = calloc(nr_cpu, sizeof(int));
 
     nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -731,6 +803,8 @@ int main(int argc, char** argv) {
 
     rec = calloc(1, sizeof(struct record_t));
     rec->sys.cpu = calloc(nr_cpu + 1, sizeof(struct cpu_util_t));
+    rec->sys.percpu_sched_delay = calloc(nr_cpu, sizeof(int));
+
     pids = calloc(pidmax, sizeof(struct id_pair_t));
     prev_task = calloc(pidmax, sizeof(struct task_cputime_t*));
     now_task = calloc(pidmax, sizeof(struct task_cputime_t*));
@@ -762,8 +836,8 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
-    cnt_map_fd = bpf_map__fd(skel->maps.cnt_map);
     fork_map_fd = bpf_map__fd(skel->maps.fork_map);
+
     err = tasktop_bpf__attach(skel);
     if (err) {
         fprintf(stderr, "Failed to attach BPF skeleton\n");
@@ -772,7 +846,8 @@ int main(int argc, char** argv) {
 
     bool first = true;
     while (env.nr_iter-- && !exiting) {
-        look_fork(cnt_map_fd, fork_map_fd, &rec->sys);
+        check_delay(&rec->sys);
+        check_fork(fork_map_fd, &rec->sys);
         runnable_proc(&rec->sys);
         unint_proc(&rec->sys);
         read_stat(prev_sys, now_sys, &rec->sys);
@@ -784,6 +859,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "Failed read all pids.\n");
             goto cleanup;
         }
+        printf("procnum=%lu\n", proc_num);
 
         rec->tasks = calloc(proc_num, sizeof(struct task_record_t*));
         /* if prev process info exist produce record*/
@@ -805,7 +881,8 @@ int main(int argc, char** argv) {
         free_records(rec, proc_num);
 
         /* update old info and free nonexist process info */
-        now_to_prev(pids, proc_num, pidmax, prev_task, now_task, prev_sys, now_sys);
+        now_to_prev(pids, proc_num, pidmax, prev_task, now_task, prev_sys,
+                    now_sys);
 
         if (env.nr_iter) sleep(env.delay);
     }
