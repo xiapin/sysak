@@ -11,37 +11,17 @@
 ---
 
 require("common.class")
-local unistd = require("posix.unistd")
+local exec = require("common.exec")
 local pwait = require("posix.sys.wait")
-local signal = require("posix.signal")
 local pystring = require("common.pystring")
 local system = require("common.system")
 local CvProc = require("collector.vproc")
 
 local CforkRun = class("execBase", CvProc)
 
-local function run(cmd, args)
-    local pid, err = unistd.fork()
-    if pid > 0 then   -- for self
-        return pid
-    elseif pid == 0 then   -- for child
-        local errno
-        prctl_death_kill()
-        _, err, errno = unistd.exec(cmd, args)
-        assert(not errno, "exec failed." .. err .. errno)
-    else
-        error("fork report" .. err)
-    end
-end
-
-local function kill(pid)
-    signal.kill(pid, signal.SIGKILL)  -- force to kill task
-    pwait.wait(pid)                     -- wait task
-end
-
 function CforkRun:_init_(opts, proto, pffi, mnt)
     CvProc._init_(self, proto, pffi, mnt)
-    self._pid = run(opts.cmd, opts.args)
+    self._pid = exec.run(opts.cmd, opts.args)
     self._opts = opts
 
     print("fork run: ",  self._pid)
@@ -49,7 +29,7 @@ end
 
 function CforkRun:_del_()
     if self._pid then
-        kill(self._pid)
+        exec.kill(self._pid)
     end
     print("kill " .. self._pid)
 end
@@ -63,11 +43,6 @@ function CforkRun:proc(elapsed, lines)
         self._pid = nil
         return -1
     end
-end
-
-local function kill(pid)
-    signal.kill(pid, signal.SIGKILL)  -- force to kill task
-    pwait.wait(pid)                     -- wait task
 end
 
 return CforkRun

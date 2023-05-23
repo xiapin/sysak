@@ -10,11 +10,12 @@ local dockerinfo = require("common.dockerinfo")
 local cjson = require("cjson.safe")
 local json = cjson.new()
 
-function Cplugin:_init_(resYaml, ffi, proto_q, so)
+function Cplugin:_init_(resYaml, ffi, proto_q, so, loop)
     self._ffi = ffi
     self._cffi = self._ffi.load(so)
     self._cffi.init(proto_q)
     self._so = so
+    self._loop = loop or -1
     self.proc_fs = resYaml.config["proc_path"] or "/"
     self.fill_arg = {["podname"]="pid"}
 end
@@ -103,6 +104,15 @@ function Cplugin:proc(t, lines)
         self:_proc(unity_lines, lines)
     end
     self._ffi.C.free(unity_lines.line)   -- should free memory.
+
+    local loop = self._loop
+    if loop > 0 then
+        loop = loop - 1
+        if loop == 0 then
+            return -1 -- to remove
+        end
+        self._loop = loop
+    end
 end
 
 return Cplugin

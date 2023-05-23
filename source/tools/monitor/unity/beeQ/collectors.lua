@@ -133,6 +133,7 @@ function work(que, proto_q, yaml, tid)
     engine, unit = setupPostEngine(que, proto_q, fYaml, tid)
     engine:setTask(main.postPlugin.tasks)
     e:addEvent("postEngine", engine, unit)
+    engine:setMainloop(main)
 
     return e:proc()
 end

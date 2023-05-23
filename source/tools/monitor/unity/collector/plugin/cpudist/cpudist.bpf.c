@@ -33,7 +33,7 @@ int sched_switch_hook(struct sched_switch_args *args){
     }
     pv = bpf_map_lookup_elem(&start, &prev);
     if (pv && ts > *pv) {
-        hist10_push((struct bpf_map_def *)&cpudist, (ts - *pv) / 1000);
+        hist10_push((struct bpf_map_def *)&cpudist, (ts - *pv) / 1000 * 10);
     }
     return 0;
 }

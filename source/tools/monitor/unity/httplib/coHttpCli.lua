@@ -472,7 +472,7 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
                 end
                 ::continue::
             end
-            res = cffi.mod_fd(self._efd, fd, 0)  -- epoll read ev only
+            res = cffi.mod_fd(efd, fd, 0)  -- epoll read ev only
             checkInt(-res, fd)
             if res < 0 then
                 print("mod_fd socket failed")

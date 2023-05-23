@@ -8,6 +8,7 @@ require("common.class")
 local CpluginManager = class("pluginManager")
 local CguardSched = require("collector.guard.guardSched")
 local Cplugin = require("collector.plugin")
+local system = require("common.system")
 
 function CpluginManager:_init_(procffi, proto_q, resYaml, tid, jperiod)
     local res = resYaml
@@ -20,6 +21,9 @@ function CpluginManager:_init_(procffi, proto_q, resYaml, tid, jperiod)
     self._names = {}
     self:setup(res, proto_q)
     self._guardSched = CguardSched.new(tid, self._plugins, self._names, jperiod)
+
+    self._resYaml = resYaml   -- for add function
+    self._proto_q = proto_q
 end
 
 function CpluginManager:_del_()
@@ -39,6 +43,14 @@ function CpluginManager:setup(resYaml, proto_q)
             table.insert(self._plugins, Cplugin.new(resYaml, pluginFFI, proto_q, so))
             table.insert(self._names, so)
         end
+    end
+end
+
+function CpluginManager:add(name, loops)
+    local pluginFFI = require("collector.native.plugincffi")
+    if not system:valueIsIn(self._names, name) then
+        table.insert(self._plugins, Cplugin.new(self._resYaml, pluginFFI, self._proto_q, name, loops))
+        table.insert(self._names, name)
     end
 end
 

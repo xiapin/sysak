@@ -17,7 +17,9 @@ int init(void *arg)
     int ret;
     printf("cpudist plugin install.\n");
     ret = LOAD_SKEL_OBJECT(cpudist, perf);
-    dist_fd = coobpf_map_find(cpudist->obj, "cpudist");
+    if (ret >= 0) {
+        dist_fd = coobpf_map_find(cpudist->obj, "cpudist");
+    }
     return ret;
 }
 

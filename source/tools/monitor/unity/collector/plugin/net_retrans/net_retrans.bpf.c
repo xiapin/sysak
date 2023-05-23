@@ -26,12 +26,15 @@ struct liphdr {
 
 BPF_PERF_OUTPUT(perf, 1024);
 BPF_STACK_TRACE(stack, MAX_ENTRY);
-BPF_HASH(outCnt, int, u64, NET_RETRANS_TYPE_MAX);
+BPF_ARRAY(outCnt, u64, NET_RETRANS_TYPE_MAX + 1);
 
 static inline void addCnt(int k, u64 val) {
+    k += 1;
     u64 *pv = bpf_map_lookup_elem(&outCnt, &k);
     if (pv) {
         __sync_fetch_and_add(pv, val);
+    } else {
+        bpf_map_update_elem(&outCnt, &k, &val, BPF_ANY);
     }
 }
 
