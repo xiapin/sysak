@@ -13,6 +13,7 @@
 #define DEBUG_LOG "./log/debug.log"
 #define PIDMAX_PATH "/proc/sys/kernel/pid_max"
 #define PROC_STAT_PATH "/proc/stat"
+#define SCHEDSTAT_PATH "/proc/schedstat"
 
 enum sort_type { SORT_SYSTEM, SORT_USER, SORT_CPU };
 
@@ -96,6 +97,8 @@ typedef struct sys_record_t {
     int nr_D;
     int nr_fork;
     struct proc_fork_info_t most_fork_info;
+
+    int *percpu_sched_delay;
 } sys_record_t;
 
 struct record_t {

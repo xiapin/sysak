@@ -29,20 +29,6 @@ struct {
     __type(value, u64);
 } cnt_map SEC(".maps");
 
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1024);
-    __type(key, u32);
-    __type(value, u64);
-} sched_delay_map SEC(".maps");
-
-struct {
-    __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 4096);
-    __type(key, u64);
-    __type(value, u64);
-} sched_info_map SEC(".maps");
-
 struct trace_event_sched_process_fork_args {
     struct trace_entry ent;
     char parent_comm[16];
@@ -88,50 +74,6 @@ SEC("tp/sched/sched_process_fork")
 int handle__sched_process_fork(struct trace_event_sched_process_fork_args *ctx) {
     update_cnt_map();
     update_fork_map();
-    return 0;
-}
-
-SEC("kprobe/sched_info_map_queued")
-int handle_enqueue() {
-    u64 now, pid;
-
-    pid = bpf_get_current_pid_tgid() & (((u64)1 << 32) - 1);
-    now = bpf_ktime_get_ns();
-    bpf_map_update_elem(&sched_info_map, &pid, &now, BPF_ANY);
-    return 0;
-}
-
-static void acc_delay() {
-    u32 cpu_id;
-    u64 *delay;
-    u64 zero = 0;
-    u64 *enqueue_ts, now, pid, delta;
-    pid = bpf_get_current_pid_tgid() & (((u64)1 << 32) - 1);
-    enqueue_ts = bpf_map_lookup_elem(&sched_info_map, &pid);
-
-    if (enqueue_ts) {
-        cpu_id = bpf_get_smp_processor_id();
-        now = bpf_ktime_get_ns();
-        delta = now - *enqueue_ts;
-
-        delay = bpf_map_lookup_elem(&sched_delay_map, &cpu_id);
-        if (delay) {
-            __sync_fetch_and_add(delay, delta);
-        } else {
-            bpf_map_update_elem(&sched_delay_map, &cpu_id, &delta, BPF_ANY);
-        }
-    }
-}
-
-SEC("kprobe/rq_sched_info_map_dequeued")
-int handle_dequeue() {
-    acc_delay();
-    return 0;
-}
-
-SEC("kprobe/rq_sched_info_map_arrive")
-int handle_arrive() {
-    acc_delay();
     return 0;
 }
 
