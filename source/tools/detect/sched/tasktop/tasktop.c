@@ -224,7 +224,7 @@ int swap(void* lhs, void* rhs, size_t sz) {
     return 0;
 }
 
-static int check_delay(struct sys_record_t* sys_rec) {
+static int read_sched_delay(struct sys_record_t* sys_rec) {
     FILE* fp = fopen(SCHEDSTAT_PATH, "r");
     int err = 0;
     if (!fp) {
@@ -260,6 +260,39 @@ cleanup:
     return 0;
 }
 
+static int read_cgroup_throttle() {
+#define TEMPPATH "/sys/fs/cgroup/cpu/cg_stress/cpu.stat"
+    cgroup_cpu_stat_t stat;
+    memset(&stat, 0, sizeof(cgroup_cpu_stat_t));
+    char name[128];
+    unsigned long long val;
+    int err = 0;
+    FILE* fp = fopen(TEMPPATH, "r");
+    if (!fp) {
+        fprintf(stderr, "Failed open cpu.stat[%s].\n", TEMPPATH);
+        err = errno;
+        return err;
+    }
+
+    while (fscanf(fp, "%s %llu", name, &val) != EOF) {
+        if (!strcmp(name, "nr_periods")) {
+            stat.nr_periods = val;
+        } else if (!strcmp(name, "nr_throttled")) {
+            stat.nr_throttled = val;
+        } else if (!strcmp(name, "throttled_time")) {
+            stat.throttled_time = val;
+        } else if (!strcmp(name, "nr_burst")) {
+            stat.nr_burst = val;
+        } else if (!strcmp(name, "burst_time")) {
+            stat.burst_time = val;
+        }
+    }
+#ifdef DEBUG
+    fprintf(stderr, "%d %d %llu %d %llu\n", stat.nr_periods, stat.nr_throttled,
+            stat.throttled_time, stat.nr_burst, stat.burst_time);
+#endif
+    return err;
+}
 static int read_stat(struct sys_cputime_t* prev_sys,
                      struct sys_cputime_t* now_sys,
                      struct sys_record_t* sys_rec) {
@@ -314,6 +347,7 @@ static u_int64_t read_pid_max() {
     int err = 0;
     FILE* fp = fopen(PIDMAX_PATH, "r");
     if (!fp) {
+        fprintf(stderr, "Failed read pid max.\n");
         err = errno;
         return err;
     }
@@ -846,7 +880,8 @@ int main(int argc, char** argv) {
 
     bool first = true;
     while (env.nr_iter-- && !exiting) {
-        check_delay(&rec->sys);
+        read_cgroup_throttle();
+        read_sched_delay(&rec->sys);
         check_fork(fork_map_fd, &rec->sys);
         runnable_proc(&rec->sys);
         unint_proc(&rec->sys);

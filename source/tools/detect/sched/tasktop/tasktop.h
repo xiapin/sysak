@@ -81,6 +81,16 @@ struct task_record_t {
     double all_cpu_rate;
 };
 
+typedef struct cgroup_cpu_stat_t {
+    int nr_periods;
+    int nr_throttled;
+    unsigned long long throttled_time;
+    unsigned long long wait_sum;
+    unsigned long long current_bw;
+    int nr_burst;
+    unsigned long long burst_time;
+} cgroup_cpu_stat_t;
+
 typedef struct cpu_util_t {
     double usr;
     double sys;
