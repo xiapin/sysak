@@ -250,18 +250,19 @@ function CLocalBeaver:_proc(fd)
     end
 end
 
-function CLocalBeaver:co_add(fd)
-    local res = self._cffi.add_fd(self._efd, fd)
+function CLocalBeaver:co_add(fd, cb)
+    local res = self._cffi.add_fd(self._efd, fd)  -- add to epoll fd
     assert(res >= 0)
 
-    local co = coroutine.create(function(o, fd)  self._proc(o, fd) end)
+    local co = coroutine.create(function(o, fd)  cb(o, fd) end)
     self._cos[fd] = co
+
     local res, msg = coroutine.resume(co, self, fd)
     assert(res, msg)
 end
 
 function CLocalBeaver:co_exit(fd)
-    local res = self._cffi.del_fd(self._efd, fd)
+    local res = self._cffi.del_fd(self._efd, fd)   -- remove from epoll fd
     assert(res >= 0)
 
     self._cos[fd] = nil
@@ -274,7 +275,7 @@ function CLocalBeaver:accept(fd, e)
     else
         local nfd, err, errno = socket.accept(fd)
         if nfd then
-            self:co_add(nfd)
+            self:co_add(nfd, self._proc)
             self:_installTmo(nfd)
         else
             system:posixError("accept new socket failed", err, errno)
