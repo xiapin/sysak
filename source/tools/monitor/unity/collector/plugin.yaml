@@ -26,6 +26,27 @@ forkRun:
     cmd: "/usr/bin/python"
     args: ["../test/curl/forkRun.py"]
 
+diagnose:
+  io_hang:
+    block: 60
+    time: 15
+    cmd: "../../../iosdiag"
+    report:
+      title: "iosdiag"
+      files:
+        - "/var/log/sysak/iosdiag/hangdetect/result.log.stat"
+        - "/var/log/sysak/iosdiag/hangdetect/result.log.seq"
+  net_edge:
+    block: 300
+    time: 60
+    so:
+      virtiostat: 15
+    cmd: "../../../netCli"
+  jruntime:
+    block: 60
+    time: 30
+    cmd: "../../../java_collect"
+
 outline:
   - /var/sysom/outline
 

@@ -29,6 +29,9 @@ function Cengine:_init_(que, proto_q, fYaml, tid)
     self._fYaml = fYaml
     self._tid  = tid
     self._task = nil
+
+    local res = system:parseYaml(fYaml)
+    self._resDiag = res.diagnose
     self._diags = {}
 end
 
@@ -50,6 +53,7 @@ function Cengine:run(e, res, diag)
     local so = diag.so
     if so then
         for plugin, loop in pairs(so) do
+            print(plugin, loop)
             self._main.soPlugins:add(plugin, loop)
         end
     end
@@ -70,10 +74,11 @@ function Cengine:pushTask(e, msgs)
             local second = res.second or 1
             local exec = CexecBase.new(execCmd, args, second)
             exec:addEvents(e)
-        elseif cmd == "diag" then
+        elseif cmd == "diag" and self._resDiag then
             local exec = res.exec
-            local diag = diagExec[exec]
+            local diag = self._resDiag[exec]
             if diag then
+                system:dumps(diag)
                 if self._diags[exec] then
                     print("cmd " .. exec .. " is blocking.")
                 else
