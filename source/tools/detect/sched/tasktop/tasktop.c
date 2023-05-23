@@ -261,36 +261,50 @@ cleanup:
 }
 
 static int read_cgroup_throttle() {
-#define TEMPPATH "/sys/fs/cgroup/cpu/cg_stress/cpu.stat"
-    cgroup_cpu_stat_t stat;
-    memset(&stat, 0, sizeof(cgroup_cpu_stat_t));
-    char name[128];
-    unsigned long long val;
+#define CGROUP_PATH "/sys/fs/cgroup/cpu"
     int err = 0;
-    FILE* fp = fopen(TEMPPATH, "r");
-    if (!fp) {
-        fprintf(stderr, "Failed open cpu.stat[%s].\n", TEMPPATH);
-        err = errno;
-        return err;
+    DIR* root_dir = opendir(CGROUP_PATH);
+    struct dirent* dir = 0;
+    while ((dir = readdir(root_dir)) != NULL) {
+        if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, "..") ||
+            dir->d_type != DT_DIR) {
+            continue;
+        }
+        char stat_path[BUF_SIZE];
+        snprintf(stat_path, BUF_SIZE, "%s/%s", CGROUP_PATH, dir->d_name);
+
+        cgroup_cpu_stat_t stat;
+
+        memset(&stat, 0, sizeof(cgroup_cpu_stat_t));
+        char name[128];
+        unsigned long long val;
+        FILE* fp = fopen(stat_path, "r");
+        if (!fp) {
+            fprintf(stderr, "Failed open cpu.stat[%s].\n", stat_path);
+            err = errno;
+            return err;
+        }
+
+        while (fscanf(fp, "%s %llu", name, &val) != EOF) {
+            if (!strcmp(name, "nr_periods")) {
+                stat.nr_periods = val;
+            } else if (!strcmp(name, "nr_throttled")) {
+                stat.nr_throttled = val;
+            } else if (!strcmp(name, "throttled_time")) {
+                stat.throttled_time = val;
+            } else if (!strcmp(name, "nr_burst")) {
+                stat.nr_burst = val;
+            } else if (!strcmp(name, "burst_time")) {
+                stat.burst_time = val;
+            }
+        }
+#ifdef DEBUG
+        fprintf(stderr, "[%-30s] nr_periods=%d nr_throttled=%d throttled_time=%llu nr_burst=%d burst_time=%llu\n", stat_path, stat.nr_periods,
+                stat.nr_throttled, stat.throttled_time, stat.nr_burst,
+                stat.burst_time);
+#endif
     }
 
-    while (fscanf(fp, "%s %llu", name, &val) != EOF) {
-        if (!strcmp(name, "nr_periods")) {
-            stat.nr_periods = val;
-        } else if (!strcmp(name, "nr_throttled")) {
-            stat.nr_throttled = val;
-        } else if (!strcmp(name, "throttled_time")) {
-            stat.throttled_time = val;
-        } else if (!strcmp(name, "nr_burst")) {
-            stat.nr_burst = val;
-        } else if (!strcmp(name, "burst_time")) {
-            stat.burst_time = val;
-        }
-    }
-#ifdef DEBUG
-    fprintf(stderr, "%d %d %llu %d %llu\n", stat.nr_periods, stat.nr_throttled,
-            stat.throttled_time, stat.nr_burst, stat.burst_time);
-#endif
     return err;
 }
 static int read_stat(struct sys_cputime_t* prev_sys,
