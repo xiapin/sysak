@@ -14,9 +14,15 @@ EXTRA_CGO_CFLAGS := -I$(abspath ./ebpf/src/libbpf/lib/include) \
 EXTRA_CGO_LDFLAGS := -L$(abspath ./ebpf/src/libbpf/lib/lib64) -lbpf \
 		-L$(abspath ./ebpf/src/bcc/lib/lib) -lbcc-syms -lstdc++ -lelf -lz \
 		-L$(abspath ./ebpf/src/lib) -lnginx
+
+.PHONY: goenv
+goenv:
+	@echo "Config Golang Env..."
+	bash ./config_goenv.sh
+
 .PHONY: build
 build:
-	@echo "COMPLIE GOLANG..."
+	@echo "Complie Golong Code..." \
 	CGO_CFLAGS="$(EXTRA_CGO_CFLAGS)" \
 	CGO_LDFLAGS="$(EXTRA_CGO_LDFLAGS)" \
 	go build -ldflags "-linkmode external -extldflags '-static' -X 'main.version=$(RELEASE_VERSION)' \
