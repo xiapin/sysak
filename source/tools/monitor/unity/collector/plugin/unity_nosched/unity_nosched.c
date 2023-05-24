@@ -5,26 +5,85 @@
 #include <limits.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include "unity_nosched.h"
 #include "sched_jit.h"
 #include "unity_nosched.skel.h"
 #include "../../../../unity/beeQ/beeQ.h"
 
+#define MAX_NOSCHED_ELEM	1024
 #ifdef __x86_64__
 #define	TIF_NEED_RESCHED	3
 #elif defined (__aarch64__)
 #define TIF_NEED_RESCHED	1
 #endif
 
+char log_dir[] = "/var/log/sysak/nosched";
+char filename[] = "/var/log/sysak/nosched/unity_nosched.log";
+
+struct evelem {
+	struct event e;
+	time_t t;
+};
+
+struct stackinfo {
+	int stackfd, fhead, bhead;
+	struct evelem elem[MAX_NOSCHED_ELEM];
+};
+
+FILE *logfp;
 unsigned int nr_cpus;
 struct sched_jit_summary summary, prev;
+struct stackinfo globEv;
+
+static struct ksym *ksyms;
+void print_stack(int fd, __u32 ret, struct ksym *syms, FILE *fp);
+int load_kallsyms(struct ksym **pksyms);
+
+static int prepare_directory(char *path)
+{
+	int ret;
+
+	ret = mkdir(path, 0777);
+	if (ret < 0 && errno != EEXIST)
+		return errno;
+	else
+		return 0;
+}
+
+void flush_to_file(struct stackinfo *ev, int index)
+{
+	int tmphd;
+
+	if (ev->fhead == ev->bhead)
+		return;
+	if (index < 0)
+		index = ev->bhead;
+	printf("will flush: fhead=%d, bhead=%d, index=%d\n",
+		ev->fhead, ev->bhead, index);
+	tmphd = ev->fhead;
+	ev->fhead = index;
+	if (index < tmphd)
+		index = index + MAX_NOSCHED_ELEM;
+	for (; tmphd < index; tmphd++) {
+		char ts[64];
+		struct tm *tm;
+		int i = tmphd%MAX_NOSCHED_ELEM;
+		tm = localtime(&globEv.elem[i].t);
+		strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
+		fprintf(logfp, "%-18.6f %-5d %-15s %-8d %-10llu %-21s\n",
+			((double)globEv.elem[i].e.stamp/1000000000), globEv.elem[i].e.cpu,
+			globEv.elem[i].e.comm, globEv.elem[i].e.pid, globEv.elem[i].e.delay,
+			(globEv.elem[i].e.exit==globEv.elem[i].e.stamp)?"(EOF)":ts);
+		print_stack(globEv.stackfd, globEv.elem[i].e.ret, ksyms, logfp);
+	}
+}
 
 static void update_summary(struct sched_jit_summary* summary, const struct event *e)
 {
 	summary->num++;
 	summary->total += e->delay;
-
 	if (e->delay < 10) {
 		summary->less10ms++;
 	} else if (e->delay < 50) {
@@ -40,6 +99,23 @@ static void update_summary(struct sched_jit_summary* summary, const struct event
 	}
 }
 
+void record_stack(struct event *e)
+{
+	time_t t;
+	int idex = globEv.bhead;
+
+	time(&t);
+	globEv.elem[idex].e = *e;
+	globEv.elem[idex].t = t;
+	idex++;
+	if (idex > MAX_NOSCHED_ELEM) {
+		/*flush_to_file(&globEv, 0);*/
+		globEv.bhead = 0;
+	} else {
+		globEv.bhead = idex;
+	}
+}
+
 void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 {
 	struct event e; 
@@ -49,10 +125,14 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e.delay = e.delay/(1000*1000);
 	if (e.cpu > nr_cpus - 1)
 		return;
+	if (e.delay > 100) {	/* we use 100ms to control the frequency of output */
+		printf("delay=%lld\n", e.delay);
+		record_stack(&e);
+		printf("record_stack over\n");
+	}
 	if (e.exit != 0)
 		update_summary(&summary, &e);
 }
-
 
 DEFINE_SEKL_OBJECT(unity_nosched);
 
@@ -71,10 +151,28 @@ static void bump_memlock_rlimit1(void)
 
 int init(void *arg)
 {
-	int err, argfd, args_key;
 	struct args args;
+	int err, ret, argfd, args_key;
 
+	err = prepare_directory(log_dir);
+	if (err) {
+		printf("prepare_dictory fail\n");
+		return err;
+	}
+	logfp = fopen(filename, "w+");
+	if (!logfp) {
+		int ret = errno;
+		fprintf(stderr, "%s :fopen %s\n",
+		strerror(errno), filename);
+		return ret;
+	}
 	bump_memlock_rlimit1();
+	ksyms = NULL;
+	err = load_kallsyms(&ksyms);
+	if (err) {
+		fprintf(stderr, "Failed to load kallsyms\n");
+		return err;
+	}
 	unity_nosched = unity_nosched_bpf__open();
 	if (!unity_nosched) {
 		err = errno;
@@ -93,7 +191,7 @@ int init(void *arg)
 	args_key = 0;
 	args.flag = TIF_NEED_RESCHED;
 	args.thresh = 50*1000*1000;	/* 50ms */
-
+	globEv.stackfd = bpf_map__fd(unity_nosched->maps.stackmap);
 	err = bpf_map_update_elem(argfd, &args_key, &args, 0);
 	if (err) {
 		fprintf(stderr, "Failed to update flag map\n");
@@ -124,7 +222,7 @@ int init(void *arg)
 		DESTORY_SKEL_BOJECT(unity_nosched);
 		return err;
 	}
-	
+	globEv.bhead = globEv.fhead = 0;
 	printf("unity_nosched plugin install.\n");
 	return 0;
 }
@@ -146,11 +244,14 @@ int call(int t, struct unity_lines *lines)
 	unity_set_value(line, 4, "gt500ms", delta(summary,less1s));
 	unity_set_value(line, 5, "gt1s", delta(summary,plus1s));
 	prev = summary;
+	flush_to_file(&globEv, -1);
 	return 0;
 }
 
 void deinit(void)
 {
 	printf("unity_nosched plugin uninstall.\n");
+	if (ksyms)
+		free(ksyms);
 	DESTORY_SKEL_BOJECT(unity_nosched);
 }
