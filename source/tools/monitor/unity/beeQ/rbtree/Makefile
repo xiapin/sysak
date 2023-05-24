@@ -4,7 +4,7 @@ LDFLAG := -g -fpic -shared
 OBJS := rbtree.o lrbtree.o
 SO = lrbtree.so
 
-all: $(SO) install
+all: install
 
 %.o: %.c
 	$(CC) -c $< -o $@ $(CFLAG)
@@ -12,7 +12,7 @@ all: $(SO) install
 $(SO): $(OBJS)
 	$(CC) -o $@ $(OBJS) $(LDFLAG)
 
-install:
+install: $(SO)
 	cp $(SO) ../lib
 
 clean:

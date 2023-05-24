@@ -448,7 +448,7 @@ return CkvProc
 1. unity\_set\_table 中 table 参数长度应该小于32（不含）
 2. unity\_set\_index 中 name、index和unity\_set\_value 中 name 参数长度应该要小于16（不含）
 3. unity\_set\_index 下标从0开始，并小于 4，即最多4个索引。而且下标数值应该连续，否则数据会从留白处截断
-4.  unity\_set\_index 下标从0开始，并小于 32，即最多32个数值。而且下标数值应该连续，否则数据会从留白处截断；
+4.  unity\_set\_value 下标从0开始，并小于 32，即最多32个数值。而且下标数值应该连续，否则数据会从留白处截断；
 5.  unity\_set\_log 中的log 指针需要开发者进行释放；
 6. get\_unity\_proc参考2.3节中 proc_path 中的内容；
 

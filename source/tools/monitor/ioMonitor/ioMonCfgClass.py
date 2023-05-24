@@ -72,7 +72,7 @@ class ioMonCfgClass(object):
                     sys.exit(0)
                 cfgDicts[c[0]] = c[1]
         except Exception:
-            print "bad cfg: %s." %cfg
+            print("bad cfg: %s." %cfg)
             sys.exit(0)
         return cfgDicts
 
@@ -126,7 +126,7 @@ class ioMonCfgClass(object):
                 cmdline = f.read().strip()
         except Exception:
             sys.exit(0)
-        if 'ioMonitorMain' in cmdline:
+        if 'ioMonitor' in cmdline:
             os.system('kill -USR2 '+str(pid))
 
 

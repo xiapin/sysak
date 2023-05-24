@@ -18,7 +18,7 @@ local function setupServer(fYaml)
     local ip = config["bind_addr"] or "0.0.0.0"
     local backlog = config["backlog"] or 32
     local unix_socket = config["unix_socket"]
-    return port, ip, backlog,unix_socket
+    return port, ip, backlog, unix_socket
 end
 
 function CLocalBeaver:_init_(frame, fYaml)
@@ -59,6 +59,7 @@ function CLocalBeaver:_installTmo(fd)
 end
 
 function CLocalBeaver:_checkTmo()
+    local res, msg
     local now = os.time()
     if now - self._last >= 30 then
         -- ! coroutine will del self._tmos cell in loop, so create a mirror table for safety
@@ -70,7 +71,8 @@ function CLocalBeaver:_checkTmo()
                 e.fd = fd
                 local co = self._cos[fd]
                 print("close " .. fd)
-                coroutine.resume(co, e)
+                res, msg = coroutine.resume(co, e)
+                assert(res, msg)
             end
         end
         self._last = now
@@ -98,7 +100,7 @@ local function localBind(fd, tPort)
         system:posixError("set sock opt failed.");
     end
 
-    while try < 120 do
+    while try < 5 do
         res, err, errno = socket.bind(fd, tPort)
         if res then
             return 0
@@ -162,7 +164,7 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
 end
 
 function CLocalBeaver:read(fd, maxLen)
-    maxLen = maxLen or 1 * 1024 * 1024  -- signal conversation accept 1M stream max
+    maxLen = maxLen or 2 * 1024 * 1024  -- signal conversation accept 2M stream max
     local function readFd()
         local e = coroutine.yield()
         if e.ev_close > 0 then
@@ -193,7 +195,7 @@ function CLocalBeaver:write(fd, stream)
     local res
 
     sent, err, errno = socket.send(fd, stream)
-    if sent then
+    if sent ~= nil then
         if sent < #stream then  -- send buffer may full
             res = self._cffi.mod_fd(self._efd, fd, 1)  -- epoll write ev
             assert(res == 0)
@@ -204,6 +206,9 @@ function CLocalBeaver:write(fd, stream)
                     return nil
                 elseif e.ev_out then
                     stream = string.sub(stream, sent + 1)
+                    if stream == nil then
+                        return 1
+                    end
                     sent, err, errno = socket.send(fd, stream)
                     if sent == nil then
                         if errno == 11 then  -- EAGAIN ?
@@ -247,22 +252,26 @@ function CLocalBeaver:_proc(fd)
     end
 end
 
-function CLocalBeaver:co_add(fd)
-    local res = self._cffi.add_fd(self._efd, fd)
+function CLocalBeaver:co_add(fd, cb)
+    local res = self._cffi.add_fd(self._efd, fd)  -- add to epoll fd
     assert(res >= 0)
 
-    local co = coroutine.create(function(o, fd)  self._proc(o, fd) end)
+    local co = coroutine.create(function(o, fd)  cb(o, fd) end)
     self._cos[fd] = co
-    local res, msg = coroutine.resume(co, self, fd)
-    assert(res, msg)
+    return co
 end
 
 function CLocalBeaver:co_exit(fd)
-    local res = self._cffi.del_fd(self._efd, fd)
+    local res = self._cffi.del_fd(self._efd, fd)   -- remove from epoll fd
     assert(res >= 0)
 
     self._cos[fd] = nil
     self._tmos[fd] = nil
+end
+
+function CLocalBeaver:mod_fd(fd, wr)
+    local res = self._cffi.mod_fd(self._efd, fd, wr)
+    assert(res == 0)
 end
 
 function CLocalBeaver:accept(fd, e)
@@ -271,7 +280,11 @@ function CLocalBeaver:accept(fd, e)
     else
         local nfd, err, errno = socket.accept(fd)
         if nfd then
-            self:co_add(nfd)
+            local co = self:co_add(nfd, self._proc)
+
+            local res, msg = coroutine.resume(co, self, nfd)
+            assert(res, msg)
+
             self:_installTmo(nfd)
         else
             system:posixError("accept new socket failed", err, errno)

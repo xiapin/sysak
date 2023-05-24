@@ -36,8 +36,7 @@ function CrbEvent:_init_()
     self._nsec = timeNsec()
 end
 
-function CrbEvent:addEvent(e, period, start, loop)
-    start = start or false
+function CrbEvent:addEvent(name, obj, period, delay, loop)
     loop = loop or -1   -- -1: 会永远增加下去，大于1 则会递减，减少0 不再使用
 
     if loop == 0 then
@@ -45,12 +44,14 @@ function CrbEvent:addEvent(e, period, start, loop)
     end
 
     local beg = os.time()
-    if not start then
+    if delay then
         beg = beg + period
+    elseif loop > 0 then
         loop = loop - 1
     end
     local node = {
-        e = e,
+        name = name,
+        obj = obj,
         t = beg,
         period = period,
         loop = loop,
@@ -58,9 +59,12 @@ function CrbEvent:addEvent(e, period, start, loop)
     self._tree:insert(node)
 end
 
-function CrbEvent:_proc(node)
-    print(node.e)
-    if node.loop ~= 0 then  -- add to tail.
+function CrbEvent:_proc(now, node)
+    local ret = -1
+    if node.obj.work then
+        ret = node.obj:work(node.period, self)
+    end
+    if node.loop ~= 0 and ret ~= -1 then  -- add to tail.
         node.t = node.t + node.period
         self._tree:insert(node)
         if node.loop > 0 then
@@ -86,16 +90,18 @@ function CrbEvent:proc()
 
         while node.t <= now do   -- 到了预期时间
             self._tree:delete(node)
-            self:_proc(node)
+            self:_proc(now, node)
             node = self._tree:first()
         end
 
         tHope = {tv_sec = tStart.tv_sec + node.t - now, tv_nsec = tStart.tv_sec}
         diff = calcSleep(tHope, tStart)
-        local _, s, errno, _ = ptime.nanosleep(diff)
-        if errno then   -- interrupt by signal
-            print(string.format("new sleep stop. %d, %s", errno, s))
-            return 0
+        if diff.tv_sec >= 0 then
+            local _, s, errno, _ = ptime.nanosleep(diff)
+            if errno then   -- interrupt by signal
+                print(string.format("new sleep stop. %d, %s", errno, s))
+                return 0
+            end
         end
     end
 end

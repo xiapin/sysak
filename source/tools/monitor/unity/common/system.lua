@@ -6,11 +6,28 @@
 
 local socket = require("socket")
 local serpent = require("common.serpent")
-
 local system = {}
 
 function system:sleep(t)
     socket.select(nil, nil, t)
+end
+
+function system:fdNonBlocking(fd)
+    local res
+    local fcntl = require("posix.fcntl")
+    local bit = require("bit")
+
+    local flag, err, errno = fcntl.fcntl(fd, fcntl.F_GETFL)
+    if flag then
+        res, err, errno = fcntl.fcntl(fd, fcntl.F_SETFL, bit.bor(flag, fcntl.O_NONBLOCK))
+        if res then
+            return 0
+        else
+            system:posixError("fcntl set failed", err, errno)
+        end
+    else
+        system:posixError("fcntl get failed", err, errno)
+    end
 end
 
 function system:deepcopy(object)
@@ -38,6 +55,13 @@ end
 
 function system:dumps(t)
     print(serpent.block(t))
+end
+
+function system:reverseTable(t)
+    local n = #t
+    for i = 1, n / 2 do
+        t[i], t[n + 1 - i] = t[n + 1 - i], t[i]
+    end
 end
 
 function system:keyIsIn(tbl, key)
@@ -172,6 +196,33 @@ end
 function system:posixError(msg, err, errno)
     local s = msg .. string.format(": %s, errno: %d", err, errno)
     error(s)
+end
+
+function system:Enum(tbl, index)
+    local eTbl = {};
+    index = index or 0;
+    for i, v in ipairs(tbl) do
+        eTbl[v] = index + i;
+    end
+    return eTbl;
+end
+
+function system:guid()
+    math.randomseed(os.time())
+    local seed={'e','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'}
+    local tb={}
+    for i = 1,32 do
+        table.insert(tb,seed[math.random(1,16)])
+    end
+
+    local sid = table.concat(tb)
+    return string.format('%s-%s-%s-%s-%s',
+            string.sub(sid,1,8),
+            string.sub(sid,9,12),
+            string.sub(sid,13,16),
+            string.sub(sid,17,20),
+            string.sub(sid,21,32)
+    )
 end
 
 return system

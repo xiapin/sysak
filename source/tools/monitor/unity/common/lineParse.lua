@@ -10,6 +10,8 @@ local system = require("common.system")
 local module = {}
 local json = cjson.new()
 
+json.encode_escape_forward_slash(false)
+
 local function parseLabel(sls, ls)
     local lss = pystring:split(sls, ",")
     for _, cell in ipairs(lss) do
@@ -79,11 +81,12 @@ end
 
 function module.pack(title, ls, vs)
     local line = title
-    if system:keyCount(ls) > 0 then
+    if ls and system:keyCount(ls) > 0 then
         local lss = {}
         local c = 0
         for k, v in pairs(ls) do
             c = c + 1
+            v = string.gsub(v, "%s", "_")
             lss[c] = table.concat({k, v}, "=")
         end
         line = line .. ',' .. pystring:join(",", lss)
@@ -99,11 +102,42 @@ function module.pack(title, ls, vs)
             c = c + 1
             vss[c] = table.concat({k, json.encode(v)}, "=")
         else
+            system:dumps(tStr)
             error("bad value type for " .. tStr)
         end
     end
     line = line .. ' ' .. pystring:join(",", vss)
     return line
+end
+
+function module.packs(line)
+    local cells
+    local title = line.line
+    local ls = {}
+    local vs = {}
+
+    cells = line.ls
+    if cells then
+        for _, cell in ipairs(cells) do
+            ls[cell.name] = cell.index
+        end
+    end
+
+    cells = line.vs
+    if cells then
+        for _, cell in ipairs(cells) do
+            vs[cell.name] = cell.value
+        end
+    end
+
+    cells = line.log
+    if cells then
+        for _, cell in ipairs(cells) do
+            vs[cell.name] = cell.log
+        end
+    end
+
+    return module.pack(title, ls, vs)
 end
 
 return module

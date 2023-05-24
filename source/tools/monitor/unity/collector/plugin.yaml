@@ -1,9 +1,10 @@
 config:
   freq: 20   # unit second
+  daemon: true
   port: 8400  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
-  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg), env(need name arg)
     mode: curl
     url: "http://100.100.100.200/latest/meta-data/instance-id"
 #    name: test_specify
@@ -15,9 +16,51 @@ config:
   db:
     rotate: 7  # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
+  limit:
+    cpu: 30  # unit %
+    mem: 40  # unit mb
+    tasks: 10  # monitor 10 pid max.
+
+forkRun:
+  -
+    cmd: "/usr/bin/python"
+    args: ["../test/curl/forkRun.py"]
+
+oss:
+  bucket: "netinfo-shenzhen"
+  endPoint: "oss-cn-shenzhen.aliyuncs.com"
+  ak: "ak"
+  sk: "sk"
+
+diagnose:
+  io_hang:
+    block: 60
+    time: 15
+    cmd: "../../../iosdiag"
+    report:
+      title: "iosdiag"
+      files:
+        - "/var/log/sysak/iosdiag/hangdetect/result.log.stat"
+        - "/var/log/sysak/iosdiag/hangdetect/result.log.seq"
+  net_edge:
+    block: 300
+    time: 60
+    so:
+      virtiostat: 15
+    cmd: "../../../netCli"
+  jruntime:
+    block: 60
+    time: 30
+    cmd: "../../../java_collect"
 
 outline:
-  - /tmp/sysom
+  - /var/sysom/outline
+
+pushTo:
+  to: "Influx"
+  host: "ld-wz9d17b514mg6kjkx-proxy-tsdb.lindorm.rds.aliyuncs.com"
+  port: 8242
+  url: "/api/v2/write?db=lua"
 
 container:
   mode: "pods"
@@ -67,6 +110,9 @@ plugins:
   -
     so: gpuinfo
     description: "collect gpuinfo"
+  -
+    so: pmu_cpi
+    description: "collect cpi"
 
 metrics:
   -
@@ -221,3 +267,13 @@ metrics:
     #head: value
     #help: "get pod alloc page used"
     #type: "gauge"
+  - title: sysak_pmu_events_percpu
+    from: pmu_events_percpu
+    head: value
+    help: "pmu events of percpu"
+    type: "gauge"
+  - title: sysak_pmu_cpi
+    from: pmu cpi
+    head: value
+    help: "pmu info of cycles/instructions."
+    type: "gauge"

@@ -4,6 +4,8 @@
 --- DateTime: 2022/12/19 10:46 PM
 ---
 
+--- refer to https://blog.csdn.net/a19881029/article/details/14002273
+
 require("common.class")
 local pystring = require("common.pystring")
 local sockerUrl = require("socket.url")
@@ -12,6 +14,8 @@ local ChttpComm = class("httplib.httpComm")
 
 local cjson = require("cjson.safe")
 local json = cjson.new()
+
+json.encode_escape_forward_slash(false)
 
 local function codeTable()
     return {
@@ -73,19 +77,19 @@ function ChttpComm:parsePath(path)
     return parseParams(res)
 end
 
-local function originHeader()
+local function originServerHeader()
     return {
-        server = "beaver/0.0.2",
+        server = "beaver/0.0.3",
         date = os.date("%a, %d %b %Y %H:%M:%S %Z", os.time()),
     }
 end
 
-function ChttpComm:packHeaders(headTable, len) -- just for http out.
+function ChttpComm:packServerHeaders(headTable, len) -- just for http out.
     local lines = {}
     if not headTable["Content-Length"] then
         headTable["Content-Length"] = len
     end
-    local origin = originHeader()
+    local origin = originServerHeader()
 
     local c = 0
     for k, v in pairs(origin) do
@@ -97,12 +101,51 @@ function ChttpComm:packHeaders(headTable, len) -- just for http out.
         c = c + 1
         lines[c] = table.concat({k, v}, ": ")
     end
-    return pystring:join("\r\n", lines) .. "\r\n"
+
+    c = c + 1
+    lines[c] = ""
+    return pystring:join("\r\n", lines)
 end
 
 local codeStrTable = codeTable()
-function ChttpComm:packStat(code)
+function ChttpComm:packStat(code)   -- only for server.
     local t = {"HTTP/1.1", code, codeStrTable[code]}
+    return pystring:join(" ", t)
+end
+
+local function originCliHeader()
+    return {
+        ["User-Agent"] = "beaverCli/0.0.2",
+        Connection = "Keep-Alive",
+    }
+end
+
+function ChttpComm:packCliHeaders(headTable, len)
+    len = len or 0
+    local lines = {}
+    if not headTable["Content-Length"] and len > 0 then
+        headTable["Content-Length"] = len
+    end
+    local origin = originCliHeader()
+
+    local c = 0
+    for k, v in pairs(origin) do
+        c = c + 1
+        lines[c] = table.concat({k, v}, ": ")
+    end
+
+    for k, v in pairs(headTable) do
+        c = c + 1
+        lines[c] = table.concat({k, v}, ": ")
+    end
+
+    c = c + 1
+    lines[c] = ""
+    return pystring:join("\r\n", lines)
+end
+
+function ChttpComm:packCliHead(method, url)
+    local t = {method, url, "HTTP/1.1"}
     return pystring:join(" ", t)
 end
 

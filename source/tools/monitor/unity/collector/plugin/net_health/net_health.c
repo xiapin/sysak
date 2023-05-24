@@ -20,8 +20,10 @@ int init(void *arg)
     int ret;
     printf("net_health plugin install.\n");
     ret = LOAD_SKEL_OBJECT(net_health, perf);
-    cnt_fd = coobpf_map_find(net_health->obj, "outCnt");
-    dist_fd = coobpf_map_find(net_health->obj, "netHist");
+    if (ret >= 0) {
+        cnt_fd = coobpf_map_find(net_health->obj, "outCnt");
+        dist_fd = coobpf_map_find(net_health->obj, "netHist");
+    }
     return ret;
 }
 
@@ -71,7 +73,7 @@ static int cal_dist(unsigned long* values) {
 static int get_count(unsigned long* values) {
     int key;
     static unsigned long rec[2];
-    unsigned long now[2];
+    unsigned long now[2] = {0, 0};
 
     key = 0;
     coobpf_key_value(cnt_fd, &key, &now[0]);

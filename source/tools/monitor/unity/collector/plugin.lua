@@ -5,65 +5,51 @@
 ---
 
 require("common.class")
-local system = require("common.system")
 local Cplugin = class("plugin")
+local dockerinfo = require("common.dockerinfo")
+local cjson = require("cjson.safe")
+local json = cjson.new()
 
-function Cplugin:_init_(proto, procffi, que, proto_q, fYaml)
-    self._proto = proto
-
-    local res = system:parseYaml(fYaml)
-    self:setProcSys(procffi, res.config)
-
-    self._sig_cffi = procffi["cffi"]
-    self._sig_cffi.ffi_plugin_init()
-
-    self._ffi = require("collector.native.plugincffi")
-    self:setup(res.plugins, proto_q)
+function Cplugin:_init_(resYaml, ffi, proto_q, so, loop)
+    self._ffi = ffi
+    self._cffi = self._ffi.load(so)
+    self._cffi.init(proto_q)
+    self._so = so
+    self._loop = loop or -1
+    self.proc_fs = resYaml.config["proc_path"] or "/"
+    self.fill_arg = {["podname"]="pid"}
 end
 
 function Cplugin:_del_()
-    self._sig_cffi.ffi_plugin_stop()
-    for _, plugin in ipairs(self._plugins) do
-        local cffi = plugin.cffi
-        cffi.deinit()
-    end
-    self._sig_cffi.ffi_plugin_deinit()
-end
-
-function Cplugin:setProcSys(procFFI, config)
-    local proc = config["proc_path"] or "/"
-    local sys = config["sys_path"] or "/"
-
-    procFFI.cffi.ffi_set_unity_proc(procFFI.ffi.string(proc))
-    procFFI.cffi.ffi_set_unity_sys(procFFI.ffi.string(sys))
-end
-
-function Cplugin:setup(plugins, proto_q)
-    self._plugins = {}
-    for _, plugin in ipairs(plugins) do
-        local so = plugin.so
-        if so then
-            print(so)
-            local cffi = self._ffi.load(so)
-            local plugin = {
-                so = plugin.so,
-                cffi = cffi
-            }
-            cffi.init(proto_q);
-            table.insert(self._plugins, plugin)
-        end
-    end
+    print("uninstall " .. self._so)
+    self._cffi.deinit()
 end
 
 function Cplugin:load_label(unity_line, line)
+
     local c = #line.ls
+    local table_dict = {}
+
+    for i=0, 4 - 1 do
+        local name = self._ffi.string(unity_line.indexs[i].name)
+        local index = self._ffi.string(unity_line.indexs[i].index)
+        table_dict[name] = index
+    end
+
     for i=0, 4 - 1 do
         local name = self._ffi.string(unity_line.indexs[i].name)
         local index = self._ffi.string(unity_line.indexs[i].index)
 
         if #name > 0 then
             c = c + 1
-            line.ls[c] = {name = name, index = index}
+            if index == "?" and self.fill_arg[name] and table_dict[self.fill_arg[name]] then
+                if name == "podname" then
+                    local podname = dockerinfo:get_podname_pid(table_dict[self.fill_arg[name]], self.proc_fs) 
+                    line.ls[c] = {name = name, index = podname}
+                end
+            else
+                line.ls[c] = {name = name, index = index}
+            end
         else
             return
         end
@@ -112,14 +98,20 @@ function Cplugin:_proc(unity_lines, lines)
 end
 
 function Cplugin:proc(t, lines)
-    for _, plugin in ipairs(self._plugins) do
-        local cffi = plugin.cffi
-        local unity_lines = self._ffi.new("struct unity_lines")
-        local res = cffi.call(t, unity_lines)
-        if res == 0 then
-            self:_proc(unity_lines, lines)
+    local unity_lines = self._ffi.new("struct unity_lines")
+    local res = self._cffi.call(t, unity_lines)
+    if res == 0 then
+        self:_proc(unity_lines, lines)
+    end
+    self._ffi.C.free(unity_lines.line)   -- should free memory.
+
+    local loop = self._loop
+    if loop > 0 then
+        loop = loop - 1
+        if loop == 0 then
+            return -1 -- to remove
         end
-        self._ffi.C.free(unity_lines.line)   -- should free memory.
+        self._loop = loop
     end
 end
 

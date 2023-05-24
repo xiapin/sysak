@@ -2,11 +2,11 @@ LIB= -lpthread -ldl
 
 CC=gcc
 CFLAG := -g -I../beaver -I../collector/outline
-LDFLAG := -g -lm -ldl -lrt -lpthread -lluajit-5.1 -L./lib/ -lbeeQ -L../beaver -lbeaver -lcollectorApi -L../collector/outline/ -loutline -L../collector/plugin/ -lproto_sender
+LDFLAG := -g -lm -ldl -lrt -lpthread -lluajit-5.1 -L./lib/ -lbeeQ -L../beaver -lbeaver -lcollectorApi -Lclock/ -llocalclock -LpostQue -lpostQue -L../collector/outline/ -loutline -L../collector/plugin/ -lproto_sender
 
 PRG=unity-mon
-OBJ=apps.o bees.o
-DEPMOD=lib rbtree ../beaver ../collector/native ../collector/interface ../collector/outline ../collector/plugin ../tsdb/native
+OBJ=apps.o bees.o daemon.o pushTo.o
+DEPMOD=lib rbtree clock postQue ../beaver ../collector/native ../collector/interface ../collector/outline ../collector/plugin ../tsdb/native
 
 $(PRG): $(DEPMOD) $(OBJ)
 	$(CC) $(LIB) -o $@ $(OBJ) $(LDFLAG)

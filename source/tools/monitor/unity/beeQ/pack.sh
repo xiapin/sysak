@@ -12,6 +12,16 @@ mkdir ${DIST}/install
 cp /usr/local/lib/libyaml-0.so* ${DIST}/install/
 cp /usr/local/lib/libluajit-5.1.so* ${DIST}/install/
 cp /usr/local/lib/libyaml.so* ${DIST}/install/
+cp /usr/lib64/libssl.so* ${DIST}/install/
+cp /usr/lib64/libcrypto.so* ${DIST}/install/
+cp /usr/lib64/libgssapi_krb5.so* ${DIST}/install/
+cp /usr/lib64/libkrb5.so* ${DIST}/install/
+cp /usr/lib64/libcom_err.so* ${DIST}/install/
+cp /usr/lib64/libk5crypto.so*  ${DIST}/install/
+cp /usr/lib64/libkrb5support.so* ${DIST}/install/
+cp /usr/lib64/libkeyutils.so* ${DIST}/install/
+cp /usr/lib64/libresolv.so* ${DIST}/install/
+cp /usr/lib64/libpcre.so* ${DIST}/install/
 
 mkdir ${DIST}/lib
 cp -r /usr/local/lib/lua/5.1/* ${DIST}/lib/
@@ -30,18 +40,32 @@ cp beaver/native/*.lua ${APP}/beaver/native
 
 mkdir ${APP}/beeQ/
 mkdir ${APP}/beeQ/lib
+mkdir ${APP}/beeQ/postQue
+mkdir ${APP}/beeQ/rbtree
 cp beeQ/lib/*.so* ${APP}/beeQ/lib/
 cp beeQ/*.lua ${APP}/beeQ/
+cp beeQ/postQue/*.lua ${APP}/beeQ/postQue/
+cp beeQ/rbtree/*.lua ${APP}/beeQ/rbtree/
 cp beeQ/unity-mon ${APP}/beeQ/
 cp beeQ/run.sh ${APP}/beeQ/
 
 mkdir ${APP}/collector
 mkdir ${APP}/collector/native
+mkdir ${APP}/collector/guard
 mkdir ${APP}/collector/outline
+mkdir ${APP}/collector/postPlugin
+mkdir ${APP}/collector/postEngine
+mkdir ${APP}/collector/execEngine
+mkdir ${APP}/collector/io
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
+cp collector/guard/*.lua ${APP}/collector/guard
 cp collector/outline/*.lua ${APP}/collector/outline
+cp collector/postPlugin/*.lua ${APP}/collector/postPlugin
+cp collector/postEngine/*.lua ${APP}/collector/postEngine
+cp collector/execEngine/*.lua ${APP}/collector/execEngine
+cp collector/io/*.lua ${APP}/collector/io
 cp collector/plugin.yaml ${APP}/collector/
 
 mkdir ${APP}/common

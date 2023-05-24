@@ -4,15 +4,16 @@
 --- DateTime: 2023/02/08 17:00 PM
 ---
 
-dockerinfo = {}
+local dockerinfo = {}
 local posix = require("posix")
-local cjson = require("cjson")
-local json = cjson.new()
 local pystring = require("common.pystring")
 local stat = require("posix.sys.stat")
+local unistd = require("posix.unistd")
+local system = require("common.system")
+local api = require("httplib.dockerApi")
 
-function file_exists(file)
-    local f=stat.lstat(file)
+local function file_exists(file)
+    local f=unistd.access(file)
     if f ~= nil then
         return true
     else
@@ -20,31 +21,14 @@ function file_exists(file)
     end
 end
 
-function dockerinfo:get_hostfs()
-    local proc_fs="/mnt/host/proc/"
-    local sys_fs="/mnt/host/sys/"
-    local pods_fs="/mnt/host/var/lib/kubelet/pods/"
-    local root_fs = "/mnt/host/"
-    if file_exists(proc_fs) then
-        return proc_fs, sys_fs, pods_fs, root_fs
-    end
-    proc_fs="/proc/"
-    sys_fs="/sys/"
-    pods_fs="/var/lib/kubelet/pods/"
-    root_fs = "/"
-    return proc_fs, sys_fs, pods_fs, root_fs
-end
-
-function get_runtimesock()
-    local root_fs = ""
-    _, _, _, root_fs = dockerinfo:get_hostfs()
+local function get_runtimesock(root_fs)
     local runtime = "docker"
     local runtime_sock = root_fs .. "var/run/docker.sock"
-    local sock={"var/run/docker.sock","run/containerd/containerd.sock", "var/run/dockershim.sock"}
+    local sock={"var/run/docker.sock","run/podman/podman.sock","run/containerd/containerd.sock", "var/run/dockershim.sock"}
     for _,runtimex in pairs(sock) do
         if file_exists(root_fs .. runtimex) then
             runtime_sock = root_fs .. runtimex
-            if not string.find(runtime_sock,"docker.sock")  then
+            if not string.find(runtime_sock,"docker.sock") and not string.find(runtime_sock,"podman.sock") then
                 runtime = "crictl"
             end
         end
@@ -52,17 +36,76 @@ function get_runtimesock()
     return runtime,runtime_sock
 end
 
-function dockerinfo:get_inspect(did)
-    local runtime,runtime_sock = get_runtimesock()
+local function get_container_inspect(did, root_fs)
+    local runtime, runtime_sock = get_runtimesock(root_fs) 
+    local d_api = api.new('localhost', runtime_sock)
+    local res = d_api:inspect_container(did)
+    if res then res = res.body end
+    return res
+end
+
+local function get_crictl_inspect(did, root_fs)
+    local runtime, runtime_sock = get_runtimesock(root_fs) 
+    local cmd = runtime .. " -r " ..  runtime_sock .. " inspect " .. did .. " 2>/dev/null " 
+    local f = io.popen(cmd,"r")
+    local res = f:read("*a")
+    f:close()
+    return res
+end
+
+function dockerinfo:get_podname_pid(pid, root_fs)
+    local did = dockerinfo:get_dockerid(pid, root_fs)
+    return dockerinfo:get_podname_did(did,root_fs)
+end
+
+function dockerinfo:get_podname_did(did, root_fs)
+    local restable = dockerinfo:get_inspect(did,root_fs)
+    local podname = did
+    local podns = did
+    local cname = did
+    
+    if not restable then return did end
+    if #restable > 0 then
+        restable = restable[1]
+    end
+    if restable['Config'] then
+        local config = restable['Config']
+        if config['Labels'] then
+            local label = config['Labels']
+            if label['io.kubernetes.pod.name'] then
+                podname = label['io.kubernetes.pod.name']
+            end
+            if label['io.kubernetes.container.name'] then
+                cname = label['io.kubernetes.container.name']
+            end
+            if label['io.kubernetes.pod.namespace'] then
+                podns = label['io.kubernetes.pod.namespace']
+            end
+        end
+        if podname == did and restable['Name'] then
+            cname = restable['Name']
+            podname = restable['Name']
+        end
+    elseif restable['status'] then
+        podname = restable['status']['labels']['io.kubernetes.pod.name']
+        cname = restable['status']['labels']['io.kubernetes.container.name']
+        podns = restable['status']['labels']['io.kubernetes.pod.namespace']
+    end
+    if pystring:startswith(podname,"/") then podname=string.sub(podname,2,-1) end
+    return podname
+end
+
+function dockerinfo:get_inspect(did, root_fs)
+    local runtime,runtime_sock = get_runtimesock(root_fs)
     if runtime == "docker" then
-        return get_container_inspect(did) 
+        return get_container_inspect(did, root_fs) 
     else
-        return get_crictl_inspect(did) 
+        return get_crictl_inspect(did, root_fs) 
     end
 end
 
-function dockerinfo:get_dockerid(pid)
-    local proc_fs = dockerinfo:get_hostfs()
+function dockerinfo:get_dockerid(pid, root_fs)
+    local proc_fs = root_fs .. "/proc/"
     local idstring = "unknow"
     if not file_exists(proc_fs .. pid .. "/cgroup") then return idstring end
     local cmd = "cat "  .. proc_fs .. pid .. "/cgroup 2>/dev/null | grep memory:"
@@ -70,35 +113,21 @@ function dockerinfo:get_dockerid(pid)
     local res = pfile:read("*a")
     pfile:close()
 
-    if not string.find(res,"kubepods") and not string.find(res,"docker%-")  then return idstring end
+    if not string.find(res,"kubepods") and not string.find(res,"docker%-")  and not string.find(res,"libpod") then return idstring end
     if string.find(res,"docker%-") then
         idstring = pystring:split(res,"docker-")[2]
     elseif string.find(res,"cri%-containerd%-") then
         idstring = pystring:split(res,"cri-containerd-")[2]
+    elseif string.find(res,"libpod%-conmon%-") then
+        idstring = pystring:split(res,"libpod-conmon-")[2]
+    elseif string.find(res,"libpod%-") then
+        idstring = pystring:split(res,"libpod-")[2]
     else
         local tmp = pystring:split(res,"/",10)
         idstring = tmp[#tmp]
     end
     idstring = string.sub(idstring,0,8)
     return idstring
-end
-
-function get_container_inspect(did)
-    local runtime, runtime_sock = get_runtimesock() 
-    local cmd = "curl --silent -XGET --unix-socket " .. runtime_sock .. " http://localhost/containers/" .. did .. "/json 2>/dev/null "
-    local f = io.popen(cmd,"r")
-    local res = f:read("*a")
-    f:close()
-    return res
-end
-
-function get_crictl_inspect(did)
-    local runtime, runtime_sock = get_runtimesock() 
-    local cmd = runtime .. " -r " ..  runtime_sock .. " inspect " .. did .. " 2>/dev/null " 
-    local f = io.popen(cmd,"r")
-    local res = f:read("*a")
-    f:close()
-    return res
 end
 
 return dockerinfo

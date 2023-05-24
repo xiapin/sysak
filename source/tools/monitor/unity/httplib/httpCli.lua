@@ -31,6 +31,27 @@ function ChttpCli:get(Url)
     }
 end
 
+function ChttpCli:put(Url, stream, header)
+    local headers = header or { Connection = 'close' }
+    local source = self._ltn12.source.string(stream)
+    local t = {}
+    local res, code, head = self._http.request{
+        url = Url,
+        method = "PUT",
+        headers = headers,
+        source = source,
+        proxy = self._proxy,
+        sink = self._ltn12.sink.table(t)
+    }
+    local body = table.concat(t)
+    return {
+        res = res,
+        code = code,
+        head = head,
+        body = body
+    }
+end
+
 function ChttpCli:post(Url, reqs, header)
     local headers = header or { Connection = 'close' }
     local source = self._ltn12.source.string(reqs)
@@ -59,6 +80,14 @@ function ChttpCli:postTable(Url, t)
         ["Content-Length"] = #req,
     }
     return self:post(Url, req, headers)
+end
+
+function ChttpCli:postLine(Url, line)
+    local headers = {
+        ["Content-Type"] = "text/plain",
+        ["Content-Length"] = #line,
+    }
+    return self:post(Url, line, headers)
 end
 
 return ChttpCli

@@ -337,22 +337,7 @@ function pystring:partition(s, del)
     end
 end
 
-function pystring:partition(s, del)
-    local result = {}
-    del = del or " "
-    local delimiter = setupDelimiter(del)
-    local iBeg, iEnd = string.find(s, delimiter)
-    if iBeg then
-        result[1] = string.sub(s, 1, iBeg - 1)
-        result[2] = del
-        result[3] = string.sub(s, iEnd + 1)
-        return result
-    else
-        return nil
-    end
-end
-
-function pystring:reverseTable(t)
+local function reverseTable(t)
     local n = #t
     for i = 1, n / 2 do
         t[i], t[n + 1 - i] = t[n + 1 - i], t[i]
@@ -389,7 +374,7 @@ function pystring:rsplit(s, delimiter, n)
         end
     end
     --return result
-    pystring:reverseTable(result)
+    reverseTable(result)
     return result
 end
 

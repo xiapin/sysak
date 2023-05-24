@@ -8,15 +8,130 @@ require("common.class")
 local system = require("common.system")
 local ChttpApp = require("httplib.httpApp")
 local CfoxTSDB = require("tsdb.foxTSDB")
+local postQue = require("beeQ.postQue.postQue")
+local CpushLine = require("beaver.pushLine")
+local CasyncDns = require("httplib.asyncDns")
+local CasyncHttp = require("httplib.asyncHttp")
+local CasyncOSS = require("httplib.asyncOSS")
 local CurlApi = class("urlApi", ChttpApp)
 
-function CurlApi:_init_(frame, fYaml)
+function CurlApi:_init_(frame, que, fYaml)
     ChttpApp._init_(self)
+    self._pushLine = CpushLine.new(que)
     self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
     self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
+    self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
+    self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
+    self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
+    self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
+    self:_ossIntall(fYaml)
+
     self:_install(frame)
     self:_setupQs(fYaml)
+    self._proxy = CasyncHttp.new()
+end
+
+function CurlApi:_ossIntall(fYaml)
+    local res = system:parseYaml(fYaml)
+    if res.oss then
+        self._oss = CasyncOSS.new(res.oss)
+        self._urlCb["/api/oss"] = function(tReq) return self:oss(tReq)  end
+    end
+end
+
+local function reqOSS(oss, uuid, stream)
+    return oss:put(uuid, stream)
+end
+
+function CurlApi:oss(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local uuid = tJson.uuid
+        local stream = tJson.stream
+        if uuid and stream then
+            local stat, body = pcall(reqOSS, self._oss, uuid, stream)
+            if stat then
+                return body
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need uuid and stream arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
+end
+
+local function reqProxy(proxy, host, uri)
+    return proxy:get(host, uri)
+end
+
+function CurlApi:proxy(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local host = tJson.host
+        local uri = tJson.uri
+        if host and uri then
+            local stat, body = pcall(reqProxy, self._proxy, host, uri)
+            if stat then
+                return {body = body}
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
+end
+
+local function reqDns(domain)
+    local dns = CasyncDns.new()
+    return dns:dns_lookup(domain)
+end
+
+function CurlApi:dns(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local domain = tJson.domain
+        if domain then
+            local stat, ip = pcall(reqDns, domain)
+            if stat then
+                return {domain = tReq.data, ip = ip}
+            else
+                return "bad req dns " .. tReq.data .. ip, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
+end
+
+function CurlApi:line(tReq)
+    local stat, _ = pcall(self._pushLine.procLines, self._pushLine, tReq.data)
+    if stat then
+        return "ok"
+    else
+        return "bad line " .. tReq.data, 400
+    end
+end
+
+function CurlApi:trig(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local s = self:jencode(tJson)
+        if #s > 5 then
+            postQue.post(s)
+        end
+        return tJson
+    else
+        return {}
+    end
 end
 
 function CurlApi:sum(tReq)

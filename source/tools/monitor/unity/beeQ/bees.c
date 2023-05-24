@@ -9,6 +9,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include "clock/ee_clock.h"
+#include "postQue/postQue.h"
 
 #define RUN_THREAD_MAX  8
 #define RUN_QUEUE_SIZE  32
@@ -29,17 +31,30 @@ void sig_handler(int num)
             break;
         case SIGUSR1:   // to stop
             break;
+        case SIGUSR2:
+            break;
         default:
             printf("signal %d exit.\n", num);
             exit(1);
     }
 }
 
+static void sig_register(void) {
+    struct sigaction action;
+
+    action.sa_handler = sig_handler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    sigaction(SIGUSR2, &action, NULL);
+}
+
+char ** entry_argv; // for daemon process
 extern struct beeQ* proto_sender_init(struct beeQ* pushQ);
 int main(int argc, char *argv[]) {
     struct beeQ* q;           //for proto-buf stream
     struct beeQ* proto_que;   //for trans c to proto-buf stream
 
+    entry_argv = argv;
     if (argc > 1) {
         g_yaml_file = argv[1];
     }
@@ -47,6 +62,14 @@ int main(int argc, char *argv[]) {
     signal(SIGHUP, sig_handler);
     signal(SIGUSR1, sig_handler);
     signal(SIGINT, sig_handler);
+    sig_register();
+
+    if (calibrate_local_clock() < 0) {
+        printf("calibrate_local_clock failed.\n");
+        exit(1);
+    }
+
+    postQue_init();
 
     q = beeQ_init(RUN_QUEUE_SIZE,
                   app_recv_setup,
@@ -68,7 +91,7 @@ int main(int argc, char *argv[]) {
     if (pid_outline == 0) {
         exit(1);
     }
-    beaver_init(g_yaml_file);
+    beaver_init(q, g_yaml_file);
 
     fprintf(stderr, "loop exit.");
     beeQ_stop(q);

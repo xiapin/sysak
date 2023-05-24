@@ -11,18 +11,21 @@
 #include <lauxlib.h>
 #include <lualib.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <sys/prctl.h>
 
 extern int lua_reg_errFunc(lua_State *L);
 extern int lua_check_ret(int ret);
 int lua_load_do_file(lua_State *L, const char* path);
 
-static int call_init(lua_State *L, int err_func, char *fYaml) {
+static int call_init(lua_State *L, int err_func, struct beeQ* q, char *fYaml) {
     int ret;
     lua_Number lret;
 
     lua_getglobal(L, "init");
+    lua_pushlightuserdata(L, q);
     lua_pushstring(L, fYaml);
-    ret = lua_pcall(L, 1, 1, err_func);
+    ret = lua_pcall(L, 2, 1, err_func);
     if (ret) {
         lua_check_ret(ret);
         goto endCall;
@@ -62,7 +65,8 @@ void LuaAddPath(lua_State *L, char *name, char *value) {
     lua_pop(L, 2);
 }
 
-static lua_State * echos_init(char *fYaml) {
+extern int collector_qout(lua_State *L);
+static lua_State * echos_init(struct beeQ* q, char *fYaml) {
     int ret;
     int err_func;
 
@@ -78,12 +82,13 @@ static lua_State * echos_init(char *fYaml) {
     LuaAddPath(L, "path", "../beaver/?.lua");
     err_func = lua_reg_errFunc(L);
 
+    lua_register(L, "collector_qout", collector_qout);
     ret = lua_load_do_file(L, "../beaver/beaver.lua");
     if (ret) {
         goto endLoad;
     }
 
-    ret = call_init(L, err_func, fYaml);
+    ret = call_init(L, err_func, q, fYaml);
     if (ret < 0) {
         goto endCall;
     }
@@ -129,11 +134,11 @@ static int echos(lua_State *L) {
     return ret;
 }
 
-int beaver_init(char *fYaml) {
+int beaver_init(struct beeQ* q, char *fYaml) {
     int ret = 0;
 
     while (ret == 0) {
-        lua_State *L = echos_init(fYaml);
+        lua_State *L = echos_init(q, fYaml);
         if (L == NULL) {
             break;
         }

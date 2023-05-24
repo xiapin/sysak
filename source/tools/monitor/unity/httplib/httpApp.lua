@@ -14,14 +14,15 @@ function ChttpApp:_init_(frame)
     ChttpBase._init_(self)
 end
 
-function ChttpApp:echo(tRet, keep)
-    local stat = self:packStat(200)
+function ChttpApp:echo(tRet, keep, code)
+    code = code or 200
+    local stat = self:packStat(code)
     local tHead = {
         ["Content-Type"] = "application/json",
         ["Connection"] = (keep and "keep-alive") or "close"
     }
     local body = self:jencode(tRet)
-    local headers = self:packHeaders(tHead, #body)
+    local headers = self:packServerHeaders(tHead, #body)
     local tHttp = {stat, headers, body}
     return pystring:join("\r\n", tHttp)
 end
