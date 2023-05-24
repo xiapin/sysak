@@ -67,7 +67,15 @@ void flush_to_file(struct stackinfo *ev, int index)
 	if (index < tmphd)
 		index = index + MAX_NOSCHED_ELEM;
 	for (; tmphd < index; tmphd++) {
+		char ts[64];
+		struct tm *tm;
 		int i = tmphd%MAX_NOSCHED_ELEM;
+		tm = localtime(&globEv.elem[i].t);
+		strftime(ts, sizeof(ts), "%F %H:%M:%S", tm);
+		fprintf(logfp, "%-18.6f %-5d %-15s %-8d %-10llu %-21s\n",
+			((double)globEv.elem[i].e.stamp/1000000000), globEv.elem[i].e.cpu,
+			globEv.elem[i].e.comm, globEv.elem[i].e.pid, globEv.elem[i].e.delay,
+			(globEv.elem[i].e.exit==globEv.elem[i].e.stamp)?"(EOF)":ts);
 		print_stack(globEv.stackfd, globEv.elem[i].e.ret, ksyms, logfp);
 	}
 }
@@ -117,7 +125,7 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e.delay = e.delay/(1000*1000);
 	if (e.cpu > nr_cpus - 1)
 		return;
-	if (e.delay > 10) {	/* we use 100ms to control the frequency of output */
+	if (e.delay > 100) {	/* we use 100ms to control the frequency of output */
 		printf("delay=%lld\n", e.delay);
 		record_stack(&e);
 		printf("record_stack over\n");
@@ -182,7 +190,7 @@ int init(void *arg)
 	argfd = bpf_map__fd(unity_nosched->maps.args_map);
 	args_key = 0;
 	args.flag = TIF_NEED_RESCHED;
-	args.thresh = 10*1000*1000;	/* 50ms */
+	args.thresh = 50*1000*1000;	/* 50ms */
 	globEv.stackfd = bpf_map__fd(unity_nosched->maps.stackmap);
 	err = bpf_map_update_elem(argfd, &args_key, &args, 0);
 	if (err) {
