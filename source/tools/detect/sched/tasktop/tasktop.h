@@ -108,7 +108,7 @@ typedef struct sys_record_t {
     int nr_fork;
     struct proc_fork_info_t most_fork_info;
 
-    int *percpu_sched_delay;
+    unsigned long long *percpu_sched_delay;
 } sys_record_t;
 
 struct record_t {

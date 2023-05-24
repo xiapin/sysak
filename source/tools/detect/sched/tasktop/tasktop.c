@@ -28,7 +28,7 @@ time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
 int nr_cpu;
-int* prev_delay;
+unsigned long long* prev_delay;
 static volatile sig_atomic_t exiting;
 
 struct env {
@@ -271,13 +271,13 @@ static int read_cgroup_throttle() {
             continue;
         }
         char stat_path[BUF_SIZE];
-        snprintf(stat_path, BUF_SIZE, "%s/%s", CGROUP_PATH, dir->d_name);
+        snprintf(stat_path, BUF_SIZE, "%s/%s/cpu.stat", CGROUP_PATH, dir->d_name);
 
         cgroup_cpu_stat_t stat;
 
         memset(&stat, 0, sizeof(cgroup_cpu_stat_t));
         char name[128];
-        unsigned long long val;
+        unsigned long long val = 0;
         FILE* fp = fopen(stat_path, "r");
         if (!fp) {
             fprintf(stderr, "Failed open cpu.stat[%s].\n", stat_path);
@@ -299,9 +299,11 @@ static int read_cgroup_throttle() {
             }
         }
 #ifdef DEBUG
-        fprintf(stderr, "[%-30s] nr_periods=%d nr_throttled=%d throttled_time=%llu nr_burst=%d burst_time=%llu\n", stat_path, stat.nr_periods,
-                stat.nr_throttled, stat.throttled_time, stat.nr_burst,
-                stat.burst_time);
+        fprintf(stderr,
+                "[%-30s] nr_periods=%d nr_throttled=%d throttled_time=%llu "
+                "nr_burst=%d burst_time=%llu\n",
+                stat_path, stat.nr_periods, stat.nr_throttled,
+                stat.throttled_time, stat.nr_burst, stat.burst_time);
 #endif
     }
 
@@ -639,7 +641,7 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
     fprintf(dest, "[ cpu ] %6s %6s %6s %10s\n", "usr", "sys", "iowait",
             "delay(ns)");
     for (i = 1; i <= nr_cpu; i++) {
-        fprintf(dest, "[cpu-%d] %6.1f %6.1f %6.1f %10.1d\n", i - 1,
+        fprintf(dest, "[cpu-%d] %6.1f %6.1f %6.1f %10llu\n", i - 1,
                 sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].iowait,
                 sys->percpu_sched_delay[i - 1]);
     }
