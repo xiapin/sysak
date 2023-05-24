@@ -77,6 +77,7 @@ void flush_to_file(struct stackinfo *ev, int index)
 			globEv.elem[i].e.comm, globEv.elem[i].e.pid, globEv.elem[i].e.delay,
 			(globEv.elem[i].e.exit==globEv.elem[i].e.stamp)?"(EOF)":ts);
 		print_stack(globEv.stackfd, globEv.elem[i].e.ret, ksyms, logfp);
+		fflush(logfp);
 	}
 }
 
