@@ -59,6 +59,7 @@ function CLocalBeaver:_installTmo(fd)
 end
 
 function CLocalBeaver:_checkTmo()
+    local res, msg
     local now = os.time()
     if now - self._last >= 30 then
         -- ! coroutine will del self._tmos cell in loop, so create a mirror table for safety
@@ -70,7 +71,8 @@ function CLocalBeaver:_checkTmo()
                 e.fd = fd
                 local co = self._cos[fd]
                 print("close " .. fd)
-                coroutine.resume(co, e)
+                res, msg = coroutine.resume(co, e)
+                assert(res, msg)
             end
         end
         self._last = now
@@ -256,9 +258,7 @@ function CLocalBeaver:co_add(fd, cb)
 
     local co = coroutine.create(function(o, fd)  cb(o, fd) end)
     self._cos[fd] = co
-
-    local res, msg = coroutine.resume(co, self, fd)
-    assert(res, msg)
+    return co
 end
 
 function CLocalBeaver:co_exit(fd)
@@ -269,13 +269,22 @@ function CLocalBeaver:co_exit(fd)
     self._tmos[fd] = nil
 end
 
+function CLocalBeaver:mod_fd(fd, wr)
+    local res = self._cffi.mod_fd(self._efd, fd, wr)
+    assert(res == 0)
+end
+
 function CLocalBeaver:accept(fd, e)
     if e.ev_close > 0 then
         error("should close bind fd.")
     else
         local nfd, err, errno = socket.accept(fd)
         if nfd then
-            self:co_add(nfd, self._proc)
+            local co = self:co_add(nfd, self._proc)
+
+            local res, msg = coroutine.resume(co, self, nfd)
+            assert(res, msg)
+
             self:_installTmo(nfd)
         else
             system:posixError("accept new socket failed", err, errno)

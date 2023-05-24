@@ -10,7 +10,8 @@ local ChttpApp = require("httplib.httpApp")
 local CfoxTSDB = require("tsdb.foxTSDB")
 local postQue = require("beeQ.postQue.postQue")
 local CpushLine = require("beaver.pushLine")
-
+local CasyncDns = require("httplib.asyncDns")
+local CasyncHttp = require("httplib.asyncHttp")
 local CurlApi = class("urlApi", ChttpApp)
 
 function CurlApi:_init_(frame, que, fYaml)
@@ -21,8 +22,59 @@ function CurlApi:_init_(frame, que, fYaml)
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
     self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
     self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
+    self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
+    self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
     self:_install(frame)
     self:_setupQs(fYaml)
+    self._proxy = CasyncHttp.new(fYaml)
+end
+
+local function reqProxy(proxy, host, uri)
+    return proxy:get(host, uri)
+end
+
+function CurlApi:proxy(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local host = tJson.host
+        local uri = tJson.uri
+        if host and uri then
+            local stat, body = pcall(reqProxy, self._proxy, host, uri)
+            if stat then
+                return {body = body}
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
+end
+
+local function reqDns(domain)
+    local dns = CasyncDns.new()
+    return dns:dns_lookup(domain)
+end
+
+function CurlApi:dns(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local domain = tJson.domain
+        if domain then
+            local stat, ip = pcall(reqDns, domain)
+            if stat then
+                return {domain = tReq.data, ip = ip}
+            else
+                return "bad req dns " .. tReq.data .. ip, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
 end
 
 function CurlApi:line(tReq)
