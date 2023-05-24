@@ -79,7 +79,7 @@ end
 
 local function originServerHeader()
     return {
-        server = "beaver/0.0.2",
+        server = "beaver/0.0.3",
         date = os.date("%a, %d %b %Y %H:%M:%S %Z", os.time()),
     }
 end

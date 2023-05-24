@@ -17,7 +17,7 @@ local CurlExportRaw = require("beaver.url_export_raw")
 local CLocalBeaver = require("beaver.localBeaver")
 local CbaseQuery = require("beaver.query.baseQuery")
 
-local lb = nil
+g_lb = nil
 
 function init(que, fYaml)
     fYaml = fYaml or "../collector/plugin.yaml"
@@ -35,10 +35,10 @@ function init(que, fYaml)
     CurlExportHtml.new(web, export)
     CurlExportRaw.new(web, export)
 
-    lb = CLocalBeaver.new(web, fYaml)
+    g_lb = CLocalBeaver.new(web, fYaml)
     return 0
 end
 
 function echo()
-    return lb:poll()
+    return g_lb:poll()
 end

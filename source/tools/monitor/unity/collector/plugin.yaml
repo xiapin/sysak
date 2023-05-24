@@ -26,6 +26,12 @@ forkRun:
     cmd: "/usr/bin/python"
     args: ["../test/curl/forkRun.py"]
 
+oss:
+  bucket: "netinfo-shenzhen"
+  endPoint: "oss-cn-shenzhen.aliyuncs.com"
+  ak: "ak"
+  sk: "sk"
+
 diagnose:
   io_hang:
     block: 60
