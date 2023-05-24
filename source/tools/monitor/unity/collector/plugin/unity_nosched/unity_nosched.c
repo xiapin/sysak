@@ -125,8 +125,8 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e.delay = e.delay/(1000*1000);
 	if (e.cpu > nr_cpus - 1)
 		return;
-	if (e.delay > 200) {	/* we use 100ms to control the frequency of output */
-		printf("delay=%lld\n", e.delay);
+	if (e.delay > 100) {	/* we use 100ms to control the frequency of output */
+		printf("%s[%d] delay=%lld\n", e.comm, e.pid, e.delay);
 		record_stack(&e);
 	}
 	if (e.exit != 0)

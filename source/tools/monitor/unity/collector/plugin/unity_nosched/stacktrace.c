@@ -14,7 +14,7 @@
 //#include "unity_nosched.h"
 
 #define MAX_SYMS 300000
-#define PERF_MAX_STACK_DEPTH	32
+#define PERF_MAX_STACK_DEPTH	127
 struct ksym {
 	long addr;
 	char *name;
@@ -122,7 +122,7 @@ void print_stack(int fd, __u32 ret, struct ksym *syms, FILE *filep)
 	if (!filep)
 		filep = stdout;
 	if (bpf_map_lookup_elem(fd, &ret, &ip) == 0) {
-		for (i = 0; i < PERF_MAX_STACK_DEPTH - 1; i++)
+		for (i = 1; i < PERF_MAX_STACK_DEPTH - 1; i++)
 			print_ksym(ip[i], syms, filep);
 	} else {
 		if ((int)(ret) < 0)
