@@ -12,6 +12,7 @@ local postQue = require("beeQ.postQue.postQue")
 local CpushLine = require("beaver.pushLine")
 local CasyncDns = require("httplib.asyncDns")
 local CasyncHttp = require("httplib.asyncHttp")
+local CasyncOSS = require("httplib.asyncOSS")
 local CurlApi = class("urlApi", ChttpApp)
 
 function CurlApi:_init_(frame, que, fYaml)
@@ -24,9 +25,43 @@ function CurlApi:_init_(frame, que, fYaml)
     self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
     self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
     self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
+    self:_ossIntall(fYaml)
+
     self:_install(frame)
     self:_setupQs(fYaml)
-    self._proxy = CasyncHttp.new(fYaml)
+    self._proxy = CasyncHttp.new()
+end
+
+function CurlApi:_ossIntall(fYaml)
+    local res = system:parseYaml(fYaml)
+    if res.oss then
+        self._oss = CasyncOSS.new(res.oss)
+        self._urlCb["/api/oss"] = function(tReq) return self:oss(tReq)  end
+    end
+end
+
+local function reqOSS(oss, uuid, stream)
+    return oss:put(uuid, stream)
+end
+
+function CurlApi:oss(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local uuid = tJson.uuid
+        local stream = tJson.stream
+        if uuid and stream then
+            local stat, body = pcall(reqOSS, self._oss, uuid, stream)
+            if stat then
+                return body
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need uuid and stream arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
 end
 
 local function reqProxy(proxy, host, uri)

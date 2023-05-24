@@ -87,9 +87,8 @@ local function tryConnect(fd, tConn)
     end
 end
 
-function CasyncHttp:_init_(fYaml)
+function CasyncHttp:_init_()
     ChttpComm._init_(self)
-    self._fYaml = fYaml
 end
 
 function CasyncHttp:pack(method, domain, uri, headers, body)
@@ -180,7 +179,6 @@ local function waitHttpRest(fread, tReq)
     if tReq.header["content-length"] then
         local lenData = #tReq.data
         local lenInfo = tonumber(tReq.header["content-length"])
-        print("len: " .. lenInfo)
 
         local rest = lenInfo - lenData
         if rest > 10 * 1024 * 1024 then  -- limit max data len
@@ -270,10 +268,8 @@ function CasyncHttp:result(fread)
     return self:parse(fread, stream)
 end
 
-function CasyncHttp:_get(fd)
+local function checkConnect(fd, connecting, toWake)
     local res, msg
-    local toWake, domain, uri, headers, connecting = coroutine.yield()
-
     if connecting > 0 then
         local e = coroutine.yield()
         if e.ev_out > 0 then
@@ -281,9 +277,13 @@ function CasyncHttp:_get(fd)
         else
             res, msg = coroutine.resume(toWake, "connect failed.")
             assert(res, msg)
+            return -1
         end
     end
-    local stream = self:pack('GET', domain, uri, headers, "")
+end
+
+function CasyncHttp:procStream(fd, stream, toWake)
+    local res, msg
     res = g_lb:write(fd, stream)
     if res then
         local fread = g_lb:read(fd)
@@ -297,7 +297,18 @@ function CasyncHttp:_get(fd)
     g_lb:co_exit(fd)
 end
 
-function CasyncHttp:connect(domain, uri, port, headers, cb)
+function CasyncHttp:_get(fd)
+    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
+
+    if checkConnect(fd, connecting, toWake) == -1 then
+        g_lb:co_exit(fd)
+        return
+    end
+    local stream = self:pack('GET', domain, uri, headers, body)
+    self:procStream(fd, stream, toWake)
+end
+
+function CasyncHttp:connect(domain, uri, port, headers, body, cb)
     port = port or 80
     local ip = getIp(domain)
     if #ip == 0 then
@@ -317,7 +328,7 @@ function CasyncHttp:connect(domain, uri, port, headers, cb)
             end
             res, msg = coroutine.resume(co, self, fd)
             assert(res, msg)
-            res, msg = coroutine.resume(co, coroutine.running(), domain, uri, headers, connect)
+            res, msg = coroutine.resume(co, coroutine.running(), domain, uri, headers, body, connect)
             assert(res, msg)
             return coroutine.yield()
         else
@@ -327,7 +338,37 @@ function CasyncHttp:connect(domain, uri, port, headers, cb)
 end
 
 function CasyncHttp:get(domain, uri, port)
-    return self:connect(domain, uri, port, {}, self._get)
+    return self:connect(domain, uri, port, {}, "", self._get)
+end
+
+function CasyncHttp:_put(fd)
+    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
+
+    if checkConnect(fd, connecting, toWake) == -1 then
+        g_lb:co_exit(fd)
+        return
+    end
+    local stream = self:pack('PUT', domain, uri, headers, body)
+    self:procStream(fd, stream, toWake)
+end
+
+function CasyncHttp:put(domain, uri, headers, body, port)
+    return self:connect(domain, uri, port, headers, body, self._put)
+end
+
+function CasyncHttp:_post(fd)
+    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
+
+    if checkConnect(fd, connecting, toWake) == -1 then
+        g_lb:co_exit(fd)
+        return
+    end
+    local stream = self:pack('POST', domain, uri, headers, body)
+    self:procStream(fd, stream, toWake)
+end
+
+function CasyncHttp:post(domain, uri, headers, body, port)
+    return self:connect(domain, uri, port, headers, body, self._post)
 end
 
 return CasyncHttp
