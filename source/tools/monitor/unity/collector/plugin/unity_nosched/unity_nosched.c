@@ -125,10 +125,9 @@ void handle_event(void *ctx, int cpu, void *data, __u32 data_sz)
 	e.delay = e.delay/(1000*1000);
 	if (e.cpu > nr_cpus - 1)
 		return;
-	if (e.delay > 100) {	/* we use 100ms to control the frequency of output */
+	if (e.delay > 200) {	/* we use 100ms to control the frequency of output */
 		printf("delay=%lld\n", e.delay);
 		record_stack(&e);
-		printf("record_stack over\n");
 	}
 	if (e.exit != 0)
 		update_summary(&summary, &e);
@@ -190,7 +189,7 @@ int init(void *arg)
 	argfd = bpf_map__fd(unity_nosched->maps.args_map);
 	args_key = 0;
 	args.flag = TIF_NEED_RESCHED;
-	args.thresh = 50*1000*1000;	/* 50ms */
+	args.thresh = 100*1000*1000;	/* 50ms */
 	globEv.stackfd = bpf_map__fd(unity_nosched->maps.stackmap);
 	err = bpf_map_update_elem(argfd, &args_key, &args, 0);
 	if (err) {
