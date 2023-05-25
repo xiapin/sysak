@@ -1,0 +1,10 @@
+directCgPath:
+  - ""
+  - "kubepods.slice"
+  - "kubepods.slice/kubepods-besteffort.slice"
+  - "kubepods.slice/kubepods-burstable.slice"
+
+indirectCgPath:
+  - "kubepods.slice"
+  - "kubepods.slice/kubepods-besteffort.slice"
+  - "kubepods.slice/kubepods-burstable.slice"

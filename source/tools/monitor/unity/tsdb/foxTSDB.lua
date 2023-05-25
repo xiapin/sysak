@@ -202,9 +202,10 @@ function CfoxTSDB:curMove(us)
 end
 
 function CfoxTSDB:resize()
-    assert(self._man)
-    local ret = self.cffi.fox_read_resize(self._man)
-    assert(ret >= 0, string.format("resize bad ret: %d", ret))
+    if self._man then
+        local ret = self.cffi.fox_read_resize(self._man)
+        assert(ret >= 0, string.format("resize bad ret: %d", ret))
+    end
 end
 
 function CfoxTSDB:loadData(stop_us)

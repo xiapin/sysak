@@ -56,6 +56,8 @@ mkdir ${APP}/collector/outline
 mkdir ${APP}/collector/postPlugin
 mkdir ${APP}/collector/postEngine
 mkdir ${APP}/collector/execEngine
+mkdir ${APP}/collector/podMan
+mkdir ${APP}/collector/container
 mkdir ${APP}/collector/io
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
@@ -65,8 +67,12 @@ cp collector/outline/*.lua ${APP}/collector/outline
 cp collector/postPlugin/*.lua ${APP}/collector/postPlugin
 cp collector/postEngine/*.lua ${APP}/collector/postEngine
 cp collector/execEngine/*.lua ${APP}/collector/execEngine
+cp collector/container/*.lua ${APP}/collector/container/
+cp collector/postPlugin/*.lua ${APP}/collector/postPlugin
+cp collector/podMan/*.lua ${APP}/collector/podMan
 cp collector/io/*.lua ${APP}/collector/io
 cp collector/plugin.yaml ${APP}/collector/
+
 
 mkdir ${APP}/common
 cp common/*.lua ${APP}/common/
@@ -79,5 +85,5 @@ mkdir ${APP}/tsdb/native
 cp tsdb/native/*.so* ${APP}/tsdb/native/
 cp tsdb/native/*.lua ${APP}/tsdb/native/
 cp tsdb/*.lua ${APP}/tsdb
-
+cp /usr/local/lib/lua/5.1/* -R ${DIST}/lib/
 #tar zcv -f dist.tar.gz $DIST/
