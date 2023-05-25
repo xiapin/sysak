@@ -16,6 +16,7 @@ local CguardDaemon = require("collector.guard.guardDaemon")
 local CguardSelfStat = require("collector.guard.guardSelfStat")
 local CpostPlugin = require("collector.postPlugin.postPlugin")
 local CforkRun = require("collector.execEngine.forkRun")
+local CpodFilter = require("collector.podMan.podFilter")
 
 local Cloop = class("loop")
 
@@ -25,7 +26,8 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self._daemon = CguardDaemon.new(res)
     self._proto = CprotoData.new(que)
     self._tid = tid
-    self:loadLuaPlugin(res, res.config.proc_path)
+
+    self:loadLuaPlugin(res, res.config.proc_path, procffi)
     self:forkRun(res)
     local jperiod = calcJiffies.calc(res.config.proc_path, procffi)  --
 
@@ -35,19 +37,25 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self.postPlugin = CpostPlugin.new(self._proto, procffi, res)
 end
 
-function Cloop:loadLuaPlugin(res, proc_path)
+function Cloop:loadLuaPlugin(res, proc_path, procffi)
     local luas = res.luaPlugins
 
     self._procs = {}
     self._names = {}
+    local c = 1
     if res.luaPlugins then
-        local c = 1
         for _, plugin in ipairs(luas) do
             local CProcs = require("collector." .. plugin)
             self._procs[c] = CProcs.new(self._proto, procffi, proc_path)
             self._names[c] = plugin
             c = c + 1
         end
+    end
+    --self._procs[c] = CpodsAll.new(res, self._proto, procffi, proc_path)
+    --self._names[c] = "podMon"
+    if res.container then
+        self._procs[c] = CpodFilter.new(res, self._proto, procffi, proc_path)
+        self._names[c] = "podFilter"
     end
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
 end

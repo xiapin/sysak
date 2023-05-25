@@ -31,16 +31,19 @@ local function mon_dirs(path)
     local ws = {}
     local c = 0
 
-    local dirs = {path}
-    walk_dirs(path, dirs)
+    if path then  -- if set path then walk all child path
+        local dirs = {path}
+        walk_dirs(path, dirs)
 
-    for _, dir in ipairs(dirs) do
-        local w = handle:addwatch(dir, inotify.IN_CREATE, inotify.IN_MOVE, inotify.IN_DELETE)
-        if w > 0 then
-            c = c + 1
-            ws[c] = w
-        else
-            error("add " .. dir .. " to watch failed.")
+        print("watch " .. #dirs .. " files")
+        for _, dir in ipairs(dirs) do
+            local w = handle:addwatch(dir, inotify.IN_CREATE, inotify.IN_MOVE, inotify.IN_DELETE)
+            if w > 0 then
+                c = c + 1
+                ws[c] = w
+            else
+                error("add " .. dir .. " to watch failed.")
+            end
         end
     end
 
@@ -59,9 +62,23 @@ function Cinotifies:_del_()
     self._handle:close()
 end
 
+function Cinotifies:add(path)
+    local w = self._handle:addwatch(path, inotify.IN_CREATE, inotify.IN_MOVE, inotify.IN_DELETE)
+    if w ~= nil then
+        if w > 0 then
+            table.insert(self._ws, w)
+        else
+            error("add " .. path .. " to watch failed.")
+        end
+    end
+end
+
 function Cinotifies:isChange()
     local events = self._handle:read()
-    return #events > 0
+    if events ~=nil then
+        return #events > 0
+    end
+    return false
 end
 
 return Cinotifies

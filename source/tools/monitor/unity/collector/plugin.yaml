@@ -64,8 +64,27 @@ pushTo:
 
 container:
   mode: "pods"
-  luaPlugin: ["cg_cpuacct_proc_stat", "cg_memory_dcmp_latency",  "cg_memory_fail_cnt",
-    "cg_cpu_stat",  "cg_cpuacct_wait_latency",  "cg_memory_drcm_latency"]
+  luaPlugin: ["cg_cpu_stat_sample", "cg_cpuacct_stat"]
+  directCgPath:
+    - "/"
+    - "/kubepods.slice"
+    - "/kubepods.slice/kubepods-besteffort.slice"
+    - "/kubepods.slice/kubepods-burstable.slice"
+
+  indirectCgPath:
+    - "kubepods.slice"
+    - "kubepods.slice/kubepods-besteffort.slice"
+    - "kubepods.slice/kubepods-burstable.slice"
+
+  indirectCgPath1:
+    - path: "/kubepods.slice"
+      child1: "/kubepods%-pod"
+      child2: "/cri%-containerd"
+    - path: "/kubepods.slice/kubepods-besteffort.slice"
+      child1: "/kubepods%-besteffort%-pod"
+      child2: "/cri%-containerd"
+    - path: "/kubepods.slice/kubepods-burstable.slice"
+      child1: "/kubepods%-burstable%-pod"
 
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
@@ -104,15 +123,15 @@ plugins:
   #-
   #  so: numainfo
   #  description: "collect numainfo"
-  # -
-  #   so: cpufreq
-  #   description: "collect cpufreq"
+  #-
+  #  so: cpufreq
+  #  description: "collect cpufreq"
   -
     so: gpuinfo
     description: "collect gpuinfo"
-  -
-    so: pmu_cpi
-    description: "collect cpi"
+  #-
+  #  so: pmu_events
+  #  description: "collect pmu events"
 
 metrics:
   -
@@ -221,7 +240,7 @@ metrics:
     head: value
     help: "Diagnose log for IO exception"
     type: "gauge"
-  - title: sched_moni_jitter
+  - title: sysak_sched_moni_jitter
     from: sched_moni_jitter
     head: value
     help: "nosched/irqoff:sys and irqoff hold cpu and didn't scheduling"
@@ -251,11 +270,11 @@ metrics:
   #  head: value
   #  help: "numainfo of system from /sys/devices/system/"
   #  type: "gauge"
-  # - title: sysak_proc_cpufreq
-  #   from: cpufreq
-  #   head: value
-  #   help: "cpufreq of system from /proc/cpuinfo"
-  #   type: "gauge"
+  #- title: sysak_proc_cpufreq
+  #  from: cpufreq
+  #  head: value
+  #  help: "cpufreq of system from /proc/cpuinfo"
+  #  type: "gauge"
   - title: sysak_gpuinfo
     from: gpuinfo
     head: value
@@ -267,13 +286,48 @@ metrics:
     #head: value
     #help: "get pod alloc page used"
     #type: "gauge"
+  - title: sysak_pmu_events
+    from: pmu_events
+    head: value
+    help: "pmu events, such as  cycles/instructions, llc events"
+    type: "gauge"
   - title: sysak_pmu_events_percpu
     from: pmu_events_percpu
     head: value
     help: "pmu events of percpu"
     type: "gauge"
-  - title: sysak_pmu_cpi
-    from: pmu cpi
+  - title: sysak_cg_memfail_cnt
+    from: cg_memfail_cnt
     head: value
-    help: "pmu info of cycles/instructions."
+    help: "sysak_cg_memFail_cnt"
+    type: "gauge"
+  - title: sysak_cg_memdrcm_latency
+    from: cg_memdrcm_latency
+    head: value
+    help: "sysak_cg_memdrcm_latency"
+    type: "gauge"
+  - title: sysak_cg_memmcmp_latency
+    from: cg_memmcmp_latency
+    head: value
+    help: "sysak_cg_memmcmp_latency"
+    type: "gauge"
+  - title: sysak_cg_wait_latency
+    from: cg_wait_latency
+    head: value
+    help: "sysak_cg_wait_latency"
+    type: "gauge"
+  - title: sysak_cg_cpuacct_proc_stat
+    from: cg_cpuacct_proc_stat
+    head: value
+    help: "sysak_cg_cpuacct_proc_stat"
+    type: "gauge"
+  - title: sysak_cg_cpu_stat
+    from: cg_cpu_stat
+    head: value
+    help: "sysak_cg_cpu_stat"
+    type: "gauge"
+  - title: sysak_cg_cpuacct_stat
+    from: cg_cpuacct_stat
+    head: value
+    help: "cpuacct/cpuacct.stat"
     type: "gauge"
