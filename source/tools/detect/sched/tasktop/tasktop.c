@@ -224,6 +224,62 @@ int swap(void* lhs, void* rhs, size_t sz) {
     return 0;
 }
 
+static bool is_D(pid_t pid, pid_t tid) {
+    int res = false;
+    char path[FILE_PATH_LEN];
+    struct proc_stat_t proc_info;
+
+    snprintf(path, FILE_PATH_LEN, "/proc/%d/task/%d/stat", pid, tid);
+    FILE* fp = fopen(path, "r");
+    if (!fp) {
+        return res;
+    }
+
+    fscanf(fp, "%d %s %c", &proc_info.pid, proc_info.comm, &proc_info.state);
+    if (proc_info.state == 'D') res = true;
+
+    fclose(fp);
+    return res;
+}
+
+static int read_stack(pid_t pid, pid_t tid) {
+    int err = 0;
+    char stack_path[FILE_PATH_LEN];
+    snprintf(stack_path, FILE_PATH_LEN, "/proc/%d/task/%d/stack", pid, tid);
+    FILE* fp = fopen(stack_path, "r");
+    if (!fp) {
+        /* may be thread is exited */
+        err = errno;
+        goto cleanup;
+    }
+
+    char buf[1024];
+    fprintf(stderr, "path=%s\n", stack_path);
+    while (fgets(buf, 1024, fp)) {
+        fprintf(stderr, "%s", buf);
+    }
+    fprintf(stderr, "\n");
+
+cleanup:
+    if (fp) fclose(fp);
+    return err;
+}
+
+static int read_d_task(struct id_pair_t* pids, int nr_thread) {
+    int i = 0;
+    int err = 0;
+    for (i = 0; i < nr_thread; i++) {
+        int pid = pids[i].pid;
+        int tid = pids[i].tid;
+
+        if (is_D(pid, tid)) {
+            read_stack(pid, tid);
+        }
+    }
+
+    return err;
+}
+
 static int read_sched_delay(struct sys_record_t* sys_rec) {
     FILE* fp = fopen(SCHEDSTAT_PATH, "r");
     int err = 0;
@@ -307,6 +363,7 @@ static int read_cgroup_throttle() {
 
     return err;
 }
+
 static int read_stat(struct sys_cputime_t* prev_sys,
                      struct sys_cputime_t* now_sys,
                      struct sys_record_t* sys_rec) {
@@ -377,7 +434,7 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
 
     DIR* dir = NULL;
     DIR* task_dir = NULL;
-    u_int64_t proc_num = 0;
+    u_int64_t nr_thread = 0;
     struct dirent* proc_de = NULL;
     struct dirent* task_de = NULL;
     long val;
@@ -397,45 +454,44 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
 
         if (err) continue;
         pid = val;
-        if (!env.thread_mode) {
-            pids[proc_num].pid = pid;
-            pids[proc_num++].tid = -1;
-        } else {
-            char taskpath[FILE_PATH_LEN];
-            snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
-            task_dir = opendir(taskpath);
-            if (!task_dir) {
-                if (errno == ENOENT) {
-                    continue;
-                }
-                err = errno;
+        // if (!env.thread_mode) {
+        //     pids[proc_num].pid = pid;
+        //     pids[proc_num++].tid = -1;
+        // } else {
+        char taskpath[FILE_PATH_LEN];
+        snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
+        task_dir = opendir(taskpath);
+        if (!task_dir) {
+            if (errno == ENOENT) {
+                continue;
+            }
+            err = errno;
+            goto cleanup;
+        }
+
+        while ((task_de = readdir(task_dir)) != NULL) {
+            if (task_de->d_type != DT_DIR || !strcmp(task_de->d_name, ".") ||
+                !strcmp(task_de->d_name, ".."))
+                continue;
+            err = parse_long(task_de->d_name, &val);
+
+            if (err) {
+                fprintf(stderr, "Failed parse tid\n");
                 goto cleanup;
             }
+            tid = val;
 
-            while ((task_de = readdir(task_dir)) != NULL) {
-                if (task_de->d_type != DT_DIR ||
-                    !strcmp(task_de->d_name, ".") ||
-                    !strcmp(task_de->d_name, ".."))
-                    continue;
-                err = parse_long(task_de->d_name, &val);
-
-                if (err) {
-                    fprintf(stderr, "Failed parse tid\n");
-                    goto cleanup;
-                }
-                tid = val;
-
-                pids[proc_num].pid = pid;
-                pids[proc_num++].tid = tid;
-            }
-
-            if (task_dir) {
-                closedir(task_dir);
-                task_dir = NULL;
-            }
+            pids[nr_thread].pid = pid;
+            pids[nr_thread++].tid = tid;
         }
+
+        if (task_dir) {
+            closedir(task_dir);
+            task_dir = NULL;
+        }
+        // }
     }
-    *num = proc_num;
+    *num = nr_thread;
 cleanup:
     if (dir) closedir(dir);
     if (task_dir) closedir(task_dir);
@@ -450,10 +506,13 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
     FILE* fp = 0;
     int err = 0;
 
-    if (tid != -1) {
+    /* tid > 0: tid valid */
+    /* tid < 0 0: tid ignored */
+    if (tid > 0) {
         snprintf(proc_path, FILE_PATH_LEN, "/proc/%d/task/%d/stat", pid, tid);
         pid = tid;
     } else {
+        /* tid < 0 means env is the process mode */
         snprintf(proc_path, FILE_PATH_LEN, "/proc/%d/stat", pid);
     }
 
@@ -528,12 +587,12 @@ cleanup:
     return err;
 }
 
-static void sort_records(struct record_t* rec, int proc_num,
+static void sort_records(struct record_t* rec, int rec_num,
                          enum sort_type sort) {
     struct task_record_t** records = rec->tasks;
     int i, j;
-    for (i = 0; i < proc_num; i++) {
-        for (j = i + 1; j < proc_num; j++) {
+    for (i = 0; i < rec_num; i++) {
+        for (j = i + 1; j < rec_num; j++) {
             if (!records[j] && !records[i]) {
                 continue;
             } else if (records[i] && !records[j]) {
@@ -612,7 +671,7 @@ static char* second2str(time_t ts, char* buf, int size) {
     return buf;
 }
 
-static void output(struct record_t* rec, int proc_num, FILE* dest) {
+static void output(struct record_t* rec, int rec_num, FILE* dest) {
     struct task_record_t** records = rec->tasks;
     struct sys_record_t* sys = &rec->sys;
     struct proc_fork_info_t* info = &(sys->most_fork_info);
@@ -642,7 +701,7 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
                 sys->percpu_sched_delay[i - 1]);
     }
 #endif
-    for (i = 0; i < proc_num; i++) {
+    for (i = 0; i < rec_num; i++) {
         if (!records[i]) break;
 
         if (env.human) {
@@ -679,7 +738,7 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
     fflush(dest);
 }
 
-static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
+static void now_to_prev(struct id_pair_t* pids, int nr_thread, int pidmax,
                         struct task_cputime_t** prev_task,
                         struct task_cputime_t** now_task,
                         struct sys_cputime_t* prev_sys,
@@ -692,25 +751,31 @@ static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
         }
     }
 
-    for (i = 0; i < proc_num; i++) {
+    for (i = 0; i < nr_thread; i++) {
         int pid;
         if (env.thread_mode)
             pid = pids[i].tid;
-        else
+        else {
+            /* only move once */
+            if (pids[i].pid != pids[i].tid) continue;
             pid = pids[i].pid;
+        }
+
         swap(&prev_task[pid], &now_task[pid], sizeof(struct task_cputime_t*));
     }
 
     swap(prev_sys, now_sys, sizeof(struct sys_cputime_t) * (nr_cpu + 1));
 }
 
-static int make_records(struct id_pair_t* pids, int proc_num,
+static int make_records(struct id_pair_t* pids, int nr_thread,
                         struct record_t* rec, struct task_cputime_t** prev_task,
-                        struct task_cputime_t** now_task) {
+                        struct task_cputime_t** now_task, int* rec_num) {
     struct task_record_t** records = rec->tasks;
     int err = 0;
     u_int64_t i;
-    for (i = 0; i < proc_num; i++) {
+    int nr_rec = 0;
+
+    for (i = 0; i < nr_thread; i++) {
         struct id_pair_t* id = &pids[i];
 
         if (env.tid != -1) {
@@ -721,20 +786,31 @@ static int make_records(struct id_pair_t* pids, int proc_num,
             }
         }
 
-        err = read_proc(id->pid, id->tid, prev_task, now_task, &records[i]);
+        /* many pair with the same pid, in process mode skip the trival read */
+        if (!env.thread_mode && id->pid != id->tid) continue;
+
+        if (env.thread_mode) {
+            err = read_proc(id->pid, id->tid, prev_task, now_task,
+                            &records[nr_rec++]);
+        } else {
+            err =
+                read_proc(id->pid, -1, prev_task, now_task, &records[nr_rec++]);
+        }
+
         if (err) {
             fprintf(stderr, "Failed read proc\n");
             return err;
         }
     }
+    *rec_num = nr_rec;
 
     return err;
 }
 
-static void free_records(struct record_t* rec, int proc_num) {
+static void free_records(struct record_t* rec, int nr_thread) {
     struct task_record_t** records = rec->tasks;
     int i;
-    for (i = 0; i < proc_num; i++) {
+    for (i = 0; i < nr_thread; i++) {
         if (records[i]) free(records[i]);
     }
     free(records);
@@ -900,35 +976,40 @@ int main(int argc, char** argv) {
         read_stat(prev_sys, now_sys, &rec->sys);
 
         /* get all process now */
-        u_int64_t proc_num;
-        err = read_all_pids(pids, &proc_num);
+        u_int64_t nr_thread = 0;
+        int rec_num = 0;
+
+        err = read_all_pids(pids, &nr_thread);
         if (err) {
             fprintf(stderr, "Failed read all pids.\n");
             goto cleanup;
         }
-        printf("procnum=%lu\n", proc_num);
 
-        rec->tasks = calloc(proc_num, sizeof(struct task_record_t*));
+        printf("nr_thread=%lu\n", nr_thread);
+
+        read_d_task(pids, nr_thread);
+
+        rec->tasks = calloc(nr_thread, sizeof(struct task_record_t*));
         /* if prev process info exist produce record*/
-        err = make_records(pids, proc_num, rec, prev_task, now_task);
+        err = make_records(pids, nr_thread, rec, prev_task, now_task, &rec_num);
         if (err) {
             fprintf(stderr, "Failed make records.\n");
             goto cleanup;
         }
 
         /* sort record by sort type */
-        sort_records(rec, proc_num, env.rec_sort);
+        sort_records(rec, rec_num, env.rec_sort);
 
         /* output record */
         if (!first)
-            output(rec, proc_num, stat_log);
+            output(rec, rec_num, stat_log);
         else
             first = false;
 
-        free_records(rec, proc_num);
+        free_records(rec, nr_thread);
 
         /* update old info and free nonexist process info */
-        now_to_prev(pids, proc_num, pidmax, prev_task, now_task, prev_sys,
+        now_to_prev(pids, nr_thread, pidmax, prev_task, now_task, prev_sys,
                     now_sys);
 
         if (env.nr_iter) sleep(env.delay);
