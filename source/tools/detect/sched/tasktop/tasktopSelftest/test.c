@@ -14,6 +14,7 @@ void create_process(int n) {
     for (i = 0; i < n; i++) {
         if ((pid[i] = fork()) == 0) {
             sleep(120);
+            exit(0);
         }
     }
 
@@ -123,7 +124,7 @@ void cpu_bind(int cpu_id) {
 }
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
+    if (argc > 3) {
         printf("usage: test [bind|fork|clone|multi_thread]\n");
         return -1;
     }
@@ -137,5 +138,7 @@ int main(int argc, char **argv) {
     } else if (!strcmp(argv[1], "multi_thread")) {
         sleep(10);
         run_multithread();
+    } else if (!strcmp(argv[1], "sleep")) {
+        create_process(atoi(argv[2]));
     }
 }
