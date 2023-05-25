@@ -1,17 +1,52 @@
-# 1 Tasktop功能测试
-## 1.0 低负载状态
+# Tasktop 测试文档
+
+## 1. 测试环境
+
+    $lscpu
+    Architecture:          x86_64
+    CPU op-mode(s):        32-bit, 64-bit
+    Byte Order:            Little Endian
+    CPU(s):                4
+    On-line CPU(s) list:   0-3
+    Thread(s) per core:    2
+    Core(s) per socket:    1
+    Socket(s):             2
+    NUMA node(s):          1
+    Vendor ID:             GenuineIntel
+    CPU family:            6
+    Model:                 79
+    Model name:            Intel(R) Xeon(R) CPU E5-2682 v4 @ 2.50GHz
+    Stepping:              1
+    CPU MHz:               2494.224
+    BogoMIPS:              4988.44
+    Hypervisor vendor:     KVM
+    Virtualization type:   full
+    L1d cache:             32K
+    L1i cache:             32K
+    L2 cache:              256K
+    L3 cache:              40960K
+    NUMA node0 CPU(s):     0-3
+    Flags:                 fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch invpcid_single fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm rdseed adx smap xsaveopt
+
+## 2. Tasktop功能测试
+
+### 2.0 低负载状态
 
     $uptime
     11:13:52 up 783 days, 20:59,  0 users,  load average: 1.28, 10.09, 32.79
 
-## 1.1 多线程、多进程场景
+### 2.1 多线程、多进程场景
+
 由于多线程或者多进程导致cpu资源不足，大量task在队列中无法被调度导致的R状态冲高
-### 1.1.1 测试方法
+
+#### 2.1.1 测试方法
+
 通过stress工具 启动64个进程进行计算
 
     stress -c 64
 
-### 1.1.2 测试结果
+#### 2.1.2 测试结果
+
     2023-05-24 02:15:36
     UTIL&LOAD
     usr    sys iowait  load1      R      D   fork : proc 
@@ -33,15 +68,20 @@
 
 观察到load1迅速冲高，伴随系统以及per-cpu的cpu利用率打满，cpu时间集中于用户态，per-cpu的调度延迟达到50s。
 
-## 1.2 cpu绑核场景
+### 2.2 cpu绑核场景
+
 由于配置不当，导致大量进程堆积在少部分CPU核上导致的R状态进程数冲高
-### 1.2.1 测试方法
+
+#### 2.2.1 测试方法
+
 启动64个计算进程 绑定到cpu0上
 
     cd tasktopSelftest
     make clean;make
     ./test bind
-### 1.2.2 测试结果
+
+#### 2.2.2 测试结果
+
     2023-05-24 02:49:31
     UTIL&LOAD
     usr    sys iowait  load1      R      D   fork : proc 
@@ -61,15 +101,20 @@
                 (test)  48449  48433 1684896441        130    1.7    0.0    1.7
                 (test)  48451  48433 1684896441        130    1.7    0.0    1.7
 观察到load1冲高，伴随有R状态进程数增多，但系统cpu利用率不高，cpu-0的利用率打满，cpu-0的调度延迟达到190s
-## 1.3 大量fork场景
+
+### 2.3 大量fork场景
+
 由于loadavg的采样是周期性的，可能存在大量短task在采样时出现但是无法被top等工具捕捉等情况
-### 1.3.1 测试方法
+
+#### 2.3.1 测试方法
+
 主进程每1ms周期性的进行fork出128个进程 每个进程执行10w次自增运算后退出
 
     cd tasktopSelftest
     make clean;make
     ./test fork
-### 1.3.2 测试结果
+
+#### 2.3.2 测试结果
 
     2023-05-24 03:42:18
     UTIL&LOAD
@@ -93,9 +138,13 @@
             (dfget)  56945      1 1684899541        197    0.3    0.0    0.3
 
 观察到load增高，同时CPU利用率也跑满，存在较多R进程但是没有被top捕捉到。此时fork增量激增，fork调用次数最多的进程为test，同时test进程的sys利用率较高。
-## 1.4 cgroup限流场景
+
+### 2.4 cgroup限流场景
+
 与cpu核绑定类似，通过cgroup限制了cpu带宽导致task堆积在就绪队列
-### 1.4.1 测试方法
+
+#### 2.4.1 测试方法
+
 创建一个cgroup 限定cgroup的cpu额度 启动一个进程并将task的pid加入cgroup的tasks中 之后该进程创建128个线程执行计算任务
 
     # 创建cgroup 设置限流30% 使用cpuset.cpus=0-3 
@@ -107,7 +156,7 @@
     # run test
     ./test multi_thread
 
-### 1.4.2 测试结果
+#### 2.4.2 测试结果
 
         [/sys/fs/cgroup/cpu/aegis/cpu.stat] nr_periods=4 nr_throttled=0 throttled_time=0 nr_burst=0 burst_time=0
         [/sys/fs/cgroup/cpu/docker/cpu.stat] nr_periods=0 nr_throttled=0 throttled_time=0 nr_burst=0 burst_time=0
@@ -140,3 +189,26 @@
         (argusagent)   3096      1 1684908962       7490    0.0    0.3    0.3
 
 可以观察到此时虽然**实际负载**很高，大量task由于限流处于R状态，但是由于cgroup机制task并不位于就绪队列中，因此R状态数量指标不准确导致load1计算不准（load1无法准确体现出系统的负载情况）。但是在cgroup限流信息中可以看到stress_cg中**出现了大量的限流**，并且**per-cpu的调度延迟很高**，一定程度体现了cpu就绪队列中存在task堆积。
+
+## 3. Tasktop性能测试
+
+tasktop在运行时会对/proc文件系统进行遍历，采集相关信息，大量进程下可能会影响业务，因此对tasktop在不同进程数的场景下进行性能测试。
+
+### 3.1 测试方法
+
+创建N个进程，并让这N个进程进入sleep状态，不占用CPU资源，只增加proc文件数量。
+
+### 3.2 测试结果
+
+| Process Number   | CPU Utilization    |
+| :---------: | :---------: |
+| 147         | 0.3%        |
+| 1155        | 1.0%        |
+| 2157        | 1.9-2.0%    |
+| 4147        | 3.7-4.7%    |
+| 8152        | 8-11%       |
+| 12198       | 15.7-18%    |
+| 15161       | 18-21%      |
+| 20173       | 26.9-31.6%  |
+
+在存在20000个进程proc文件情况下，tasktop的整体cpu资源消耗在单核的30%左右。

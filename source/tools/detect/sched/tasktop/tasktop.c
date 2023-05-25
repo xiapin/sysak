@@ -243,10 +243,7 @@ static int read_sched_delay(struct sys_record_t* sys_rec) {
                    &ph, &ph, &ph, &ph, &ph, &delay, &ph);
 
             int cpu_id = atoi(name + 3);
-            // #ifdef DEBUG
-            //             fprintf(stderr, "cpu_id = %d delay=%llu\n", cpu_id,
-            //             delay);
-            // #endif
+
             sys_rec->percpu_sched_delay[cpu_id] = delay - prev_delay[cpu_id];
             prev_delay[cpu_id] = delay;
         } else {
@@ -271,7 +268,8 @@ static int read_cgroup_throttle() {
             continue;
         }
         char stat_path[BUF_SIZE];
-        snprintf(stat_path, BUF_SIZE, "%s/%s/cpu.stat", CGROUP_PATH, dir->d_name);
+        snprintf(stat_path, BUF_SIZE, "%s/%s/cpu.stat", CGROUP_PATH,
+                 dir->d_name);
 
         cgroup_cpu_stat_t stat;
 
@@ -343,8 +341,8 @@ static int read_stat(struct sys_cputime_t* prev_sys,
         // int all_time = (sysconf(_SC_NPROCESSORS_ONLN) * env.delay *
         // sysconf(_SC_CLK_TCK));
 
-        /* all_time can't not calculate by delay * ticks * online-cpu-num,
-         * because there is error between process waked up and running, when
+        /* all_time can't calculated by delay * ticks * online-cpu-num,
+         * because there is an error between process waked up and running, when
          * sched delay occur , the sum of cpu rates more than 100%. */
 
         sys_rec->cpu[i].usr =
@@ -572,7 +570,6 @@ static void sort_records(struct record_t* rec, int proc_num,
 }
 
 static char* ts2str(time_t ts, char* buf, int size) {
-    // __builtin_memset(buf, 0, size;
     struct tm* t = gmtime(&ts);
     strftime(buf, size, "%Y-%m-%d %H:%M:%S", t);
     return buf;
@@ -616,7 +613,6 @@ static char* second2str(time_t ts, char* buf, int size) {
 }
 
 static void output(struct record_t* rec, int proc_num, FILE* dest) {
-    // system("clear");
     struct task_record_t** records = rec->tasks;
     struct sys_record_t* sys = &rec->sys;
     struct proc_fork_info_t* info = &(sys->most_fork_info);
