@@ -53,8 +53,10 @@ function Cloop:loadLuaPlugin(res, proc_path, procffi)
     end
     --self._procs[c] = CpodsAll.new(res, self._proto, procffi, proc_path)
     --self._names[c] = "podMon"
-    self._procs[c] = CpodFilter.new(res, self._proto, procffi, proc_path)
-    self._names[c] = "podFilter"
+    if res.container then
+        self._procs[c] = CpodFilter.new(res, self._proto, procffi, proc_path)
+        self._names[c] = "podFilter"
+    end
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
 end
 
