@@ -408,7 +408,11 @@ def oom_is_memleak(oom, oom_result):
         if len(tcp) != 0:
             res["tcp_task"] = tcp["top_task"]
             res["tcp_mem"] = tcp["tcp_mem"]
-        summary = "slab memleak, usage:%dkb\n"%(meminfo['slab'])
+        if 'topuslab' in oom['meminfo']:
+            summary = "slab memleak, usage:%dKB(%s:%sKB, %s:%sKB)\n"%(meminfo['slab'], meminfo['topuslab'][0][0],meminfo['topuslab'][0][1]['total'],
+                    meminfo['topuslab'][1][0],meminfo['topuslab'][1][1]['total'])
+        else:
+            summary = "slab memleak, usage:%dKB\n"%(meminfo['slab'])
     elif memleak_check(total, used):
         res['leaktype'] = 'allocpage'
         res['leakusage'] = used
@@ -416,11 +420,11 @@ def oom_is_memleak(oom, oom_result):
         if len(tcp) != 0:
             res["tcp_task"] = tcp["top_task"]
             res["tcp_mem"] = tcp["tcp_mem"]
-        summary = "allocpage memleak, usage:%dkb\n"%(used)
+        summary = "allocpage memleak, usage:%dKB\n"%(used)
     if memleak_check(total, meminfo['pagetables']):
         res['leaktype'] = 'pagetables'
         res['leakusage'] = meminfo['pagetables']
-        summary += "pagetables usage:%dkb indicates lots of processes or lots of mmaps\n"%(meminfo['pagetables'])
+        summary += "pagetables usage:%dKB indicates lots of processes or lots of mmaps\n"%(meminfo['pagetables'])
     if len(summary) != 0 and  len(tcp) != 0:
         summary += "tcp_task:%s tcp_mem:%sKB\n"%(tcp["top_task"][0], tcp["tcp_mem"])
     if len(summary) != 0:
@@ -475,6 +479,7 @@ def oom_host_output(oom_result, num):
         summary += leak
     summary += "host free:%s,"%(oom['host_free'])
     summary += "low:%s\n"%(oom['host_low'])
+
     res['host_free'] = oom['host_free']
     res['host_low'] = oom['host_low']
     return summary
@@ -615,6 +620,8 @@ def oom_get_memstat(oom_result, line, num, key, lines):
     oom = oom_result['sub_msg'][num]
     tmp = {}
     while(key < len(lines)):
+        if lines[key].find("workingset") >= 0:
+            break
         if "] anon " in lines[key]:
             gp  = re.search("\] (\S*) (\d*)$",lines[key])
         else:
@@ -700,6 +707,9 @@ def oom_output_msg(oom_result,num, summary):
             for line in oom['state_mem']['msg']:
                 summary += line +'\n'
     summary += "type: %s, root: %s\n"%(oom['type'], oom['root'])
+    if 'kernelUsed' in oom['meminfo']:
+        summary += "mem info: total:%sKB, user used:%sKB, kernel used:%s KB\nuser file used:%sKB, user anon used:%s KB, kernel resevred:%sKB, kernel page used:%sKB kernel uslab:%sKB" %(
+                oom['meminfo']['total_mem'],oom['meminfo']['userUsed'], oom['meminfo']['kernelUsed'],oom['meminfo']['active_file']+oom['meminfo']['inactive_file'], oom['meminfo']['active_anon']+oom['meminfo']['inactive_anon'],oom['meminfo']['rmem'],oom['meminfo']['allocPage'], oom['meminfo']['slab'])
     res['root'] = oom['root']
     res['type'] = oom['type']
     res['result'] = reason
@@ -773,6 +783,39 @@ def oom_get_max_task(num, oom_result):
         oom['rss_list_desc'].append({'task':task, 'rss':oom['rss_all'][task]['rss']})
     return res
 
+def get_memgraph(oom_result,num,summary):
+    try:
+        meminfo = oom_result['sub_msg'][num]['meminfo']
+        if len(meminfo) == 0:
+            return
+        user = meminfo["active_anon"] + meminfo["inactive_anon"]
+        user += meminfo["active_file"] + meminfo["inactive_file"]
+        #user += meminfo["Mlocked"]
+        if "hugepage" in meminfo:
+            user += meminfo["hugepage"]
+        kernelOther = meminfo["slab"] + meminfo["slabr"]  + meminfo["pagetables"] + meminfo['unevictable']
+        pageUsed = meminfo["total_mem"] - meminfo["free"] - user - kernelOther
+        if pageUsed < 1:
+            pageUsed = 1024
+        meminfo["allocPage"] = pageUsed
+        meminfo["kernelUsed"] = pageUsed + kernelOther + meminfo["rmem"]
+        meminfo["userUsed"] = user
+        meminfo["kernelOther"] = kernelOther
+    except Exception as err:
+        sys.stderr.write("get_memgraph err {} lines {}\n".format(err, traceback.print_exc()))
+
+
+def oom_get_unslab_info(oom_result, line, num, key, lines):
+    column = {}
+    for i in range(key+2,len(lines)):
+        items = lines[i].split()
+        if not (len(items) >=3 and items[-1].endswith('KB') and items[-2].endswith('KB')):
+            break
+        column[items[-3]] = {'active':int(items[-2][:-2]), 'total':int(items[-1][:-2])}
+    tmprss = sorted(column.items(),key=lambda k:k[1]['total'], reverse=True)[0:10]
+    #print tmprss
+    meminfo = oom_result['sub_msg'][num]['meminfo']['topuslab'] = tmprss
+
 def oom_reason_analyze(num, oom_result, summary):
     try:
         node_num = 0
@@ -811,12 +854,15 @@ def oom_reason_analyze(num, oom_result, summary):
                     oom_get_hugepage(oom_result, line, num)
                 elif "] anon " in line:
                     oom_get_memstat(oom_result, line, num, key, lines)
+                elif "Unreclaimable slab info" in line:
+                    oom_get_unslab_info(oom_result, line, num, key, lines)
                 elif OOM_END_KEYWORD in line or OOM_END_KEYWORD_4_19 in line:
                     oom_get_task_mem(oom_result, line, num)
                     oom_get_pid(oom_result, line, num)
             except Exception as err: 
                 sys.stderr.write("oom_reason_analyze loop err {} lines {}\n".format(err, traceback.print_exc()))
                 continue
+        get_memgraph(oom_result,num,summary)
         oom_result['node_num'] = node_num
         if 'cgroup_major_used' in oom_result['sub_msg'][num]:
             oom_result['sub_msg'][num]['reason'] = '%s, %s used over 85%% memory (%dKB)' %(oom_result['sub_msg'][num]['reason'],oom_result['sub_msg'][num]['cgroup_major_used']['name'],oom_result['sub_msg'][num]['cgroup_major_used']['value'])
