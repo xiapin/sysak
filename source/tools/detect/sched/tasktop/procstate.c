@@ -26,6 +26,7 @@ int runnable_proc(struct sys_record_t *sys) {
     sys->load1 = avg.load1;
     sys->nr_R = avg.nr_running;
     // printf("load1 = %.2f load5 = %.2f load15 = %.2f\n", avg.load1, avg.load5, avg.load15);
+    fclose(fp);
     return err;
 }
 
