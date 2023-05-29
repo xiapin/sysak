@@ -6,9 +6,7 @@
 
 #define STACK_CONTENT_LEN 1024
 #define FILE_PATH_LEN 256
-#define MAX_COMM_LEN 30
-#define PEROID 3
-#define LIMIT 20
+#define MAX_COMM_LEN 24
 #define CPU_NAME_LEN 8
 #define BUF_SIZE 512
 #define DEBUG_LOG "./log/debug.log"
