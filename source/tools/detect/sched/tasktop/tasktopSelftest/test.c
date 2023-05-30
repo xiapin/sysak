@@ -28,6 +28,8 @@ void *run_forever(void *arg) {
     }
 }
 
+void *run_sleep(void *arg) { sleep(10000); }
+
 void run_multithread() {
     pthread_t pid[128];
     int i;
@@ -37,6 +39,20 @@ void run_multithread() {
     }
 
     for (i = 0; i < 128; i++) {
+        pthread_join(pid[i], 0);
+    }
+}
+
+void run_multithread_sleep() {
+    #define THREAD_NUM 10000
+    pthread_t pid[THREAD_NUM];
+    int i;
+    for (i = 0; i < THREAD_NUM; i++) {
+        pthread_create(&pid[i], 0, run_sleep, 0);
+        // printf("fork.\n");
+    }
+
+    for (i = 0; i < THREAD_NUM; i++) {
         pthread_join(pid[i], 0);
     }
 }
@@ -136,8 +152,10 @@ int main(int argc, char **argv) {
     } else if (!strcmp(argv[1], "bind")) {
         cpu_bind(0);
     } else if (!strcmp(argv[1], "multi_thread")) {
-        sleep(10);
+        sleep(30);
         run_multithread();
+    } else if (!strcmp(argv[1], "multi_thread_sleep")) {
+        run_multithread_sleep();
     } else if (!strcmp(argv[1], "sleep")) {
         create_process(atoi(argv[2]));
     }

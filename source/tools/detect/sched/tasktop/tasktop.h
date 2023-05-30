@@ -4,10 +4,9 @@
 #include <sys/types.h>
 #include "common.h"
 
+#define STACK_CONTENT_LEN 1024
 #define FILE_PATH_LEN 256
-#define MAX_COMM_LEN 16
-#define PEROID 3
-#define LIMIT 20
+#define MAX_COMM_LEN 24
 #define CPU_NAME_LEN 8
 #define BUF_SIZE 512
 #define DEBUG_LOG "./log/debug.log"
@@ -70,7 +69,7 @@ struct sys_cputime_t {
     long guest_nice;
 };
 
-struct task_record_t {
+typedef struct R_task_record_t {
     int pid;
     int ppid;
     char comm[MAX_COMM_LEN];
@@ -79,9 +78,17 @@ struct task_record_t {
     double system_cpu_rate;
     double user_cpu_rate;
     double all_cpu_rate;
-};
+} R_task_record_t;
+
+typedef struct D_task_record_t {
+    int pid;
+    int tid;
+    char comm[MAX_COMM_LEN];
+    char stack[STACK_CONTENT_LEN];
+} D_task_record_t;
 
 typedef struct cgroup_cpu_stat_t {
+    char cgroup_name[MAX_COMM_LEN];
     int nr_periods;
     int nr_throttled;
     unsigned long long throttled_time;
@@ -112,8 +119,10 @@ typedef struct sys_record_t {
 } sys_record_t;
 
 struct record_t {
-    struct task_record_t **tasks;
-    struct sys_record_t sys;
+    R_task_record_t **r_tasks;
+    D_task_record_t *d_tasks;
+    cgroup_cpu_stat_t *cgroups;
+    sys_record_t sys;
 };
 
 #endif
