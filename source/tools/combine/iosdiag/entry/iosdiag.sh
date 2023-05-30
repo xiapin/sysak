@@ -87,15 +87,21 @@ enable_hangdetect() {
 		hang_mod_depend
 		chmod +x $hangdetect_bin
 		rm -f $(dirname $logfile)/result.log*
-		$hangdetect_bin $*
-		wait $!
+		$hangdetect_bin $* &
+		hangdetect_pid=$!
+		wait $hangdetect_pid
 		disable_hangdetect
 	} 3<> /tmp/hangdetect.lock
 }
 
 disable_hangdetect() {
-	pid=`ps -ef | grep "\$hangdetect_bin" | awk '{print $2}'`
-	if [ "$pid" != "" ]
+	pid=$hangdetect_pid
+	if [ $diag_stop ]; then
+		pid=`ps -ef | grep "\$hangdetect_bin" | grep -v "grep" | awk '{print $2}'`
+	fi
+
+	comm=`cat /proc/$pid/comm 2>/dev/null`
+	if [ "$comm" = "hangdetect" ]
 	then
 		kill -9 $pid 2>/dev/null
 	fi
@@ -105,9 +111,11 @@ disable_hangdetect() {
 		rmmod sysak
 	fi
 
-	datafile_analysis hangdetect
-	if [ -n "$url" ]; then
-		upload_data hangdetect
+	if [ ! $diag_stop ]; then
+		datafile_analysis hangdetect
+		if [ -n "$url" ]; then
+			upload_data hangdetect
+		fi
 	fi
 	exit 0
 }
@@ -125,23 +133,31 @@ enable_latency() {
 		#mkdir -p `dirname $datafile`
 		chmod +x $latency_bin
 		rm -f $(dirname $logfile)/result.log*
-		$SYSAK_WORK_PATH/../sysak btf
+		#$SYSAK_WORK_PATH/../sysak btf
 		$latency_bin $* &
-		wait $!
+		latency_pid=$!
+		wait $latency_pid
 		disable_latency
 	} 3<> /tmp/latency.lock
 }
 
 disable_latency() {
-	pid=`ps -ef | grep "\$latency_bin" | awk '{print $2}'`
-	if [ "$pid" != "" ]
+	pid=$latency_pid
+	if [ $diag_stop ]; then
+		pid=`ps -ef | grep "\$latency_bin" | grep -v "grep" | awk '{print $2}'`
+	fi
+
+	comm=`cat /proc/$pid/comm 2>/dev/null`
+	if [ "$comm" = "latency" ]
 	then
 		kill -9 $pid 2>/dev/null
 	fi
 
-	datafile_analysis latency
-	if [ -n "$url" ]; then
-		upload_data latency
+	if [ ! $diag_stop ]; then
+		datafile_analysis latency
+		if [ -n "$url" ]; then
+			upload_data latency
+		fi
 	fi
 	exit 0
 }
@@ -161,6 +177,7 @@ function execute() {
 	enable_$1 ${*:2}
 }
 
+diag_stop=
 while getopts 'hs:u:' OPT; do
 	case $OPT in
 		"u")

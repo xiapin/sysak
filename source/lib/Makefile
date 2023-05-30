@@ -10,7 +10,7 @@ else
 endif
 	make -C uapi
 ifeq ($(BUILD_LIBBPF), YES)
-	OBJDIR=$(OBJ_LIB_PATH)/coolbpf DESTDIR=$(OBJ_LIB_PATH) sh internal/ebpf/coolbpf/build.sh
+	cd internal/ebpf/coolbpf && mkdir -p build && cd build && cmake -DCMAKE_INSTALL_PREFIX=${OBJ_LIB_PATH} .. && make install
 endif
 
 clean:

@@ -2,12 +2,15 @@
 内存直接回收规整跟踪工具
 
 使用说明:
+```
 Usage: sysak reclaimhung [options]
 Options:
     --time/-t     specify the monitor period(s), default=5000s
     --help/-h     help info
+```
 
 使用示例：sysak reclaimhung -t 60 监控60‘s内内存直接回收规整情况
+```
 Reclaim:
 pid                     name                    nr_reclaimed            last_delay(ns)          last_time                               nr_pages        
 345131                  AliYunDunUpdate         3                       211520461               2022-08-09 21:56:31(2524618984216187)   181             
@@ -27,3 +30,4 @@ Compaction:
 pid                     name                    nr_compacted            last_delay(ns)          last_time                               result          
 Cgroup Reclaim:
 pid                     name                    nr_reclaimed            last_delay(ns)          last_time                               nr_page
+```

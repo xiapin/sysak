@@ -27,14 +27,13 @@ pub enum CongestionState {
 }
 
 use anyhow::{bail, Result};
-use bincode::{config, Decode, Encode};
 use std::fmt::Display;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::str::FromStr;
 use std::{collections::HashMap, ops::Add};
 
-#[derive(Default, Debug, Clone, Encode, Decode, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq)]
 struct Netstat {
     hm: HashMap<(String, String), isize>,
 }
@@ -102,8 +101,8 @@ use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 
 pub struct Addrpair {
-    local: SocketAddr,
-    remote: SocketAddr,
+    pub local: SocketAddr,
+    pub remote: SocketAddr,
 }
 
 impl Default for Addrpair {

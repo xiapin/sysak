@@ -189,7 +189,6 @@ int BPF_KPROBE(kprobe__raw_sendmsg, u64 arg1, u64 arg2, u64 arg3)
     return 0;
 }
 
-#if 0
 // ping program can automatic privilege escalation, thus it always is raw socket, even not dgram at non-root user.
 SEC("kprobe/ping_v4_sendmsg")
 int BPF_KPROBE(kprobe__ping_v4_sendmsg, struct sock *sk, struct msghdr *msg)
@@ -197,7 +196,7 @@ int BPF_KPROBE(kprobe__ping_v4_sendmsg, struct sock *sk, struct msghdr *msg)
     raw_and_dgram_entry(ctx, sk, msg, true);
     return 0;
 }
-
+#if 0
 SEC("kprobe/ping_sendmsg")
 int BPF_KPROBE(kprobe__ping_sendmsg, u64 arg1, struct sock *sk, struct msghdr *msg)
 {

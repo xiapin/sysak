@@ -192,7 +192,7 @@ current_analyse() {
 	if [ -e $global_cpuflamegraph ];then
 		echo "$global_cpuflamegraph" >> $tmpfile
 	else
-		echo "Failed to generate cpu flamwgrapg" >> $tmpfile
+		echo "Failed to generate cpu flamegraph" >> $tmpfile
 	fi
 	load_proc=`cat /proc/loadavg`
 	load_proc="load_proc: $load_proc"
@@ -342,7 +342,6 @@ monitor() {
 				show_result $tmpfile
 			fi
 
-			datafile=${loadtask_dir}loadtask-`date "+%Y-%m-%d-%H-%M-%S"`.log
 			cat ${tmpfile} >> ${datafile}
 
 			if [ "$deamon" != "true" ];then

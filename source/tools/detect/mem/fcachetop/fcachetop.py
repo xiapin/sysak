@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+#!/usr/bin/python3
 # -*- coding: UTF-8 -*-
 
 import os, sys, getopt, signal, threading
@@ -26,7 +26,7 @@ except ImportError:
 	c_off_t = c_longlong if is_64bits else c_int
 
 if os.geteuid() != 0:
-	print "This program must be run as root. Aborting."
+	print("%s" % ("This program must be run as root. Aborting."))
 	sys.exit(1)
 
 MAP_FAILED = c_ulong(-1).value
@@ -84,12 +84,12 @@ class Filecachestat:
 				filename = "%s...%s" % (filename_start, filename_end)
 			else:
 				filename += ' '
-		print "%s%s%-16d%-16s%s" \
+		print("%s%s%-16d%-16s%s" \
 			% (filename.ljust(48),\
 			(str(self.pagecached)+'/'+hum_convert(self.pagecached*PAGESIZE)).ljust(24),\
 			self.nr_page,\
 			str(self.hit_percent)+"%",\
-			self.comm)
+			self.comm))
 
 def getCacheStat(filename, comm):
 	if os.path.isfile(filename) and os.access(filename, os.R_OK):
@@ -104,7 +104,7 @@ def getCacheStat(filename, comm):
 			f.close()
 			return 0
 
-		nr_pages = (size + PAGESIZE - 1) / PAGESIZE
+		nr_pages = int((size + PAGESIZE - 1) / PAGESIZE)
 		vec = (c_ubyte * nr_pages)()
 		ret = _mincore(addr, size, cast(vec, POINTER(c_ubyte)))
 		if ret != 0:
@@ -172,7 +172,7 @@ def topFileCache(interval, top):
 		topDisplay = 0
 		total_cached = 0
 		os.system("clear")
-		print "The top%d Max cached open files:" %top
+		print("The top%d Max cached open files:" %top)
 		print(head_txt)
 		global global_stat_list
 		for stat in global_stat_list:
@@ -181,7 +181,8 @@ def topFileCache(interval, top):
 			total_cached += (stat.pagecached * PAGESIZE)
 			topDisplay += 1
 		if total_cached != 0:
-			print "Total cached %s for all open files%s" %(hum_convert(total_cached),'(ctrl+c exit)' if interval else '')
+			print("Total cached %s for all open files%s" %(
+			hum_convert(total_cached),'(ctrl+c exit)' if interval else ''))
 		if interval == 0:
 			break
 		sleep(interval)

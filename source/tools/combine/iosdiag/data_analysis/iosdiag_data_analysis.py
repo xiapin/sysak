@@ -86,7 +86,10 @@ class latencyAnalysis:
 		diskIdx = diskIdxDicts[disk]
 		delayDicts['summary'][diskIdx]['slow ios'].append(sDict)
 		for component,idx in componentDicts.items():
-			delay = sDict['delays'][idx]['delay']
+			try:
+				delay = sDict['delays'][idx]['delay']
+			except Exception:
+				return
 			if delay > delayStatDicts['summary'][diskIdx]['delays'][idx]['max']:
 				delayStatDicts['summary'][diskIdx]['delays'][idx]['max'] = delay
 			if delay < delayStatDicts['summary'][diskIdx]['delays'][idx]['min']:
