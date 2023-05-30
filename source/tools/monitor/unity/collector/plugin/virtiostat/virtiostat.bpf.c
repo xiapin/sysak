@@ -10,19 +10,19 @@
 
 BPF_HASH(stats, u64, virtio_stat_t, 256);
 
-struct virtio_device_id {
+struct _virtio_device_id {
     u32 device;
     u32 vendor;
 };
 
-struct virtio_device {
+struct _virtio_device {
     int index;
     bool failed;
     bool config_enabled;
     bool config_change_pending;
     spinlock_t config_lock;
     struct device dev;
-    struct virtio_device_id id;
+    struct _virtio_device_id id;
     void *config;
     void *vringh_config;
     struct list_head vqs;
@@ -30,11 +30,11 @@ struct virtio_device {
     void *priv;
 };
 
-struct virtqueue {
+struct _virtqueue {
     struct list_head list;
-    void (*callback)(struct virtqueue *vq);
+    void (*callback)(struct _virtqueue *vq);
     const char *name;
-    struct virtio_device *vdev;
+    struct _virtio_device *vdev;
     unsigned int index;
     unsigned int num_free;
     void *priv;
@@ -46,7 +46,7 @@ static inline void add_value(virtio_stat_t *vs, struct scatterlist **sgs,
     vs->in_sgs += in_sgs;
 }
 
-static inline void record(struct virtqueue *vq, struct scatterlist **sgs,
+static inline void record(struct _virtqueue *vq, struct scatterlist **sgs,
                    unsigned int out_sgs, unsigned int in_sgs)
 {
     virtio_stat_t newvs = {0};
@@ -69,7 +69,7 @@ static inline void record(struct virtqueue *vq, struct scatterlist **sgs,
 SEC("kprobe/virtqueue_add_sgs")
 int trace_virtqueue_add_sgs(struct pt_regs *ctx)
 {
-    struct virtqueue *vq = (struct virtqueue *)PT_REGS_PARM1(ctx);
+    struct _virtqueue *vq = (struct _virtqueue *)PT_REGS_PARM1(ctx);
     struct scatterlist **sgs = (struct scatterlist **)PT_REGS_PARM2(ctx);
     u32 out_sgs = PT_REGS_PARM3(ctx);
     u32 in_sgs  = PT_REGS_PARM4(ctx);
@@ -80,7 +80,7 @@ int trace_virtqueue_add_sgs(struct pt_regs *ctx)
 SEC("kprobe/virtqueue_add_outbuf")
 int trace_virtqueue_add_outbuf(struct pt_regs *ctx)
 {
-    struct virtqueue *vq = (struct virtqueue *)PT_REGS_PARM1(ctx);
+    struct _virtqueue *vq = (struct _virtqueue *)PT_REGS_PARM1(ctx);
     struct scatterlist **sgs = (struct scatterlist **)PT_REGS_PARM2(ctx);
     record(vq, sgs, 1, 0);
     return 0;
@@ -89,7 +89,7 @@ int trace_virtqueue_add_outbuf(struct pt_regs *ctx)
 SEC("kprobe/virtqueue_add_inbuf")
 int trace_virtqueue_add_inbuf(struct pt_regs *ctx)
 {
-    struct virtqueue *vq = (struct virtqueue *)PT_REGS_PARM1(ctx);
+    struct _virtqueue *vq = (struct _virtqueue *)PT_REGS_PARM1(ctx);
     struct scatterlist **sgs = (struct scatterlist **)PT_REGS_PARM2(ctx);
     record(vq, sgs, 0, 1);
     return 0;
@@ -98,7 +98,7 @@ int trace_virtqueue_add_inbuf(struct pt_regs *ctx)
 SEC("kprobe/virtqueue_add_inbuf_ctx")
 int trace_virtqueue_add_inbuf_ctx(struct pt_regs *ctx)
 {
-    struct virtqueue *vq = (struct virtqueue *)PT_REGS_PARM1(ctx);
+    struct _virtqueue *vq = (struct _virtqueue *)PT_REGS_PARM1(ctx);
     struct scatterlist **sgs = (struct scatterlist **)PT_REGS_PARM2(ctx);
     record(vq, sgs, 0, 1);
     return 0;

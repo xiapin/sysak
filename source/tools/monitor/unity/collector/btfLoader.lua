@@ -40,8 +40,8 @@ end
 local function downBtf(path, region, machine, release)
     local url = "https://sysom-".. region ..".oss-".. region .."-internal.aliyuncs.com/home/hive/btf/".. machine .."/vmlinux-" .. release
     if not unistd.access("/boot") then
-        local res, err, errno = posix.mkdir("/boot")
-        assert(res ~= 0, err .. errno)
+        local res, err = posix.mkdir("/boot")
+        assert(res == 0, err)
     end
     local cli = ChttpCli.new()
     local res = cli:get(url)

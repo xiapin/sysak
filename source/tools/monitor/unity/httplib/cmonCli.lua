@@ -18,5 +18,5 @@ local CcmonCli = class("cmonCli", ChttpCli)
 
 function CcmonCli:_init_(cpath, proxy)
     ChttpCli._init_(proxy)
-
+    self._cpath = cpath
 end
