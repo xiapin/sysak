@@ -25,15 +25,7 @@ pub struct DeltaCommand {
     json: bool,
 }
 
-use bincode::{config, Decode, Encode};
-
 use crate::message::MessageType;
-
-#[derive(Debug, Clone, Encode, Decode, PartialEq)]
-#[repr(u32)]
-enum DeltaDataType {
-    Netstat,
-}
 
 
 pub fn delta_snmp_thread(tx: crossbeam_channel::Sender<MessageType>, period: u64) {

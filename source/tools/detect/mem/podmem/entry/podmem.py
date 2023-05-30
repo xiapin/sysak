@@ -4,6 +4,7 @@ import sys
 import json
 import  getopt
 import copy
+from pagealloc import page_mem
 
 def get_runtime(podinfo):
     if 'runtime' in podinfo.keys():
@@ -42,14 +43,14 @@ def get_container_info(podinfo, cid, con):
     if podinfo['runtime'] == "docker":
         con['fullid'] = res[0]['Id']
         con['type'] = 'docker'
-        if 'HostConfig' in res[0]:
+        if 'HostConfig' in res[0] and res[0]['HostConfig'] is not None:
             if 'CgroupParent' in res[0]['HostConfig']:
                 con['cparent'] = res[0]['HostConfig']['CgroupParent']
-        if 'Config' in res[0]:
+        if 'Config' in res[0] and res[0]['Config'] is not None:
             config = res[0]['Config']
-            if 'Labels' in config:
+            if 'Labels' in config and config['Labels'] is not None:
                 labels = config['Labels']
-                if 'io.kubernetes.pod.namespace' in labels:
+                if 'io.kubernetes.pod.namespace' in labels and labels['io.kubernetes.pod.namespace'] is not None:
                     con['ns'] = labels['io.kubernetes.pod.namespace']
                     con['uid'] = labels['io.kubernetes.pod.uid']
                     con['podname'] = labels['io.kubernetes.pod.name']
@@ -152,6 +153,18 @@ def get_k8s_path(podinfo, cid):
             cinfo['ino'] = get_file_ino(cpath)
     return None
                     
+def get_podman_path(podinfo, cid):
+    cinfo = podinfo['container'][cid]
+    pre = '/sys/fs/cgroup/memory/machine.slice'
+    cpath = pre +'/' +"libpod-" + cinfo['fullid'].strip() + '.scope'
+    if not os.path.exists(cpath):
+        cinfo['cgroup'] = ''
+        cinfo['ino'] = ''
+        return None
+    cinfo['cgroup'] = cpath
+    cinfo['ino'] = get_file_ino(cpath)
+    return True
+
 def get_docker_path(podinfo, cid):
     cinfo = podinfo['container'][cid]
     pre = '/sys/fs/cgroup/memory/system.slice'
@@ -366,6 +379,8 @@ def build_cgroup_info(podinfo, cid):
         get_k8s_path(podinfo, cid)
     elif ctype == 'docker':
         get_docker_path(podinfo, cid)
+        if podinfo['container'][cid]['cgroup'] == '':
+            get_podman_path(podinfo, cid)
     elif ctype == 'cgroup':
         get_cgroup_path(podinfo, cid)
     else:
@@ -382,7 +397,7 @@ def handle_args(podinfo, argv):
     cmdline['output'] = 'stdio'
     cmdline['top'] = 10
     try:
-        opts, args = getopt.getopt(argv,"hj:r:sap:c:f:t:")
+        opts, args = getopt.getopt(argv,"hmj:r:sap:c:f:t:")
     except getopt.GetoptError:
         print('get opt error')
         sys.exit(2)
@@ -397,6 +412,7 @@ def handle_args(podinfo, argv):
             print("-j: dump result to json file (sysak podmem -s -j ./test.json)")
             print("-r: set sample rate ,default set to 1 (sysak podmem -s -r 2)")
             print("-t: output filecache top ,default for top 10 (sysak podmem -s -t 20)")
+            print("-m: analysis pod recv-Q memory")
             sys.exit(2) 
         elif opt == '-r':
             cmdline['rate'] = int(arg)
@@ -413,6 +429,9 @@ def handle_args(podinfo, argv):
             cmdline['mode'] = 'system'
         elif opt == '-a':
             cmdline['mode'] = 'allcgroup'
+        elif opt == '-m':
+            page_mem()
+            sys.exit(2) 
         elif opt == '-t':
             cmdline['top'] = int(arg)
         elif opt == '-j':

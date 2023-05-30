@@ -48,7 +48,7 @@ def print_trace_top3(log_path):
         for line in log_fd.readlines():
             if "用户态堆栈4" in line:
                 break
-            print line.split('\n')
+            print(line.split('\n'))
         log_fd.close
 
 def show_result(trace_reslut):
@@ -220,7 +220,7 @@ def quick_check():
 
     if check_time:
         count = 0
-        print "please waiting %ds..." %(int(check_time)*task_num)
+        print("please waiting %ds..." %(int(check_time)*task_num))
         while (count < task_num):
 
             time.sleep(int(check_time))
@@ -246,11 +246,11 @@ def quick_check():
             count += 1
 
     count = 0
-    print "RSS size Top %d:" %(task_num)
+    print("RSS size Top %d:" %(task_num))
     if check_time:
-        print "%-15s%-20s%-15s%-15s%-15s%-15s" %("pid", "name", "rsssize(kb)", "rss_inc(kb)/s", "vmsize(kb)", "vm_inc(kb)/s")
+        print("%-15s%-20s%-15s%-15s%-15s%-15s" %("pid", "name", "rsssize(kb)", "rss_inc(kb)/s", "vmsize(kb)", "vm_inc(kb)/s"))
     else:
-        print "%-15s%-20s%-15s%-15s" %("pid", "name", "rsssize(kb)", "vmsize(kb)")
+        print("%-15s%-20s%-15s%-15s" %("pid", "name", "rsssize(kb)", "vmsize(kb)"))
     while (count < task_num):
         if check_time:
             print ("%-15s%-20s%-15d%-15d%-15d%-15d" %(rss_sorted[count]["pid"], rss_sorted[count]["name"], int(rss_sorted[count]["rsssize"]), int(rss_sorted[count]["rss_inc"]), int(rss_sorted[count]["vmsize"]), int(rss_sorted[count]["vm_inc"])))

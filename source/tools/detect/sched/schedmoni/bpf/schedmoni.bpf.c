@@ -2,6 +2,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
+#include <coolbpf.h>
 #include "../schedmoni.h"
 #include "../nosched.h"
 #include "schedmoni.bpf.h"
@@ -89,13 +90,7 @@ static inline int test_tsk_thread_flag_low(struct task_struct *tsk, int flag)
  * return ture if struct thread_info is in task_struct */
 static bool test_THREAD_INFO_IN_TASK(struct task_struct *p)
 {
-	volatile long *pstate;
-	size_t len;
-
-	pstate = &(p->state);
-
-	len = (u64)pstate - (u64)p;
-	return (len == sizeof(struct thread_info));
+	return bpf_core_task_struct_thread_info_exist(p);
 }
 
 static inline int test_tsk_need_resched(struct task_struct *tsk, int flag)
@@ -186,6 +181,33 @@ int raw_tp__sched_wakeup(struct bpf_raw_tracepoint_args *ctx)
 	return trace_enqueue(p, runqlen);
 }
 
+struct sched_wu_new_tp_args {
+	char comm[16];
+	pid_t pid;
+	int prio;
+	int success;
+	int target_cpu;
+};
+
+SEC("tp/sched/sched_wakeup_new")
+int schedmoni_wake_up_new(struct sched_wu_new_tp_args *ctx)
+{
+	u64 ts;
+	u32 pid;
+	unsigned int runqlen = 0;
+	struct enq_info enq_info;
+
+	if (!program_ready())
+		return 0;
+
+	pid = ctx->pid;
+	__builtin_memset(&enq_info, 0, sizeof(struct enq_info));
+	ts = bpf_ktime_get_ns();
+	enq_info.ts = ts;
+	enq_info.rqlen = runqlen;	/* for centos7.6 we can't get the runq lenth */
+	bpf_map_update_elem(&start, &pid, &enq_info, 0);
+	return 0;
+}
 
 SEC("kprobe/wake_up_new_task")
 int BPF_KPROBE(wake_up_new_task, struct task_struct *p)

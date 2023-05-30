@@ -27,9 +27,9 @@ git submodule update --init
 mkdir -p build && cd build && cmake3 .. && make -j && make install
 
 cd $WORKDIR
-wget -c https://invisible-mirror.net/archives/ncurses/current/ncurses-6.3-20220205.tgz
-tar -zxf ncurses-6.3-20220205.tgz
-cd ncurses-6.3-20220205/
+wget -c https://invisible-mirror.net/archives/ncurses/ncurses-6.4.tar.gz
+tar -zxf ncurses-6.4.tar.gz
+cd ncurses-6.4/
 ./configure && make -j && make install
 ln -sf /usr/lib/libncurses.a /usr/lib/libtinfo.a
 

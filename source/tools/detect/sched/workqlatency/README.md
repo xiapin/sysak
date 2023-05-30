@@ -2,14 +2,17 @@
 工作队列(workqueue)延时跟踪工具
 
 使用说明:
+```
 Usage: sysak workqlatency [options]
 Options:
     --time/-t		specify the monitor period(s), default=10s
     --help/-h		help info
 example: sysak workqlatency -t 100  #trace work runtime and latency statistics
+```
 
 
-使用示例：sysak worklatency -t 10 监控10‘s内内存直接回收规整情况
+使用示例：sysak worklatency -t 10 监控10‘s work latency和runtime情况
+```
 Kwork Name                                              Cpu             Avg delay(ns)   Count           Max delay(ns)   Max delay start(s)      Max delay end(s)
 <0xffffffff9245ade0> blk_mq_timeout_work                1               6507            1               6507            2022-08-14 09:57:13     2022-08-14 09:57:13
 <0xffffffff92225a10> vmstat_shepherd                    0               1994208015      5               3964009175      2022-08-14 09:57:11     2022-08-14 09:57:15
@@ -54,3 +57,4 @@ Kwork Name                                              Cpu             Avg runt
 <0xffffffff92211f80> lru_add_drain_per_cpu              1               5557            1               5557            2022-08-14 09:57:11     2022-08-14 09:57:11
 <0xffffffff9250f410> fb_flashcursor                     2               2391213317      24              4784001660      2022-08-14 09:57:11     2022-08-14 09:57:15
 <0xffffffff921bf650> bpf_prog_free_deferred             0               29087           1               29087           2022-08-14 09:57:11     2022-08-14 09:57:11
+```

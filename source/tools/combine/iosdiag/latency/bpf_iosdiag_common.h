@@ -51,6 +51,29 @@ init_iosdiag_key(unsigned long sector, struct iosdiag_key *key)
 	key->sector = sector;
 }
 
+struct request___below_516 {
+	struct gendisk *rq_disk;
+};
+
+struct request_queue___above_516 {
+	struct gendisk *disk;
+};
+
+inline struct gendisk *get_rq_disk(struct request *req)
+{
+	struct request___below_516 *rq = req;
+	struct request_queue___above_516 *q;
+	struct gendisk *rq_disk;
+
+	if (bpf_core_field_exists(rq->rq_disk)) {
+		bpf_core_read(&rq_disk, sizeof(struct gendisk *), &rq->rq_disk);
+	} else {
+		bpf_probe_read(&q, sizeof(struct request_queue *), &req->q);
+		bpf_core_read(&rq_disk, sizeof(struct gendisk *), &q->disk);
+	}
+	return rq_disk;
+}
+
 inline int
 trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_type type)
 {
@@ -68,7 +91,7 @@ trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_typ
 		if (!ioreq->ts[type])
 			ioreq->ts[type] = now;
 		if (ioreq->diskname[0] == '\0') {
-			bpf_probe_read(&rq_disk, sizeof(struct gendisk *), &req->rq_disk);
+			rq_disk = get_rq_disk(req);
 			bpf_probe_read(ioreq->diskname, sizeof(ioreq->diskname), &rq_disk->disk_name);
 		}
 		if (type == IO_RESPONCE_DRIVER_POINT)

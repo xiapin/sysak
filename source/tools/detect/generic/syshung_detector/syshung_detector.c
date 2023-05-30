@@ -46,7 +46,7 @@ static void usage(void)
 	            "Usage: syshung_detector [options]\n"
                 "Options:\n"
                 "    -c     check system hung\n"
-                "    -j     date display esult by json\n"
+                "    -j     data display result by json\n"
                 "    -d     collect system data without bpf tools\n"
                 "    -b     collect system data with bpf tools\n"
                 "    -p     collect specify task info\n"

@@ -14,8 +14,9 @@ local CkvProc = require("collector.kvProc")
 local CvProc = require("collector.vproc")
 local pystring = require("common.pystring")
 local dockerinfo = require("common.dockerinfo")
-
+local json = require("cjson")
 local CPodAlloc = class("podalloc", CkvProc)
+local ChttpCli = require("httplib.httpCli")
 
 function CPodAlloc:_init_(proto, pffi, mnt, pFile)
     CkvProc._init_(self, proto, pffi, mnt, pFile , "pod_alloc")
@@ -24,7 +25,15 @@ function CPodAlloc:_init_(proto, pffi, mnt, pFile)
     self.proc_fs = mnt .. "/proc/"
     self.name_space = {}
     self.pod_mem = {}
+    self.inode_link = {}
+    self.link_pid = {}
+    self.cgroup_pod = {}
+    self.allpods = {}
+    self.blacklist = {["arms-prom"] = 1, ["kube-system"] = 1, ["kube-public"] = 1, ["kube-node-lease"] = 1}
+    -- self.blacklist= {}
     self.total = 0
+    self.count = 0
+    self.cgroup_count = 0
 end
 
 function CPodAlloc:file_exists(file)
@@ -36,11 +45,11 @@ function CPodAlloc:file_exists(file)
     end
 end
 
-function CPodAlloc:switch_ns(pid)
-    local pid_ns =  self.proc_fs .. pid .. "/ns/net"
-    if not self:file_exists(pid_ns) then return end
+function CPodAlloc:switch_ns(file)
+    if file == nil then file = self.proc_fs ..  "1/ns/net" end
+    if not self:file_exists(file) then return end
 
-    local f = fcntl.open(pid_ns,fcntl.O_RDONLY)
+    local f = fcntl.open(file,fcntl.O_RDONLY)
     if f == nil then return false end
     local res = self._ffi.C.setns(f,0)
     if res == -1 then return false end
@@ -54,7 +63,10 @@ function CPodAlloc:get_container_info(did)
     local podns = did
     local cname = did
     
-    restable = dockerinfo:get_inspect(did, self.root_fs)
+    res = dockerinfo:get_inspect(did, self.root_fs)
+    res = pystring:strip(res)
+    if #res == 0 then return podname,podns end
+    local restable = json.decode(res)
     if not restable then return podname end
     if #restable > 0 then
         restable = restable[1]
@@ -83,36 +95,28 @@ function CPodAlloc:get_container_info(did)
         podns = restable['status']['labels']['io.kubernetes.pod.namespace']
     end
     if pystring:startswith(podname,"/") then podname=string.sub(podname,2,-1) end
-    if not self.pod_mem[podname] then
-        self.pod_mem[podname] = {}
-        self.pod_mem[podname]["allocpage"] = 0
-        self.pod_mem[podname]["podns"] = podns
-        self.pod_mem[podname]["podname"] = podname
-    end
-    return podname
+    return podname,podns
 end
 
 function CPodAlloc:get_pidalloc()
-    local pods = {}
     local dockerids = {}
-    for net,pidn in pairs(self.name_space) do
-        if pidn == "self" then pidn = "1" end
-
-        local ns_res = self:switch_ns(pidn)
+    for inode,nsfile in pairs(self.name_space) do
+        local ns_res = self:switch_ns(nsfile)
         if not ns_res then goto continue end 
         -- local env = posix.getenv()
         -- env["PROC_ROOT"] = self.proc_fs
-
         stdlib.setenv("PROC_ROOT",self.proc_fs)
-        local pfile = io.popen("ss -anp","r")
+        local pfile = io.popen("ss -an| grep -E 'tcp|udp|raw' | awk '$3 > 0'","r")
         io.input(pfile)
         for line in io.lines() do
             repeat
-            local proto,recv,task,pid = string.match(line,"(%S*)%s*%S*%s*(%d*).*users:%S*\"(%S*)\",pid=(%d*)")
-            if not proto or not recv or not task or not pid then break end
+            local proto,recv,srcip,srcport,dstip,dstport = string.match(line,"(%S*)%s*%S*%s*(%d*)%s+%d*%s*(%S*):(%d*)%s*(%S*):(%d*)")
+            if not proto or not recv then break end
             if proto ~="tcp" and proto ~="udp" and proto ~="raw" then break end
-
+            local index = srcip..srcport..dstip..dstport
+            if not self.link_pid[index] then break end
             recv = tonumber(recv)
+            local pid = self.link_pid[index]
 
             local dockerid = ""
             if not dockerids[pid] then
@@ -122,20 +126,22 @@ function CPodAlloc:get_pidalloc()
             else
                 dockerid = dockerids[pid]
             end
-
             local podname = dockerid
-            if not pods[dockerid] then
-                podname = self:get_container_info(dockerid)
-                pods[dockerid] = podname
-            else
-                podname = pods[dockerid]
-            end
-            if recv < 1024 and podname == dockerid then break end
+            local podns = dockerid
+            if not self.cgroup_pod[dockerid] then
+                podname,podns = self:get_container_info(dockerid)
+                self.cgroup_pod[dockerid] = {["podname"]=podname, ["podns"]=podns}
+                self.cgroup_count = self.cgroup_count + 1
+                if recv < 1024 and podname == dockerid then break end
 
+            else
+                podname = self.cgroup_pod[dockerid]["podname"]
+                podns = self.cgroup_pod[dockerid]["podns"]
+            end
             if not self.pod_mem[podname] then
                 self.pod_mem[podname] = {}
                 self.pod_mem[podname]["allocpage"] = 0
-                self.pod_mem[podname]["podns"] = podname
+                self.pod_mem[podname]["podns"] = podns
                 self.pod_mem[podname]["podname"] = podname
             end
             self.pod_mem[podname]["allocpage"] = self.pod_mem[podname]["allocpage"] + recv
@@ -143,52 +149,117 @@ function CPodAlloc:get_pidalloc()
         until true
         end
         pfile:close()
-        self:switch_ns("1")
+        self:switch_ns()
         stdlib.setenv("PROC_ROOT","")
         ::continue::
     end
 end
 
 function CPodAlloc:scan_namespace()
-    local root = self.proc_fs
-    for pid in dirent.files(root) do
-        repeat
-        if pystring:startswith(pid,".") then break end
-        if not self:file_exists(self.proc_fs .. pid .. "/comm") then break end
+    local files = {"/var/run/docker/netns/","/var/run/netns/"}
+    for _,nsfile in pairs(files) do
+        if CPodAlloc:file_exists(self.root_fs ..nsfile) then
+        for file in dirent.files(self.root_fs .. nsfile) do
+            if not pystring:startswith(file,".") then
+                local fs = stat.lstat(self.root_fs .. nsfile .. file)
+                local inode = fs.st_ino
+                if not self.name_space[inode] then self.name_space[inode] = pystring:strip(self.root_fs .. nsfile .. file) end
+        end
+        end
+    end
+end
+end
 
-        local proc_ns = self.proc_fs .. pid .. "/ns/net"
-        if not self:file_exists(proc_ns) then break end
+function CPodAlloc:get_fdlink()
+    for pid in dirent.files(self.proc_fs) do
+        if not pystring:startswith(pid,".") then
+            if self:file_exists(self.proc_fs .. pid .. "/fd") then
+            for fd in dirent.files(self.proc_fs .. pid .. "/fd") do
+                local res = stat.stat(self.proc_fs .. pid .. "/fd/" .. fd)
+                if res and stat.S_ISSOCK(res.st_mode) then
+                   if self.inode_link[tostring(res.st_ino)] then   self.link_pid[self.inode_link[tostring(res.st_ino)]] = pid end
+                end
+            end
+            end
+        end
+    end
+end
 
-        local slink = unistd.readlink(proc_ns)
-        if not slink then break end
-        if not string.find(slink,"net") then break end
+function CPodAlloc:get_link()
+    local files = {"/net/tcp", "/net/udp", "/net/raw"}
+    for _,file in pairs(files) do
+        local lines = io.lines(self.proc_fs .. file)  
+        lines()
+        for line in lines do
+            local srcip, srcport, dstip, dstport, inode =string.match(line,"%s*%d+:%s*([0-9A-F]+):([0-9A-F]+)%s+([0-9A-F]+):([0-9A-F]+)%s+[0-9A-f]+%s+[0-9A-F]+:[0-9A-F]+%s+[0-9A-F]+:[0-9A-F]+%s+[0-9A-F]+%s+%d+%s+%d+%s+(%d+)")
+            if inode and inode ~= 0 then
+                srcip = tonumber(srcip:sub(7,8),16) .. "." .. tonumber(srcip:sub(5,6),16) .. "." .. tonumber(srcip:sub(3,4),16) .. "." .. tonumber(srcip:sub(1,2),16)
+                srcport = tonumber(srcport,16)
+                dstip = tonumber(dstip:sub(7,8),16) .. "." .. tonumber(dstip:sub(5,6),16) .. "." .. tonumber(dstip:sub(3,4),16) .. "." .. tonumber(dstip:sub(1,2),16)
+                dstport = tonumber(dstport,16)
+                local index = srcip..srcport..dstip..dstport
+                if not self.inode_link[inode] then self.inode_link[inode] = index end
+            end
+        end
+    end
+end
 
-        local inode = string.match(slink,"%[(%S+)%]")
-        if not inode then break end
-
-        if not self.name_space[inode] then self.name_space[inode] = pystring:strip(pid) end
-        if not self:file_exists(root .. self.name_space[inode] .. "/comm") then self.name_space[inode] = pystring:strip(pid) end
-    until true
+function CPodAlloc:get_allpods()
+    local url = "http://127.0.0.1:10255/pods"
+    local cli = ChttpCli.new()
+    local content = cli:get(url)
+    local obj = cli:jdecode(content.body)
+    for _,v in pairs(obj['items']) do
+        if not self.blacklist[v['metadata']['namespace']] then self.allpods[v['metadata']['name']] = v['metadata']['namespace'] end
     end
 end
 
 function CPodAlloc:proc(elapsed, lines)
     CvProc.proc(self)
+    self.count = self.count + 1
+    if (self.count-1) % 4 ~= 0 then
+        for k,v in pairs(self.allpods) do
+            local cell = nil
+            if self.pod_mem[k] then 
+                cell = {{name="pod_allocpage", value=self.pod_mem[k]['allocpage']/1024}}
+            else
+                cell = {{name="pod_allocpage", value=0}}
+            end
+            local label = {{name="podname",index=k,}, {name="podns",index = v,},}
+            self:appendLine(self:_packProto("pod_alloc", label, cell))
+        end
+        local cell = {{name="pod_allocpage_total", value=self.total/1024}}
+        self:appendLine(self:_packProto("pod_alloc", nil, cell))
+        self:push(lines)
+        return
+    end
     self.name_space = {}
     self.pod_mem = {}
+    self.inode_link = {}
+    self.link_pid = {}
+    self.allpods = {}
+    if self.cgroup_count > 1000 then self.cgroup_pod = {} self.cgroup_count = 0 end
     self.total = 0
+
+    self:get_link()
+    self:get_fdlink()
+    self:get_allpods()
+    -- for k,v in pairs(self.link_pid) do print(k,v) end
     self:scan_namespace()
     self:get_pidalloc()
 
-    for k,v in pairs(self.pod_mem) do
-        local cell = {{name="pod_allocpage", value=v['allocpage']/1024}}
-        local label = {{name="podname",index=v['podname'],}, {name="namespace",index = v['podns'],},}
+    for k,v in pairs(self.allpods) do
+        local cell = nil
+        if self.pod_mem[k] then 
+            cell = {{name="pod_allocpage", value=self.pod_mem[k]['allocpage']/1024}}
+        else
+            cell = {{name="pod_allocpage", value=0}}
+        end
+        local label = {{name="podname",index=k,}, {name="podns",index = v,},}
         self:appendLine(self:_packProto("pod_alloc", label, cell))
     end
     local cell = {{name="pod_allocpage_total", value=self.total/1024}}
     self:appendLine(self:_packProto("pod_alloc", nil, cell))
-
     self:push(lines)
 end
-
 return CPodAlloc
