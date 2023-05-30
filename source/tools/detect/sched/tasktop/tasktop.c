@@ -261,25 +261,29 @@ static bool is_D(pid_t pid, pid_t tid, D_task_record_t* t_rec) {
 
     t_rec->pid = pid;
     memset(t_rec->comm, 0, sizeof(t_rec->comm));
-    fscanf(fp, "%d %s", &t_rec->tid, t_rec->comm);
+    if (fscanf(fp, "%d %s", &t_rec->tid, t_rec->comm) == EOF) goto cleanup;
 
     /* process the situation comm contains space,eg. comm=(Signal Dispatch)  */
     while (true) {
         int len = strlen(t_rec->comm);
         if (t_rec->comm[len - 1] == ')') break;
-        fscanf(fp, "%s", t_rec->comm + len);
+        if (fscanf(fp, "%s", t_rec->comm + len) == EOF) goto cleanup;
     }
 
     char state;
-    fscanf(fp, " %c", &state);
+    if (fscanf(fp, " %c", &state) == EOF) goto cleanup;
 
     if (state == 'D') res = true;
 
+cleanup:
     fclose(fp);
     return res;
 }
 
 static int read_stack(pid_t pid, pid_t tid, D_task_record_t* t_rec) {
+#ifdef DEBUG
+    fprintf(stderr, "DEBUG: read_stack pid=%d tid=%d\n", pid, tid);
+#endif
     int err = 0;
     char stack_path[FILE_PATH_LEN];
     snprintf(stack_path, FILE_PATH_LEN, "/proc/%d/task/%d/stack", pid, tid);
@@ -299,6 +303,9 @@ cleanup:
 
 static int read_d_task(struct id_pair_t* pids, int nr_thread, int* stack_num,
                        struct D_task_record_t* d_tasks) {
+#ifdef DEBUG
+    fprintf(stderr, "DEBUG: read_d_task\n");
+#endif
     int i = 0;
     int err = 0;
 
@@ -375,7 +382,7 @@ static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num) {
         fprintf(stderr, "Failed open %s\n", CGROUP_PATH);
         goto cleanup;
     }
-    
+
     while ((dir = readdir(root_dir)) != NULL) {
         char name[128];
         unsigned long long val = 0;
@@ -503,6 +510,7 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
 
     dir = opendir("/proc");
     if (!dir) {
+        fprintf(stderr, "Failed open %s\n", "/proc");
         err = errno;
         goto cleanup;
     }
@@ -512,10 +520,9 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
             !strcmp(proc_de->d_name, ".."))
             continue;
         err = parse_long(proc_de->d_name, &val);
-
         if (err) continue;
-        pid = val;
 
+        pid = val;
         char taskpath[FILE_PATH_LEN];
         snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
         task_dir = opendir(taskpath);
@@ -523,6 +530,8 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
             if (errno == ENOENT) {
                 continue;
             }
+            perror(taskpath);
+            fprintf(stderr, "Failed opendir %s\n", taskpath);
             err = errno;
             goto cleanup;
         }
@@ -535,8 +544,7 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
 
             if (err) {
                 fprintf(stderr, "Failed parse tid\n");
-
-                goto cleanup;
+                break;
             }
             tid = val;
 
@@ -1166,8 +1174,8 @@ int main(int argc, char** argv) {
         /* update old info and free nonexist process info */
         now_to_prev(pids, nr_thread, pidmax, prev_task, now_task, prev_sys,
                     now_sys);
-        // if (env.nr_iter) sleep(env.delay);
-        usleep(10000);
+        if (env.nr_iter) sleep(env.delay);
+            // usleep(10000);
 #endif
     }
 

@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
     } else if (!strcmp(argv[1], "bind")) {
         cpu_bind(0);
     } else if (!strcmp(argv[1], "multi_thread")) {
-        sleep(10);
+        sleep(30);
         run_multithread();
     } else if (!strcmp(argv[1], "multi_thread_sleep")) {
         run_multithread_sleep();
