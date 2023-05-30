@@ -527,13 +527,8 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
         snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
         task_dir = opendir(taskpath);
         if (!task_dir) {
-            if (errno == ENOENT) {
-                continue;
-            }
-            perror(taskpath);
-            fprintf(stderr, "Failed opendir %s\n", taskpath);
-            err = errno;
-            goto cleanup;
+            // fprintf(stderr, "Failed opendir %s\n", taskpath);
+            continue;
         }
 
         while ((task_de = readdir(task_dir)) != NULL) {
@@ -1142,11 +1137,7 @@ int main(int argc, char** argv) {
 #endif
 
         /* get all process now */
-        err = read_all_pids(pids, &nr_thread);
-        if (err) {
-            fprintf(stderr, "Failed read all pids.\n");
-            goto cleanup;
-        }
+        read_all_pids(pids, &nr_thread);
 
         read_d_task(pids, nr_thread, &d_num, rec->d_tasks);
 
@@ -1175,7 +1166,7 @@ int main(int argc, char** argv) {
         now_to_prev(pids, nr_thread, pidmax, prev_task, now_task, prev_sys,
                     now_sys);
         if (env.nr_iter) sleep(env.delay);
-            // usleep(10000);
+        // usleep(10000);
 #endif
     }
 
