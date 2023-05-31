@@ -165,6 +165,7 @@ void mrelease(__attribute__((unused)) const pid_t pid)
 int kill_wait(const poll_loop_args_t* args, pid_t pid, int sig)
 {
     int pidfd = -1;
+    unsigned i = 0;
 
     if (args->dryrun && sig != 0) {
         warn("dryrun, not actually sending any signal\n");
@@ -221,7 +222,7 @@ int kill_wait(const poll_loop_args_t* args, pid_t pid, int sig)
     }
 #endif
 
-    for (unsigned i = 0; i < 100; i++) {
+    for (i; i < 100; i++) {
         struct timespec t1 = { 0 };
         clock_gettime(CLOCK_MONOTONIC, &t1);
         float secs = (float)(t1.tv_sec - t0.tv_sec) + (float)(t1.tv_nsec - t0.tv_nsec) / (float)1e9;
