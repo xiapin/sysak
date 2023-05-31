@@ -74,12 +74,13 @@ function CbtfLoader:_init_(root)
     if distro then
         local release, machine = distro.release, distro.machine
         local path = '/boot/vmlinux-' .. release
-        local region = regionId()
         if checkBtf(path) then
+            local region = regionId()
             downBtf(path, region, machine, release)
         end
         local ko = root .. "/lib/" .. release .. "/sysak.ko"
         if checkKo(ko) then
+            local region = regionId()
             local path = root .. "/lib/" .. release .. "/"
             ko = downKo(path, "sysak.ko", region, machine, release)
         end
