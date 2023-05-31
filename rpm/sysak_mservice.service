@@ -1,0 +1,14 @@
+[Unit]
+Description=SysAK monitor service
+After=syslog.target
+
+[Service]
+Type=simple
+
+ExecStart=/usr/bin/sysak mservice -S &
+ExecStop=/usr/bin/killall mservice
+MemoryLimit=300M
+CPUQuota=60%
+
+[Install]
+WantedBy=multi-user.target
