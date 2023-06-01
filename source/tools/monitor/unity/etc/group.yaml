@@ -1,0 +1,94 @@
+config:
+  freq: 20   # unit second
+  daemon: true
+  port: 8400  # bind port
+  bind_addr: 127.0.0.1 # bind ip
+  backlog: 32  # listen backlog
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg), env(need name arg)
+    mode: hostip
+  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  db:
+    rotate: 7  # tsdb file retention time, unit day
+    budget: 200 # max query buffer from tsdb.
+  limit:
+    cpu: 30  # unit %
+    mem: 50  # unit mb
+    tasks: 10  # monitor 10 pid max.
+
+diagnose:
+  io_hang:
+    block: 60
+    time: 15
+    cmd: "../../../iosdiag"
+    report:
+      title: "iosdiag"
+      files:
+        - "/var/log/sysak/iosdiag/hangdetect/result.log.stat"
+        - "/var/log/sysak/iosdiag/hangdetect/result.log.seq"
+  net_edge:
+    block: 300
+    time: 60
+    so:
+      virtiostat: 15
+    cmd: "../../../netCli"
+  jruntime:
+    block: 60
+    time: 30
+    cmd: "../../../java_collect"
+
+outline:
+  - /var/sysom/outline
+
+pushTo:
+  to: "Influx"
+  host: "xxx.aliyuncs.com"
+  port: 8242
+  url: "/api/v2/write?db=sysom"
+
+luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
+             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
+             "proc_uptime"]
+
+plugins:
+  - so: kmsg
+    description: "collect dmesg info."
+  - so: net_health
+    description: "tcp net health."
+  - so: net_retrans
+    description: "tcp retrans monitor."
+  - so: virtout
+    description: "virt status out put."
+  - so: sum_retrans
+    description: "summary retrans out put."
+
+metrics:
+  - title: sysak_proc_pkt_status
+    from: pkt_status
+    head: counter
+    help: "net status info from /proc/net/snmp and /proc/net/status."
+    type: "gauge"
+  - title: sysak_net_health_hist
+    from: net_health_hist
+    head: value
+    help: "net_health_hist"
+    type: "gauge"
+  - title: sysak_net_health_count
+    from: net_health_count
+    head: value
+    help: "net_health_count"
+    type: "gauge"
+  - title: sysak_net_retrans_count
+    from: net_retrans_count
+    head: value
+    help: "net_retrans_count"
+    type: "gauge"
+  - title: sysak_virtout_dist
+    from: virtout_dist
+    head: value
+    help: "sysak_virtout_dist"
+    type: "gauge"
+  - title: sysak_retrans
+    from: retrans
+    head: value
+    help: "sysak_retrans"
+    type: "gauge"
