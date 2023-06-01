@@ -226,7 +226,7 @@
 
 可以观察到此时虽然**实际负载**很高，大量task由于限流处于R状态，但是由于cgroup机制task并不位于就绪队列中，因此R状态数量指标不准确导致load1计算不准（load1无法准确体现出系统的负载情况）。但是在cgroup限流信息中可以看到stress_cg中**出现了大量的限流**，并且**per-cpu的调度延迟很高**，一定程度体现了cpu就绪队列中存在task堆积。
 
-### 2.5 D状态进程多场景
+### 2.5 IO打满场景
 
 出现D状态的情况很多，最常见的是由于IO导致进入Uninterrupted Sleep状态。
 
@@ -323,6 +323,130 @@
                                     [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
                                     [<0>] 0xffffffffffffffff
 可以看到当前存在大量D状态task，并且系统的sys较高，并且抓取到了D-task的内核栈，主要是由stress进程在进行IO导致。
+
+### 2.6 模拟锁竞争场景
+
+D状态在内核中出现的路径很多，锁的竞争是其中的一种情况，当有task取得锁后但是没有尽快释放就有可能导致出现大量D-task等待锁资源。
+
+#### 2.6.1 测试方法
+
+编写一个linux kernel module，在模块中创建一个proc文件，设置文件的open回调，在open时去获取mutex，拿到锁后sleep 10s，让其他尝试open该文件的task进入D状态。
+
+    cd tasktop/tasktopSelftest/mod
+    make
+    make install
+    bash race.sh
+
+其中race.sh 启动10个task去调用cat命令，open proc文件。
+
+#### 2.6.2 测试结果
+
+    [TIME-STAMP] 2023-06-01 01:58:49
+    [UTIL&LOAD]
+    usr    sys iowait  load1      R      D   fork : proc 
+    0.0   20.0    0.0    4.2      0     10      0 : logagentctl.sh(28502) ppid=28501 cnt=5 
+    [PER-CPU]
+        cpu    usr    sys iowait  delay(ns)
+    cpu-0    0.0    0.0    0.0     110692
+    cpu-1    0.0    0.0    0.0     170744
+    cpu-2    0.0   66.7    0.0      81461
+    cpu-3    0.0    0.0    0.0     148981
+    [CGROUP]
+            cgroup_name      nr_periods    nr_throttled  throttled_time        nr_burst      burst_time
+            stress_cg            7811            7801   2868506676781               0               0
+    [TASKTOP]
+            COMMAND    PID   PPID      START        RUN %UTIME %STIME   %CPU
+            (tasktop)  22504  22502 1685584509        220    0.3    0.7    1.0
+    [D-STASK]
+            COMMAND    PID   PPID  STACK
+        (load_calc)    141    141 [<0>] load_calc_func+0x57/0x130
+                                    [<0>] kthread+0xf5/0x130
+                                    [<0>] ret_from_fork+0x1f/0x30
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28209  28209 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28210  28210 [<0>] open_proc+0x53/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28211  28211 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28212  28212 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28213  28213 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28214  28214 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28215  28215 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28216  28216 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+                (cat)  28217  28217 [<0>] open_proc+0x2d/0x7e [mutex_block]
+                                    [<0>] proc_reg_open+0x72/0x130
+                                    [<0>] do_dentry_open+0x23a/0x3a0
+                                    [<0>] path_openat+0x768/0x13e0
+                                    [<0>] do_filp_open+0x99/0x110
+                                    [<0>] do_sys_open+0x12e/0x210
+                                    [<0>] do_syscall_64+0x55/0x1a0
+                                    [<0>] entry_SYSCALL_64_after_hwframe+0x44/0xa9
+                                    [<0>] 0xffffffffffffffff
+
+                                    
+可以看到抓到的D状态task的命令、ppid、pid等信息，以及这些task当前的内核栈。
 
 ## 3. Tasktop性能测试
 
