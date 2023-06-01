@@ -4,15 +4,14 @@
 --- DateTime: 2022/12/19 9:26 PM
 ---
 
-package.path = package.path .. ";../../common/?.lua;"
-package.path = package.path .. ";../../httplib/?.lua;"
-local serpent = require("serpent")
+package.path = package.path .. ";../../?.lua;"
 
-local ChttpCli = require("httpCli")
+local ChttpCli = require("httplib.httpCli")
+local system = require("common.system")
 
 local cli = ChttpCli.new()
-local res = cli:get("http://100.82.20.22/")
-print(serpent.block(res.head))
+local res = cli:get("http://127.0.0.1/")
+system:dumps(res.head)
 print(res.code)
 assert(res.code == 200)
 
@@ -21,7 +20,7 @@ local req = {num1 = 101, num2 = 2}
 local res = cli:postTable(url, req)
 print(res.code)
 assert(res.code == 200)
-print(serpent.block(res))
+system:dumps(res)
 print(#res.body)
 print(res.body)
 local tRes = cli:jdecode(res.body)

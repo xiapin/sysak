@@ -14,6 +14,10 @@ config:
   db:
     rotate: 7  # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
+  limit:
+    cpu: 30  # unit %
+    mem: 50  # unit mb
+    tasks: 10  # monitor 10 pid max.
 
 outline:
   - /var/sysom/outline
@@ -32,9 +36,6 @@ plugins:
   -
     so: proc_loadavg
     description: "collect load avg"
-  -
-    so: unity_nosched
-    description: "nosched:sys hold cpu and didn't scheduling"
   - so: net_health
     description: "tcp net health."
   - so: net_retrans
