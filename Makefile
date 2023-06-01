@@ -71,11 +71,17 @@ install:
 	mkdir -p /etc/sysak
 	mkdir -p /var/log/sysak
 	cp $(SRC)/../rpm/sysak_server.conf /usr/local/sysak/
-ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf),)
-		cp $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf /usr/local/sysak/
+ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/dist),)
 		cp $(SRC)/../rpm/sysak.service /usr/lib/systemd/system/
 endif
-
+ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf),)
+		cp $(OBJPATH)/.sysak_components/tools/monitor/sysakmon.conf /usr/local/sysak/
+		cp $(SRC)/../rpm/sysak_mservice.service /usr/lib/systemd/system/
+endif
+ifneq ($(wildcard $(OBJPATH)/.sysak_components/tools/monitor/monctl.conf),)
+		cp $(OBJPATH)/.sysak_components/tools/monitor/monctl.conf /usr/local/sysak/
+		cp $(SRC)/../rpm/sysak_monctl.service /usr/lib/systemd/system/
+endif
 uninstall:
 	rm -rf /etc/sysak
 	rm -rf /usr/bin/sysak
