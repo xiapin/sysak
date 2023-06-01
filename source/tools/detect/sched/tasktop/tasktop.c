@@ -22,6 +22,7 @@
 
 // #define DEBUG
 // #define ONLY_THREAD
+// #define STRESS_TEST
 
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
@@ -605,7 +606,7 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
     while (true) {
         int len = strlen(proc_info.comm);
         if (proc_info.comm[len - 1] == ')') break;
-        fscanf(fp, " %s", proc_info.comm + len);
+        if (fscanf(fp, " %s", proc_info.comm + len) == EOF) goto cleanup;
     }
 
     fscanf(fp,
@@ -765,7 +766,7 @@ static void output_per_cpu(struct record_t* rec, FILE* dest) {
     int i;
     struct sys_record_t* sys = &rec->sys;
 
-    fprintf(dest, "[PER_CPU]\n");
+    fprintf(dest, "[PER-CPU]\n");
     fprintf(dest, "%7s %6s %6s %6s %10s\n", "cpu", "usr", "sys", "iowait",
             "delay(ns)");
     for (i = 1; i <= nr_cpu; i++) {
@@ -857,9 +858,10 @@ static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
         token = strtok(str, delim);
         fprintf(dest, "%s\n", token);
 
-        while (token) {
-            fprintf(dest, "%18s %6s %6s %s\n", "", "", "", token);
+        while (true) {
             token = strtok(NULL, delim);
+            if (!token) break;
+            fprintf(dest, "%18s %6s %6s %s\n", "", "", "", token);
         }
     }
 }
@@ -1073,10 +1075,11 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Failed calloc memory\n");
         goto cleanup;
     }
+
     prev_delay = calloc(nr_cpu, sizeof(int));
-    pids = calloc(pidmax, sizeof(struct id_pair_t));
-    prev_task = calloc(pidmax, sizeof(struct task_cputime_t*));
-    now_task = calloc(pidmax, sizeof(struct task_cputime_t*));
+    pids = calloc(pidmax + 1, sizeof(struct id_pair_t));
+    prev_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
+    now_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
     prev_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
     now_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
     for (i = 0; i <= nr_cpu; i++) {
@@ -1165,8 +1168,11 @@ int main(int argc, char** argv) {
         /* update old info and free nonexist process info */
         now_to_prev(pids, nr_thread, pidmax, prev_task, now_task, prev_sys,
                     now_sys);
+#ifdef STRESS_TEST
+        usleep(10000);
+#else
         if (env.nr_iter) sleep(env.delay);
-        // usleep(10000);
+#endif
 #endif
     }
 
