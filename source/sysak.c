@@ -76,6 +76,7 @@ bool post_module = false;
 bool btf_depend = false;
 bool auto_get_components = false;
 bool oss_get_components = false;
+bool only_download = false;
 pid_t child_pid;
 
 static struct tool_list tool_lists[MAX_TOOL_TYPE]={
@@ -92,7 +93,9 @@ static void usage(void)
                 "       cmd:\n"
                 "              list [-a],   show subcmds\n"
                 "              -h/help,     help informati on for specify subcmd\n"
-                "              -g,          auto download btf and components\n"
+                "              -g,          auto download btf and components from anolis mirrors\n"
+                "              -oss,        auto download btf and components from oss\n"
+                "              -d,          only download btf and components. example: sysak -oss -d\n"
                 "       subcmd: see the result of list\n");
 }
 
@@ -343,8 +346,8 @@ static int down_install(const char *component_name)
         //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s 1&>/dev/null",
         //        sysak_components_server, machine, module_tag, module_path, kern_version);
         if (oss_get_components){
-            sprintf(download_cmd, "wget -T 5 -t 2 -q -O %s/%s/sysak.ko %s-%s.oss-cn-%s-internal.aliyuncs.com/home/hive/sysak/modules/%s/sysak-%s.ko",
-                    module_path, kern_version, sysak_oss_server, &region[3], &region[3], machine, kern_version);
+            sprintf(download_cmd, "wget -T 5 -t 2 -q -O %s/%s/sysak.ko %s-%s.oss-%s-internal.aliyuncs.com/home/hive/sysak/modules/%s/sysak-%s.ko",
+                    module_path, kern_version, sysak_oss_server, &region[0], &region[0], machine, kern_version);
         }
         else
             sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
@@ -358,8 +361,8 @@ static int down_install(const char *component_name)
 	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
         if (oss_get_components){
-            sprintf(download_cmd, "wget -T 5 -t 2 -q -P %s %s-%s.oss-cn-%s-internal.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",
-                    tools_path, sysak_oss_server, &region[3], &region[3], machine, kern_version);
+            sprintf(download_cmd, "wget -T 5 -t 2 -q -P %s %s-%s.oss-%s-internal.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",
+                    tools_path, sysak_oss_server, &region[0], &region[0], machine, kern_version);
         }
         else
 	        sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
@@ -463,9 +466,13 @@ static int do_prev_depend(void)
         return check_or_install_components("sysak_modules and btf");
 
     if (pre_module) {
-        if (!check_or_install_components("sysak_modules"))
-            return mod_ctrl(true);
-        printf("sysak_modules not installed, exit ...\n");
+        if (!check_or_install_components("sysak_modules")){
+            if (!only_download){
+                return mod_ctrl(true);
+            }
+        } else{
+            printf("sysak_modules not installed, exit ...\n");
+        }
         return -1;
     }
 
@@ -497,7 +504,7 @@ static void sig_handler(int sig, siginfo_t *info, void *act)
 {
     if (child_pid > 0 )
         kill(-child_pid, sig);
-    if (post_module)
+    if (post_module && !only_download)
         mod_ctrl(false);
 }
 
@@ -550,6 +557,9 @@ static int exectue(int argc, char *argv[])
 
     if (do_prev_depend() < 0)
         return -1;
+
+    if (only_download)
+        return 0;
 
     snprintf(subcmd_name, sizeof(subcmd_name), "%s%s", tools_path, argv[0]);
 
@@ -771,9 +781,14 @@ static int subcmd_parse(int argc, char *argv[])
 {
     int i;
 
-    if (!tool_lookup(argv[0])) {
+    if (!tool_lookup(argv[0]) && strcmp(argv[0], "-d")) {
         printf("no components, you should get first\n");
         return -ERR_NOSUBTOOL;
+    }
+
+    if (!strcmp(argv[0], "-d")) {
+        only_download = true;
+        pre_module = true;
     }
 
     if (strstr(prev_dep, "btf") != NULL) {
