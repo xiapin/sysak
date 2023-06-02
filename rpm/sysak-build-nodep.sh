@@ -14,6 +14,8 @@ build_rpm()
 	mkdir -p "${RPMBUILD_DIR}"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 echo "cat"
 cat > $RPMBUILD_DIR/sysak.spec <<EOF
+%global __filter_GLIBC_PRIVATE 1
+%define __requires_exclude libc.so.6(GLIBC_PRIVATE)
 Name: sysak
 Summary: system analyse kit
 Version: ${RPM_VERSION}
@@ -45,7 +47,7 @@ mkdir -p \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 /bin/cp -rf $BUILD_DIR/sysak \$RPM_BUILD_ROOT/usr/bin/
 /bin/cp -f $BUILD_DIR/.sysak_components/tools/monitor/sysakmon.conf \$RPM_BUILD_ROOT/usr/local/sysak
 /bin/cp -f $BUILD_DIR/.sysak_components/tools/monitor/monctl.conf \$RPM_BUILD_ROOT/usr/local/sysak
-/bin/cp -f $BUILD_DIR/.sysak_components/tools/dist/app/collector/plugin.yaml \$RPM_BUILD_ROOT/etc/sysak/
+/bin/cp -f $BUILD_DIR/.sysak_components/tools/dist/app/etc/* \$RPM_BUILD_ROOT/etc/sysak/
 /bin/cp $SOURCE_DIR/rpm/sysak.service \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 /bin/cp $SOURCE_DIR/rpm/sysak_server.conf \$RPM_BUILD_ROOT/usr/local/sysak/
 
@@ -77,6 +79,8 @@ rpmbuild --define "%linux_version $LINUX_VERSION" \
 	 --define "%_topdir ${RPMBUILD_DIR}"       \
 	 --define "%source_dir $SOURCE_DIR" \
 	 --define "%target $TARGET_LIST" \
+	 --define "%global __filter_GLIBC_PRIVATE 1" \
+	 --define "%define __requires_exclude libc.so.6(GLIBC_PRIVATE)" \
 	 -bb $RPMBUILD_DIR/sysak.spec
 }
 
