@@ -6,27 +6,127 @@
 
 -------------
 
-### uptime 表 
+### cpu\_total 表
+
+* 对应export 指标 sysak\_proc\_cpu\_total
+* 属性标签: mode
+
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :--- | ---: | :---- | :---- | :--- |
-| uptime | 秒 | 从系统启动到现在的时间 |  | collector/proc\_uptime.lua |
-| idletime | 秒 | 系统总空闲的时间 |  | collector/proc\_uptime.lua |
-| stamp | 秒 | 系统时间戳 | unix 时间  | collector/proc\_uptime.lua |
+| softirq | % | 软中断百分比 |  | collector/proc\_stat.lua |
+| user | % | 用户态占用率百分比 |  | collector/proc\_stat.lua |
+| guestnice | % | guestnice百分比 |  | collector/proc\_stat.lua |
+| guest | % |guest百分比 |  | collector/proc\_stat.lua |
+| steal | % |steal百分比 |  | collector/proc\_stat.lua |
+| hardirq | % | 硬中断百分比 |  | collector/proc\_stat.lua |
+| nice | % | nice百分比 |  | collector/proc\_stat.lua |
+| idle | % | idle百分比 |  | collector/proc\_stat.lua |
+| sys | % | sys百分比 |  | collector/proc\_stat.lua |
+| iowait | % | iowait百分比 |  | collector/proc\_stat.lua |
 
-### uname 表
+### cpus 表
 
-每小时获取一次
+* 对应export 指标 sysak\_proc\_cpus
+* 属性标签: mode
+
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :--- | ---: | :---- | :---- | :--- |
+| cpu_name |  | CPU 名称 |  | collector/proc\_stat.lua |
+| softirq | % | 软中断百分比 |  | collector/proc\_stat.lua |
+| user | % | 用户态占用率百分比 |  | collector/proc\_stat.lua |
+| guestnice | % | guestnice百分比 |  | collector/proc\_stat.lua |
+| guest | % |guest百分比 |  | collector/proc\_stat.lua |
+| steal | % |steal百分比 |  | collector/proc\_stat.lua |
+| hardirq | % | 硬中断百分比 |  | collector/proc\_stat.lua |
+| nice | % | nice百分比 |  | collector/proc\_stat.lua |
+| idle | % | idle百分比 |  | collector/proc\_stat.lua |
+| sys | % | sys百分比 |  | collector/proc\_stat.lua |
+| iowait | % | iowait百分比 |  | collector/proc\_stat.lua |
+
+
+### cpus 表
+
+* 对应export 指标 sysak\_proc\_cpus
+* 属性标签: mode
+
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :--- | ---: | :---- | :---- | :--- |
+| cpu_name |  | CPU 名称 |  | collector/proc\_stat.lua |
+| softirq | % | 软中断百分比 |  | collector/proc\_stat.lua |
+| user | % | 用户态占用率百分比 |  | collector/proc\_stat.lua |
+| guestnice | % | guestnice百分比 |  | collector/proc\_stat.lua |
+| guest | % |guest百分比 |  | collector/proc\_stat.lua |
+| steal | % |steal百分比 |  | collector/proc\_stat.lua |
+| hardirq | % | 硬中断百分比 |  | collector/proc\_stat.lua |
+| nice | % | nice百分比 |  | collector/proc\_stat.lua |
+| idle | % | idle百分比 |  | collector/proc\_stat.lua |
+| sys | % | sys百分比 |  | collector/proc\_stat.lua |
+| iowait | % | iowait百分比 |  | collector/proc\_stat.lua |
+
+
+### stat\_counters表
+
+* 对应export 指标 sysak\_proc\_stat\_counters
+* 属性标签: counter
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :--- | ---: | :---- | :---- | :--- |
+| procs_blocked |  | D状态任务数量 |  | collector/proc\_stat.lua |
+| processes_forks |  | fork 任务数量 |  | collector/proc\_stat.lua |
+| btime |  | 启动时间 |  | collector/proc\_stat.lua |
+| procs_running |  |  并行任务数量 |  | collector/proc\_stat.lua |
+| ctxt |  | 上下文切换次数 |  | collector/proc\_stat.lua |
+
+
+### proc\_loadavg 表
+
+* 对应 export 指标： sysak\_proc\_loadavg
+* 属性标签：value
 
 | 指标名      | 单位 | 标签说明 | 备注 | 源码路径 |
 |:---------| ---: | :---- | :---- | :--- |
-| nodename | - | uname -r |  | collector/proc\_uptime.lua |
-| version  | - | uname -r |  | collector/proc\_uptime.lua |
-| release  | - | uname -r |  | collector/proc\_uptime.lua |
-| machine  | - | uname -r |  | collector/proc\_uptime.lua |
-| sysname | - | uname -r |  | collector/proc\_uptime.lua |
+| runq | - | rq队列长度 |  | collector/proc\_load.lua |
+| load1  | - | load1 |  | collector/proc\_load.lua |
+| load5  | - | load5 |  | collector/proc\_load.lua |
+| load10  | - | load10 |  | collector/proc\_load.lua |
+| plit | - | plit |  | collector/proc\_load.lua |
+
+
+### proc\_loadavg 表
+
+* 对应 export 指标： sysak\_proc\_loadavg
+* 属性标签：value
+
+| 指标名      | 单位 | 标签说明 | 备注 | 源码路径 |
+|:---------| ---: | :---- | :---- | :--- |
+| runq | - | rq队列长度 |  | collector/proc\_load.lua |
+| load1  | - | load1 |  | collector/proc\_load.lua |
+| load5  | - | load5 |  | collector/proc\_load.lua |
+| load10  | - | load10 |  | collector/proc\_load.lua |
+| plit | - | plit |  | collector/proc\_load.lua |
+
+
+### meminfo 表
+
+* 对应 export 指标： sysak\_proc\_meminfo
+* 属性标签：value
+
+指标说明参考[/proc/meminfo内存文件详解](https://zhuanlan.zhihu.com/p/145524701)
+
+### vmstat 表
+
+* 对应 export 指标： sysak\_proc\_vmstate
+* 属性标签：value
+
+指标说明参考[/proc/vmstat输出含义](https://blog.csdn.net/kaka__55/article/details/125236633)
 
 ### cgroups 表
+
+* 对应 export 指标： sysak\_cgroups
+* 属性标签：value
 
 | 指标名     | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---       | --- | :---- | :---- | :--- |
@@ -46,12 +146,18 @@
 
 ### interrupts 表
 
+* 对应 export 指标： sysak\_interrupts
+* 属性标签：value
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | cpu      | - | CPU ID       |  | collector/proc\_interrupts.lua |
 | 中断名称 | 次 | 中断触发次数 |  | collector/proc\_interrupts.lua |
 
 ### mounts 表
+
+* 对应 export 指标： sysak\_fs\_stat
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
@@ -66,6 +172,9 @@
 | f\_favail | - | Number of free inodes for unprivileged users |  | collector/proc\_mounts.lua |
 
 ### softirqs 表
+
+* 对应 export 指标： sysak\_softirqs
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
@@ -82,7 +191,10 @@
 | RCU      | 次 | RCU软中断触发次数      |  | collector/proc\_softirqs.lua |
 
 ### self_statm 表
-统计监控进程的statm信息
+
+* 统计监控进程的statm信息
+* 对应 export 指标： sysak\_self\_statm
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
@@ -100,13 +212,18 @@
 
 ### arp
 
+* 对应 export 指标： sysak\_arp
+* 属性标签：value
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :--- | ---: | :---- | :---- | :--- |
 | count | 个 | 网卡名 | 网卡上对应arp表数量  | collector/proc\_arp.lua |
 
 ### networks
 
-这是网卡流量统计信息，已做差值处理
+* 这是网卡流量统计信息，已做差值处理
+* 对应 export 指标： sysak\_proc\_networks
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :--- | ---: | :---- | :---- | :--- |
@@ -129,7 +246,9 @@
 
 ### pkt_status
 
-这里统计所有包状态，详细可以通过 pkt_logs 获取
+* 对应 export 指标： sysak\_proc\_pkt\_status
+* 属性标签：counter
+* 这里统计所有包状态，详细可以通过 pkt\_logs 获取
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :--- | ---: | :---- | :---- | :--- |
@@ -142,6 +261,9 @@
 | drop | 次 |  | 协议栈丢包次数 | collector/proc\_snmp\_stat.lua |
 
 ### sock_stat 
+
+* 对应 export 指标： sysak\_sock\_stat
+* 属性标签：value
 
 统计所有包状态。[参考连接](https://developer.aliyun.com/article/484451)
 
@@ -163,7 +285,8 @@
 
 ### softnets
 
-This parser parses the stats from network devices. These stats includes events per cpu\(in row\), number of packets processed i.e packet_process \(first column\), number of packet drops packet\_drops \(second column\), time squeeze eg net\_rx\_action performed time_squeeze\(third column\), cpu collision eg collision occur while obtaining device lock while transmitting cpu\_collision packets \(eighth column\), received_rps number of times cpu woken up received\_rps \(ninth column\), number of times reached flow limit count flow\_limit\_count \(tenth column\), backlog status \(eleventh column\), core id \(twelfth column\).
+* 对应 export 指标： sysak\_softnets
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :--- | ---: | :---- | :---- | :--- |
@@ -175,6 +298,9 @@ This parser parses the stats from network devices. These stats includes events p
 | flow\_limit\_count | 个 | cpu，对应CPU号 | 达到 flow limit 的次数. | collector/proc\_softnet\_stat.lua |
 
 ### cgroups 表
+
+* 对应 export 指标： sysak\_cgroups
+* 属性标签：value
 
 | 指标名     | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---       | --- | :---- | :---- | :--- |
@@ -191,56 +317,6 @@ This parser parses the stats from network devices. These stats includes events p
 | cpuacct    | 个 | cpuacct cgroup数量    |  | collector/proc\_cgroups.lua |
 | perf\_event | 个 | perf_event cgroup数量 |  | collector/proc\_cgroups.lua |
 | memory     | 个 | memory cgroup数量     |  | collector/proc\_cgroups.lua |
-
-### interrupts 表
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| cpu      | - | CPU ID       |  | collector/proc\_interrupts.lua |
-| 中断名称 | 次 | 中断触发次数 |  | collector/proc\_interrupts.lua |
-
-### mounts 表
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| fs     | - | sysfs       |  | collector/proc\_mounts.lua |
-| mount  | - | 挂载目录 |  | collector/proc\_mounts.lua |
-| f\_bsize  | - | Filesystem block size |  | collector/proc\_mounts.lua |
-| f\_blocks | - | Size of fs in f_frsize units |  | collector/proc\_mounts.lua |
-| f\_bfree  | - | Number of free blocks |  | collector/proc\_mounts.lua |
-| f\_bavail | - | Number of free blocks for unprivileged users |  | collector/proc\_mounts.lua |
-| f\_files  | - | Number of inodes |  | collector/proc\_mounts.lua |
-| f\_ffree  | - | Number of free inodes |  | collector/proc\_mounts.lua |
-| f\_favail | - | Number of free inodes for unprivileged users |  | collector/proc\_mounts.lua |
-
-### softirqs 表
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| cpu     | - | CPU ID       |  | collector/proc\_softirqs.lua |
-| HI       | 次 | HI软中断触发次数       |  | collector/proc\_softirqs.lua |
-| TIMER    | 次 | TIMER软中断触发次数    |  | collector/proc\_softirqs.lua |
-| NET\_TX   | 次 | NET\_TX软中断触发次数   |  | collector/proc\_softirqs.lua |
-| NET\_RX   | 次 | NET\_RX软中断触发次数   |  | collector/proc\_softirqs.lua |
-| BLOCK    | 次 | BLOCK软中断触发次数    |  | collector/proc\_softirqs.lua |
-| IRQ_POLL | 次 | IRQ\_POLL软中断触发次数 |  | collector/proc\_softirqs.lua |
-| TASKLET  | 次 | TASKLET软中断触发次数  |  | collector/proc\_softirqs.lua |
-| SCHED    | 次 | SCHED软中断触发次数    |  | collector/proc\_softirqs.lua |
-| HRTIMER  | 次 | HRTIMER软中断触发次数  |  | collector/proc\_softirqs.lua |
-| RCU      | 次 | RCU软中断触发次数      |  | collector/proc\_softirqs.lua |
-
-### self_statm 表
-统计监控进程的statm信息
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :---   | --- | :---- | :---- | :--- |
-| size     | - | total program size |  | collector/proc\_statm.lua |
-| resident | - | resident set size |  | collector/proc\_statm.lua |
-| shared   | - | number of resident shared pages |  | collector/proc\_statm.lua |
-| text     | - | text (code) |  | collector/proc\_statm.lua |
-| lib      | - | library |  | collector/proc\_statm.lua |
-| data     | - | data + stack |  | collector/proc\_statm.lua |
-| dt       | - | dirty pages |  | collector/proc\_statm.lua |
 
 
 ## IO指标
@@ -275,12 +351,20 @@ This parser parses the stats from network devices. These stats includes events p
 -----------
 
 ### cg_cpu_stat 表
+
+* 对应 export 指标： sysak\_
+* 属性标签：value
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | nr_throttled | - | total throttled number |  | collector/container/cg\_cpu\_stat.lua | 
 | throttled_time | ms | total throttled time |  | collector/container/cg\_cpu\_stat.lua | 
 
 ### cg_proc_stat 表
+
+* 对应 export 指标： sysak\_
+* 属性标签：value
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | user      | % | usr cpu util |  | collector/container/cg\_cpuacct\_proc\_stat.lua | 
@@ -302,11 +386,19 @@ This parser parses the stats from network devices. These stats includes events p
 | nr_uninterruptible  | - | number of deep sleep tasks |  | collector/container/cg\_cpuacct\_proc\_stat.lua |
  
 ### cg_memfail_cnt 表
+
+* 对应 export 指标： sysak\_
+* 属性标签：value
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | fail_cnt | - | number of mem fail counts |  | collector/container/cg\_memory\_fail\_cnt.lua | 
  
 ### cg_memdrcm_latency 表
+
+* 对应 export 指标： sysak\_
+* 属性标签：value
+
 This table show the hist of the latency of direct memory reclamation
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
@@ -318,6 +410,10 @@ This table show the hist of the latency of direct memory reclamation
 | memDrcm_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
  
 ### cg_memmcmp_latency 表
+
+* 对应 export 指标： sysak\_
+* 属性标签：value
+
 This table show the hist of the latency of direct memory compaction
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
@@ -329,6 +425,10 @@ This table show the hist of the latency of direct memory compaction
 | memDcmp_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
  
 ### pmu_events 表
+
+* 对应 export 指标： sysak\_
+* 属性标签：value
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | cpu_cycles | - | cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
