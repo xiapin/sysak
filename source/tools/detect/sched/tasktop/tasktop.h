@@ -101,8 +101,15 @@ typedef struct cgroup_cpu_stat_t {
 
 typedef struct cpu_util_t {
     double usr;
+    double nice;
     double sys;
+    double idle;
     double iowait;
+    double irq;
+    double softirq;
+    double steal;
+    double guest;
+    double guest_nice;
 } cpu_util_t;
 
 typedef struct sys_record_t {
@@ -127,5 +134,3 @@ struct record_t {
 };
 
 #endif
-
-
