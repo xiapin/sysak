@@ -96,6 +96,7 @@ typedef struct cgroup_cpu_stat_t {
     unsigned long long current_bw;
     int nr_burst;
     unsigned long long burst_time;
+    time_t last_update;
 } cgroup_cpu_stat_t;
 
 typedef struct cpu_util_t {
@@ -126,3 +127,5 @@ struct record_t {
 };
 
 #endif
+
+
