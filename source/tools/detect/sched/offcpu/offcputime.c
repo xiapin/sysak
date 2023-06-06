@@ -16,6 +16,7 @@
 static struct env {
 	pid_t pid;
 	pid_t tid;
+	bool folded;
 	bool user_threads_only;
 	bool kernel_threads_only;
 	int stack_storage_size;
@@ -28,6 +29,7 @@ static struct env {
 } env = {
 	.pid = -1,
 	.tid = -1,
+	.folded = false,
 	.stack_storage_size = 1024,
 	.perf_max_stack_depth = 127,
 	.min_block_time = 1,
@@ -48,6 +50,7 @@ const char argp_program_doc[] =
 "EXAMPLES:\n"
 "    offcputime             # trace off-CPU stack time until Ctrl-C\n"
 "    offcputime 5           # trace for 5 seconds only\n"
+"    offcputime -f 5        # trace for 5 seconds and foled the output\n"
 "    offcputime -m 1000     # trace only events that last more than 1000 usec\n"
 "    offcputime -M 10000    # trace only events that last less than 10000 usec\n"
 "    offcputime -p 185      # only trace threads for PID 185\n"
@@ -62,6 +65,7 @@ const char argp_program_doc[] =
 static const struct argp_option opts[] = {
 	{ "pid", 'p', "PID", 0, "Trace this PID only" },
 	{ "tid", 't', "TID", 0, "Trace this TID only" },
+	{ "folded-output", 'f', NULL, 0, "Folded output" },
 	{ "user-threads-only", 'u', NULL, 0,
 	  "User threads only (no kernel threads)" },
 	{ "kernel-threads-only", 'k', NULL, 0,
@@ -112,6 +116,9 @@ static error_t parse_arg(int key, char *arg, struct argp_state *state)
 		break;
 	case 'k':
 		env.kernel_threads_only = true;
+		break;
+	case 'f':
+		env.folded = true;
 		break;
 	case OPT_PERF_MAX_STACK_DEPTH:
 		errno = 0;
@@ -194,6 +201,87 @@ static int libbpf_print_fn(enum libbpf_print_level level, const char *format, va
 
 static void sig_handler(int sig)
 {
+}
+
+static void print_map_fold(struct ksyms *ksyms, struct syms_cache *syms_cache,
+		      struct offcputime_bpf *obj)
+{
+	struct key_t lookup_key = {}, next_key;
+	const struct ksym *ksym;
+	const struct syms *syms;
+	const struct sym *sym;
+	int err, i, ifd, sfd, kern, usr;
+	__u64 *ip, *ip_k;
+	struct val_t val;
+
+	ip = calloc(env.perf_max_stack_depth, sizeof(*ip));
+	if (!ip) {
+		fprintf(stderr, "failed to alloc ip\n");
+		return;
+	}
+	ip_k = calloc(env.perf_max_stack_depth, sizeof(*ip));
+	if (!ip_k) {
+		fprintf(stderr, "failed to alloc ip_k\n");
+		free(ip);
+		return;
+	}
+	kern = usr = 0;
+	ifd = bpf_map__fd(obj->maps.info);
+	sfd = bpf_map__fd(obj->maps.stackmap);
+	while (!bpf_map_get_next_key(ifd, &lookup_key, &next_key)) {
+		err = bpf_map_lookup_elem(ifd, &next_key, &val);
+		if (err < 0) {
+			fprintf(stderr, "failed to lookup info: %d\n", err);
+			goto cleanup;
+		}
+		lookup_key = next_key;
+		if (val.delta == 0)
+			continue;
+
+		printf("%s;", val.comm);
+		if (next_key.user_stack_id == -1)
+			goto print_kstack;
+
+		if (bpf_map_lookup_elem(sfd, &next_key.user_stack_id, ip) != 0) {
+			printf("[Missed User Stack];");
+			printf("-;");
+			goto print_kstack;
+		}
+
+		syms = syms_cache__get_syms(syms_cache, next_key.tgid);
+		if (!syms) {
+			//fprintf(stderr, "failed to get syms\n");
+			goto print_kstack;
+		}
+		for (i = 0; i < env.perf_max_stack_depth && ip[i]; i++) {
+		}
+		usr = i - 1;
+
+		for (i = usr; i >= 0; i--) {
+			sym = syms__map_addr(syms, ip[i]);
+			if (sym)
+				printf("%s;", sym->name);
+			else
+				printf("[unknown];");
+		}
+		printf("-;");
+print_kstack:
+		if (bpf_map_lookup_elem(sfd, &next_key.kern_stack_id, ip_k) != 0) {
+			printf("[Missed Kernel Stack];");
+			goto skip_kstack;
+		}
+		for (i = 0; i < env.perf_max_stack_depth && ip_k[i]; i++) {
+		}
+		kern = i - 1;
+		for (i = kern; i > 0; i--) {
+			ksym = ksyms__map_addr(ksyms, ip_k[i]);
+			printf("%s;", ksym ? ksym->name : "Unknown");
+		}
+skip_kstack:
+		printf(" %lld\n", val.delta);
+	}
+cleanup:
+	free(ip);
 }
 
 static void print_map(struct ksyms *ksyms, struct syms_cache *syms_cache,
@@ -340,9 +428,10 @@ int main(int argc, char **argv)
 	 * be "handled" with noop by sig_handler).
 	 */
 	sleep(env.duration);
-
-	print_map(ksyms, syms_cache, obj);
-
+	if (env.folded)
+		print_map_fold(ksyms, syms_cache, obj);
+	else
+		print_map(ksyms, syms_cache, obj);
 cleanup:
 	offcputime_bpf__destroy(obj);
 	syms_cache__free(syms_cache);
