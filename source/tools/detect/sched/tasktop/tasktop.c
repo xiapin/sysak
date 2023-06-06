@@ -923,6 +923,7 @@ static void output_tasktop(struct record_t* rec, int rec_num, FILE* dest) {
 static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
     int i;
     struct D_task_record_t* d_tasks = rec->d_tasks;
+    char* str = calloc(STACK_CONTENT_LEN, sizeof(char));
     for (i = 0; i < d_num; i++) {
         if (i == 0) {
             fprintf(dest, "[D-STASK]\n");
@@ -932,7 +933,8 @@ static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
         fprintf(dest, "%18s %6d %6d ", d_tasks[i].comm, d_tasks[i].tid,
                 d_tasks[i].pid);
 
-        char* str = d_tasks[i].stack;
+        strncpy(str, d_tasks[i].stack, STACK_CONTENT_LEN);
+
         const char delim[2] = "\n";
         char* token;
 
@@ -945,122 +947,150 @@ static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
             fprintf(dest, "%18s %6s %6s %s\n", "", "", "", token);
         }
     }
+
+    free(str);
 }
 
-static bool check_cpu_overload(cpu_util_t* cpu) {
-#define THRESHOLD_CPU_OVERLOAD 85
-    double load = cpu->usr + cpu->sys + cpu->iowait + cpu->nice + cpu->irq +
-                  cpu->softirq + cpu->guest;
-
-    return load >= THRESHOLD_CPU_OVERLOAD;
+static bool inline is_high_load1(struct record_t* rec) {
+#define THRESHOLD_LOAD1 nr_cpu * 1.5
+    return rec->sys.load1 >= THRESHOLD_LOAD1;
 }
 
-static bool check_race(unsigned long long delay) {
-#define THRESHOLD_DELAY 1 * 1000 * 1000 * 1000
-    return delay > THRESHOLD_DELAY;
+static bool inline is_high_R(struct record_t* rec) {
+#define THRESHOLD_R nr_cpu
+    return rec->sys.nr_R >= THRESHOLD_R;
 }
 
-// static bool is_high_R(struct record_t* rec) {
-// #define THRESHOLD_R nr_cpu * 1.5
-//     return rec->sys.nr_R >= THRESHOLD_R;
-// }
-
-static bool is_high_D(struct record_t* rec) {
+static bool inline is_high_D(struct record_t* rec) {
 #define THRESHOLD_D 8
     return rec->sys.nr_D >= THRESHOLD_D;
 }
 
-static bool is_distribution_normal(cpu_util_t* cpu) {
-#define THRESHOLD_CPU_USELESS 30
-    double sys_time = cpu->sys + cpu->iowait + cpu->irq + cpu->softirq;
-    return sys_time <= THRESHOLD_CPU_USELESS;
+// static bool fork_detect(struct record_t* rec, FILE* dest) {
+// #define THRESHOLD_FORK_PS 2000
+//     return rec->sys.nr_fork >= THRESHOLD_FORK_PS;
+// }
+
+double inline calculate_sys(cpu_util_t* cpu) {
+    double sys_util = cpu->iowait + cpu->sys + cpu->softirq + cpu->irq;
+    return sys_util;
 }
 
-void throttled_bind_detect(struct record_t* rec, FILE* dest) {
-    cpu_util_t* cpus = rec->sys.cpu;
-    unsigned long long* percpu_delay = rec->sys.percpu_sched_delay;
-    bool status[nr_cpu];
-    int i;
-    for (i = 1; i <= nr_cpu; i++) {
-        bool race = check_race(percpu_delay[i - 1]);
-        status[i - 1] = race;
+double inline calculate_overall(cpu_util_t* cpu) {
+    double overall_cpuutil = cpu->iowait + cpu->sys + cpu->softirq + cpu->irq +
+                             +cpu->nice + cpu->usr;
+    return overall_cpuutil;
+}
 
-        bool overload = check_cpu_overload(cpus + i);
-        if (race && overload) {
-            fprintf(dest, "CPU-%d is overloaded. Maybe tasks is too much.\n",
-                    i - 1);
-        } else if (race && !overload)
-            fprintf(dest, "CPU-%d maybe throttled. Please check cgroup.\n",
-                    i - 1);
-        else if (!race && overload) {
-            if (!is_distribution_normal(cpus + i)) {
-                fprintf(dest,
-                        "CPU-%d is overloaded. \nthe proportion of sys, "
-                        "iowait, "
-                        "hrad-irq and softirq is too high. \nPlease use other "
-                        "tools to analyse.\n",
-                        i - 1);
-            } else {
-                fprintf(dest, "CPU-%d is overloaded but normal.\n", i - 1);
-            }
-        } else if (!race && !overload) {
-            // #ifdef LOG_DEBUG
-            fprintf(dest, "CPU-%d is not overload.\n", i - 1);
-            // #endif
+static void inline is_high_overall_cpuutil(struct record_t* rec, FILE* dest) {
+#define THRESHOLD_CPU_OVERLOAD 55
+    cpu_util_t* cpu = rec->sys.cpu;
+    double overall_cpuutil = calculate_overall(cpu);
+    if (overall_cpuutil >= THRESHOLD_CPU_OVERLOAD) {
+        fprintf(dest, "WARN: CPU overall utilization is high.\n");
+    }
+}
+
+static void inline is_high_sys(struct record_t* rec, FILE* dest) {
+#define THRESHOLD_SYS 15
+    double sys_util = calculate_sys(rec->sys.cpu);
+    if (sys_util >= THRESHOLD_SYS) {
+        fprintf(dest, "INFO: Sys time of cpu is high.\n");
+    }
+}
+
+static void is_bind(struct record_t* rec, FILE* dest) {
+#define THRESHOLD_BIND 25
+    int i;
+    cpu_util_t* cpu = rec->sys.cpu;
+    double min_overall = calculate_overall(cpu);
+
+    for (i = 1; i <= nr_cpu; i++) {
+        double overall = calculate_overall(cpu + i);
+        if (overall < min_overall) min_overall = overall;
+    }
+
+    bool status[nr_cpu];
+    bool exist = false;
+    for (i = 1; i <= nr_cpu; i++) {
+        double overall = calculate_overall(cpu + i);
+        if (overall - min_overall > THRESHOLD_BIND) {
+            status[i - 1] = true;
+            exist = true;
+        } else {
+            status[i - 1] = false;
         }
     }
 
-    bool some_cores_race = false;  // some core is race?
-    bool all_cores_race = true;    // all core is race?
-
-    for (i = 0; i < nr_cpu; i++) {
-        some_cores_race = some_cores_race || status[i];
-        all_cores_race = all_cores_race && status[i];
-    }
-
-    if (all_cores_race) {
-        /* all cores race, there is no bind */
-        fprintf(dest, "System cpu resource is not enough.\n");
-    } else if (some_cores_race) {
-        fprintf(dest, "There maybe some tasks bind on cpu. Please check cpu:");
-        for (i = 0; i < nr_cpu; i++) {
-            if (status[i]) fprintf(dest, " [%d]", i);
+    if (exist) {
+        fprintf(dest, "WARN: Some tasks bind cpu. Please check cpu: ");
+        for (i = 1; i <= nr_cpu; i++) {
+            if (status[i - 1]) {
+                fprintf(dest, " [%d]", i - 1);
+            }
         }
         fprintf(dest, "\n");
+    }
+}
+
+static void group_by_stack(struct record_t* rec, FILE* dest, int d_num) {
+#define PREFIX_LEN 64
+    D_task_record_t* dtask = rec->d_tasks;
+    int* counter = calloc(d_num, sizeof(int));
+    D_task_record_t** stack = calloc(d_num, sizeof(D_task_record_t*));
+
+    int empty_slot = 0;
+    int i, j;
+    for (i = 0; i < d_num; i++) {
+        D_task_record_t* s = dtask + i;
+        bool match = false;
+        for (j = 0; j < empty_slot; j++) {
+            if (stack[j]) {
+                if (!strncmp(stack[j]->stack, s->stack, 64)) {
+                    counter[j]++;
+                    match = true;
+                    break;
+                }
+            }
+        }
+
+        if (!match) {
+            stack[empty_slot++] = s;
+        }
+    }
+
+    int max_idx = 0;
+    int max_times = 0;
+    for (i = 0; i < empty_slot; i++) {
+        if (counter[i] > max_times) {
+            max_times = counter[i];
+            max_idx = i;
+        }
+    }
+
+    fprintf(dest, "WARN: The most stack, times=%d\n", max_times);
+    fprintf(dest, "%s", stack[max_idx]->stack);
+    free(stack);
+    free(counter);
+}
+
+static void load_analyse(struct record_t* rec, int rec_num, FILE* dest,
+                         int d_num, int cgroup_num) {
+    if (is_high_load1(rec)) {
+        if (is_high_R(rec)) {
+            is_high_overall_cpuutil(rec, dest);
+
+            is_high_sys(rec, dest);
+
+            is_bind(rec, dest);
+        }
+
+        if (is_high_D(rec)) {
+            group_by_stack(rec, dest, d_num);
+        }
     } else {
-        fprintf(dest, "System cpu is normal.\n ");
+        fprintf(dest, "INFO: Load is normal.\n");
     }
-}
-
-static void fork_detect(struct record_t* rec, FILE* dest) {
-#define THRESHOLD_FORK 4000
-    if (rec->sys.nr_fork >= THRESHOLD_FORK) {
-        fprintf(dest,
-                "There are many forks, mayebe influence load1. Please check "
-                "the task:comm=%s pid=%d ppid=%d\n",
-                rec->sys.most_fork_info.comm, rec->sys.most_fork_info.pid,
-                rec->sys.most_fork_info.ppid);
-    }
-}
-
-static void D_detect(struct record_t* rec, FILE* dest) {
-    /* IO or kernel resource？ */
-    if (is_high_D(rec)) {
-        fprintf(dest, "There are many D tasks, please analyse the D-stack.\n");
-    }
-}
-
-static void decision(struct record_t* rec, int rec_num, FILE* dest, int d_num,
-                     int cgroup_num) {
-    fprintf(dest, "[EXCEPTION&ADVICE]\n");
-    /* check throttled or bind */
-    throttled_bind_detect(rec, dest);
-
-    /* check fork */
-    fork_detect(rec, dest);
-
-    /* check D */
-    D_detect(rec, dest);
 }
 
 static void output(struct record_t* rec, int rec_num, FILE* dest, int d_num,
@@ -1072,7 +1102,7 @@ static void output(struct record_t* rec, int rec_num, FILE* dest, int d_num,
     output_tasktop(rec, rec_num, dest);
     output_d_stack(rec, d_num, dest);
 
-    decision(rec, rec_num, dest, d_num, cgroup_num);
+    load_analyse(rec, rec_num, dest, d_num, cgroup_num);
     fflush(dest);
 }
 
