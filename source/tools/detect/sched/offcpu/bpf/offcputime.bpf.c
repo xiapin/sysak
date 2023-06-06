@@ -173,7 +173,7 @@ int tp__sched_switch(struct sched_switch_tp_args *ctx)
 	delta = (s64)(bpf_ktime_get_ns() - i_keyp->start_ts);
 	if (delta < 0)
 		goto cleanup;
-	delta /= 1000U;
+	delta = (u64)delta/1000U;
 	if (delta < min_block_ns || delta > max_block_ns)
 		goto cleanup;
 	valp = bpf_map_lookup_elem(&info, &i_keyp->key);
