@@ -406,5 +406,6 @@ int memcg_cgroup_file(char *cgroupfile)
     {
         memcg_cgroup_path(cgroup.c_str());       
     }
+    filename.close();
     return 0;
 }

@@ -25,6 +25,7 @@ int sym_init(char *btf_name)
 
 int sym_uninit(void)
 {
+    btf__free(handle);
     map<string,struct member_attribute *>::iterator iter; 
     struct member_attribute *info;
  
