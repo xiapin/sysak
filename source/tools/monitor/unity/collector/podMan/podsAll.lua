@@ -102,6 +102,40 @@ local function setupCons(res)
     return cons
 end
 
+function CpodsAll:getAllcons(procfs)
+    local mnt = procfs
+    local runtime = getRuntime(mnt)
+    local cli = ChttpCli.new()
+    local cons = {}
+    local c = 0
+    local content = cli:get("http://127.0.0.1:10255/pods")
+    if #content.body == 0 then return cons end
+    local obj = cli:jdecode(content.body)
+
+    for _, pod in ipairs(obj.items) do
+        local metadata = pod.metadata
+        local lpod = {name = metadata.name,
+                      namespace = metadata.namespace,
+                      uid = pystring:replace(metadata.uid, "-", "_"),
+                      qos = pystring:lower(pod.status.qosClass),
+        }
+        local containerStatuses = pod.status.containerStatuses
+        for _, con in ipairs(containerStatuses) do
+            local cell = {
+                pod = lpod,
+                name = con.name,
+                id = spiltConId(con.containerID)
+            }
+            cell.path = joinPath(cell, runtime)
+            if unistd.access(mnt .. "/sys/fs/cgroup/memory/" .. cell.path) == 0 then
+                c = c + 1
+                cons[c] = cell
+            end
+        end
+    end
+    return cons
+end
+
 local function setupPlugins(res, proto, pffi, mnt, ino)
     local c = 0
     local cons = setupCons(res)
