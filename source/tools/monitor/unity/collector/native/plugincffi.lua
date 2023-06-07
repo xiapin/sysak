@@ -39,6 +39,9 @@ void deinit(void);
 
 void free(void *p);
 int setns(int fd, int nstype);
+char* scanall();
+int monitor_init(const char* proc);
+void monitor_exit();
 ]]
 
 return ffi
