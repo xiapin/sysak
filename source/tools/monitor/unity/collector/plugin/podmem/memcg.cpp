@@ -15,6 +15,7 @@
 #include<map>
 #include<vector>
 #include<algorithm>
+#include<set>
 using namespace std;
 
 #ifndef KPF_RESERVED
@@ -28,8 +29,6 @@ using namespace std;
 #define MAX_BIT (26)
 
 
-map<unsigned long , struct file_info *> files;
-map<unsigned long , int> inodes;
 static bool full_scan;
 static unsigned int scan_rate = 4;
 struct file_info {
@@ -45,6 +44,16 @@ struct file_info {
     int shmem;
     int del;
 };
+map<unsigned long , struct file_info *> files;
+struct myComp
+{
+    bool operator()(const unsigned long &a,const unsigned long &b)
+    {
+        return files[a]->cached >= files[b]->cached;
+    }
+};
+set<unsigned long,myComp> fileset;
+map<unsigned long , int> inodes;
 extern struct member_attribute *get_offset(string struct_name,  string member_name);
  
 static int prepend(char **buffer, int *buflen, const char *str, int namelen, int off)
@@ -118,7 +127,7 @@ static int get_filename(unsigned long dentry, char *filename, int len)
  * pfn: page pfn
  * cinode: cgroup inode
  */ 
-static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int shmem, int dirty)
+static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int shmem, int dirty, int top)
 {
     map<unsigned long,struct file_info*>::iterator iter;
     unsigned long page = PFN_TO_PAGE(pfn);
@@ -153,7 +162,7 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     }
     kcore_readmem(map + att->offset,  &cached, sizeof(cached));
     /* skip file cache < 100K */ 
-    if (cached*4 < 100)
+    if (fileset.size() >= top and (cached*4 < (files[*(--fileset.end())]->cached)))
         return 0;
     
     att = get_offset("address_space", "host");
@@ -275,6 +284,15 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     strncpy(info->filename, end, sizeof(info->filename) - 2);
     info->filename[sizeof(info->filename) -1] = '0';
     files[i_ino] = info;
+    fileset.insert(i_ino);
+    if(fileset.size() > top)
+    {
+        i_ino = *(--fileset.end());
+        fileset.erase(--fileset.end());
+        iter=files.find(i_ino);
+        free(iter->second);
+        files.erase(iter);
+    }
     return 0;
 }
 
@@ -305,66 +323,23 @@ bool cached_cmp(const pair<unsigned long, struct file_info*>& a, const pair<unsi
 
 static int output_file_cached_string(unsigned int top, char *res)
 {
-    map<unsigned long,struct file_info*>::iterator iter; 
-    vector< pair <unsigned long, struct file_info *> > vec(files.begin(), files.end());
+    set<unsigned long, myComp>::iterator  iter2;
     struct file_info *info;
     int size = 0;
 
-    for (iter = files.begin(); iter != files.end(); ++iter) {
-        info = (*iter).second;
+    for (iter2 = fileset.begin(); iter2 != fileset.end(); ++iter2) {
+        info = files[*iter2];
         if (!info) {
             continue;
         }
-    } 
-    sort(vec.begin(), vec.end(), cached_cmp);
-
-    for (int i = 0; i < vec.size(); ++i) {
-        info = vec[i].second;
-        if (!info) {
-            continue;
-        }
-        //printf("inode=%lu file=%s cached=%lu size=%lu cinode=%lu active=%lu inactive=%lu shmem=%d \ 
-        //        delete=%d cgcached=%lu dirty=%lu\n", info->inode, info->filename, info->cached, info->size,\
-        //       info->cinode, info->active*4, info->inactive*4, info->shmem, info->del, info->cgcached*4, info->dirty*4);
-
-        if (i <= top - 1)
-            size += sprintf(res + size, "cinode=%lu cached=%lu size=%lu file=%s\n",info->cinode,info->cached, info->size,info->filename);
+        size += sprintf(res + size, "cinode=%lu cached=%lu size=%lu file=%s\n", info->cinode,info->cached, info->size,info->filename);
         free(info);
     }
     files.clear();
-    return 0;    
+    fileset.clear();
+
+    return 0;
 }
-static int output_file_cached(unsigned int top)
-{
-    map<unsigned long,struct file_info*>::iterator iter; 
-    vector< pair <unsigned long, struct file_info *> > vec(files.begin(), files.end());
-    struct file_info *info;
-
-    for (iter = files.begin(); iter != files.end(); ++iter) {
-        info = (*iter).second;
-        if (!info) {
-            continue;
-        }
-    } 
-    sort(vec.begin(), vec.end(), cached_cmp);
-
-    for (int i = 0; i < vec.size(); ++i) {
-        info = vec[i].second;
-        if (!info) {
-            continue;
-        }
-        printf("inode=%lu file=%s cached=%lu size=%lu cinode=%lu active=%lu inactive=%lu shmem=%d \ 
-                delete=%d cgcached=%lu dirty=%lu\n", info->inode, info->filename, info->cached, info->size,\
-               info->cinode, info->active*4, info->inactive*4, info->shmem, info->del, info->cgcached*4, info->dirty*4);
-
-        //size += sprintf(res + size, "cinode=%lu cached=%lu size=%lu file=%s\n", info->cinode,info->cached, info->size,info->filename);
-        free(info);
-        if (i >= top - 1)
-            break;
-    }
-    return 0;    
-}
-
 
 int scan_pageflags_nooutput(struct options *opt, char *res)
 {
@@ -407,58 +382,10 @@ int scan_pageflags_nooutput(struct options *opt, char *res)
         shmem = !!(pageflag & (1 <<KPF_SWAPBACKED)); 
         inode = get_cgroup_inode(pfn);
         if (check_cgroup_inode(inode)) {
-            get_dentry(pfn, inode, active, shmem,dirty);
+            get_dentry(pfn, inode, active, shmem,dirty, opt->top);
         } 
     }
     output_file_cached_string(opt->top, res);
-    return 0;
-}
-
-int scan_pageflags(struct options *opt)
-{
-    unsigned long  pageflag;
-    unsigned long pfn = 0;
-    unsigned long inode = 0;
-    int active = 0; 
-    int dirty = 0;
-    int shmem = 0;
-
-    if (opt->rate != 0) {
-        scan_rate = opt->rate;
-    } 
-    full_scan = opt->fullscan;
-    while (1) {
-        int ret = 0;
-        pageflag = 0;
-        
-        pfn += scan_rate ;/* skip 2M*/
-        
-        if (pfn > max_pfn)
-            break;
-        ret = kpageflags_read(&pageflag, sizeof(pageflag), sizeof(pageflag)*pfn); 
-        if (ret != sizeof(pageflag)) {
-            break;
-        }
-        if (pageflag & (1 << KPF_NOPAGE) || !pageflag)
-            continue;
-    
-        if ((pageflag & (1<<KPF_BUDDY)) || (pageflag & (1 << KPF_IDLE))) 
-            continue;
-    
-        if ((pageflag & (1<<KPF_SLAB)) || ((pageflag >> KPF_RESERVED) & 0x1))
-            continue;
-        if (pageflag & (1 << KPF_ANON))
-            continue;
- 
-        active = !!((1<<KPF_ACTIVE) & pageflag); 
-        dirty = !!((1<<KPF_DIRTY) & pageflag);
-        shmem = !!(pageflag & (1 <<KPF_SWAPBACKED)); 
-        inode = get_cgroup_inode(pfn);
-        if (check_cgroup_inode(inode)) {
-            get_dentry(pfn, inode, active, shmem,dirty);
-        } 
-    }
-    output_file_cached(opt->top);
     return 0;
 }
 
