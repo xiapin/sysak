@@ -23,7 +23,7 @@ struct id_pair_t {
 
 struct proc_stat_t {
     int pid;
-    char comm[16];
+    char comm[MAX_COMM_LEN];
     char state;
     int ppid;
     int pgrp;
