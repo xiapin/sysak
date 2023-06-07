@@ -53,7 +53,7 @@ function CPodMem:get_allcons()
         if not self.blacklist[v['pod']['namespace']] then
             local path =  self.root_fs .. "/sys/fs/cgroup/memory/" .. v['path']
             local inode = self:get_inode(path)
-            self.allcons[v['name']..v['pod']['name']] = {["pod"]=v['pod']['name'], ["ns"]=v['pod']['namespace'], ["path"]=path,  ["inode"] = inode}
+            self.allcons[v['name']..v['pod']['name']] = {["pod"]=v['pod']['name'], ["ns"]=v['pod']['namespace'], ["path"]=path,  ["inode"] = inode, ["cname"]=v['name']}
             self.inodes[inode] = v['name']..v['pod']['name']
         end
     end
@@ -90,7 +90,7 @@ function CPodMem:proc(elapsed, lines)
             if filen:find("diff") ~= nil then filen = pystring:split(filen,"diff")[2] end 
             local cname = self.inodes[tonumber(cinode)]
             if not self.podmemres[cname] then self.podmemres[cname]= {} end
-            self.podmemres[cname][filen] = {["pod"]=self.allcons[cname]['pod'], ["ns"]=self.allcons[cname]['ns'], ["size"]=size, ["cache"]=cache}
+            self.podmemres[cname][filen] = {["pod"]=self.allcons[cname]['pod'], ["ns"]=self.allcons[cname]['ns'], ["size"]=size, ["cache"]=cache, ["cname"]=self.allcons[cname]['cname']}
         end
     end
     self._ffi.C.free(resptr)
@@ -99,10 +99,10 @@ function CPodMem:proc(elapsed, lines)
         for k1,v1 in pairs(v) do 
             -- for k2,v2 in pairs(v1) do print(k,k1,k2,v2) end
             local cell = {{name="podmem_size", value=v1['size']}}
-            local label = {{name="podname",index=v1['pod'],}, {name="podns",index = v1['ns'],},{name="file",index = k1,},}
+            local label = {{name="podname",index=v1['pod'],}, {name="podns",index = v1['ns'],},{name="file",index = k1,},{name="container", index=v1['cname']},}
             self:appendLine(self:_packProto("podmem", label, cell))
             cell = {{name="podmem_cache", value=v1['cache']}}
-            label = {{name="podname",index=v1['pod'],}, {name="podns",index = v1['ns'],},{name="file",index = k1,},}
+            label = {{name="podname",index=v1['pod'],}, {name="podns",index = v1['ns'],},{name="file",index = k1,},{name="container", index=v1['cname']},}
             self:appendLine(self:_packProto("podmem", label, cell))
         end
     end
