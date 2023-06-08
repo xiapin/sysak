@@ -98,10 +98,10 @@ function CPodMem:proc(elapsed, lines)
     for k,v in pairs(self.podmemres) do
         for k1,v1 in pairs(v) do 
             -- for k2,v2 in pairs(v1) do print(k,k1,k2,v2) end
-            local cell = {{name="podmem_size", value=v1['size']}}
+            local cell = {{name="size", value=tonumber(v1['size'])}}
             local label = {{name="podname",index=v1['pod'],}, {name="podns",index = v1['ns'],},{name="file",index = k1,},{name="container", index=v1['cname']},}
             self:appendLine(self:_packProto("podmem", label, cell))
-            cell = {{name="podmem_cache", value=v1['cache']}}
+            cell = {{name="cached", value=tonumber(v1['cache'])}}
             label = {{name="podname",index=v1['pod'],}, {name="podns",index = v1['ns'],},{name="file",index = k1,},{name="container", index=v1['cname']},}
             self:appendLine(self:_packProto("podmem", label, cell))
         end
