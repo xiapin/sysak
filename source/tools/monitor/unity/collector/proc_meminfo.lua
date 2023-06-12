@@ -19,10 +19,6 @@ function CprocMeminfo:_init_(proto, pffi, mnt, pFile)
         vs = {}
     }
     self:readIomem()
-    self:readVmalloc()
-    self:readUsed()
-    self:readHugepage(2048,"huge_2M")
-    self:readHugepage(1048576,"huge_1G")
 end
 
 function CprocMeminfo:readIomem()
@@ -48,7 +44,7 @@ function CprocMeminfo:readVmalloc()
 end
 
 function CprocMeminfo:readUsed()
-    local f = assert(io.popen('free -k','r'))
+    local f = io.popen('free -k','r')
     io.input(f)
     for line in io.lines() do
         if string.find(line,'Mem') then
@@ -92,6 +88,10 @@ function CprocMeminfo:proc(elapsed, lines)
         self:readKV(line)
     end
     local tmp_dict = self._protoTable_dict.vs
+    self:readVmalloc()
+    self:readUsed()
+    self:readHugepage(2048,"huge_2M")
+    self:readHugepage(1048576,"huge_1G")
 
     local cell = {name="total", value=tmp_dict["MemTotal"]+tmp_dict["res"]}
     table.insert(self._protoTable["vs"], cell)
