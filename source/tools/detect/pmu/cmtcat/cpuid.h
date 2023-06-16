@@ -80,4 +80,17 @@ int cpuid_L3_RMID_eventID(void)
 #ifdef  DEBUG
 	printf ("factor=%d, RMID=%lu, eventid==0x%x\n", EBX, ECX, EDX);
 #endif
+	/* the maxRMID */
+	return ECX;
+}
+
+int cpuid_L3_factor(void)
+{
+	int EBX;
+
+	__asm__("mov $0xF, %eax\n\t");
+	__asm__("mov $0x1, %ecx\n\t");	/* 0x1 is from cpuid_L3_type_supported() */
+	__asm__("cpuid\n\t");
+	__asm__("mov %%ebx, %0\n\t":"=r" (EBX));
+	return EBX;
 }
