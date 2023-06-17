@@ -21,6 +21,7 @@
 #include "common.h"
 
 // #define DEBUG
+// #define LOG_DEBUG
 // #define ONLY_THREAD
 // #define STRESS_TEST
 
@@ -372,7 +373,48 @@ cleanup:
     return 0;
 }
 
-static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num) {
+static int check_cgroup(cgroup_cpu_stat_t** prev_cgroups, char* cgroup_name) {
+    int i = 0;
+    for (i = 0; i < env.cgroup_limit; i++) {
+        if (prev_cgroups[i] &&
+            !strcmp(cgroup_name, prev_cgroups[i]->cgroup_name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static cgroup_cpu_stat_t* get_cgroup(cgroup_cpu_stat_t** prev_cgroups,
+                                     int idx) {
+    int i = 0;
+    if (idx < env.cgroup_limit && idx >= 0) {
+        return prev_cgroups[idx];
+    }
+
+    /* find a empty slot */
+    for (i = 0; i < env.cgroup_limit; i++) {
+        if (!prev_cgroups[i]) {
+            prev_cgroups[i] = calloc(1, sizeof(cgroup_cpu_stat_t));
+            prev_cgroups[i]->last_update = time(0);
+            return prev_cgroups[i];
+        }
+    }
+
+    /* find the long time no update slot */
+    int last_time = prev_cgroups[0]->last_update;
+    int res_idx = 0;
+    for (i = 0; i < env.cgroup_limit; i++) {
+        if (last_time > prev_cgroups[i]->last_update) {
+            last_time = prev_cgroups[i]->last_update;
+            res_idx = i;
+        }
+    }
+
+    return prev_cgroups[res_idx];
+}
+
+static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num,
+                                cgroup_cpu_stat_t** prev_cgroups) {
 #define CGROUP_PATH "/sys/fs/cgroup/cpu"
     int err = 0;
     struct dirent* dir = 0;
@@ -383,6 +425,7 @@ static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num) {
         fprintf(stderr, "Failed open %s\n", CGROUP_PATH);
         goto cleanup;
     }
+    time_t ts = time(0);
 
     while ((dir = readdir(root_dir)) != NULL) {
         char name[128];
@@ -405,24 +448,48 @@ static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num) {
             continue;
         }
 
-        cgroup_cpu_stat_t* stat = cgroups + c_num;
-        memset(stat->cgroup_name, 0, sizeof(stat->cgroup_name));
+        /* if idx == -1,means no history record */
+        int idx = check_cgroup(prev_cgroups, dir->d_name);
 
-        strncpy(stat->cgroup_name, dir->d_name, sizeof(stat->cgroup_name) - 1);
+        /* find a slot, store the history cgroup info */
+        cgroup_cpu_stat_t* slot = get_cgroup(prev_cgroups, idx);
+        if (!slot) {
+            fprintf(stderr, "Get a null cgroup slot.\n");
+            err = 1;
+            exit(err);
+        }
+
+        cgroup_cpu_stat_t* rec = cgroups + c_num;
+
+        memset(slot->cgroup_name, 0, sizeof(slot->cgroup_name));
+        memset(rec->cgroup_name, 0, sizeof(rec->cgroup_name));
+
+        strncpy(slot->cgroup_name, dir->d_name, sizeof(slot->cgroup_name) - 1);
+        strncpy(rec->cgroup_name, dir->d_name, sizeof(rec->cgroup_name) - 1);
+
         while (fscanf(fp, "%s %llu", name, &val) != EOF) {
             if (!strcmp(name, "nr_periods")) {
-                stat->nr_periods = val;
+                if (idx != -1) rec->nr_periods = val - slot->nr_periods;
+                slot->nr_periods = val;
             } else if (!strcmp(name, "nr_throttled")) {
-                stat->nr_throttled = val;
+                if (idx != -1) rec->nr_throttled = val - slot->nr_throttled;
+                slot->nr_throttled = val;
             } else if (!strcmp(name, "throttled_time")) {
-                stat->throttled_time = val;
+                if (idx != -1) rec->throttled_time = val - slot->throttled_time;
+                slot->throttled_time = val;
             } else if (!strcmp(name, "nr_burst")) {
-                stat->nr_burst = val;
+                if (idx != -1) rec->nr_burst = val - slot->nr_burst;
+                slot->nr_burst = val;
             } else if (!strcmp(name, "burst_time")) {
-                stat->burst_time = val;
+                if (idx != -1) rec->burst_time = val - slot->burst_time;
+                slot->burst_time = val;
             }
         }
-        if (stat->nr_throttled > 0) c_num++;
+
+        if (rec->nr_throttled > 0 && idx != -1) {
+            c_num++;
+            slot->last_update = ts;
+        }
         fclose(fp);
     }
 
@@ -866,6 +933,102 @@ static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
     }
 }
 
+static bool check_cpu_overload(cpu_util_t* cpu) {
+#define THRESHOLD_CPU_OVERLOAD 85
+    double load = cpu->usr + cpu->sys + cpu->iowait;
+    return load >= THRESHOLD_CPU_OVERLOAD;
+}
+
+static bool check_race(unsigned long long delay) {
+#define THRESHOLD_DELAY 1 * 1000 * 1000 * 1000
+    return delay > THRESHOLD_DELAY;
+}
+
+// static bool is_high_R(struct record_t* rec) {
+// #define THRESHOLD_R nr_cpu * 1.5
+//     return rec->sys.nr_R >= THRESHOLD_R;
+// }
+
+static bool is_high_D(struct record_t* rec) {
+#define THRESHOLD_D 8
+    return rec->sys.nr_D >= THRESHOLD_D;
+}
+
+void throttled_bind_detect(struct record_t* rec, FILE* dest) {
+    cpu_util_t* cpus = rec->sys.cpu;
+    unsigned long long* percpu_delay = rec->sys.percpu_sched_delay;
+    bool status[nr_cpu];
+    int i;
+    for (i = 1; i <= nr_cpu; i++) {
+        bool race = check_race(percpu_delay[i - 1]);
+        status[i - 1] = race;
+
+        bool overload = check_cpu_overload(cpus + i);
+        if (race && overload)
+            fprintf(dest, "CPU-%d is overload.\n", i - 1);
+        else if (race && !overload)
+            fprintf(dest, "CPU-%d maybe throttled. Please check cgroup.\n",
+                    i - 1);
+        else if (!race) {
+#ifdef LOG_DEBUG
+            fprintf(dest, "CPU-%d is normal.\n", i - 1);
+#endif
+        }
+    }
+
+    bool some_cores_race = false;  // some core is race?
+    bool all_cores_race = true;    // all core is race?
+
+    for (i = 0; i < nr_cpu; i++) {
+        some_cores_race = some_cores_race || status[i];
+        all_cores_race = all_cores_race && status[i];
+    }
+
+    if (all_cores_race) {
+        /* all cores race, there is no bind */
+        fprintf(dest, "System cpu resource is not enough.\n");
+    } else if (some_cores_race) {
+        fprintf(dest, "There maybe some tasks bind on cpu. Please check cpu:");
+        for (i = 0; i < nr_cpu; i++) {
+            if (status[i]) fprintf(dest, " [%d]", i);
+        }
+        fprintf(dest, "\n");
+    } else {
+        fprintf(dest, "System cpu is normal.\n ");
+    }
+}
+
+static void fork_detect(struct record_t* rec, FILE* dest) {
+#define THRESHOLD_FORK 4000
+    if (rec->sys.nr_fork >= THRESHOLD_FORK) {
+        fprintf(dest,
+                "There are many forks, mayebe influence load1. Please check "
+                "the task:comm=%s pid=%d ppid=%d\n",
+                rec->sys.most_fork_info.comm, rec->sys.most_fork_info.pid,
+                rec->sys.most_fork_info.ppid);
+    }
+}
+
+static void D_detect(struct record_t* rec, FILE* dest) {
+    /* IO or kernel resource？ */
+    if (is_high_D(rec)) {
+        fprintf(dest, "There are many D tasks, please analyse the D-stack.\n");
+    }
+}
+
+static void decision(struct record_t* rec, int rec_num, FILE* dest, int d_num,
+                     int cgroup_num) {
+    fprintf(dest, "[EXCEPTION&ADVICE]\n");
+    /* check throttled or bind */
+    throttled_bind_detect(rec, dest);
+
+    /* check fork */
+    fork_detect(rec, dest);
+
+    /* check D */
+    D_detect(rec, dest);
+}
+
 static void output(struct record_t* rec, int rec_num, FILE* dest, int d_num,
                    int cgroup_num) {
     output_ts(dest);
@@ -875,6 +1038,7 @@ static void output(struct record_t* rec, int rec_num, FILE* dest, int d_num,
     output_tasktop(rec, rec_num, dest);
     output_d_stack(rec, d_num, dest);
 
+    decision(rec, rec_num, dest, d_num, cgroup_num);
     fflush(dest);
 }
 
@@ -1023,6 +1187,7 @@ int main(int argc, char** argv) {
     struct tasktop_bpf* skel = 0;
     struct id_pair_t* pids = 0;
     struct task_cputime_t **prev_task = 0, **now_task = 0;
+    struct cgroup_cpu_stat_t** prev_cgroup = 0;
     struct sys_cputime_t **prev_sys = 0, **now_sys = 0;
     struct record_t* rec = 0;
     u_int64_t i;
@@ -1075,6 +1240,8 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Failed calloc memory\n");
         goto cleanup;
     }
+
+    prev_cgroup = calloc(env.cgroup_limit, sizeof(struct cgroup_cpu_stat_t*));
 
     prev_delay = calloc(nr_cpu, sizeof(int));
     pids = calloc(pidmax + 1, sizeof(struct id_pair_t));
@@ -1131,7 +1298,7 @@ int main(int argc, char** argv) {
         int cgroup_num = 0;
 
 #ifndef ONLY_THREAD
-        read_cgroup_throttle(rec->cgroups, &cgroup_num);
+        read_cgroup_throttle(rec->cgroups, &cgroup_num, prev_cgroup);
         read_sched_delay(&rec->sys);
         check_fork(fork_map_fd, &rec->sys);
         runnable_proc(&rec->sys);
