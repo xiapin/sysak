@@ -14,7 +14,7 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <bpf/libbpf.h>
-#include <bpf/bpf.h> /* bpf_obj_pin */
+#include <bpf/bpf.h> 
 #include "bpf/tasktop.skel.h"
 #include "procstate.h"
 #include "tasktop.h"
@@ -1076,7 +1076,10 @@ static void group_by_stack(struct record_t* rec, FILE* dest, int d_num) {
 
 static void load_analyse(struct record_t* rec, int rec_num, FILE* dest,
                          int d_num, int cgroup_num) {
+    fprintf(dest, "[EXCEPTION&ADVICE]\n");
+
     if (is_high_load1(rec)) {
+        fprintf(dest, "INFO: Load is abnormal.\n");
         if (is_high_R(rec)) {
             is_high_overall_cpuutil(rec, dest);
 
