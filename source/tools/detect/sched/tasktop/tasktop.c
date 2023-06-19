@@ -14,7 +14,7 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <bpf/libbpf.h>
-#include <bpf/bpf.h> 
+#include <bpf/bpf.h>
 #include "bpf/tasktop.skel.h"
 #include "procstate.h"
 #include "tasktop.h"
@@ -60,8 +60,7 @@ const char argp_program_doc[] =
     "\n"
 
     "USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] "
-    "[-f LOGFILE] [-l "
-    "LIMIT]\n"
+    "[-f LOGFILE] [-l LIMIT] [-H] [-e D-LIMIT]\n"
     "\n"
 
     "EXAMPLES:\n"
@@ -70,10 +69,13 @@ const char argp_program_doc[] =
     "    tasktop -p 1100    # only display task with pid 1100.\n"
     "    tasktop -d 5       # modify the sample interval.\n"
     "    tasktop -i 3       # output 3 times then exit.\n"
+    "    tasktop -S user    # top tasks sorted by user time.\n"
     "    tasktop -l 20      # limit the records number no more than 20.\n"
     "    tasktop -e 10      # limit the d-stack no more than 10, default is "
     "20.\n"
-    "    tasktop -f a.log   # log to a.log \n";
+    "    tasktop -H         # output time string, not timestamp."
+    "    tasktop -f a.log   # log to a.log.\n";
+    "    tasktop -e 10      # most record 10 d-task stack.\n";
 
 static const struct argp_option opts[] = {
     {"human", 'H', 0, 0, "Output human-readable time info."},
@@ -87,8 +89,8 @@ static const struct argp_option opts[] = {
      "Sort the result, available options are user, sys and cpu, default is "
      "cpu"},
     {"r-limit", 'l', "LIMIT", 0, "Specify the top R-LIMIT tasks to display"},
-    {"d-limit", 'e', "STACK-LIMIT", 0,
-     "Specify the STACK-LIMIT D tasks's stack to display"},
+    {"d-limit", 'e', "D-LIMIT", 0,
+     "Specify the D-LIMIT D tasks's stack to display"},
 
     {NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
     {},
@@ -226,7 +228,7 @@ static int read_btime() {
         buf[5] = '\0';
         if (strcmp(buf, "btime") != 0) {
             continue;
-        };
+        }
         char* str = buf + 6;
         err = parse_long(str, &val);
         if (err) continue;
@@ -448,7 +450,7 @@ static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num,
             continue;
         }
 
-        /* if idx == -1,means no history record */
+        /* if idx == -1, means no history record */
         int idx = check_cgroup(prev_cgroups, dir->d_name);
 
         /* find a slot, store the history cgroup info */
@@ -1310,13 +1312,13 @@ int main(int argc, char** argv) {
     }
 
     prev_cgroup = calloc(env.cgroup_limit, sizeof(struct cgroup_cpu_stat_t*));
-
     prev_delay = calloc(nr_cpu, sizeof(int));
     pids = calloc(pidmax + 1, sizeof(struct id_pair_t));
     prev_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
     now_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
     prev_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
     now_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
+
     for (i = 0; i <= nr_cpu; i++) {
         prev_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
         now_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
@@ -1359,7 +1361,6 @@ int main(int argc, char** argv) {
 
     bool first = true;
     while (env.nr_iter-- && !exiting) {
-        // printf("prev_sys=0x%x now_sys=0x%x\n", prev_sys, now_sys);
         u_int64_t nr_thread = 0;
         int rec_num = 0;
         int d_num = 0;
