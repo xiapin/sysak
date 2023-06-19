@@ -538,12 +538,21 @@ static int read_stat(struct sys_cputime_t** prev_sys,
          * because there is an error between process waked up and running, when
          * sched delay occur , the sum of cpu rates more than 100%. */
 
-        sys_rec->cpu[i].usr =
-            (double)(now_sys[i]->usr - prev_sys[i]->usr) * 100 / all_time;
-        sys_rec->cpu[i].sys =
-            (double)(now_sys[i]->sys - prev_sys[i]->sys) * 100 / all_time;
-        sys_rec->cpu[i].iowait =
-            (double)(now_sys[i]->iowait - prev_sys[i]->iowait) * 100 / all_time;
+#define CALC_SHARE(TIME_TYPE)                                            \
+    sys_rec->cpu[i].TIME_TYPE =                                          \
+        (double)(now_sys[i]->TIME_TYPE - prev_sys[i]->TIME_TYPE) * 100 / \
+        all_time;
+
+        CALC_SHARE(usr)
+        CALC_SHARE(nice)
+        CALC_SHARE(sys)
+        CALC_SHARE(idle)
+        CALC_SHARE(iowait)
+        CALC_SHARE(irq)
+        CALC_SHARE(softirq)
+        CALC_SHARE(steal)
+        CALC_SHARE(guest)
+        CALC_SHARE(guest_nice)
     }
 cleanup:
     if (fp) fclose(fp);
@@ -833,15 +842,20 @@ static void output_per_cpu(struct record_t* rec, FILE* dest) {
     int i;
     struct sys_record_t* sys = &rec->sys;
 
+    //  18.8 us, 14.1 sy,  0.0 ni, 65.6 id,  0.0 wa,  0.0 hi,  1.6 si,  0.0 st
     fprintf(dest, "[PER-CPU]\n");
-    fprintf(dest, "%7s %6s %6s %6s %10s\n", "cpu", "usr", "sys", "iowait",
-            "delay(ns)");
+    fprintf(dest, "%7s %6s %6s %6s %6s %6s %6s %6s %6s %10s\n", "cpu", "usr",
+            "sys", "nice", "idle", "iowait", "h-irq", "s-irq", "steal",
+            "delay(ms)");
     for (i = 1; i <= nr_cpu; i++) {
         char cpu_name[10];
         snprintf(cpu_name, 10, "cpu-%d", i - 1);
-        fprintf(dest, "%7s %6.1f %6.1f %6.1f %10llu\n", cpu_name,
-                sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].iowait,
-                sys->percpu_sched_delay[i - 1]);
+        fprintf(dest,
+                "%7s %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %10llu\n",
+                cpu_name, sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].nice,
+                sys->cpu[i].idle, sys->cpu[i].iowait, sys->cpu[i].irq,
+                sys->cpu[i].softirq, sys->cpu[i].steal,
+                sys->percpu_sched_delay[i - 1] / (1000 * 1000));
     }
 }
 
@@ -935,7 +949,9 @@ static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
 
 static bool check_cpu_overload(cpu_util_t* cpu) {
 #define THRESHOLD_CPU_OVERLOAD 85
-    double load = cpu->usr + cpu->sys + cpu->iowait;
+    double load = cpu->usr + cpu->sys + cpu->iowait + cpu->nice + cpu->irq +
+                  cpu->softirq + cpu->guest;
+
     return load >= THRESHOLD_CPU_OVERLOAD;
 }
 
@@ -954,6 +970,12 @@ static bool is_high_D(struct record_t* rec) {
     return rec->sys.nr_D >= THRESHOLD_D;
 }
 
+static bool is_distribution_normal(cpu_util_t* cpu) {
+#define THRESHOLD_CPU_USELESS 30
+    double sys_time = cpu->sys + cpu->iowait + cpu->irq + cpu->softirq;
+    return sys_time <= THRESHOLD_CPU_USELESS;
+}
+
 void throttled_bind_detect(struct record_t* rec, FILE* dest) {
     cpu_util_t* cpus = rec->sys.cpu;
     unsigned long long* percpu_delay = rec->sys.percpu_sched_delay;
@@ -964,15 +986,27 @@ void throttled_bind_detect(struct record_t* rec, FILE* dest) {
         status[i - 1] = race;
 
         bool overload = check_cpu_overload(cpus + i);
-        if (race && overload)
-            fprintf(dest, "CPU-%d is overload.\n", i - 1);
-        else if (race && !overload)
+        if (race && overload) {
+            fprintf(dest, "CPU-%d is overloaded. Maybe tasks is too much.\n",
+                    i - 1);
+        } else if (race && !overload)
             fprintf(dest, "CPU-%d maybe throttled. Please check cgroup.\n",
                     i - 1);
-        else if (!race) {
-#ifdef LOG_DEBUG
-            fprintf(dest, "CPU-%d is normal.\n", i - 1);
-#endif
+        else if (!race && overload) {
+            if (!is_distribution_normal(cpus + i)) {
+                fprintf(dest,
+                        "CPU-%d is overloaded. \nthe proportion of sys, "
+                        "iowait, "
+                        "hrad-irq and softirq is too high. \nPlease use other "
+                        "tools to analyse.\n",
+                        i - 1);
+            } else {
+                fprintf(dest, "CPU-%d is overloaded but normal.\n", i - 1);
+            }
+        } else if (!race && !overload) {
+            // #ifdef LOG_DEBUG
+            fprintf(dest, "CPU-%d is not overload.\n", i - 1);
+            // #endif
         }
     }
 
@@ -1092,7 +1126,8 @@ static int make_records(struct id_pair_t* pids, int nr_thread,
             }
         }
 
-        /* many pair with the same pid, in process mode skip the trival read */
+        /* many pair with the same pid, in process mode skip the trival read
+         */
         if (!env.thread_mode && id->pid != id->tid) continue;
 
         if (env.thread_mode) {
