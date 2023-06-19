@@ -31,14 +31,15 @@ void *run_forever(void *arg) {
 void *run_sleep(void *arg) { sleep(10000); }
 
 void run_multithread() {
-    pthread_t pid[128];
+    #define NUM 128
+    pthread_t pid[NUM];
     int i;
-    for (i = 0; i < 128; i++) {
+    for (i = 0; i < NUM; i++) {
         pthread_create(&pid[i], 0, run_forever, 0);
         // printf("fork.\n");
     }
 
-    for (i = 0; i < 128; i++) {
+    for (i = 0; i < NUM; i++) {
         pthread_join(pid[i], 0);
     }
 }
