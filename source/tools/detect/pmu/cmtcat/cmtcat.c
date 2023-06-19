@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <limits.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -23,7 +24,7 @@ long nr_cpu;
 __u64 l3_factor;
 #define FAIL	(-1)
 
-void *test(void *cookie)
+void *threadFunc(void *cookie)
 {
 	char array[1024*1024];
 	__u64 old, new;
@@ -31,10 +32,10 @@ void *test(void *cookie)
 	//printf("%d\n", rmid);
 	set_msr_assoc(msr, msr->rmid);
 	sleep(1);
-	old = read_mb_local(msr)*l3_factor;
+	old = extract_val(read_mb_local(msr))*l3_factor;
 	memset(array, 'a', sizeof(array));
-	new = read_mb_local(msr)*l3_factor;
-	printf("rmid%u, old=%llu, new=%llu, delta=%llu\n",
+	new = extract_val(read_mb_local(msr))*l3_factor;
+	printf("rmid%-4u, old=%-12llu, new=%-12llu, delta=%-12llu\n",
 		msr->rmid, old, new, new-old);
 }
 
@@ -96,7 +97,7 @@ int main()
 	l3_factor = cpuid_L3_factor();
 	for (i = 0; i < nr_cpu; i++)
 		msrs[i].rmid = maxRMID-i;
-	percpu_threads(test, msrs);
+	percpu_threads(threadFunc, msrs);
 over:
 	deinit_msr(msrs, nr_fd);
 }
