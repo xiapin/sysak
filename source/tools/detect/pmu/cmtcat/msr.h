@@ -95,6 +95,11 @@ __u64 get_msr_count(msr_t* m, __u64 event)
 	return val;
 }
 
+__u64 read_l3_cache(msr_t *m)
+{
+	return get_msr_count(m, 1);
+}
+
 __u64 read_mb_total(msr_t *m)
 {
 	return get_msr_count(m, 2);
