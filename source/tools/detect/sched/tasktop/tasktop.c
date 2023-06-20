@@ -74,7 +74,7 @@ const char argp_program_doc[] =
     "    tasktop -e 10      # limit the d-stack no more than 10, default is "
     "20.\n"
     "    tasktop -H         # output time string, not timestamp."
-    "    tasktop -f a.log   # log to a.log.\n";
+    "    tasktop -f a.log   # log to a.log.\n"
     "    tasktop -e 10      # most record 10 d-task stack.\n";
 
 static const struct argp_option opts[] = {
@@ -1057,7 +1057,8 @@ static void group_by_stack(struct record_t* rec, FILE* dest, int d_num) {
         }
 
         if (!match) {
-            stack[empty_slot++] = s;
+            stack[empty_slot] = s;
+            counter[empty_slot++] = 1;
         }
     }
 
