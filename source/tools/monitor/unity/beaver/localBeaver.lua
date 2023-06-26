@@ -23,12 +23,17 @@ end
 
 function CLocalBeaver:_init_(frame, fYaml)
     local port, ip, backlog, unix_socket = setupServer(fYaml)
+    self:_installFFI()
     if not unix_socket then
         self._bfd = self:_install_fd(port, ip, backlog)
     else
         self._bfd = self:_install_fd_unisock(backlog, unix_socket)
     end
-    self._efd = self:_installFFI()
+    --self._efd = self:_installFFI()
+
+    local efd =  self._cffi.init(self._bfd)
+    assert(efd > 0)
+    self._efd = efd
 
     self._cos = {}
     self._last = os.time()
@@ -85,18 +90,17 @@ function CLocalBeaver:_installFFI()
     self._ffi = ffi.ffi
     self._cffi = ffi.cffi
 
-    local efd = self._cffi.init(self._bfd)
-    assert(efd > 0)
-    return efd
 end
 
-local function localBind(fd, tPort)
+function CLocalBeaver:localBind(fd, tPort)
     local try = 0
     local res, err, errno
 
     -- can reuse for time wait socket.
-    res, err, errno = socket.setsockopt(fd, socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
-    if not res then
+    --res, err, errno = socket.setsockopt(fd, socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+    print(self)
+    res = self._cffi.setsockopt_AP(fd)
+    if res<0 then
         system:posixError("set sock opt failed.");
     end
 
