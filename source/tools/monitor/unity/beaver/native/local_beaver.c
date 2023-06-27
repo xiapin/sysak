@@ -11,6 +11,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+int setsockopt_AP(int fd){
+    int opt =1;
+    int r = setsockopt(fd, SOL_SOCKET,SO_REUSEPORT,(char*)&opt,sizeof(int));
+//    SO_REUSEPORT
+    if(r<0){
+        perror("set sock opt");
+    }
+    return r;
+}
+
 static int socket_non_blocking(int sfd)
 {
     int flags, res;
