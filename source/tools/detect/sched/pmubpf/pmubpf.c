@@ -402,7 +402,7 @@ int main(int argc, char **argv)
 	args.threshold = env.threshold;
 
 	map_fd[0] = bpf_map__fd(obj->maps.event);
-	map_fd[1] = bpf_map__fd(obj->maps.pid_counter);
+	map_fd[1] = bpf_map__fd(obj->maps.task_counter);
 	if (!env.summary) {
 		if (env.previous)
 			fprintf(filep, "%-21s %-6s %-16s %-8s %-10s %-16s %-6s\n",

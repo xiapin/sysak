@@ -2,6 +2,8 @@
 #include <bpf/bpf_helpers.h>
 #include "sched_jit.h"
 #include "../pmubpf.h"
+#define MAX_CON		512
+#define MAX_CPUS	256
 
 #define TASK_RUNNING	0
 #define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
@@ -18,21 +20,21 @@ struct {
 	__uint(max_entries, 128);
 	__type(key, u32);
 	__type(value, u64);
-} pid_start SEC(".maps");
+} task_schedin SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__uint(max_entries, 128);
 	__type(key, u32);
 	__type(value, u64);
-} pid_counter SEC(".maps");
+} task_counter SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 512);
+	__uint(max_entries, MAX_CON*MAX_CPUS);
 	__type(key, struct cg_key);
 	__type(value, u64);
-} cg_start SEC(".maps");
+} cg_schedin SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -73,17 +75,31 @@ struct sched_switch_tp_args {
 	char __data[0];
 };
 
-SEC("tp/sched/sched_switch")
-int handle_switch(struct sched_switch_tp_args *ctx)
+SEC("raw_tracepoint/sched_switch")
+int sysak_pmubpf__sched_switch(struct bpf_raw_tracepoint_args *ctx)
 {
-	struct args *argp;
-	u32 pid, prev_pid, next_pid;
-	u64 *prevp, *countp, this, delta;
-	s64 error;
-	int cpu;
+	bool preempt = (bool)(ctx->args[0]);
+	struct task_struct *prev, *next;
 
-	{
-		int cpuid;
+	prev = (struct task_struct *)(ctx->args[1]);
+	next = (struct task_struct *)(ctx->args[2]);
+
+	{	/* cgroup switchin */
+		u64 *valp, *last, val;
+		struct cg_key key;
+
+		__builtin_memset(&key, 0, sizeof(struct cg_key));
+		key.cpu = bpf_get_smp_processor_id();
+		key.cgid = bpf_get_current_cgroup_id();
+		last = bpf_map_lookup_elem(&cg_schedin, &key);
+		if (!last || (*last == 0)) {
+			val = bpf_perf_event_read(&event, key.cpu);
+			bpf_map_update_elem(&cg_schedin, &key, &val, 0);
+		}
+	}
+
+	{	/* cgroup switchout */
+		s64 delta;
 		u64 *valp, *last, val;
 		struct cg_key key;
 
@@ -91,7 +107,7 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 		key.cpu = bpf_get_smp_processor_id();
 		key.cgid = bpf_get_current_cgroup_id();	/* cgroup that will switch-out */
 
-		last = bpf_map_lookup_elem(&cg_start, &key);
+		last = bpf_map_lookup_elem(&cg_schedin, &key);
 		if (last && (*last != 0)) {
 			val = bpf_perf_event_read(&event, key.cpu);
 			delta = val - *last;
@@ -102,21 +118,32 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 				bpf_map_update_elem(&cg_counter, &key, &delta, 0);
 		}
 	}
+}
+
+SEC("tp/sched/sched_switch")
+int handle_switch(struct sched_switch_tp_args *ctx)
+{
+	struct args *argp;
+	u32 pid, prev_pid, next_pid;
+	u64 *prevp, *countp, this, delta;
+	s64 error;
+	int cpu;
 
 	prev_pid = ctx->prev_pid;
 	next_pid = ctx->next_pid;
+
 	pid = GETARG_FROM_ARRYMAP(argmap, argp, u64, targ_pid);
 	cpu = bpf_get_smp_processor_id();
 	if (prev_pid == pid) {	/* switch out */
-		prevp = bpf_map_lookup_elem(&pid_start, &cpu);
+		prevp = bpf_map_lookup_elem(&task_schedin, &cpu);
 		if (prevp && (*prevp != 0)) {
 			this = bpf_perf_event_read(&event, cpu);
-			countp = bpf_map_lookup_elem(&pid_counter, &cpu);
+			countp = bpf_map_lookup_elem(&task_counter, &cpu);
 			delta = this - *prevp;
 			if (countp) {
 				*countp = *countp + delta;
 			} else {
-				bpf_map_update_elem(&pid_counter, &cpu, &delta, 0);
+				bpf_map_update_elem(&task_counter, &cpu, &delta, 0);
 			}
 		} else {
 			;/* do what ? */
@@ -125,7 +152,7 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 
 	if (next_pid == pid) {	/* switch in */
 		/* record the current counter of this cpu */
-		prevp = bpf_map_lookup_elem(&pid_start, &cpu);
+		prevp = bpf_map_lookup_elem(&task_schedin, &cpu);
 		if (prevp) {
 			this = bpf_perf_event_read(&event, cpu);
 			error = (s64)this;
@@ -134,7 +161,7 @@ int handle_switch(struct sched_switch_tp_args *ctx)
 			*prevp = this;
 		} else {
 			this = bpf_perf_event_read(&event, cpu);
-			bpf_map_update_elem(&pid_start, &cpu, &this, 0);
+			bpf_map_update_elem(&task_schedin, &cpu, &this, 0);
 		}
 	}
 
