@@ -1,3 +1,10 @@
+enum {
+	L3CHE,
+	MBTOL,
+	MBLOC,
+	MAX_EVENT,
+};
+
 int get_cpus(long *nr_cpus)
 {
 	errno = 0;

@@ -103,7 +103,9 @@ __u64 read_l3_cache(msr_t *m)
 {
 	__u64 tmp;
 	tmp = get_msr_count(m, 1);
-	printf("l3oc=%llu\n", tmp);
+#ifdef DEBUG
+	printf("DEBUG:l3oc=%llu\n", tmp);
+#endif
 	return tmp;
 }
 
@@ -111,7 +113,9 @@ __u64 read_mb_total(msr_t *m)
 {
 	__u64 tmp;
 	tmp = get_msr_count(m, 2);
-	printf("mbTotal=%llu\n", tmp);
+#ifdef DEBUG
+	printf("DEBUG:mbTotal=%llu\n", tmp);
+#endif
 	return tmp;
 }
 
@@ -119,6 +123,8 @@ __u64 read_mb_local(msr_t *m)
 {
 	__u64 tmp;
 	tmp = get_msr_count(m, 3);
-	printf("mbLocal=%llu\n", tmp);
+#ifdef DEBUG
+	printf("DEBUG:mbLocal=%llu\n", tmp);
+#endif
 	return tmp;
 }

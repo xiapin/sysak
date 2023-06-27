@@ -1,4 +1,3 @@
-#define DEBUG	1
 typedef union cpuid_info {
 	int array[4];
 	struct {
@@ -88,7 +87,9 @@ void cpuid_Factor_RMID_eventID(cpuid_info *cpuid_i)
  	 *  EVENTID:CPUID.(EAX=0FH, ECX=1H).EDX
  	**/
 	cpuid(0xF, 0x1, cpuid_i);
+#ifdef  DEBUG
 	printf("eventid=%lld\n", cpuid_i->info.eventid);
+#endif
 }
 
 bool check_cpuid_support(void)

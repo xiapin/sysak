@@ -1,10 +1,10 @@
 #include <stdbool.h>
+/*#define DEBUG	1*/
 #include "mbm.h"
 #include "cpuid.h"
 #include "msr.h"
 #include "public.h"
 
-#define DEBUG	1
 msr_t *msrs;
 long nr_cpus;
 cpuid_info cpuid_i;
@@ -12,8 +12,7 @@ __u64 summary[NR_EVENTS];
 static int init_fail;
 char *events_str[] = {"L3Occupancy", "MbmTotal", "MbmLocal"};
 
-
-bool is_resctrl_mounted(void)
+static bool is_resctrl_mounted(void)
 {
 	struct stat st;
 
@@ -23,7 +22,7 @@ bool is_resctrl_mounted(void)
 	return true;
 }
 
-void discovery_resctrl_mon(void)
+static void discovery_resctrl_mon(void)
 {
 }
 
@@ -41,12 +40,13 @@ int init(void * arg)
 
 	resctrl = is_resctrl_mounted();
 	/*if (resctrl)*/
-	if (0)
-		discovery_resctrl();
-
+	if (0) {
+		discovery_resctrl_mon();
+		goto end;
+	}
 	if (check_cpuid_support()) {
 		cpuid_Factor_RMID_eventID(&cpuid_i);
-		ret = init_msr(&msrs, 8);
+		ret = init_msr(&msrs, cpuid_i.info.rmid-1);
 		if (ret < 0) {
 			printf("init_msr failed\n");
 			return 0;
@@ -55,7 +55,7 @@ int init(void * arg)
 		printf(" not supported\n");
 		return 1;
 	}
-
+end:
 	printf("pmu_events plugin install.\n");
 	init_fail = 0;
 	return 0;
@@ -70,12 +70,12 @@ int collect(msr_t *msr, cpuid_info *cpu, __u64 *sum)
 		else
 			break;
 	}
-		if (cpu->info.eventid & 1<<0)
-			sum[0] += extract_val(read_l3_cache(&msr[i]))*cpu->info.factor;
-		if (cpu->info.eventid & 1<<1)
-			sum[1] += extract_val(read_mb_total(&msr[i]))*cpu->info.factor;
-		if (cpu->info.eventid & 1<<2)
-			sum[2] += extract_val(read_mb_local(&msr[i]))*cpu->info.factor;
+		if (cpu->info.eventid & 1<<L3CHE)
+			sum[L3CHE] += extract_val(read_l3_cache(&msr[i]))*cpu->info.factor;
+		if (cpu->info.eventid & 1<<MBTOL)
+			sum[MBTOL] += extract_val(read_mb_total(&msr[i]))*cpu->info.factor;
+		if (cpu->info.eventid & 1<<MBLOC)
+			sum[MBLOC] += extract_val(read_mb_local(&msr[i]))*cpu->info.factor;
 }
 
 int fill_line(struct unity_line *line, __u64 *summ, char *mode, char *index)
@@ -90,10 +90,8 @@ int fill_line(struct unity_line *line, __u64 *summ, char *mode, char *index)
 int call(int t, struct unity_lines* lines)
 {
 	int i;
-	__u64 sum[3];
-	char index[16] = {0};
+	__u64 sum[MAX_EVENT];
 	struct unity_line* line;
-	struct pcpu_hw_info *pcp_hw;
 
 	if (init_fail) {
 		return init_fail;
@@ -124,11 +122,11 @@ int call_debug(__u64 *sum)
 	collect(msrs, &cpuid_i, sum);
 }
 
-char datas[1024*1024];
+char datas[1024*1024*1024];
 int main(int argc, char *argv[])
 {
-	int ret, i = 4;
-	__u64 sum[3], tmp[3];
+	int ret, i = 8;
+	__u64 sum[MAX_EVENT], tmp[MAX_EVENT];
 
 	ret = init(NULL);
 	if (ret)
@@ -141,12 +139,12 @@ int main(int argc, char *argv[])
 	while(i > 0) {
 		sleep(1);
 		memset(sum, 0, sizeof(sum));
-		//memset(datas, 'b', sizeof(datas));
+		memset(datas, 'b', sizeof(datas));
 		call_debug(sum);
-		printf("l3Oc=%llu, totalMB=%llu, localMB=%llu\n",
-				sum[0]-tmp[0],
-				sum[1]-tmp[1],
-				sum[2]-tmp[2]);
+		printf("l3Oc=%lluKB, totalMB=%lluKB, localMB=%lluKB\n",
+			sum[0]<tmp[0]?0:(sum[0]-tmp[0])/1024,
+			sum[1]<tmp[1]?0:(sum[1]-tmp[1])/1024,
+			sum[2]<tmp[2]?0:(sum[2]-tmp[2])/1024);
 		tmp[0] = sum[0];
 		tmp[1] = sum[1];
 		tmp[2] = sum[2];
