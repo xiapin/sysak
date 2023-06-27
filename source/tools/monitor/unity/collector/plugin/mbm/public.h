@@ -1,3 +1,9 @@
+enum {
+	L3CHE,
+	MBTOL,
+	MBLOC,
+	MAX_EVENT,
+};
 
 int get_cpus(long *nr_cpus)
 {
@@ -22,8 +28,6 @@ static __u64 extract_bits(__u64 myin, __u32 beg, __u32 end)
 {
 	__u64 myll = 0;
 	__u32 beg1, end1;
-
-	// Let the user reverse the order of beg & end.
 	if (beg <= end) {
 		beg1 = beg;
 		end1 = end;
@@ -33,7 +37,6 @@ static __u64 extract_bits(__u64 myin, __u32 beg, __u32 end)
 	}
 	myll = myin >> beg1;
 	myll = myll & build_bit(beg1, end1);
-	//printf("input=0x%x output=0x%x\n", myin, myll);
 	return myll;
 }
 

@@ -3,12 +3,14 @@
 #define IA32_QM_CTR (0xc8e)
 #define BUF_SIZE	1024
 
-extern long nr_cpu;
+extern long nr_cpus;
 typedef struct msr {
 	int fd;
 	__u32 rmid;
 	long cpuid;
 } msr_t;
+
+__u64 set_msr_assoc(msr_t* m, int rmid);
 
 int open_msr(int cpu_id)
 {
@@ -24,26 +26,29 @@ int open_msr(int cpu_id)
 
 /*
  *return value: <0 for fail, or the number of msr
- * */
-int init_msr(msr_t **msrs)
+ **/
+int init_msr(msr_t **msrs, int init_rmid)
 {
 	int i, err, suce;
 	msr_t *p;
 
-	p = calloc(nr_cpu, sizeof(msr_t));
+	p = calloc(nr_cpus, sizeof(msr_t));
 	if (!p)
 		return -errno;
 
 	suce = -1;
-	for (i = 0; i <  nr_cpu; i++) {
+	for (i = 0; i <  nr_cpus; i++) {
 		p[i].cpuid = i;
 		p[i].fd = open_msr(i);
-		if (p[i].fd > 0)
+		if (p[i].fd > 0) {
+			p[i].rmid = init_rmid;
+			set_msr_assoc(&p[i], p[i].rmid);
 			suce++;
+		}
 	}
 	*msrs = p;
 	if (suce >= 0)
-		return nr_cpu;
+		return nr_cpus;
 	else
 		return -1;
 }
@@ -79,8 +84,7 @@ __u64 set_msr_assoc(msr_t* m, int rmid)
  *  1 : L3 Oc
  *  2 : L3 Total External Bandwidth
  *  3 : L3 Local External Bandwidth
- *
- */
+ **/
 __u64 get_msr_count(msr_t* m, __u64 event)
 {
 	__u64 msr_qm_evtsel = 0, value = 0;
@@ -97,15 +101,30 @@ __u64 get_msr_count(msr_t* m, __u64 event)
 
 __u64 read_l3_cache(msr_t *m)
 {
-	return get_msr_count(m, 1);
+	__u64 tmp;
+	tmp = get_msr_count(m, 1);
+#ifdef DEBUG
+	printf("DEBUG:l3oc=%llu\n", tmp);
+#endif
+	return tmp;
 }
 
 __u64 read_mb_total(msr_t *m)
 {
-	return get_msr_count(m, 2);
+	__u64 tmp;
+	tmp = get_msr_count(m, 2);
+#ifdef DEBUG
+	printf("DEBUG:mbTotal=%llu\n", tmp);
+#endif
+	return tmp;
 }
 
 __u64 read_mb_local(msr_t *m)
 {
-	return get_msr_count(m, 3);
+	__u64 tmp;
+	tmp = get_msr_count(m, 3);
+#ifdef DEBUG
+	printf("DEBUG:mbLocal=%llu\n", tmp);
+#endif
+	return tmp;
 }
