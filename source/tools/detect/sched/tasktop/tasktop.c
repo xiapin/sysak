@@ -69,7 +69,7 @@ const char argp_program_doc[] =
     "    tasktop -p 1100    # only display task with pid 1100.\n"
     "    tasktop -d 5       # modify the sample interval.\n"
     "    tasktop -i 3       # output 3 times then exit.\n"
-    "    tasktop -S user    # top tasks sorted by user time.\n"
+    "    tasktop -s user    # top tasks sorted by user time.\n"
     "    tasktop -l 20      # limit the records number no more than 20.\n"
     "    tasktop -e 10      # limit the d-stack no more than 10, default is "
     "20.\n"
@@ -1040,6 +1040,10 @@ static void group_by_stack(struct record_t* rec, FILE* dest, int d_num) {
     D_task_record_t* dtask = rec->d_tasks;
     int* counter = calloc(d_num, sizeof(int));
     D_task_record_t** stack = calloc(d_num, sizeof(D_task_record_t*));
+    if (!counter || !stack) {
+        fprintf(stderr, "Failed calloc counter and stack.\n");
+        exit(1);
+    }
 
     int empty_slot = 0;
     int i, j;
@@ -1062,8 +1066,8 @@ static void group_by_stack(struct record_t* rec, FILE* dest, int d_num) {
         }
     }
 
-    int max_idx = 0;
-    int max_times = 0;
+    int max_idx = -1;
+    int max_times = -1;
     for (i = 0; i < empty_slot; i++) {
         if (counter[i] > max_times) {
             max_times = counter[i];
@@ -1071,8 +1075,12 @@ static void group_by_stack(struct record_t* rec, FILE* dest, int d_num) {
         }
     }
 
-    fprintf(dest, "WARN: The most stack, times=%d\n", max_times);
-    fprintf(dest, "%s", stack[max_idx]->stack);
+    /* maybe there is no d-stack */
+    if (max_idx != -1) {
+        fprintf(dest, "WARN: The most stack, times=%d\n", max_times);
+        fprintf(dest, "%s", stack[max_idx]->stack);
+    }
+
     free(stack);
     free(counter);
 }
@@ -1252,6 +1260,7 @@ static int check_fork(int fork_map_fd, struct sys_record_t* sys_rec) {
 
 static void sigint_handler(int signo) { exiting = 1; }
 
+// #define SEG_TRAP
 int main(int argc, char** argv) {
     int err = 0, fork_map_fd = -1;
     FILE* stat_log = 0;
