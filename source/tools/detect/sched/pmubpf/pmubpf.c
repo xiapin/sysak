@@ -30,7 +30,7 @@
 unsigned int nr_cpus;
 int pmufds[512];
 FILE *filep = NULL;
-int map_fd[2];
+int map_fd[3];
 static volatile sig_atomic_t exiting = 0;
 char log_dir[] = "/var/log/sysak/pmubpf/";
 char defaultfile[] = "/var/log/sysak/pmubpf/pmubpf.log";
@@ -250,8 +250,7 @@ on_exit:
 static void test_perf_event_array(struct perf_event_attr *attr,
 				  const char *name)
 {
-	int i, status;
-	pid_t pid[nr_cpus];
+	int i;
 	int err = 0;
 
 	printf("Test reading %s counters\n", name);
@@ -350,9 +349,44 @@ static void test_bpf_perf_event(void)
 #endif
 }
 
+int output_task_counter(void)
+{
+	int cpu, err = 0;
+	__u64 sum = 0, value = 0;
+
+	for (cpu = 0; cpu < nr_cpus; cpu++) {
+		if (bpf_map_lookup_elem(map_fd[1], &cpu, &value)) {
+			fprintf(stderr, "Value missing for CPU %d\n", cpu);
+			err = 1;
+			return err;
+		} else {
+			/*fprintf(stderr, "CPU %d: %llu\n", cpu, value);*/
+			sum = sum+value;
+		}
+	}
+	fprintf(stderr, "count = %llu\n", sum);
+	return 0;
+}
+
+void output_cgroup_counter(void)
+{
+	__u64 val;
+	int err = 0;
+	struct cg_key lookup_key = {}, next_key;
+
+	while (!bpf_map_get_next_key(map_fd[2], &lookup_key, &next_key)) {
+		err = bpf_map_lookup_elem(map_fd[2], &next_key, &val);
+		if (err) {
+			printf("lookup elem fail\n");
+		}
+		lookup_key = next_key;
+		printf("cgid[%llu] cpu[%d] counter=%llu\n",
+			lookup_key.cgid, lookup_key.cpu, val);
+	}
+}
+
 int main(int argc, char **argv)
 {
-	__u64 value;
 	int i, err, arg_fd, cpu;
 	static const struct argp argp = {
 		.options = opts,
@@ -403,6 +437,7 @@ int main(int argc, char **argv)
 
 	map_fd[0] = bpf_map__fd(obj->maps.event);
 	map_fd[1] = bpf_map__fd(obj->maps.task_counter);
+	map_fd[2] = bpf_map__fd(obj->maps.cg_counter);
 	if (!env.summary) {
 		if (env.previous)
 			fprintf(filep, "%-21s %-6s %-16s %-8s %-10s %-16s %-6s\n",
@@ -438,20 +473,8 @@ int main(int argc, char **argv)
 
 	while (!exiting) {
 		sleep(1);
-		{
-		__u64 sum = 0;
-		for (cpu = 0; cpu < nr_cpus; cpu++) {
-			if (bpf_map_lookup_elem(map_fd[1], &cpu, &value)) {
-				fprintf(stderr, "Value missing for CPU %d\n", cpu);
-				err = 1;
-				goto cleanup;
-			} else {
-				/*fprintf(stderr, "CPU %d: %llu\n", cpu, value);*/
-				sum = sum+value;
-			}
-		}
-		fprintf(stderr, "count = %llu\n", sum);
-		}
+		output_task_counter();
+		output_cgroup_counter();
 	}
 
 

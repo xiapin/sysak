@@ -118,6 +118,7 @@ int sysak_pmubpf__sched_switch(struct bpf_raw_tracepoint_args *ctx)
 				bpf_map_update_elem(&cg_counter, &key, &delta, 0);
 		}
 	}
+	return 0;
 }
 
 SEC("tp/sched/sched_switch")
