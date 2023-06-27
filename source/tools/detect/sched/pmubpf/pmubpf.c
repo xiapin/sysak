@@ -257,19 +257,16 @@ static void test_perf_event_array(struct perf_event_attr *attr,
 	printf("Test reading %s counters\n", name);
 
 	for (i = 0; i < nr_cpus; i++) {
-		pid[i] = fork();
-		assert(pid[i] >= 0);
-		if (pid[i] == 0) {
-			check_on_cpu(i, attr);
-			exit(1);
-		}
+		err = check_on_cpu(i, attr);
+		if (err)
+			printf(" check_on_cpu %d failed\n", i);
 	}
-
+#if 0
 	for (i = 0; i < nr_cpus; i++) {
 		assert(waitpid(pid[i], &status, 0) == pid[i]);
 		err |= status;
 	}
-
+#endif
 	if (err)
 		printf("Test: %s FAILED\n", name);
 }
@@ -424,7 +421,7 @@ int main(int argc, char **argv)
 
 	if (env.span)
 		alarm(env.span);
-	nr_cpus = sysconf(_SC_NPROCESSORS_CONF);
+	nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 	bpf_map_update_elem(arg_fd, &i, &args, 0);
 	if (err) {
 		fprintf(stderr, "Failed to update flag map\n");
@@ -441,9 +438,7 @@ int main(int argc, char **argv)
 
 	while (!exiting) {
 		sleep(1);
-	}
-
-	{
+		{
 		__u64 sum = 0;
 		for (cpu = 0; cpu < nr_cpus; cpu++) {
 			if (bpf_map_lookup_elem(map_fd[1], &cpu, &value)) {
@@ -456,7 +451,9 @@ int main(int argc, char **argv)
 			}
 		}
 		fprintf(stderr, "count = %llu\n", sum);
+		}
 	}
+
 
 cleanup:
 	pmubpf_bpf__destroy(obj);
