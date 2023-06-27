@@ -1,5 +1,6 @@
 #include <vmlinux.h>
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_core_read.h>
 #include "sched_jit.h"
 #include "../pmubpf.h"
 #define MAX_CON		512
@@ -75,48 +76,100 @@ struct sched_switch_tp_args {
 	char __data[0];
 };
 
+union kernfs_node_id {
+	struct {
+		u32 ino;
+		u32 generation;
+	};
+	u64 id;
+};
+
+struct kernfs_node___419 {
+	atomic_t count;
+	atomic_t active;
+	struct kernfs_node *parent;
+	const char *name;
+	struct rb_node rb;
+	const void *ns;
+	unsigned int hash;
+	union {
+		struct kernfs_elem_dir dir;
+		struct kernfs_elem_symlink symlink;
+		struct kernfs_elem_attr attr;
+	};
+	void *priv;
+	union kernfs_node_id id;
+	short unsigned int flags;
+	umode_t mode;
+	struct kernfs_iattrs *iattr;
+};
+
+#define PERF_SUBSYS_ID	1
+static u64 get_cgroup_id(struct task_struct *t)
+{
+	struct cgroup *cgrp;
+	struct kernfs_node___419 *node;
+	union kernfs_node_id id;
+	u64 knid;
+
+	cgrp = BPF_CORE_READ(t, cgroups, subsys[PERF_SUBSYS_ID], cgroup);
+	if (bpf_core_read(&node, sizeof(struct kernfs_node___419 *), &cgrp->kn))
+		return 0;
+	if (bpf_core_read(&id, sizeof(union kernfs_node_id), &node->id))
+		return 0;
+	if (bpf_core_read(&knid, sizeof(u64), &id.id))
+		return 0;
+
+	return knid;
+}
+#if 0
+static inline __u64 get_cgroup_id(struct task_struct *t)
+{
+	struct cgroup *cgrp;
+
+	cgrp = BPF_CORE_READ(t, cgroups, subsys[PERF_SUBSYS_ID], cgroup);
+	//cgrp = BPF_CORE_READ(t, cgroups, subsys, cgroup);
+	return BPF_CORE_READ(cgrp, kn, id);
+	//return PERF_SUBSYS_ID;
+}
+#endif
+
 SEC("raw_tracepoint/sched_switch")
 int sysak_pmubpf__sched_switch(struct bpf_raw_tracepoint_args *ctx)
 {
+	struct cg_key pkey, nkey;
 	bool preempt = (bool)(ctx->args[0]);
 	struct task_struct *prev, *next;
+	u32 cpu = bpf_get_smp_processor_id();
 
+	__builtin_memset(&pkey, 0, sizeof(struct cg_key));
+	__builtin_memset(&nkey, 0, sizeof(struct cg_key));
 	prev = (struct task_struct *)(ctx->args[1]);
 	next = (struct task_struct *)(ctx->args[2]);
+	
+	pkey.cpu = cpu;
+	pkey.cgid = get_cgroup_id(prev);
+	nkey.cpu = cpu;
+	nkey.cgid = get_cgroup_id(next);
 
-	{	/* cgroup switchin */
+	if (nkey.cgid != pkey.cgid) {	/* cgroup changed  */
+		s64 delta = 0;
 		u64 *valp, *last, val;
-		struct cg_key key;
 
-		__builtin_memset(&key, 0, sizeof(struct cg_key));
-		key.cpu = bpf_get_smp_processor_id();
-		key.cgid = bpf_get_current_cgroup_id();
-		last = bpf_map_lookup_elem(&cg_schedin, &key);
-		if (!last || (*last == 0)) {
-			val = bpf_perf_event_read(&event, key.cpu);
-			bpf_map_update_elem(&cg_schedin, &key, &val, 0);
-		}
-	}
-
-	{	/* cgroup switchout */
-		s64 delta;
-		u64 *valp, *last, val;
-		struct cg_key key;
-
-		__builtin_memset(&key, 0, sizeof(struct cg_key));
-		key.cpu = bpf_get_smp_processor_id();
-		key.cgid = bpf_get_current_cgroup_id();	/* cgroup that will switch-out */
-
-		last = bpf_map_lookup_elem(&cg_schedin, &key);
+		last = bpf_map_lookup_elem(&cg_schedin, &pkey);
 		if (last && (*last != 0)) {
-			val = bpf_perf_event_read(&event, key.cpu);
+			val = bpf_perf_event_read(&event, cpu);
 			delta = val - *last;
-			valp = bpf_map_lookup_elem(&cg_counter, &key);
+			valp = bpf_map_lookup_elem(&cg_counter, &pkey);
 			if (valp)
 				*valp = *valp + delta;
 			else
-				bpf_map_update_elem(&cg_counter, &key, &delta, 0);
+				bpf_map_update_elem(&cg_counter, &pkey, &delta, 0);
 		}
+
+		/* record the start value of new sched_in task */
+		val = bpf_perf_event_read(&event, cpu);
+		bpf_map_update_elem(&cg_schedin, &nkey, &val, 0);
 	}
 	return 0;
 }
