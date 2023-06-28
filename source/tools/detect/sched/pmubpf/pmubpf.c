@@ -370,18 +370,23 @@ int output_task_counter(void)
 
 void output_cgroup_counter(void)
 {
-	__u64 val;
-	int err = 0;
+	__u64 *val, sum = 0;
+	int i, err = 0;
 	struct cg_key lookup_key = {}, next_key;
 
+	val = calloc(nr_cpus, sizeof(__u64));
+	if (!val)
+		return;
 	while (!bpf_map_get_next_key(map_fd[2], &lookup_key, &next_key)) {
-		err = bpf_map_lookup_elem(map_fd[2], &next_key, &val);
+		err = bpf_map_lookup_elem(map_fd[2], &next_key, val);
 		if (err) {
 			printf("lookup elem fail\n");
 		}
 		lookup_key = next_key;
-		printf("cgid[%llu] cpu[%d] counter=%llu\n",
-			lookup_key.cgid, lookup_key.cpu, val);
+		for (i = 0; i < nr_cpus; i++)
+			sum += val[i];
+		printf("cgid[%llu] counter=%llu\n",
+			lookup_key.cgid, sum);
 	}
 }
 

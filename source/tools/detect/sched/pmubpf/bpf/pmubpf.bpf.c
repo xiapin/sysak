@@ -31,7 +31,7 @@ struct {
 } task_counter SEC(".maps");
 
 struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(type, BPF_MAP_TYPE_PERCPU_HASH);
 	__uint(max_entries, MAX_CON*MAX_CPUS);
 	__type(key, struct cg_key);
 	__type(value, u64);
@@ -147,9 +147,7 @@ int sysak_pmubpf__sched_switch(struct bpf_raw_tracepoint_args *ctx)
 	prev = (struct task_struct *)(ctx->args[1]);
 	next = (struct task_struct *)(ctx->args[2]);
 	
-	pkey.cpu = cpu;
 	pkey.cgid = get_cgroup_id(prev);
-	nkey.cpu = cpu;
 	nkey.cgid = get_cgroup_id(next);
 
 	if (nkey.cgid != pkey.cgid) {	/* cgroup changed  */

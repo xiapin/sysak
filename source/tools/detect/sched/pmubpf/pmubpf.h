@@ -25,7 +25,6 @@ struct args {
 };
 
 struct cg_key {
-	int cpu;
 	__u64 cgid;
 };
 
