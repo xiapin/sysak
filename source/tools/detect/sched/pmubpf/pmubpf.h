@@ -27,5 +27,5 @@ struct args {
 struct cg_key {
 	__u64 cgid;
 };
-
+unsigned long long get_cgroup_id_user(const char *path);
 #endif /* __PMUBPF_H */
