@@ -76,6 +76,9 @@ struct sched_switch_tp_args {
 	char __data[0];
 };
 
+#define PERF_SUBSYS_ID	1
+
+#if 0
 union kernfs_node_id {
 	struct {
 		u32 ino;
@@ -104,7 +107,6 @@ struct kernfs_node___419 {
 	struct kernfs_iattrs *iattr;
 };
 
-#define PERF_SUBSYS_ID	1
 static u64 get_cgroup_id(struct task_struct *t)
 {
 	struct cgroup *cgrp;
@@ -122,15 +124,15 @@ static u64 get_cgroup_id(struct task_struct *t)
 
 	return knid;
 }
-#if 0
+#endif
+
+#if 1
 static inline __u64 get_cgroup_id(struct task_struct *t)
 {
 	struct cgroup *cgrp;
 
 	cgrp = BPF_CORE_READ(t, cgroups, subsys[PERF_SUBSYS_ID], cgroup);
-	//cgrp = BPF_CORE_READ(t, cgroups, subsys, cgroup);
 	return BPF_CORE_READ(cgrp, kn, id);
-	//return PERF_SUBSYS_ID;
 }
 #endif
 
