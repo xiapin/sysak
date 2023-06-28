@@ -126,7 +126,7 @@ static u64 get_cgroup_id_419(struct task_struct *t)
 	if (bpf_core_read(&knid, sizeof(u64), &id.id))
 		return 0;
 
-	return knid;
+	return knid & 0x0ffffffff;
 }
 
 static inline __u64 get_cgroup_id(struct task_struct *t)
