@@ -22,6 +22,8 @@
 #include <asm/unistd.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
+#include <sys/utsname.h>
+#include <linux/version.h>
 #include "pmubpf.h"
 #include "bpf/pmubpf.skel.h"
 
@@ -390,6 +392,45 @@ void output_cgroup_counter(void)
 	}
 }
 
+int check_kprobe(struct pmubpf_bpf *obj)
+{
+	int i, ret = 0;
+	char *str, *endptr;
+	unsigned long ver[4];
+	struct utsname ut;
+
+	ret = uname(&ut);
+	if (ret < 0)
+		return -errno;
+
+	str = ut.release;
+	for (i = 0; i < 4; i++) {
+		errno = 0;
+		ver[i] = strtoul(str, &endptr, 10);
+		if ((errno == ERANGE && (ver[i] == LONG_MAX || ver[i] == LONG_MIN))
+			|| (errno != 0 && ver[i] == 0)) {
+			perror("strtol");
+			return -errno;
+		}
+		str = endptr+1;
+	}
+
+	if (ver[0] >= 5 && ver[1] >= 10) {
+		ret = bpf_program__set_autoload(obj->progs.sysak_pmubpf__sched_switch_419, false);
+		if (ret < 0) {
+			printf("FAIL:bpf_program__set_autoload kp_ttwu_do_wakeup\n");
+			return ret;
+		}
+	} else {
+		ret = bpf_program__set_autoload(obj->progs.sysak_pmubpf__sched_switch, false);
+		if (ret < 0) {
+			printf("FAIL:bpf_program__set_autoload raw_tp__sched_wakeup\n");
+			return ret;
+		}
+	}
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	int i, err, arg_fd, cpu;
@@ -426,7 +467,11 @@ int main(int argc, char **argv)
 		fprintf(stderr, "failed to open BPF object\n");
 		return 1;
 	}
-
+	err = check_kprobe(obj);
+	if (err) {
+		fprintf(stderr, "failed to filter object: %d\n", err);
+		goto cleanup;
+	}
 	err = pmubpf_bpf__load(obj);
 	if (err) {
 		fprintf(stderr, "failed to load BPF object: %d\n", err);

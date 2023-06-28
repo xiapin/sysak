@@ -78,7 +78,7 @@ struct sched_switch_tp_args {
 
 #define PERF_SUBSYS_ID	1
 
-#if 0
+#if 1
 union kernfs_node_id {
 	struct {
 		u32 ino;
@@ -107,7 +107,7 @@ struct kernfs_node___419 {
 	struct kernfs_iattrs *iattr;
 };
 
-static u64 get_cgroup_id(struct task_struct *t)
+static u64 get_cgroup_id_419(struct task_struct *t)
 {
 	struct cgroup *cgrp;
 	struct kernfs_node___419 *node;
@@ -151,6 +151,44 @@ int sysak_pmubpf__sched_switch(struct bpf_raw_tracepoint_args *ctx)
 	
 	pkey.cgid = get_cgroup_id(prev);
 	nkey.cgid = get_cgroup_id(next);
+
+	if (nkey.cgid != pkey.cgid) {	/* cgroup changed  */
+		s64 delta = 0;
+		u64 *valp, *last, val;
+
+		last = bpf_map_lookup_elem(&cg_schedin, &pkey);
+		if (last && (*last != 0)) {
+			val = bpf_perf_event_read(&event, cpu);
+			delta = val - *last;
+			valp = bpf_map_lookup_elem(&cg_counter, &pkey);
+			if (valp)
+				*valp = *valp + delta;
+			else
+				bpf_map_update_elem(&cg_counter, &pkey, &delta, 0);
+		}
+
+		/* record the start value of new sched_in task */
+		val = bpf_perf_event_read(&event, cpu);
+		bpf_map_update_elem(&cg_schedin, &nkey, &val, 0);
+	}
+	return 0;
+}
+
+SEC("raw_tracepoint/sched_switch")
+int sysak_pmubpf__sched_switch_419(struct bpf_raw_tracepoint_args *ctx)
+{
+	struct cg_key pkey, nkey;
+	bool preempt = (bool)(ctx->args[0]);
+	struct task_struct *prev, *next;
+	u32 cpu = bpf_get_smp_processor_id();
+
+	__builtin_memset(&pkey, 0, sizeof(struct cg_key));
+	__builtin_memset(&nkey, 0, sizeof(struct cg_key));
+	prev = (struct task_struct *)(ctx->args[1]);
+	next = (struct task_struct *)(ctx->args[2]);
+	
+	pkey.cgid = get_cgroup_id_419(prev);
+	nkey.cgid = get_cgroup_id_419(next);
 
 	if (nkey.cgid != pkey.cgid) {	/* cgroup changed  */
 		s64 delta = 0;
