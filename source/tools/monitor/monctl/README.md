@@ -8,11 +8,11 @@ Options:
     -e         run monctl
     -h			help info
 Usage step:
-1. enable mod in /usr/log/sysak/sysak_monctl.conf
+1. enable mod in /usr/local/sysak/monctl.conf 
 2. run sysak monctl, example: sysak monctl -e &
 ```
 
-/usr/log/sysak/sysak_monctl.conf
+/usr/local/sysak/monctl.conf 
 ```
 ####[module]
 mod_iomonitor off
