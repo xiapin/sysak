@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+#include <linux/types.h>
 #include <stdbool.h>
 #include <bpf/libbpf.h>
 #include <bpf/bpf.h>
@@ -31,19 +32,19 @@ time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
 int nr_cpu;
-unsigned long long* prev_delay;
+u_int64_t* prev_delay;
 static volatile sig_atomic_t exiting;
 
 struct env {
     bool thread_mode;
     time_t delay;
     pid_t tid;
-    long nr_iter;
+    int64_t nr_iter;
     enum sort_type rec_sort;
-    int limit;
+    int64_t limit;
     bool human;
-    int stack_limit;
-    int cgroup_limit;
+    int64_t stack_limit;
+    int64_t cgroup_limit;
 } env = {.thread_mode = false,
          .delay = 3,
          .tid = -1,
@@ -372,7 +373,6 @@ static int read_sched_delay(struct sys_record_t* sys_rec) {
 cleanup:
     if (fp) fclose(fp);
     return err;
-    return 0;
 }
 
 static int check_cgroup(cgroup_cpu_stat_t** prev_cgroups, char* cgroup_name) {
@@ -1262,7 +1262,7 @@ static void sigint_handler(int signo) { exiting = 1; }
 
 // #define SEG_TRAP
 int main(int argc, char** argv) {
-    int err = 0, fork_map_fd = -1;
+    int err = 0, fork_map_fd = -1, i = 0;
     FILE* stat_log = 0;
     struct tasktop_bpf* skel = 0;
     struct id_pair_t* pids = 0;
@@ -1270,7 +1270,6 @@ int main(int argc, char** argv) {
     struct cgroup_cpu_stat_t** prev_cgroup = 0;
     struct sys_cputime_t **prev_sys = 0, **now_sys = 0;
     struct record_t* rec = 0;
-    u_int64_t i;
 
     nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -1322,7 +1321,7 @@ int main(int argc, char** argv) {
     }
 
     prev_cgroup = calloc(env.cgroup_limit, sizeof(struct cgroup_cpu_stat_t*));
-    prev_delay = calloc(nr_cpu, sizeof(int));
+    prev_delay = calloc(nr_cpu, sizeof(unsigned long long));
     pids = calloc(pidmax + 1, sizeof(struct id_pair_t));
     prev_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
     now_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
