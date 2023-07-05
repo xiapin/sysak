@@ -7,6 +7,7 @@
 #define STACK_CONTENT_LEN 1024
 #define FILE_PATH_LEN 256
 #define MAX_COMM_LEN 24
+#define MAX_CGROUP_NAME_LEN 256
 #define CPU_NAME_LEN 8
 #define BUF_SIZE 512
 #define DEBUG_LOG "./log/debug.log"
@@ -88,7 +89,7 @@ typedef struct D_task_record_t {
 } D_task_record_t;
 
 typedef struct cgroup_cpu_stat_t {
-    char cgroup_name[MAX_COMM_LEN];
+    char cgroup_name[MAX_CGROUP_NAME_LEN];
     int nr_periods;
     int nr_throttled;
     unsigned long long throttled_time;
