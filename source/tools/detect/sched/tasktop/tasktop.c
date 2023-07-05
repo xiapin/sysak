@@ -466,8 +466,8 @@ static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num,
         memset(slot->cgroup_name, 0, sizeof(slot->cgroup_name));
         memset(rec->cgroup_name, 0, sizeof(rec->cgroup_name));
 
-        strncpy(slot->cgroup_name, dir->d_name, sizeof(slot->cgroup_name) - 1);
-        strncpy(rec->cgroup_name, dir->d_name, sizeof(rec->cgroup_name) - 1);
+        strncpy(slot->cgroup_name, dir->d_name, sizeof(slot->cgroup_name));
+        strncpy(rec->cgroup_name, dir->d_name, sizeof(rec->cgroup_name));
 
         while (fscanf(fp, "%s %llu", name, &val) != EOF) {
             if (!strcmp(name, "nr_periods")) {
@@ -850,8 +850,8 @@ static void output_per_cpu(struct record_t* rec, FILE* dest) {
             "sys", "nice", "idle", "iowait", "h-irq", "s-irq", "steal",
             "delay(ms)");
     for (i = 1; i <= nr_cpu; i++) {
-        char cpu_name[10];
-        snprintf(cpu_name, 10, "cpu-%d", i - 1);
+        char cpu_name[16];
+        snprintf(cpu_name, 16, "cpu-%d", i - 1);
         fprintf(dest,
                 "%7s %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %10llu\n",
                 cpu_name, sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].nice,
@@ -935,7 +935,7 @@ static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
         fprintf(dest, "%18s %6d %6d ", d_tasks[i].comm, d_tasks[i].tid,
                 d_tasks[i].pid);
 
-        strncpy(str, d_tasks[i].stack, STACK_CONTENT_LEN);
+        strncpy(str, d_tasks[i].stack, STACK_CONTENT_LEN - 1);
 
         const char delim[2] = "\n";
         char* token;
