@@ -5,7 +5,7 @@
 *.o.cmd
 *.ko
 *.ko.cmd
-*.idea
+
 Module.symvers
 modules.builtin
 modules.order

@@ -4,7 +4,6 @@
 
 #include "local_beaver.h"
 #include <sys/epoll.h>
-#include <sys/socket.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
