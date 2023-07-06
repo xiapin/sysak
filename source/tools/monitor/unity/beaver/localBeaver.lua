@@ -133,7 +133,7 @@ function CLocalBeaver:_install_fd_unisock(backlog,unix_socket)
                 system:posixError("socket listen failed", err, errno)
             end
         else
-            print(msg)
+            print("call localBind failed, report: " .. msg)
             unistd.close(fd)
             os.exit(1)
         end
@@ -157,7 +157,7 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
                 system:posixError("socket listen failed", err, errno)
             end
         else
-            print(msg)
+            print("call localBind failed, report: " .. msg)
             unistd.close(fd)
             os.exit(1)
         end
