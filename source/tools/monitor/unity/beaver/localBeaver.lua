@@ -92,14 +92,13 @@ function CLocalBeaver:_installFFI()
 
 end
 
-function CLocalBeaver:localBind(fd, tPort)
+local function localBind(cffi, fd, tPort)
     local try = 0
     local res, err, errno
 
     -- can reuse for time wait socket.
     --res, err, errno = socket.setsockopt(fd, socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
-    print(self)
-    res = self._cffi.setsockopt_AP(fd)
+    res = cffi.setsockopt_AP(fd)
     if res<0 then
         system:posixError("set sock opt failed.");
     end
@@ -124,7 +123,7 @@ function CLocalBeaver:_install_fd_unisock(backlog,unix_socket)
     fd, err, errno = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0)
     if fd then  -- for socket
         local tPort = {family=socket.AF_UNIX, path=unix_socket}
-        local r, msg = pcall(localBind, fd, tPort)
+        local r, msg = pcall(localBind, self._cffi, fd, tPort)
         if r then
             res, err, errno = socket.listen(fd, backlog)
             if res then -- for listen
@@ -148,7 +147,7 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
     fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     if fd then  -- for socket
         local tPort = {family=socket.AF_INET, addr=ip, port=port}
-        local r, msg = pcall(localBind, fd, tPort)
+        local r, msg = pcall(localBind, self._cffi, fd, tPort)
         if r then
             res, err, errno = socket.listen(fd, backlog)
             if res then -- for listen
