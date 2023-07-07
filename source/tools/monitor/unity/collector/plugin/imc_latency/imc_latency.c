@@ -576,6 +576,11 @@ int init(void* arg) {
 
     fprintf(stderr, "nr_socket=%d nr_core=%d nr_cpu=%d nr_channel=%d \n",
             env.nr_socket, env.nr_core, env.nr_cpu, env.nr_channel);
+    int i = 0;
+    for (i = 0; i < env.nr_socket; i++) {
+        fprintf(stderr, "socket%d-ref cpu=%d\n", i, env.socket_ref_core[i]);
+    }
+
 cleanup:
 
     if (pmu_ids) {
@@ -707,7 +712,7 @@ void print_record(record* rec) {
 
 int call(int t, struct unity_lines* lines) {
     struct unity_line* line;
-    int32_t i = 0, line_num = 0;
+    int32_t socket_id = 0, channel_id = 0, line_num = 0;
     read_imc();
 #ifdef DEBUG
     fprintf(stderr, "before.\n");
@@ -716,25 +721,51 @@ int call(int t, struct unity_lines* lines) {
     fprintf(stderr, "after.\n");
     print_record(&after);
 #endif
-    // line_num = env.nr_socket + env.nr_socket * env.nr_channel;
-    // unity_alloc_lines(lines, line_num);
-    // for (i = 0; i < env.nr_socket; i++) {
-    //     line = unity_get_line(lines, i);
-    //     unity_set_table(line, "imc_latency");
-    //     unity_set_index(line, 0, "level", "socket");
 
-    //     unity_set_value(line, 0, "rpq_occupancy", 1.0 + value);
-    //     unity_set_value(line, 1, "write_occpancy", 1.0 + value);
-    // }
+    line_num = env.nr_socket * (1 + env.nr_channel);
+    unity_alloc_lines(lines, line_num);
+    for (socket_id = 0; socket_id < env.nr_socket; socket_id++) {
+        char socket_name[32];
+        snprintf(socket_name, 32, "%d", socket_id);
+
+        line = unity_get_line(lines, (1 + env.nr_channel) * socket_id);
+        unity_set_table(line, "imc_socket_latency");
+        unity_set_index(line, 0, "socket", socket_name);
+        unity_set_value(line, 0, "ralt",
+                        after.socket_record_arr[socket_id].read_latency);
+        unity_set_value(line, 1, "wlat",
+                        after.socket_record_arr[socket_id].write_latency);
+
+        for (channel_id = 0; channel_id < env.nr_channel; channel_id++) {
+            char channel_name[32];
+            snprintf(channel_name, 32, "%d", channel_id);
+
+            line = unity_get_line(
+                lines, (1 + env.nr_channel) * socket_id + 1 + channel_id);
+            unity_set_table(line, "imc_channel_latency");
+            unity_set_index(line, 0, "socket", socket_name);
+            unity_set_index(line, 1, "channel", channel_name);
+            unity_set_value(line, 0, "rlat",
+                            after.socket_record_arr[socket_id]
+                                .channel_record_arr[channel_id]
+                                .read_latency);
+            unity_set_value(line, 1, "wlat",
+                            after.socket_record_arr[socket_id]
+                                .channel_record_arr[channel_id]
+                                .write_latency);
+        }
+    }
 
     /* swap data */
     socket_record* tmp = before.socket_record_arr;
     before.socket_record_arr = after.socket_record_arr;
     after.socket_record_arr = tmp;
 
+    /* clear after data */
     free_socket_record(after.socket_record_arr);
     after.socket_record_arr = alloc_socket_record();
 
+    /* reset before timestamp */
     before_ts = after_ts;
 
     return 0;
