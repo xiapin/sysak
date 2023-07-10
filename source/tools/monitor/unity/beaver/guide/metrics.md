@@ -343,3 +343,17 @@ This table show the hist of the latency of direct memory compaction
 | llc_wmiss_rate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
 | llc_miss_rate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
 | llc_cache_mpi | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+
+### imc_socket_latency 表
+
+| 指标名 | 单位 | 标签说明              | 备注 | 源码路径                                    |
+| :----- | ---- | :-------------------- | :--- | :------------------------------------------ |
+| rlat   | ns   | imc read ddr latency  |  socket级    | collector/plugin/imc_latency/imc\_latency.c |
+| wlat   | ns   | imc write ddr latency |  socket级    | collector/plugin/imc_latency/imc\_latency.c |
+
+### imc_channel_latency 表
+
+| 指标名 | 单位 | 标签说明              | 备注 | 源码路径                                    |
+| :----- | ---- | :-------------------- | :--- | :------------------------------------------ |
+| rlat   | ns   | imc read ddr latency  | channel级     | collector/plugin/imc_latency/imc\_latency.c |
+| wlat   | ns   | imc write ddr latency | channel级     | collector/plugin/imc_latency/imc\_latency.c |
