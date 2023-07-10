@@ -1,17 +1,42 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <unistd.h>
 #include <stdbool.h>
+#include <strings.h>
+#include <signal.h>
+#include <unistd.h>
 #include <memory.h>
 #include <errno.h>
-#include <strings.h>
+#include <argp.h>
+#include <time.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <linux/types.h>
 
 #include "imc_latency.h"
 
 // #define DEBUG
+
+const char* argp_program_version = "imc_latency 0.1";
+const char argp_program_doc[] =
+    "Detect the memory latency based on IMC PMU.\n"
+    "\n"
+
+    "USAGE: imc_latency [--help] [-d DELAY] [-i ITERATION] [-f LOGFILE]\n"
+    "\n"
+
+    "EXAMPLES:\n"
+    "    imc_latency            # run forever, display the memory latency.\n"
+    "    imc_latency -f foo.log   # log to foo.log.\n";
+
+static const struct argp_option opts[] = {
+    {"delay", 'd', "DELAY", 0, "Sample peroid, default is 3 seconds"},
+    {"iter", 'i', "ITERATION", 0, "Output times, default run forever"},
+    {"logfile", 'f', "LOGFILE", 0,
+     "Logfile for result, default /var/log/sysak/imc_latency/imc_latency.log"},
+    {NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
+    {},
+};
 
 struct Env {
     uint32_t max_cpuid;
@@ -24,44 +49,99 @@ struct Env {
     int64_t nr_core;
     int64_t nr_channel;
     int64_t* socket_ref_core;
-} env = {.vm = false};
-
-typedef struct event {
-    uint64_t rpq_occ;
-    uint64_t rpq_ins;
-    uint64_t wpq_occ;
-    uint64_t wpq_ins;
-    uint64_t dram_speed;
-} event;
-
-typedef struct channel_record {
-    uint64_t rpq_occ;
-    uint64_t rpq_ins;
-    uint64_t wpq_occ;
-    uint64_t wpq_ins;
-    double read_latency;
-    double write_latency;
-} channel_record;
-
-typedef struct socket_record {
-    channel_record* channel_record_arr;
-    uint64_t rpq_occ;
-    uint64_t rpq_ins;
-    uint64_t wpq_occ;
-    uint64_t wpq_ins;
-    double read_latency;
-    double write_latency;
-    uint64_t dram_clock;
-} socket_record;
-
-typedef struct record {
-    socket_record* socket_record_arr;
-} record;
+    int64_t nr_iter;
+    int64_t delay;
+} env = {.vm = false, .nr_iter = INT64_MAX, .delay = DEFAUlT_PEROID};
 
 record before, after;
-
 time_t before_ts = 0, after_ts = 0;
 imc_pmu* pmus = 0;
+char log_dir[FILE_PATH_LEN] = "/var/log/sysak/imc_latency";
+char default_log_path[FILE_PATH_LEN] =
+    "/var/log/sysak/imc_latency/imc_latency.log";
+char* log_path = 0;
+FILE* log_fp = 0;
+bool exiting = false;
+
+static void sigint_handler(int signo) { exiting = 1; }
+
+/* if out of range or no number found return nonzero */
+static int parse_long(const char* str, long* retval) {
+    int err = 0;
+    char* endptr;
+    errno = 0;
+    long val = strtol(str, &endptr, 10);
+
+    /* Check for various possible errors */
+    if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) ||
+        (errno != 0 && val == 0)) {
+        fprintf(stderr, "Failed parse val.\n");
+        err = errno;
+        return err;
+    }
+
+    if (endptr == str) return err = -1;
+    *retval = val;
+    return err;
+}
+
+static error_t parse_arg(int key, char* arg, struct argp_state* state) {
+    int err = 0;
+    long val;
+    switch (key) {
+        case 'h':
+            argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+            break;
+        case 'd':
+            err = parse_long(arg, &val);
+            if (err || val <= 0) {
+                fprintf(stderr, "Failed parse delay.\n");
+                argp_usage(state);
+            }
+
+            env.delay = val;
+            break;
+        case 'i':
+            err = parse_long(arg, &val);
+            if (err || val <= 0) {
+                fprintf(stderr, "Failed parse iteration-num.\n");
+                argp_usage(state);
+            }
+            env.nr_iter = val;
+            env.nr_iter++;
+            break;
+        case 'f':
+            log_path = arg;
+            break;
+        case ARGP_KEY_ARG:
+            break;
+        default:
+            return ARGP_ERR_UNKNOWN;
+    }
+
+    return 0;
+}
+
+static int prepare_directory(char* path) {
+    int ret;
+
+    ret = mkdir(path, 0777);
+    if (ret < 0 && errno != EEXIST)
+        return errno;
+    else
+        return 0;
+}
+
+static FILE* open_logfile() {
+    FILE* f = 0;
+    if (!log_path) {
+        log_path = default_log_path;
+    }
+
+    f = fopen(log_path, "w");
+
+    return f;
+}
 
 int64_t read_sys_file(char* path, bool slient) {
     int64_t val;
@@ -573,13 +653,14 @@ static int init_env() {
 
     // init data
     init_data();
-
+#ifdef DEBUG
     fprintf(stderr, "nr_socket=%d nr_core=%d nr_cpu=%d nr_channel=%d \n",
             env.nr_socket, env.nr_core, env.nr_cpu, env.nr_channel);
     int i = 0;
     for (i = 0; i < env.nr_socket; i++) {
         fprintf(stderr, "socket%d-ref cpu=%d\n", i, env.socket_ref_core[i]);
     }
+#endif
 
 cleanup:
 
@@ -710,38 +791,77 @@ void print_record(record* rec) {
 }
 #endif
 
-static int collect_data() {
-    int32_t socket_id = 0, channel_id = 0, line_num = 0;
-    read_imc();
+static char* ts2str(time_t ts, char* buf, int size) {
+    struct tm* t = gmtime(&ts);
+    strftime(buf, size, "%Y-%m-%d %H:%M:%S", t);
+    return buf;
+}
 
-    fprintf(stderr, "[SOCKET_LEVEL]\n");
-    fprintf(stderr, "%16s %16s %16s\n", "socket", "rlat", "wlat");
+static void output_ts(FILE* dest) {
+    char stime_str[BUF_SIZE] = {0};
+    time_t now = time(0);
+    fprintf(dest, "[TIME-STAMP] %s\n", ts2str(now, stime_str, BUF_SIZE));
+}
+
+static void output_socket_lat(FILE* dest) {
+    int32_t socket_id = 0;
+
+    fprintf(dest, "%s\n", "[SOCKET_LEVEL]");
+    // fprintf(dest, "%8s%16s%16s\n", "socket", "rlat", "wlat");
+    fprintf(dest, "%8s", "");
 
     for (socket_id = 0; socket_id < env.nr_socket; socket_id++) {
-        char socket_name[32];
-        snprintf(socket_name, 32, "%d", socket_id);
-        socket_record* srec = &after.socket_record_arr[socket_id];
-        fprintf(stderr, "%16s %16lf %16lf\n", socket_name, srec->read_latency,
-                srec->write_latency);
+        fprintf(dest, "%8d", socket_id);
     }
+    fprintf(dest, "\n");
 
+    fprintf(dest, "%8s", "rlat");
     for (socket_id = 0; socket_id < env.nr_socket; socket_id++) {
-        fprintf(stderr, "[CHANNEL_LEVEL-SOCKET%d]\n", socket_id);
+        socket_record* srec = &after.socket_record_arr[socket_id];
+        fprintf(dest, "%8.2lf", srec->read_latency);
+    }
+    fprintf(dest, "\n");
+
+    fprintf(dest, "%8s", "wlat");
+    for (socket_id = 0; socket_id < env.nr_socket; socket_id++) {
+        socket_record* srec = &after.socket_record_arr[socket_id];
+        fprintf(dest, "%8.2lf", srec->write_latency);
+    }
+    fprintf(dest, "\n");
+}
+
+static void output_channel_lat(FILE* dest) {
+    int32_t socket_id = 0, channel_id = 0;
+    for (socket_id = 0; socket_id < env.nr_socket; socket_id++) {
         char socket_name[32];
         snprintf(socket_name, 32, "%d", socket_id);
 
         socket_record* srec = &after.socket_record_arr[socket_id];
 
-        fprintf(stderr, "%16s %16s %16s\n", "channel", "rlat", "wlat");
+        fprintf(dest, "[CHANNEL_LEVEL]-[SOCKET-%d]\n", socket_id);
+        fprintf(dest, "%8s", "");
+        for (channel_id = 0; channel_id < env.nr_channel; channel_id++) {
+            fprintf(dest, "%8d", channel_id);
+        }
+        fprintf(dest, "\n");
+
+        fprintf(dest, "%8s", "rlat");
         for (channel_id = 0; channel_id < env.nr_channel; channel_id++) {
             channel_record* crec = &srec->channel_record_arr[channel_id];
-            char channel_name[32];
-            snprintf(channel_name, 32, "%d", channel_id);
-            fprintf(stderr, "%16s %16s %16s\n", channel_name,
-                    crec->read_latency, crec->write_latency);
+            fprintf(dest, "%8.2lf", crec->read_latency);
         }
-    }
+        fprintf(dest, "\n");
 
+        fprintf(dest, "%8s", "wlat");
+        for (channel_id = 0; channel_id < env.nr_channel; channel_id++) {
+            channel_record* crec = &srec->channel_record_arr[channel_id];
+            fprintf(dest, "%8.2lf", crec->write_latency);
+        }
+        fprintf(dest, "\n");
+    }
+}
+
+void swap_record() {
     /* swap data */
     socket_record* tmp = before.socket_record_arr;
     before.socket_record_arr = after.socket_record_arr;
@@ -753,17 +873,58 @@ static int collect_data() {
 
     /* reset before timestamp */
     before_ts = after_ts;
-
-    return 0;
 }
 
-static clean_env(void) { free_data(); }
+static void output_split(FILE* dest) { fprintf(dest, "\n"); }
+static void collect_data() {
+    int32_t socket_id = 0, channel_id = 0, line_num = 0;
+    read_imc();
 
-int main() {
+    if (before_ts) {
+        output_ts(log_fp);
+        output_socket_lat(log_fp);
+        output_channel_lat(log_fp);
+        output_split(log_fp);
+        fflush(log_fp);
+    }
+
+    swap_record();
+}
+
+static void clean_env(void) { free_data(); }
+
+int main(int argc, char** argv) {
+    int err;
+    /* parse args */
+    static const struct argp argp = {
+        .options = opts,
+        .parser = parse_arg,
+        .doc = argp_program_doc,
+    };
+
+    err = argp_parse(&argp, argc, argv, 0, 0, 0);
+    if (err) {
+        fprintf(stderr, "Failed parse args.\n");
+        return -1;
+    }
+
+    prepare_directory(log_dir);
+    log_fp = open_logfile();
+    if (!log_fp) {
+        fprintf(stderr, "Failed open log file.\n");
+        return -1;
+    }
+
+    if (signal(SIGINT, sigint_handler) == SIG_ERR) {
+        fprintf(stderr, "Failed set signal handler.\n");
+        return -errno;
+    }
+
     init_env();
-    while (1) {
-        sleep(1);
+
+    while (env.nr_iter-- && !exiting) {
         collect_data();
+        sleep(env.delay);
     }
 
     clean_env();
