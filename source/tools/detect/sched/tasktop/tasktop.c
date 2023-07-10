@@ -74,7 +74,7 @@ const char argp_program_doc[] =
     "    tasktop -l 20      # limit the records number no more than 20.\n"
     "    tasktop -e 10      # limit the d-stack no more than 10, default is "
     "20.\n"
-    "    tasktop -H         # output time string, not timestamp."
+    "    tasktop -H         # output time string, not timestamp.\n"
     "    tasktop -f a.log   # log to a.log.\n"
     "    tasktop -e 10      # most record 10 d-task stack.\n";
 
