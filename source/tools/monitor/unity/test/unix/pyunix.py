@@ -23,6 +23,6 @@ if __name__ == "__main__":
     nf = CnfPut()
     i = 10
     while True:
-        nf.puts('io_burst,disk=/dev/vda1 limit=10.0,max=%d,log="io log burst"' % i)
+        print(nf.puts('io_burst,disk=/dev/vda1 limit=10.0,max=%d,log="io log burst"' % i))
         i += 1
         time.sleep(5)
