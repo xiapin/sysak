@@ -762,35 +762,6 @@ void read_imc() {
     }
 }
 
-#ifdef DEBUG
-void print_socket(socket_record* rec) {
-    fprintf(stderr,
-            "rpq_occ=%ld rpq_ins=%ld wpq_occ=%ld wpq_ins=%ld dram_clocks=%ld "
-            "r_latency=%lf w_latency=%lf\n",
-            rec->rpq_occ, rec->rpq_ins, rec->wpq_occ, rec->wpq_ins,
-            rec->dram_clock, rec->read_latency, rec->write_latency);
-}
-
-void print_channel(channel_record* rec) {
-    fprintf(stderr,
-            "rpq_occ=%ld rpq_ins=%ld wpq_occ=%ld wpq_ins=%ld r_latency = % lf "
-            "w_latency = % lf\n ",
-            rec->rpq_occ, rec->rpq_ins, rec->wpq_occ, rec->wpq_ins,
-            rec->read_latency, rec->write_latency);
-}
-
-void print_record(record* rec) {
-    int i = 0;
-    int j = 0;
-    for (i = 0; i < env.nr_socket; i++) {
-        print_socket(&rec->socket_record_arr[i]);
-        for (j = 0; j < env.nr_channel; j++) {
-            print_channel(&rec->socket_record_arr[i].channel_record_arr[j]);
-        }
-    }
-}
-#endif
-
 static char* ts2str(time_t ts, char* buf, int size) {
     struct tm* t = gmtime(&ts);
     strftime(buf, size, "%Y-%m-%d %H:%M:%S", t);
@@ -920,8 +891,12 @@ int main(int argc, char** argv) {
         return -errno;
     }
 
-    init_env();
-
+    err = init_env();
+    if (err) {
+        fprintf(stderr, "Init env error.\n");
+        return -1;
+    }
+    
     while (env.nr_iter-- && !exiting) {
         collect_data();
         sleep(env.delay);
