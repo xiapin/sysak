@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sysom
+  namespace: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: sysom-role
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - pods
+      - nodes
+      - nodes/status
+      - nodes/pods
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ''
+    resources:
+      - nodes/proxy
+    verbs:
+      - '*'
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: sysom-binding
+subjects:
+  - kind: ServiceAccount
+    name: sysom
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: sysom-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: sysom
+  name: sysom
+  namespace: kube-system
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: sysom
+  template:
+    metadata:
+      labels:
+        app: sysom
+    spec:
+      containers:
+        - command:
+            - /bin/sh
+            - '-c'
+            - cd /root/dist/app/beeQ && sh ./run.sh
+          image: 'ackpod-registry.cn-shanghai.cr.aliyuncs.com/mem/sysom:v2.2'
+          imagePullPolicy: IfNotPresent
+          name: sysom
+          ports:
+            - containerPort: 8889
+              hostPort: 8889
+              name: sysom
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 250m
+              memory: 250Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /mnt/host
+              name: volume-sysom
+            - mountPath: /sys/kernel/debug
+              name: volume-debugfs
+      hostNetwork: true
+      hostPID: true
+      restartPolicy: Always
+      serviceAccount: sysom
+      serviceAccountName: sysom
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - hostPath:
+            path: /
+            type: ''
+          name: volume-sysom
+        - hostPath:
+            path: /sys/kernel/debug
+            type: ''
+          name: volume-debugfs
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
