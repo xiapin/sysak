@@ -11,6 +11,7 @@ local system = require("common.system")
 local pystring = require("common.pystring")
 local Cinotifies = require("common.inotifies")
 local unistd = require("posix.unistd")
+local json = require("cjson")
 
 local CpodsAll = class("podsApi")
 
@@ -72,12 +73,22 @@ local function setupCons(res)
     local cli = ChttpCli.new()
     local cons = {}
     local c = 0
-
+    local blacklist = {["arms-prom"] = 1, ["kube-system"] = 1, ["kube-public"] = 1, ["kube-node-lease"] = 1}
     local content = cli:get("http://127.0.0.1:10255/pods")
     local obj = cli:jdecode(content.body)
+    if not obj then 
+        local cmd = ' curl -s -k -XGET https://127.0.0.1:10250/pods --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token) "'
+        local f = io.popen(cmd,"r")
+        local podsinfo = f:read("*a")
+        f:close()
+        obj = json.decode(podsinfo)
+    end
 
     for _, pod in ipairs(obj.items) do
         local metadata = pod.metadata
+        if blacklist[metadata.namespace] then
+            goto continue
+        end
         local lpod = {name = metadata.name,
                       namespace = metadata.namespace,
                       uid = pystring:replace(metadata.uid, "-", "_"),
@@ -97,6 +108,7 @@ local function setupCons(res)
                 cons[c] = cell
             end
         end
+        ::continue::
     end
 
     return cons
@@ -109,11 +121,18 @@ function CpodsAll:getAllcons(procfs)
     local cons = {}
     local c = 0
     local content = cli:get("http://127.0.0.1:10255/pods")
-    if #content.body == 0 then return cons end
     local obj = cli:jdecode(content.body)
+    if not obj then 
+        local cmd = ' curl -s -k -XGET https://127.0.0.1:10250/pods --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token) "'
+        local f = io.popen(cmd,"r")
+        local podsinfo = f:read("*a")
+        f:close()
+        obj = json.decode(podsinfo) 
+    end
 
     for _, pod in ipairs(obj.items) do
         local metadata = pod.metadata
+        --print(string.format("podns :%s, pod:%s",metadata.namespace, metadata.name))
         local lpod = {name = metadata.name,
                       namespace = metadata.namespace,
                       uid = pystring:replace(metadata.uid, "-", "_"),
@@ -144,28 +163,16 @@ local function setupPlugins(res, proto, pffi, mnt, ino)
     for _, con in ipairs(cons) do
         local ls = {
             {
-                name = "pod_name",
+                name = "podname",
                 index = con.pod.name,
             },
             {
-                name = "con_name",
-                index = con.name,
+                name = "container",
+                index = con.name.."-"..string.sub(con.id,0,4),
             },
             {
-                name = "qos",
-                index = con.pod.qos,
-            },
-            {
-                name = "ns",
+                name = "podns",
                 index = con.pod.namespace,
-            },
-            {
-                name = "uid",
-                index = con.pod.uid,
-            },
-            {
-                name = "con_id",
-                index = con.id,
             },
         }
 
@@ -189,15 +196,23 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
 
     self._ino = Cinotifies.new()
     self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
+    
+    self._ino:add(mnt .. "sys/fs/cgroup/memory/kubepods.slice")
+    self._ino:add(mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-besteffort.slice")
+    self._ino:add(mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-burstable.slice")
+ 
     print( "pods plugin add " .. #self._plugins)
 end
 
 function CpodsAll:proc(elapsed, lines)
     local rec = {}
-    if self._ino:isChange() then
+    if self._ino:isChange() or #self._plugins == 0 then
         print("cgroup changed.")
         self._ino = Cinotifies.new()
         self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
+        self._ino:add(self._mnt .. "sys/fs/cgroup/memory/kubepods.slice")
+        self._ino:add(self._mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-besteffort.slice")
+        self._ino:add(self._mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-burstable.slice")
     end
     for i, plugin in ipairs(self._plugins) do
         --local res = plugin:proc(elapsed, lines)
