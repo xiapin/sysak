@@ -47,7 +47,8 @@ end
 
 local function get_point(fName)
     local lines = get_lines(fName)
-    local lOut = {"devtmpfs", "tmpfs"}
+    ---local lOut = {"devtmpfs", "tmpfs"}
+    local lOut = {}
     local tDev = {}
     local ret = {}
     for _, line in ipairs(lines) do
