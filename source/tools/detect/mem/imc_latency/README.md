@@ -10,7 +10,7 @@
 Sample:
 
 imc_latency -f /dev/stdout #输出日子到控制台
-imc_latency -d 15 i 20  # 每15秒采集一次 输出20次采集结果
+imc_latency -d 15 -i 20  # 每15秒采集一次 输出20次采集结果
 ```
 
 ### 结果说明
@@ -38,7 +38,7 @@ imc_latency -d 15 i 20  # 每15秒采集一次 输出20次采集结果
 
 ## 原理与限制
 
-基于IMC的PMU组件实现，需要硬件支持。目前仅支持Intel的Ice Lake（ICX）、Sky Lake（SKX）、Cascade Lake以及Sapphire Rapids(SPR)等架构。
+基于IMC的PMU组件实现，需要硬件支持。目前仅支持Intel的Ice Lake（ICX）、Sky Lake（SKX）、Cascade Lake以及Sapphire Rapids(SPR)等微架构。
 
 | 微架构          | 代号 | cpu-model编号 |
 | --------------- | ---- | ------------- |
@@ -49,7 +49,7 @@ imc_latency -d 15 i 20  # 每15秒采集一次 输出20次采集结果
 
 ### 检查是否支持
 
-可以通过`lscpu`的`Model`字段检查硬件是否支持。
+可以使用`lscpu`命令，通过CPU的`Model`字段查看微架构类型，检查硬件是否支持。
 
 ```bash
 Architecture:        x86_64
