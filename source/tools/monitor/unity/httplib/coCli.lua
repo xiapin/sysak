@@ -144,8 +144,19 @@ function CcoCli:pushMsg(coOut, bytes)
 
     ok, msg = coroutine.resume(coOut, lines)
     if not ok then
-        error(string.format("coOut run failed %s", msg))
+        print(string.format("coOut run failed %s", msg))
     end
+    return ok
+end
+
+function CcoCli:_newOut(cli)
+    local coOut = coroutine.create(self.coQueFunc)
+    local ok, msg = coroutine.resume(coOut, self, cli, self.cffi, self._efd, coOut)
+    if not ok then
+        error(string.format("coOut run failed %s", msg))
+        return nil
+    end
+    return coOut
 end
 
 function CcoCli:_pollFd(bfd, cli, nes, coIn, coOut)
@@ -157,7 +168,11 @@ function CcoCli:_pollFd(bfd, cli, nes, coIn, coOut)
             ok, msg = coroutine.resume(coIn, e)
             if ok then
                 if msg then
-                    self:pushMsg(coOut, msg)
+                    ok = self:pushMsg(coOut, msg)
+                    if not ok then
+                        coOut = self:_newOut(cli)
+                        assert(coOut)
+                    end
                 end
             else
                 error(string.format("coIn run failed %s", msg))
@@ -177,6 +192,7 @@ function CcoCli:_pollFd(bfd, cli, nes, coIn, coOut)
             print("bad fd " .. fd .. "use fd " .. cli.fd)
         end
     end
+    return coOut
 end
 
 function CcoCli:_poll(cli)
@@ -185,11 +201,14 @@ function CcoCli:_poll(cli)
     local efd = self._efd
     local ffi, cffi = self.ffi, self.cffi
 
-    local coOut = coroutine.create(self.coQueFunc)
-    ok, msg = coroutine.resume(coOut, self, cli, cffi, efd, coOut)
-    if not ok then
-        error(string.format("coOut run failed %s", msg))
-    end
+    --local coOut = coroutine.create(self.coQueFunc)
+    --ok, msg = coroutine.resume(coOut, self, cli, cffi, efd, coOut)
+    --if not ok then
+    --    error(string.format("coOut run failed %s", msg))
+    --end
+
+    local coOut = self:_newOut(cli)
+    assert(coOut)
 
     local coIn = coroutine.create(read_stream)
     ok, msg = coroutine.resume(coIn, bfd)
@@ -197,7 +216,6 @@ function CcoCli:_poll(cli)
         error(string.format("coIn run failed %s", msg))
     end
 
-    local c = 1
     while true do
         local nes = ffi.new("native_events_t")
         local res = cffi.poll_fds(efd, 1, nes)
@@ -206,7 +224,7 @@ function CcoCli:_poll(cli)
             return "end poll."
         end
         if nes.num > 0 then
-            self:_pollFd(bfd, cli, nes, coIn, coOut)
+            coOut = self:_pollFd(bfd, cli, nes, coIn, coOut)
         else
             self:checkOvertime(cli, coOut, ffi)
         end
