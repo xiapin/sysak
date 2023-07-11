@@ -30,7 +30,7 @@ function CPodAlloc:_init_(proto, pffi, mnt, pFile)
     self.cgroup_pod = {}
     self.allpods = {}
     self.blacklist = {["arms-prom"] = 1, ["kube-system"] = 1, ["kube-public"] = 1, ["kube-node-lease"] = 1}
-    -- self.blacklist= {}
+    --self.blacklist= {}
     self.total = 0
     self.count = 0
     self.cgroup_count = 0
@@ -209,6 +209,13 @@ function CPodAlloc:get_allpods()
     local cli = ChttpCli.new()
     local content = cli:get(url)
     local obj = cli:jdecode(content.body)
+    if not obj then 
+        local cmd = ' curl -s -k -XGET https://127.0.0.1:10250/pods --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token) "'
+        local f = io.popen(cmd,"r")
+        local podsinfo = f:read("*a")
+        f:close()
+        obj = json.decode(podsinfo) 
+    end 
     for _,v in pairs(obj['items']) do
         if not self.blacklist[v['metadata']['namespace']] then self.allpods[v['metadata']['name']] = v['metadata']['namespace'] end
     end
