@@ -731,7 +731,7 @@ int call(int t, struct unity_lines* lines) {
         line = unity_get_line(lines, (1 + env.nr_channel) * socket_id);
         unity_set_table(line, "imc_socket_latency");
         unity_set_index(line, 0, "socket", socket_name);
-        unity_set_value(line, 0, "ralt",
+        unity_set_value(line, 0, "rlat",
                         after.socket_record_arr[socket_id].read_latency);
         unity_set_value(line, 1, "wlat",
                         after.socket_record_arr[socket_id].write_latency);
