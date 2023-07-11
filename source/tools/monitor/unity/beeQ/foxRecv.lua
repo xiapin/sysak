@@ -11,6 +11,7 @@ local system = require("common.system")
 local CfoxRecv = class("CfoxRecv")
 local unistd = require("posix.unistd")
 local fcntl = require("posix.fcntl")
+local bit = require("bit")
 local struct = require("struct")
 
 local function setupCo(fYaml)
@@ -24,6 +25,10 @@ local function setupCo(fYaml)
 
         fcntl.fcntl(fdIn, 1031, 1024 * 1024)
         fcntl.fcntl(fdOut, 1031, 1024 * 1024)
+
+        local flag = fcntl.fcntl(fdOut, fcntl.F_GETFL, 0);
+        flag = bit.bor(flag, fcntl.O_NONBLOCK)
+
         lua_push_start(fdIn)
         return fdIn, fdOut
     end
@@ -50,11 +55,17 @@ function CfoxRecv:_del_()
     end
 end
 
-function CfoxRecv:outToFd(stream)
+local function pipeOut(fd, stream)
     local len = #stream
     local s = struct.pack("<i", len)
-    unistd.write(self.fdOut, s)
-    unistd.write(self.fdOut, stream)
+    local ret = unistd.write(fd, s)
+    if ret > 0 then
+        unistd.write(fd, stream)
+    end
+end
+
+function CfoxRecv:outToFd(stream)
+    pipeOut(self.fdOut, stream)
     self._fox:write(stream)
 end
 

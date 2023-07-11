@@ -70,8 +70,7 @@ local function downKo(path, name, region, machine, release)
 end
 
 function CbtfLoader:_init_(root)
-    return
-    local distro = utsname.uname()
+    --local distro = utsname.uname()
     if distro then
         local release, machine = distro.release, distro.machine
         local path = '/boot/vmlinux-' .. release
