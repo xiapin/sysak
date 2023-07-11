@@ -59,8 +59,10 @@ local function pipeOut(fd, stream)
     local len = #stream
     local s = struct.pack("<i", len)
     local ret = unistd.write(fd, s)
-    if ret > 0 then
+    if ret == 4 then
         unistd.write(fd, stream)
+    else
+        print("pipeOut failed.")
     end
 end
 
