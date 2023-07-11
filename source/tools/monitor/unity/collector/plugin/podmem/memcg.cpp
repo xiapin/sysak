@@ -44,6 +44,15 @@ struct file_info {
     int shmem;
     int del;
 };
+struct myComp2
+{
+    bool operator()(const pair<unsigned long,int> &a,const pair<unsigned long,int> &b)
+    {
+        return a.second>b.second;
+    }
+};
+
+set<pair<unsigned long, int> ,myComp2> cachedset;
 map<unsigned long , struct file_info *> files;
 struct myComp
 {
@@ -120,6 +129,177 @@ static int get_filename(unsigned long dentry, char *filename, int len)
         prepend(&end, &buflen, name, strlen(name), 1); 
     }
     strncpy(filename, end, len);
+    return 0;
+}
+
+int get_top_dentry(unsigned long pfn, int top)
+{
+    unsigned long page = PFN_TO_PAGE(pfn);
+    map<unsigned long,struct file_info*>::iterator iter2;
+    struct member_attribute *att;
+    struct member_attribute *att2;
+    unsigned long map = 0;
+    unsigned long cached = 0;
+    unsigned long inode = 0;
+    unsigned long i_ino;
+    char* tables;
+    att = get_offset("page", "mapping");
+    if (!att) {
+        return 0;
+    }
+
+    kcore_readmem(page + att->offset, &map, sizeof(map));
+    if (!is_kvaddr(map))
+        return 0;
+    att = get_offset("address_space", "host");
+    if (!att) {
+        return 0;
+    }
+    att2 = get_offset("address_space", "nrpages");
+    if (!att2) {
+        return 0;
+    }
+    tables = (char*)malloc(att2->offset-att->offset + sizeof(cached));
+    kcore_readmem(map + att->offset, tables, att2->offset-att->offset + sizeof(cached));
+    inode = *((unsigned long*) tables);
+    cached = *((unsigned long*) (tables+att2->offset-att->offset));
+    free(tables);
+    /* skip file cache < 100K */
+    //printf("top:%d, cached size:%d, cached:%d\n",top, cachedset.size(), cached*4);
+    if (cachedset.size() >= top and (cached*4 < (--cachedset.end())->second))
+        return 0;
+
+    att = get_offset("inode", "i_ino");
+    if (!att) {
+        return 0;
+    }
+    kcore_readmem(inode + att->offset, &i_ino, sizeof(i_ino));
+    iter2 = files.find(i_ino);
+    if (iter2 != files.end()) {
+        return -1;
+    }
+
+    cachedset.insert(pair<unsigned long, int>(inode,cached*4));
+    if (cachedset.size() > top)
+        cachedset.erase(--cachedset.end());
+}
+
+static int get_dentry_top()
+{
+    set<pair<unsigned long , int>, myComp2>::iterator iter;
+    unsigned long map = 0;
+    unsigned long inode = 0;
+    unsigned long i_ino;
+    unsigned long i_size;
+    unsigned long inode_dentry =0;
+    unsigned long dentry_first = 0;
+    unsigned long hdentry = 0;
+    unsigned long pdentry = 0;
+    unsigned long mount = 0;
+    char tmp[4096] = {0};
+    char *end = tmp + 4095;
+    int buflen = 4095;
+    unsigned long cached;
+    int del = 0;
+    char filename[1024] = {0};
+    struct file_info *info;
+    struct member_attribute *att;
+    for(iter=cachedset.begin();iter!=cachedset.end();iter++)
+    {
+        cached = iter->second;
+        inode = iter->first;
+        att = get_offset("inode", "i_ino");
+        if (!att) {
+            return 0;
+        }
+        kcore_readmem(inode + att->offset, &i_ino, sizeof(i_ino));
+        att = get_offset("inode", "i_size");
+        if (!att) {
+            return 0;
+        }
+        kcore_readmem(inode + att->offset, &i_size, sizeof(i_size));
+
+        mount = inode2mount(inode);
+        att = get_offset("inode","i_dentry");
+        if (!att) {
+            return 0;
+        }
+        kcore_readmem(inode + att->offset, &inode_dentry, sizeof(inode));
+        if (!is_kvaddr(inode_dentry))
+            continue;
+        att = get_offset("dentry", "d_alias");
+        if (!att) {
+            att = get_offset("dentry", "d_u");
+            if (!att)
+                return 0;
+        }
+
+        dentry_first = inode_dentry - att->offset;
+        memset(filename, 0, 1024);
+        att = get_offset("dentry", "d_parent");
+        if (!att) {
+            return 0;
+        }
+        kcore_readmem(dentry_first+att->offset, &pdentry, sizeof(pdentry));
+        att = get_offset("dentry", "d_hash");
+        if (!att) {
+            return 0;
+        }
+        kcore_readmem(dentry_first+att->offset + sizeof(void*), &hdentry, sizeof(hdentry));
+        if ((dentry_first != pdentry) && !hdentry)
+            del = 1;
+        do {
+            unsigned long mount_parent = 0;
+            unsigned long mount_dentry = 0;
+            int len = 0;
+            int ret = 0;
+
+            get_filename(dentry_first, filename, 1024);
+            len = strlen(filename);
+            if (len <=0 || ((len == 1) && (filename[0] == '/')))
+                break;
+
+            prepend(&end, &buflen, filename, strlen(filename), 0);
+            att = get_offset("mount", "mnt_parent");
+            if (!att) {
+                return 0;
+            }
+            ret = kcore_readmem(mount + att->offset, &mount_parent , sizeof(mount_parent));
+            if (ret != sizeof(mount_parent))
+                break;
+            att = get_offset("mount", "mnt_mountpoint");
+            if (!att) {
+                return 0;
+            }
+            kcore_readmem(mount+ att->offset, &mount_dentry, sizeof(mount_dentry));
+            if (mount_parent == mount || mount_dentry==dentry_first)
+                break;
+            dentry_first = mount_dentry;
+            mount = mount_parent;
+         } while(true);
+
+        if (buflen >= 4092)
+            continue;
+        info = (struct file_info *)malloc(sizeof(struct file_info));
+        if (!info) {
+            printf("alloc file info error \n");
+            continue;
+        }
+        memset(info, 0, sizeof(struct file_info));
+        info->inode = i_ino;
+        //info->shmem = shmem;
+        info->cached = cached;
+        info->cgcached = 1;
+        info->active = 0;
+        info->dirty = 0;
+        info->inactive = 0;
+        info->del = del;
+
+        info->size = i_size>>10;
+        strncpy(info->filename, end, sizeof(info->filename) - 2);
+        info->filename[sizeof(info->filename) -1] = '0';
+        files[i_ino] = info;
+    }
     return 0;
 }
 
@@ -382,9 +562,10 @@ int scan_pageflags_nooutput(struct options *opt, char *res)
         shmem = !!(pageflag & (1 <<KPF_SWAPBACKED)); 
         inode = get_cgroup_inode(pfn);
         if (check_cgroup_inode(inode)) {
-            get_dentry(pfn, inode, active, shmem,dirty, opt->top);
+            get_top_dentry(pfn, opt->top);
         } 
     }
+    get_dentry_top();
     output_file_cached_string(opt->top, res);
     return 0;
 }
