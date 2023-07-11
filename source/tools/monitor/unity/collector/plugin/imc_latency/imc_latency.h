@@ -1,5 +1,5 @@
-#ifndef UNITY_SAMPLE_H
-#define UNITY_SAMPLE_H
+#ifndef UNITY_IMC_LATENCY_H
+#define UNITY_IMC_LATENCY_H
 
 #include <linux/types.h>
 #include <stdbool.h>
@@ -123,4 +123,4 @@ struct topology_ent {
     int64_t socket_id;
 };
 
-#endif  // UNITY_SAMPLE_H
+#endif
