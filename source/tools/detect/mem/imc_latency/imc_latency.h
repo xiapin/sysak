@@ -1,5 +1,5 @@
-#ifndef UNITY_SAMPLE_H
-#define UNITY_SAMPLE_H
+#ifndef IMC_LATENCY_H
+#define IMC_LATENCY_H
 
 #include <linux/types.h>
 #include <stdbool.h>
@@ -153,4 +153,4 @@ typedef struct record {
     socket_record* socket_record_arr;
 } record;
 
-#endif  // UNITY_SAMPLE_H
+#endif
