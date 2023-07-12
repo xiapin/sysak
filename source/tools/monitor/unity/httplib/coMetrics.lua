@@ -26,6 +26,8 @@ function CcoMetrics:_init_(fYaml)
     self._sk = 2
     self._transPro = CtransPro.new(self._instance, fYaml, false, false)
 
+    self._url = "http://127.0.0.1:3330/api/v1/write"
+
     -- go ffi
     local ffi = require("sls_metric.native.ffi_lua")
     self.ffi = ffi.ffi
@@ -84,7 +86,7 @@ function CcoMetrics:pack(body)
         ["Content-Type"] = "application/x-protobuf",
         ["X-Prometheus-Remote-Write-Version"] = "0.1.0",
         --["Content-Length"] = #body,
-        ["Authorization"] = "Basic " .. base64.encode(self._ak .. ":"..self._sk)
+        --["Authorization"] = "Basic " .. base64.encode(self._ak .. ":"..self._sk)
     }
 
     local heads = self:packCliHeaders(head)
