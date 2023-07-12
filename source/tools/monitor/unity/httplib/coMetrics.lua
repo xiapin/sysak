@@ -11,7 +11,7 @@ local system = require("common.system")
 local pystring = require("common.pystring")
 local lineParse = require("common.lineParse")
 local CtransPro = require("common.transPro")
-
+local base64 = require("base64")
 
 
 local CcoMetrics = class("coMetrics", CcoHttpCli)
@@ -22,13 +22,19 @@ function CcoMetrics:_init_(fYaml)
     local _metrics = res.metrics
     self._mhead = _metrics.head
     self._title = _metrics.title
-
+    self._ak = 1
+    self._sk = 2
     self._transPro = CtransPro.new(self._instance, fYaml, false, false)
 
     -- go ffi
     local ffi = require("sls_metric.native.ffi_lua")
     self.ffi = ffi.ffi
     self.awesome = ffi.awesome
+
+    --fox ffi
+    local foxFFI = require("tsdb.native.foxffi")
+    self.foxffi = foxFFI.ffi
+    self.foxcffi = foxFFI.cffi
 end
 
 function CcoMetrics:echo(tReq)
@@ -45,31 +51,40 @@ function CcoMetrics:trans(msgs)
 
     lines = msgs.lines
     res = self._transPro:export(lines)
-
+    print("trans finish")
     local prome = self.ffi.new("GoString")
     prome.p = res
     prome.n = #res
     local prome_ptr = self.ffi.cast("GoString*", prome)
     local byte = self.ffi.new("GoSlice")
-    local byte_ptr = self.ffi.cast("GoSlice*", byte)
+    local byte_ptr = self.ffi.cast("GoSlice*", byte) --{ void *data; GoInt len; GoInt cap; } GoSlice
     local data_len = self.awesome.metricSnappy(prome,byte_ptr)
     data_len = tonumber(data_len)
     local data = self.ffi.cast("GoUint8*", byte_ptr.data)
+    --local stream = ""
     --for i = 0, data_len do
-    --    print(data[i])
+    --    --print(data[i])
+    --
+    --    stream = stream .. string.char(data[i])
     --end
+    --
+    --print(stream)
+    --return stream
 
-    return data
+    return self.foxffi.string(data, data_len)
 end
 
-function CcoMetrics:pack(body) --在哪里调用的
+function CcoMetrics:pack(body)
+    print("pack start ".. body)
     local line = self:packCliHead('POST', self._url)
     local head = {
         Host = self._host,
         ["Content-Encoding"] = "snappy",
         ["Content-Type"] = "application/x-protobuf",
         ["Content-Length"] = #body,
+        ["Authorization"] = "Basic " .. base64.encode(self._ak .. ":"..self._sk)
     }
+
     local heads = self:packCliHeaders(head)
     print("pack finish")
     return pystring:join("\r\n", {line, heads, body})

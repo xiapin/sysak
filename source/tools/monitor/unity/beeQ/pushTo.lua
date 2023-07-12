@@ -15,11 +15,11 @@ function work(fd, fYaml)
     local conf = system:parseYaml(fYaml)
     local to = conf.pushTo.to
     local frame = coCli.new(fd)
-    self._funcs = {
+    local _funcs = {
         Influx = function(fYaml) return coInflux.new(fYaml) end,
         Metrics = function(fYaml) return coMetrics.new(fYaml) end
     }
-    local c = self._funcs[to](fYaml)
+    local c = _funcs[to](fYaml)
     frame:poll(c)
     print("end push.")
     return 0
