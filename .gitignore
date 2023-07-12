@@ -7,8 +7,10 @@
 *.ko.cmd
 *.idea
 sync.sh
-/.DS_Store
-/.idea
+.DS_Store
+**/.DS_Store
+.idea/
+**/.idea
 Module.symvers
 modules.builtin
 modules.order
