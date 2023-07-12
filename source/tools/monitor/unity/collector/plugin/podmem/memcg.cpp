@@ -299,6 +299,7 @@ static int get_dentry_top()
         strncpy(info->filename, end, sizeof(info->filename) - 2);
         info->filename[sizeof(info->filename) -1] = '0';
         files[i_ino] = info;
+        fileset.insert(i_ino);
     }
     return 0;
 }
@@ -517,6 +518,7 @@ static int output_file_cached_string(unsigned int top, char *res)
     }
     files.clear();
     fileset.clear();
+    cachedset.clear();
 
     return 0;
 }
