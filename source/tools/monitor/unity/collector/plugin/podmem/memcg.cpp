@@ -63,6 +63,7 @@ struct myComp
 };
 set<unsigned long,myComp> fileset;
 map<unsigned long , int> inodes;
+map<unsigned long , int> history_inodes;
 extern struct member_attribute *get_offset(string struct_name,  string member_name);
  
 static int prepend(char **buffer, int *buflen, const char *str, int namelen, int off)
@@ -166,20 +167,11 @@ int get_top_dentry(unsigned long pfn, int top)
     free(tables);
     /* skip file cache < 100K */
     //printf("top:%d, cached size:%d, cached:%d\n",top, cachedset.size(), cached*4);
-    if (cachedset.size() >= top and (cached*4 < (--cachedset.end())->second))
+    if (history_inodes.find(inode) != history_inodes.end() or (cachedset.size() >= top and (cached*4 < (--cachedset.end())->second)))
         return 0;
-
-    att = get_offset("inode", "i_ino");
-    if (!att) {
-        return 0;
-    }
-    kcore_readmem(inode + att->offset, &i_ino, sizeof(i_ino));
-    iter2 = files.find(i_ino);
-    if (iter2 != files.end()) {
-        return -1;
-    }
 
     cachedset.insert(pair<unsigned long, int>(inode,cached*4));
+    history_inodes[inode] = 1;
     if (cachedset.size() > top)
         cachedset.erase(--cachedset.end());
 }
@@ -196,16 +188,16 @@ static int get_dentry_top()
     unsigned long hdentry = 0;
     unsigned long pdentry = 0;
     unsigned long mount = 0;
-    char tmp[4096] = {0};
-    char *end = tmp + 4095;
-    int buflen = 4095;
     unsigned long cached;
     int del = 0;
-    char filename[1024] = {0};
     struct file_info *info;
     struct member_attribute *att;
     for(iter=cachedset.begin();iter!=cachedset.end();iter++)
     {
+        char tmp[4096] = {0};
+        char *end = tmp + 4095;
+        int buflen = 4095;
+        char filename[1024] = {0};
         cached = iter->second;
         inode = iter->first;
         att = get_offset("inode", "i_ino");
@@ -519,6 +511,7 @@ static int output_file_cached_string(unsigned int top, char *res)
     files.clear();
     fileset.clear();
     cachedset.clear();
+    history_inodes.clear();
 
     return 0;
 }
