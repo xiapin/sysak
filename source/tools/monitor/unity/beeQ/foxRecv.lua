@@ -11,7 +11,6 @@ local system = require("common.system")
 local CfoxRecv = class("CfoxRecv")
 local unistd = require("posix.unistd")
 local fcntl = require("posix.fcntl")
-local bit = require("bit")
 local struct = require("struct")
 
 local function setupCo(fYaml)
@@ -26,8 +25,7 @@ local function setupCo(fYaml)
         fcntl.fcntl(fdIn, 1031, 1024 * 1024)
         fcntl.fcntl(fdOut, 1031, 1024 * 1024)
 
-        local flag = fcntl.fcntl(fdOut, fcntl.F_GETFL, 0);
-        flag = bit.bor(flag, fcntl.O_NONBLOCK)
+        system:fdNonBlocking(fdOut)
 
         lua_push_start(fdIn)
         return fdIn, fdOut

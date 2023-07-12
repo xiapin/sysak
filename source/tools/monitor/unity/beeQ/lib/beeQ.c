@@ -221,6 +221,7 @@ int beeQ_stop(struct beeQ *q) {
 
 int beeQ_send(struct beeQ *q, void *msg) {
     int loop = 0;
+    int wake = 0;
 
     pthread_mutex_lock(&q->mtx);
     if (q->stop) {
@@ -243,11 +244,14 @@ int beeQ_send(struct beeQ *q, void *msg) {
     }
 
     if (isempty(q)) {
-        pthread_cond_signal(&q->cond);  // need to wakeup.
+        wake = 1;
     }
     q->send = (q->send + 1) % q->size;
     q->msgs[q->send] = msg;
     pthread_mutex_unlock(&q->mtx);
+    if (wake) {
+        pthread_cond_signal(&q->cond);  // need to wakeup.
+    }
     return 0;
 }
 
