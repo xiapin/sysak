@@ -71,6 +71,7 @@ function CcoMetrics:pack(body) --在哪里调用的
         ["Content-Length"] = #body,
     }
     local heads = self:packCliHeaders(head)
+    print("pack finish")
     return pystring:join("\r\n", {line, heads, body})
 end
 
