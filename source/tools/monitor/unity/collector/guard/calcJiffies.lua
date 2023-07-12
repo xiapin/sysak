@@ -6,6 +6,7 @@
 
 local mod = {}
 local ptime = require("posix.time")
+local pstime = require("posix.sys.time")
 local unistd = require("posix.unistd")
 local system = require("common.system")
 
@@ -26,7 +27,16 @@ local function read_jiffies(path, procffi)
     return res
 end
 
-local function nproc()
+local function get_native_us()
+    local res, err, errno = pstime.gettimeofday()
+    if res then
+        return res.tv_sec * 1e6 + res.tv_usec
+    else
+        system:posixError("gettimeofday failed", err, errno)
+    end
+end
+
+local function nproc()   -- get cpu numbers, exec nproc
     local r, err, errno = unistd.sysconf(84)
     if err then
         system:posixError("sysconf failed", err, errno)
@@ -40,26 +50,30 @@ function mod.calc(mnt, procffi)
     local r, err, errno
 
     local j1 = read_jiffies(path, procffi)
+    local ns1 = get_native_us()
     r, err, errno = ptime.nanosleep(t)
     if err then
         system:posixError("nano sleep failed", err, errno)
     end
 
     local j2 = read_jiffies(path, procffi)
+    local ns2 = get_native_us()
     ptime.nanosleep(t)
     if err then
         system:posixError("nano sleep failed", err, errno)
     end
 
     local j3 = read_jiffies(path, procffi)
+    local ns3 = get_native_us()
+
     local delta1, delta2 = j2 - j1, j3 -j2
-    local comp = delta1 / delta2
+    local dts1, dts2 = ns2 - ns1, ns3 - ns2
+    local comp = (delta1 / dts1) / ( delta2 / dts2 )
 
     if comp >= 1.1 or comp < 0.9 then
-        error("calculate jiffies failed.")
+        error(string.format("calculate jiffies failed, delta1: %d, delta2: %d, dts1: %d, dts2: %d", delta1, delta2, dts1, dts2))
     end
-
-    return (delta1 + delta2) * 2.5 / nproc()
+    return (delta1 + delta2) * ( 1e6 / (dts1 + dts2)) / nproc()
 end
 
 return mod
