@@ -72,6 +72,7 @@ function CcoMetrics:trans(msgs)
     --return stream
 
     return self.foxffi.string(data, data_len)
+    --return "hello world"
 end
 
 function CcoMetrics:pack(body)
@@ -81,7 +82,8 @@ function CcoMetrics:pack(body)
         Host = self._host,
         ["Content-Encoding"] = "snappy",
         ["Content-Type"] = "application/x-protobuf",
-        ["Content-Length"] = #body,
+        ["X-Prometheus-Remote-Write-Version"] = "0.1.0",
+        --["Content-Length"] = #body,
         ["Authorization"] = "Basic " .. base64.encode(self._ak .. ":"..self._sk)
     }
 

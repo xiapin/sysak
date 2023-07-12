@@ -101,6 +101,7 @@ func MockRemoteWrite() {
 
 	// data, _ := proto.Marshal(&prompb.WriteRequest{Timeseries: timeSeries})
 	// bufBody := snappy.Encode(nil, data)
+	fmt.Println(bufBody)
 	rwR, err := http.NewRequest("POST", Url, ioutil.NopCloser(bytes.NewReader(bufBody)))
 	rwR.Header.Add("Content-Encoding", "snappy")
 	rwR.Header.Set("Content-Type", "application/x-protobuf")

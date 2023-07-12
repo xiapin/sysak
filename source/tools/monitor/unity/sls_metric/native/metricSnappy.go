@@ -33,7 +33,7 @@ func metricSnappy(prome_ptr *string, ret *[]byte) int {
 		// seperate data
 		sep := "[{} ]"
 		result := regexp.MustCompile(sep).Split(metric, -1)
-		fmt.Println(result)
+// 		fmt.Println(result)
 		if (len(result)!=4){
 			continue
 		}
