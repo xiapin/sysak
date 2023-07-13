@@ -1,8 +1,10 @@
 # 外部数据写入支持
-unity-mon可以作为一个独立的TSDB 数据库进行使用，支持[行协议](https://jasper-zhang1.gitbooks.io/influxdb/content/Write_protocols/line_protocol.html)写入数据，并按需完成对外数据吐出。
+unity-mon可以作为一个独立的TSDB 数据库进行使用，支持[行协议](https://jasper-zhang1.gitbooks.io/influxdb/content/Write_protocols/line_protocol.html)写入数据，并按需完成对外数据吐出，如exporter等接口。
 
 ## 行协议格式支持情况
 unity-mon 当前除了不支持时间戳，支持行协议其它所有的数据类型，包含数值和日志。写行数据时，有以下注意事项：
+
+* 指标写入周期需要与大循环刷新周期保持一致，参考 yaml/config/freq 参数配置；
 
 * 不要将同一表名和同一索引，但数值不同的数据放在同一批次写入操作中，会发生时序数据覆盖，如；
 
@@ -18,7 +20,7 @@ talbe_a,index=table_a value1=1,value2=2
 talbe_a,index=table_b value1=3,value2=4
 ```
 
-不要出现同一张表，但是写入的索引和数值不的情况，如：
+* 不要出现同一张表，但是写入的索引和数值不的情况，如：
 
 ```
 talbe_a,index=table_a value1=1
@@ -34,7 +36,7 @@ unity-mon 同时支持管道和http post 两种方式进行写入，两者差别
 | --- | --- | --- |
 | 适用范围 | 内部 | 内部 + 外部 |
 | 写入效率 | 高 | 低 |
-| 最大写入数据长度 | 64K | 2M |
+| 最大单次写入数据长度 | 64K | 2M |
 
 使用者可以结合自己的实际情况进行推送
 

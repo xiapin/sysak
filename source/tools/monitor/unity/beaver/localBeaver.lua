@@ -23,12 +23,17 @@ end
 
 function CLocalBeaver:_init_(frame, fYaml)
     local port, ip, backlog, unix_socket = setupServer(fYaml)
+    self:_installFFI()
     if not unix_socket then
         self._bfd = self:_install_fd(port, ip, backlog)
     else
         self._bfd = self:_install_fd_unisock(backlog, unix_socket)
     end
-    self._efd = self:_installFFI()
+    --self._efd = self:_installFFI()
+
+    local efd =  self._cffi.init(self._bfd)
+    assert(efd > 0)
+    self._efd = efd
 
     self._cos = {}
     self._last = os.time()
@@ -85,18 +90,16 @@ function CLocalBeaver:_installFFI()
     self._ffi = ffi.ffi
     self._cffi = ffi.cffi
 
-    local efd = self._cffi.init(self._bfd)
-    assert(efd > 0)
-    return efd
 end
 
-local function localBind(fd, tPort)
+local function localBind(cffi, fd, tPort)
     local try = 0
     local res, err, errno
 
     -- can reuse for time wait socket.
-    res, err, errno = socket.setsockopt(fd, socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
-    if not res then
+    --res, err, errno = socket.setsockopt(fd, socket.SOL_SOCKET, socket.SO_REUSEADDR, 1);
+    res = cffi.setsockopt_AP(fd)
+    if res<0 then
         system:posixError("set sock opt failed.");
     end
 
@@ -120,7 +123,7 @@ function CLocalBeaver:_install_fd_unisock(backlog,unix_socket)
     fd, err, errno = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM, 0)
     if fd then  -- for socket
         local tPort = {family=socket.AF_UNIX, path=unix_socket}
-        local r, msg = pcall(localBind, fd, tPort)
+        local r, msg = pcall(localBind, self._cffi, fd, tPort)
         if r then
             res, err, errno = socket.listen(fd, backlog)
             if res then -- for listen
@@ -130,7 +133,7 @@ function CLocalBeaver:_install_fd_unisock(backlog,unix_socket)
                 system:posixError("socket listen failed", err, errno)
             end
         else
-            print(msg)
+            print("call localBind failed, report: " .. msg)
             unistd.close(fd)
             os.exit(1)
         end
@@ -144,7 +147,7 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
     fd, err, errno = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
     if fd then  -- for socket
         local tPort = {family=socket.AF_INET, addr=ip, port=port}
-        local r, msg = pcall(localBind, fd, tPort)
+        local r, msg = pcall(localBind, self._cffi, fd, tPort)
         if r then
             res, err, errno = socket.listen(fd, backlog)
             if res then -- for listen
@@ -154,7 +157,7 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
                 system:posixError("socket listen failed", err, errno)
             end
         else
-            print(msg)
+            print("call localBind failed, report: " .. msg)
             unistd.close(fd)
             os.exit(1)
         end

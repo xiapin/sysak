@@ -24,6 +24,9 @@ local function setupCo(fYaml)
 
         fcntl.fcntl(fdIn, 1031, 1024 * 1024)
         fcntl.fcntl(fdOut, 1031, 1024 * 1024)
+
+        system:fdNonBlocking(fdOut)
+
         lua_push_start(fdIn)
         return fdIn, fdOut
     end
@@ -50,11 +53,19 @@ function CfoxRecv:_del_()
     end
 end
 
-function CfoxRecv:outToFd(stream)
+local function pipeOut(fd, stream)
     local len = #stream
     local s = struct.pack("<i", len)
-    unistd.write(self.fdOut, s)
-    unistd.write(self.fdOut, stream)
+    local ret = unistd.write(fd, s)
+    if ret == 4 then
+        unistd.write(fd, stream)
+    else
+        print("pipeOut failed.")
+    end
+end
+
+function CfoxRecv:outToFd(stream)
+    pipeOut(self.fdOut, stream)
     self._fox:write(stream)
 end
 

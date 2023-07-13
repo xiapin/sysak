@@ -24,6 +24,7 @@ int add_fd(int efd, int fd);
 int mod_fd(int efd, int fd, int wr);
 int del_fd(int efd, int fd);
 int poll_fds(int efd, int tmo, native_events_t* nes);
+int setsockopt_AP(int fd);
 void deinit(int efd);
 ]]
 

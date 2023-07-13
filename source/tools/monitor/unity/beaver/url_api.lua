@@ -45,11 +45,11 @@ local function reqOSS(oss, uuid, stream)
 end
 
 function CurlApi:oss(tReq)
-    local stat, tJson = pcall(self.getJson, self, tReq)
-    if stat and tJson then
-        local uuid = tJson.uuid
-        local stream = tJson.stream
-        if uuid and stream then
+    local uuid = tReq.header['uuid']
+    local cLen = tonumber(tReq.header['content-length'])
+    if uuid and cLen and cLen > 0 then
+        local stream = tReq.data
+        if stream then
             local stat, body = pcall(reqOSS, self._oss, uuid, stream)
             if stat then
                 return body
@@ -57,10 +57,10 @@ function CurlApi:oss(tReq)
                 return "bad req dns " .. body, 400
             end
         else
-            return "need uuid and stream arg.", 400
+            return "need stream arg.", 400
         end
     else
-        return "bad dns " .. tReq.data, 400
+        return "need uuid and content-length > 0." .. tReq.data, 400
     end
 end
 

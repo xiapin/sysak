@@ -13,6 +13,10 @@ local url = "http://127.0.0.1:8400/api/oss"
 local file = io.open("test.bin", "rb")
 local content = file:read("*all")
 file:close()
-local req = {stream = content, uuid = system:guid()}
-local res = cli:postTable(url, req)
+local header = {
+    uuid = system:guid(),
+    ['Content-Type'] = 'application/octet-stream',
+    ["Content-Length"] = #content
+}
+local res = cli:post(url, content, header)
 system:dumps(res)

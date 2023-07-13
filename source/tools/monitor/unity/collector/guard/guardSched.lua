@@ -15,7 +15,7 @@ function CguardSched:_init_(tid, procs, names, jperiod)
     self._jperiod = jperiod
     self._procs = procs
     self._names = names
-    self._limit = 1e5*5   -- 500 ms
+    self._limit = 1e5 * 5   -- 500 ms
 end
 
 function CguardSched:proc(t, lines)
@@ -38,7 +38,7 @@ function CguardSched:proc(t, lines)
             if stop - start - overTime >= self._limit then   --
                 print(stop - start)
                 local j2 = self._stat:jiffies()
-                if j2 - j1 >= self._limit / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used bye plugin
+                if j2 - j1 >= self._limit / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used by plugin
                     table.insert(toRemove, i)
                 end
             end
