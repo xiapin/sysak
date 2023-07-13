@@ -1,14 +1,14 @@
 [Unit]
-Description=SysAK monitor service
-After=syslog.target
+  Description=sysak unity-mon
+  After=network.target
 
 [Service]
-Type=simple
-
-ExecStart=/usr/bin/sysak mservice -S &
-ExecStop=/usr/bin/killall mservice
-MemoryLimit=300M
-CPUQuota=60%
-
-[Install]
-WantedBy=multi-user.target
+  Type=simple
+  Restart=always
+  RestartSec=10
+  CPUQuota=30%
+  MemoryLimit=60M
+  ExecStart=/usr/local/sysak/.sysak_components/tools/dist/app/beeQ/run.sh
+  ExecStop=kill -9 $(pidof unity-mon)
+  ExecReload=kill -1 $(pidof unity-mon)
+  TimeoutStopSec=30s

@@ -31,7 +31,7 @@ struct member_attribute
  * Note: Remember to free pointer of struct member_attribute
  */
 struct member_attribute *btf_find_struct_member(struct btf *btf, char *struct_name, char *member_name);
-
+void btf__free(struct btf *btf);
 
 #endif
 

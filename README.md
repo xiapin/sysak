@@ -15,6 +15,7 @@ with user-mode tools.
 Quick start to use SysAK:
 1) ./configure
 2) make
-3) ./out/sysak list -a
+3) make install
+4) sysak list -a
 
 More usage documentation of SysAK are included in doc/

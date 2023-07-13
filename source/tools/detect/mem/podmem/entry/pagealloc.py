@@ -32,12 +32,12 @@ def get_runtime_sock(meminfo):
     meminfo["runtime"] = "docker"
     meminfo["runtime_sock"] = "/var/run/docker.sock"
     runtime_sock = ""
-    sock=["var/run/docker.sock","run/containerd/containerd.sock", "var/run/dockershim.sock"] 
+    sock=["var/run/docker.sock","run/podman/podman.sock", "run/containerd/containerd.sock", "var/run/dockershim.sock"] 
     for runtime in sock:
         runtime_sock = rootfs + runtime
         if os.path.exists(runtime_sock):
             meminfo["runtime_sock"] = runtime_sock
-            if runtime_sock.find("docker.sock") == -1:
+            if runtime_sock.find("docker.sock") == -1 or runtime_sock.find("podman.sock") == -1:
                 meminfo["runtime"] = "crictl"
             return runtime_sock
     print("get docker runtime error")
@@ -225,7 +225,7 @@ def pagemem_check(meminfo,ns):
         #ret = os_cmd("ss -anp")
         idx = 0
         for idx in range(len(ret)):
-            line = ret[idx]
+            line = ret[idx].decode("utf-8")
             if line.find(":") == -1:
                 continue
             if line.find("Recv-Q") != -1:
@@ -234,14 +234,16 @@ def pagemem_check(meminfo,ns):
             if len(line_list) < 4:
                 continue
             proto = line_list[0]
-            if proto != "tcp" and proto != "udp" and proto != "raw":
+            if proto != "tcp" and proto != "udp" and proto != "raw" and  proto != "tcp6":
                 continue
             info = get_task(line)
             task = info[0]
             pid = info[1]
             task_pid = task+"-"+pid
             rx = int(line_list[2])
+            tx = int(line_list[3])
             rx_mem += rx
+            tx_mem += tx
             if task_pid not in memTask.keys():
                 memTask[task_pid] = pod_id(info[1],task)
             cid = memTask[task_pid]
@@ -249,22 +251,27 @@ def pagemem_check(meminfo,ns):
                 podname = get_container_info(meminfo, cid, task)
                 memPod[cid] = podname
             podname = memPod[cid]
-            if rx < 1024 and podname == task:
+            if rx < 1024 and tx < 1024 and podname == task:
                 continue
-            print("podname:{} task:{} pid: {} rx:{}".format(podname, task, pid,rx))
+            #print("podname:{} task:{} pid: {} rx:{}".format(podname, task, pid,rx))
             if podname not in meminfo["podinfo"].keys():
                 meminfo["podinfo"][podname] = {}
-                meminfo["podinfo"][podname]["mem"] = 0
+                meminfo["podinfo"][podname]["rxmem"] = 0
+                meminfo["podinfo"][podname]["txmem"] = 0
                 meminfo["podinfo"][podname]["podname"] = podname
                 meminfo["podinfo"][podname]["podns"] = podname
-            meminfo["podinfo"][podname]["mem"] += rx
+            meminfo["podinfo"][podname]["rxmem"] += rx
+            meminfo["podinfo"][podname]["txmem"] += tx
         set_ns("1")
-    total = (rx_mem) / 1024
+    total_rx = (rx_mem) / 1024
+    total_tx = (tx_mem) / 1024
     meminfo["rx_queue"] = rx_mem/1024
+    meminfo["tx_queue"] = tx_mem/1024
     meminfo["task"] = memPod
-    print("total Recv-Q: {}K".format(rx_mem/1024))
+    print("total Recv-Q: {:.2f}K".format(rx_mem/1024))
+    print("total Send-Q: {:.2f}K".format(tx_mem/1024))
     for podname,value in meminfo["podinfo"].items():
-        print("Recv-Q: {}K podname:{} podns: {}".format(value["mem"]/1024, value["podname"],value["podns"]))
+        print("Recv-Q: {:.2f}K Send-Q: {:.2f}K podname:{} podns: {}".format(value["rxmem"]/1024, value["txmem"]/1024, value["podname"],value["podns"]))
     return meminfo
 
 

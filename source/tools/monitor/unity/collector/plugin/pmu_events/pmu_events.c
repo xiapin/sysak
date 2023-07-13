@@ -10,7 +10,7 @@ double summary[NR_EVENTS];
 struct pcpu_hw_info *gpcpu_hwi;
 struct pmu_events *glb_pme;
 char *events_str[] = {"cycles", "ins", "refCyc",
-			"llcLoadMis", "llcStoreMis"
+			"llcLoadMis", "llcStoreMis",
 			"llcLoad", "llcStore"};
 char *value_str[] = {"cycles", "instructions", "CPI",
 			"llc_load_ref", "llc_load_miss", "LLC_LMISS_RATE"
