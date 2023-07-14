@@ -20,7 +20,9 @@ function work(fd, fYaml)
         Metrics = function(fYaml) return coMetrics.new(fYaml) end
     }
     local c = _funcs[to](fYaml)
+    --local c = _funcs[to]("/etc/sysak/base.yaml")
     frame:poll(c)
+
     print("end push.")
     return 0
 end

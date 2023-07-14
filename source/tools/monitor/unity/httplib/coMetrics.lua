@@ -17,7 +17,7 @@ local base64 = require("base64")
 local CcoMetrics = class("coMetrics", CcoHttpCli)
 
 function CcoMetrics:_init_(fYaml)
-    CcoHttpCli._init_(self, fYaml)
+
     local res = system:parseYaml(fYaml)
     local _metrics = res.metrics
     self._mhead = _metrics.head
@@ -33,8 +33,14 @@ function CcoMetrics:_init_(fYaml)
     self._endpoint = sysconf.config.endpoint
     self._metricstore = sysconf.config.metricstore
     self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"
-    print(self._url)
     self._host = self._project .."." .. self._endpoint
+
+    local pushMetrics = {
+        host = self._host,
+        url = self._url,
+        port = 80
+    }
+    CcoHttpCli._init_(self, pushMetrics)
     -- go ffi
     local ffi = require("sls_metric.native.ffi_lua")
     self.ffi = ffi.ffi
