@@ -412,7 +412,7 @@ def handle_args(podinfo, argv):
             print("-j: dump result to json file (sysak podmem -s -j ./test.json)")
             print("-r: set sample rate ,default set to 1 (sysak podmem -s -r 2)")
             print("-t: output filecache top ,default for top 10 (sysak podmem -s -t 20)")
-            print("-m: analysis pod recv-Q memory")
+            print("-m: analysis pod recv-Q  and send-Q memory")
             sys.exit(2) 
         elif opt == '-r':
             cmdline['rate'] = int(arg)
