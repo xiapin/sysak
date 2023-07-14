@@ -61,6 +61,7 @@ int get_oom_score(int pid);
 int get_oom_score_adj(const int pid, int* out);
 long long get_vm_rss_kib(int pid);
 int get_comm(int pid, char* out, size_t outlen);
+int get_cmdline(int pid, char *out, int out_len);
 int get_uid(int pid);
 
 #endif

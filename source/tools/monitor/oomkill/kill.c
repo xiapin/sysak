@@ -427,6 +427,8 @@ procinfo_t find_largest_process(const poll_loop_args_t* args)
  */
 void kill_process(const poll_loop_args_t* args, int sig, const procinfo_t* victim)
 {
+    char cmdline[512];
+
     if (victim->pid <= 0) {
         warn("Could not find a process to kill. Sleeping 1 second.\n");
         if (args->notify) {
@@ -444,10 +446,12 @@ void kill_process(const poll_loop_args_t* args, int sig, const procinfo_t* victi
     } else if (sig == 0) {
         sig_name = "0 (no-op signal)";
     }
+    get_cmdline(victim->pid, cmdline, sizeof(cmdline));
     // sig == 0 is used as a self-test during startup. Don't notify the user.
     if (sig != 0 || enable_debug) {
         warn("sending %s to process %d uid %d \"%s\": badness %ld, VmRSS %lld MiB adj:%d\n",
             sig_name, victim->pid, victim->uid, victim->name, victim->badness, victim->VmRSSkiB / 1024, victim->oom_score_adj);
+        warn("process cmdline:%s\n", cmdline);
     }
 
     int res = kill_wait(args, victim->pid, sig);
