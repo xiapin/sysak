@@ -25,6 +25,7 @@ int sym_init(char *btf_name)
 
 int sym_uninit(void)
 {
+    btf__free(handle);
     map<string,struct member_attribute *>::iterator iter; 
     struct member_attribute *info;
  
@@ -149,10 +150,11 @@ static int download_btf(void)
     if(getenv("SYSAK_WORK_PATH") != NULL)
     {
         sysak_path = getenv("SYSAK_WORK_PATH") ;
-        sysak_path += "/tools";
+        sysak_path += "/tools/";
+        sysak_path += kernel;
     }
 
-    snprintf(dw, LEN + LEN + LEN, "wget -T 5 -t 2 -q -O %s/%s/vmlinux-%s https://sysom-cn-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",sysak_path.c_str(), kernel, kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
+    snprintf(dw, LEN + LEN + LEN, "wget -T 5 -t 2 -q -O %s/vmlinux-%s https://sysom-cn-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",sysak_path.c_str(), kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
 
     do_cmd(dw, kernel, LEN);
     return 0;

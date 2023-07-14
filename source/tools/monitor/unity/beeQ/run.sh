@@ -17,5 +17,8 @@ export LUA_CPATH="./lib/?.so;../../lib/?.so;../../lib/loadall.so;"
 yaml_path=$1
 [ ! $yaml_path ] && yaml_path="/etc/sysak/base.yaml"
 
+#download sysak.ko
+sysak -oss -d
+
 echo $yaml_yaml_path
 ./unity-mon $yaml_path

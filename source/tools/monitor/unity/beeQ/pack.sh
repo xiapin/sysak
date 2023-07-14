@@ -93,3 +93,6 @@ cp tsdb/native/*.lua ${APP}/tsdb/native/
 cp tsdb/*.lua ${APP}/tsdb
 cp /usr/local/lib/lua/5.1/* -R ${DIST}/lib/
 #tar zcv -f dist.tar.gz $DIST/
+
+mkdir ${APP}/etc
+cp etc/* ${APP}/etc/

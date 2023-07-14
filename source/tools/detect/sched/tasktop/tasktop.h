@@ -4,10 +4,10 @@
 #include <sys/types.h>
 #include "common.h"
 
+#define STACK_CONTENT_LEN 1024
 #define FILE_PATH_LEN 256
-#define MAX_COMM_LEN 16
-#define PEROID 3
-#define LIMIT 20
+#define MAX_COMM_LEN 24
+#define MAX_CGROUP_NAME_LEN 256
 #define CPU_NAME_LEN 8
 #define BUF_SIZE 512
 #define DEBUG_LOG "./log/debug.log"
@@ -24,7 +24,7 @@ struct id_pair_t {
 
 struct proc_stat_t {
     int pid;
-    char comm[16];
+    char comm[MAX_COMM_LEN];
     char state;
     int ppid;
     int pgrp;
@@ -70,7 +70,7 @@ struct sys_cputime_t {
     long guest_nice;
 };
 
-struct task_record_t {
+typedef struct R_task_record_t {
     int pid;
     int ppid;
     char comm[MAX_COMM_LEN];
@@ -79,9 +79,17 @@ struct task_record_t {
     double system_cpu_rate;
     double user_cpu_rate;
     double all_cpu_rate;
-};
+} R_task_record_t;
+
+typedef struct D_task_record_t {
+    int pid;
+    int tid;
+    char comm[MAX_COMM_LEN];
+    char stack[STACK_CONTENT_LEN];
+} D_task_record_t;
 
 typedef struct cgroup_cpu_stat_t {
+    char cgroup_name[MAX_CGROUP_NAME_LEN];
     int nr_periods;
     int nr_throttled;
     unsigned long long throttled_time;
@@ -89,12 +97,20 @@ typedef struct cgroup_cpu_stat_t {
     unsigned long long current_bw;
     int nr_burst;
     unsigned long long burst_time;
+    time_t last_update;
 } cgroup_cpu_stat_t;
 
 typedef struct cpu_util_t {
     double usr;
+    double nice;
     double sys;
+    double idle;
     double iowait;
+    double irq;
+    double softirq;
+    double steal;
+    double guest;
+    double guest_nice;
 } cpu_util_t;
 
 typedef struct sys_record_t {
@@ -112,8 +128,10 @@ typedef struct sys_record_t {
 } sys_record_t;
 
 struct record_t {
-    struct task_record_t **tasks;
-    struct sys_record_t sys;
+    R_task_record_t **r_tasks;
+    D_task_record_t *d_tasks;
+    cgroup_cpu_stat_t *cgroups;
+    sys_record_t sys;
 };
 
 #endif

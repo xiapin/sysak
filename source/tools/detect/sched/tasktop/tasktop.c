@@ -12,15 +12,19 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+#include <linux/types.h>
 #include <stdbool.h>
 #include <bpf/libbpf.h>
-#include <bpf/bpf.h> /* bpf_obj_pin */
+#include <bpf/bpf.h>
 #include "bpf/tasktop.skel.h"
 #include "procstate.h"
 #include "tasktop.h"
 #include "common.h"
 
-#define DEBUG
+// #define DEBUG
+// #define LOG_DEBUG
+// #define ONLY_THREAD
+// #define STRESS_TEST
 
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
@@ -28,24 +32,28 @@ time_t btime = 0;
 u_int64_t pidmax = 0;
 char* log_path = 0;
 int nr_cpu;
-unsigned long long* prev_delay;
+u_int64_t* prev_delay;
 static volatile sig_atomic_t exiting;
 
 struct env {
     bool thread_mode;
     time_t delay;
     pid_t tid;
-    long nr_iter;
+    int64_t nr_iter;
     enum sort_type rec_sort;
-    int limit;
+    int64_t limit;
     bool human;
+    int64_t stack_limit;
+    int64_t cgroup_limit;
 } env = {.thread_mode = false,
          .delay = 3,
          .tid = -1,
          .human = false,
          .rec_sort = SORT_CPU,
          .nr_iter = LONG_MAX - 1,
-         .limit = INT_MAX};
+         .limit = INT_MAX,
+         .stack_limit = 20,
+         .cgroup_limit = 20};
 
 const char* argp_program_version = "tasktop 0.1";
 const char argp_program_doc[] =
@@ -53,8 +61,7 @@ const char argp_program_doc[] =
     "\n"
 
     "USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] "
-    "[-f LOGFILE] [-l "
-    "LIMIT]\n"
+    "[-f LOGFILE] [-l LIMIT] [-H] [-e D-LIMIT]\n"
     "\n"
 
     "EXAMPLES:\n"
@@ -63,9 +70,13 @@ const char argp_program_doc[] =
     "    tasktop -p 1100    # only display task with pid 1100.\n"
     "    tasktop -d 5       # modify the sample interval.\n"
     "    tasktop -i 3       # output 3 times then exit.\n"
+    "    tasktop -s user    # top tasks sorted by user time.\n"
     "    tasktop -l 20      # limit the records number no more than 20.\n"
-    "    tasktop -f a.log   # log to a.log (default to "
-    "/var/log/sysak/tasktop/tasktop.log)\n";
+    "    tasktop -e 10      # limit the d-stack no more than 10, default is "
+    "20.\n"
+    "    tasktop -H         # output time string, not timestamp.\n"
+    "    tasktop -f a.log   # log to a.log.\n"
+    "    tasktop -e 10      # most record 10 d-task stack.\n";
 
 static const struct argp_option opts[] = {
     {"human", 'H', 0, 0, "Output human-readable time info."},
@@ -78,11 +89,22 @@ static const struct argp_option opts[] = {
     {"sort", 's', "SORT", 0,
      "Sort the result, available options are user, sys and cpu, default is "
      "cpu"},
-    {"limit", 'l', "LIMIT", 0, "Specify the top-LIMIT tasks to display"},
+    {"r-limit", 'l', "LIMIT", 0, "Specify the top R-LIMIT tasks to display"},
+    {"d-limit", 'e', "D-LIMIT", 0,
+     "Specify the D-LIMIT D tasks's stack to display"},
+
     {NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
     {},
 };
 
+/* PROCESS MODE
+ /proc/pid/stat -- calculate process cpu util
+ /proc/pid/task/tid/stat -- check task state, if d read the stack */
+
+/* THREAD MODE
+/proc/pid/task/tid/stat -- calcualte thread cpu util
+/proc/pid/task/tid/sat -- read task state, if d read stack
+*/
 static int prepare_directory(char* path) {
     int ret;
 
@@ -172,6 +194,14 @@ static error_t parse_arg(int key, char* arg, struct argp_state* state) {
             }
             env.limit = val;
             break;
+        case 'e':
+            err = parse_long(arg, &val);
+            if (err || val <= 0) {
+                fprintf(stderr, "Failed parse d-stack limit.\n");
+                argp_usage(state);
+            }
+            env.stack_limit = val;
+            break;
         case 'H':
             env.human = true;
             break;
@@ -199,7 +229,7 @@ static int read_btime() {
         buf[5] = '\0';
         if (strcmp(buf, "btime") != 0) {
             continue;
-        };
+        }
         char* str = buf + 6;
         err = parse_long(str, &val);
         if (err) continue;
@@ -222,6 +252,95 @@ int swap(void* lhs, void* rhs, size_t sz) {
     free(temp);
 
     return 0;
+}
+
+static bool is_D(pid_t pid, pid_t tid, D_task_record_t* t_rec) {
+    int res = false;
+    char path[FILE_PATH_LEN];
+
+    snprintf(path, FILE_PATH_LEN, "/proc/%d/task/%d/stat", pid, tid);
+    FILE* fp = fopen(path, "r");
+    if (!fp) {
+        return res;
+    }
+
+    t_rec->pid = pid;
+    memset(t_rec->comm, 0, sizeof(t_rec->comm));
+    if (fscanf(fp, "%d %s", &t_rec->tid, t_rec->comm) == EOF) goto cleanup;
+
+    /* process the situation comm contains space,eg. comm=(Signal Dispatch)  */
+    while (true) {
+        int len = strlen(t_rec->comm);
+        if (t_rec->comm[len - 1] == ')') break;
+        if (fscanf(fp, "%s", t_rec->comm + len) == EOF) goto cleanup;
+    }
+
+    char state;
+    if (fscanf(fp, " %c", &state) == EOF) goto cleanup;
+
+    if (state == 'D') res = true;
+
+cleanup:
+    fclose(fp);
+    return res;
+}
+
+static int read_stack(pid_t pid, pid_t tid, D_task_record_t* t_rec) {
+#ifdef DEBUG
+    fprintf(stderr, "DEBUG: read_stack pid=%d tid=%d\n", pid, tid);
+#endif
+    int err = 0;
+    char stack_path[FILE_PATH_LEN];
+    snprintf(stack_path, FILE_PATH_LEN, "/proc/%d/task/%d/stack", pid, tid);
+    FILE* fp = fopen(stack_path, "r");
+    if (!fp) {
+        /* may be thread is exited */
+        err = errno;
+        goto cleanup;
+    }
+    memset(t_rec->stack, 0, sizeof(t_rec->stack));
+    fread(t_rec->stack, STACK_CONTENT_LEN, 1, fp);
+
+cleanup:
+    if (fp) fclose(fp);
+    return err;
+}
+
+static int read_d_task(struct id_pair_t* pids, int nr_thread, int* stack_num,
+                       struct D_task_record_t* d_tasks) {
+#ifdef DEBUG
+    fprintf(stderr, "DEBUG: read_d_task\n");
+#endif
+    int i = 0;
+    int err = 0;
+
+#ifdef DEBUG
+    struct timeval start, end;
+    err = gettimeofday(&start, 0);
+    if (err) fprintf(stderr, "read start time error.\n");
+#endif
+
+    int d_num = 0;
+    for (i = 0; i < nr_thread; i++) {
+        if (d_num >= env.stack_limit) break;
+        int pid = pids[i].pid;
+        int tid = pids[i].tid;
+
+        if (is_D(pid, tid, d_tasks + d_num)) {
+            read_stack(pid, tid, d_tasks + d_num);
+            d_num++;
+        }
+    }
+    *stack_num = d_num;
+
+#ifdef DEBUG
+    err = gettimeofday(&end, 0);
+    if (err) fprintf(stderr, "read end time error.\n");
+    fprintf(stderr, "read %d thread user %lds %ldus.\n", nr_thread,
+            end.tv_sec - start.tv_sec, end.tv_usec - start.tv_usec);
+#endif
+
+    return err;
 }
 
 static int read_sched_delay(struct sys_record_t* sys_rec) {
@@ -254,61 +373,136 @@ static int read_sched_delay(struct sys_record_t* sys_rec) {
 cleanup:
     if (fp) fclose(fp);
     return err;
-    return 0;
 }
 
-static int read_cgroup_throttle() {
+static int check_cgroup(cgroup_cpu_stat_t** prev_cgroups, char* cgroup_name) {
+    int i = 0;
+    for (i = 0; i < env.cgroup_limit; i++) {
+        if (prev_cgroups[i] &&
+            !strcmp(cgroup_name, prev_cgroups[i]->cgroup_name)) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+static cgroup_cpu_stat_t* get_cgroup(cgroup_cpu_stat_t** prev_cgroups,
+                                     int idx) {
+    int i = 0;
+    if (idx < env.cgroup_limit && idx >= 0) {
+        return prev_cgroups[idx];
+    }
+
+    /* find a empty slot */
+    for (i = 0; i < env.cgroup_limit; i++) {
+        if (!prev_cgroups[i]) {
+            prev_cgroups[i] = calloc(1, sizeof(cgroup_cpu_stat_t));
+            prev_cgroups[i]->last_update = time(0);
+            return prev_cgroups[i];
+        }
+    }
+
+    /* find the long time no update slot */
+    int last_time = prev_cgroups[0]->last_update;
+    int res_idx = 0;
+    for (i = 0; i < env.cgroup_limit; i++) {
+        if (last_time > prev_cgroups[i]->last_update) {
+            last_time = prev_cgroups[i]->last_update;
+            res_idx = i;
+        }
+    }
+
+    return prev_cgroups[res_idx];
+}
+
+static int read_cgroup_throttle(cgroup_cpu_stat_t* cgroups, int* cgroup_num,
+                                cgroup_cpu_stat_t** prev_cgroups) {
 #define CGROUP_PATH "/sys/fs/cgroup/cpu"
     int err = 0;
-    DIR* root_dir = opendir(CGROUP_PATH);
     struct dirent* dir = 0;
+    int c_num = 0;
+
+    DIR* root_dir = opendir(CGROUP_PATH);
+    if (!root_dir) {
+        fprintf(stderr, "Failed open %s\n", CGROUP_PATH);
+        goto cleanup;
+    }
+    time_t ts = time(0);
+
     while ((dir = readdir(root_dir)) != NULL) {
+        char name[128];
+        unsigned long long val = 0;
+
+        if (c_num >= env.cgroup_limit) break;
+
         if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, "..") ||
             dir->d_type != DT_DIR) {
             continue;
         }
+
         char stat_path[BUF_SIZE];
         snprintf(stat_path, BUF_SIZE, "%s/%s/cpu.stat", CGROUP_PATH,
                  dir->d_name);
 
-        cgroup_cpu_stat_t stat;
-
-        memset(&stat, 0, sizeof(cgroup_cpu_stat_t));
-        char name[128];
-        unsigned long long val = 0;
         FILE* fp = fopen(stat_path, "r");
         if (!fp) {
             fprintf(stderr, "Failed open cpu.stat[%s].\n", stat_path);
-            err = errno;
-            return err;
+            continue;
         }
+
+        /* if idx == -1, means no history record */
+        int idx = check_cgroup(prev_cgroups, dir->d_name);
+
+        /* find a slot, store the history cgroup info */
+        cgroup_cpu_stat_t* slot = get_cgroup(prev_cgroups, idx);
+        if (!slot) {
+            fprintf(stderr, "Get a null cgroup slot.\n");
+            err = 1;
+            exit(err);
+        }
+
+        cgroup_cpu_stat_t* rec = cgroups + c_num;
+
+        memset(slot->cgroup_name, 0, sizeof(slot->cgroup_name));
+        memset(rec->cgroup_name, 0, sizeof(rec->cgroup_name));
+
+        strncpy(slot->cgroup_name, dir->d_name, sizeof(slot->cgroup_name));
+        strncpy(rec->cgroup_name, dir->d_name, sizeof(rec->cgroup_name));
 
         while (fscanf(fp, "%s %llu", name, &val) != EOF) {
             if (!strcmp(name, "nr_periods")) {
-                stat.nr_periods = val;
+                if (idx != -1) rec->nr_periods = val - slot->nr_periods;
+                slot->nr_periods = val;
             } else if (!strcmp(name, "nr_throttled")) {
-                stat.nr_throttled = val;
+                if (idx != -1) rec->nr_throttled = val - slot->nr_throttled;
+                slot->nr_throttled = val;
             } else if (!strcmp(name, "throttled_time")) {
-                stat.throttled_time = val;
+                if (idx != -1) rec->throttled_time = val - slot->throttled_time;
+                slot->throttled_time = val;
             } else if (!strcmp(name, "nr_burst")) {
-                stat.nr_burst = val;
+                if (idx != -1) rec->nr_burst = val - slot->nr_burst;
+                slot->nr_burst = val;
             } else if (!strcmp(name, "burst_time")) {
-                stat.burst_time = val;
+                if (idx != -1) rec->burst_time = val - slot->burst_time;
+                slot->burst_time = val;
             }
         }
-#ifdef DEBUG
-        fprintf(stderr,
-                "[%-30s] nr_periods=%d nr_throttled=%d throttled_time=%llu "
-                "nr_burst=%d burst_time=%llu\n",
-                stat_path, stat.nr_periods, stat.nr_throttled,
-                stat.throttled_time, stat.nr_burst, stat.burst_time);
-#endif
+
+        if (rec->nr_throttled > 0 && idx != -1) {
+            c_num++;
+            slot->last_update = ts;
+        }
+        fclose(fp);
     }
 
+cleanup:
+    if (root_dir) closedir(root_dir);
+    *cgroup_num = c_num;
     return err;
 }
-static int read_stat(struct sys_cputime_t* prev_sys,
-                     struct sys_cputime_t* now_sys,
+
+static int read_stat(struct sys_cputime_t** prev_sys,
+                     struct sys_cputime_t** now_sys,
                      struct sys_record_t* sys_rec) {
     int err = 0;
     int i = 0;
@@ -318,25 +512,26 @@ static int read_stat(struct sys_cputime_t* prev_sys,
         err = errno;
         goto cleanup;
     }
+
     for (i = 0; i <= nr_cpu; i++) {
         /*now only read first line, maybe future will read more info*/
         fscanf(fp, "%s %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld\n",
-               now_sys[i].cpu, &now_sys[i].usr, &now_sys[i].nice,
-               &now_sys[i].sys, &now_sys[i].idle, &now_sys[i].iowait,
-               &now_sys[i].irq, &now_sys[i].softirq, &now_sys[i].steal,
-               &now_sys[i].guest, &now_sys[i].guest_nice);
+               now_sys[i]->cpu, &now_sys[i]->usr, &now_sys[i]->nice,
+               &now_sys[i]->sys, &now_sys[i]->idle, &now_sys[i]->iowait,
+               &now_sys[i]->irq, &now_sys[i]->softirq, &now_sys[i]->steal,
+               &now_sys[i]->guest, &now_sys[i]->guest_nice);
 
-        if (prev_sys[i].usr == 0) continue;
+        if (prev_sys[i]->usr == 0) continue;
 
-        int now_time = now_sys[i].usr + now_sys[i].sys + now_sys[i].nice +
-                       now_sys[i].idle + now_sys[i].iowait + now_sys[i].irq +
-                       now_sys[i].softirq + now_sys[i].steal +
-                       now_sys[i].guest + now_sys[i].guest_nice;
-        int prev_time = prev_sys[i].usr + prev_sys[i].sys + prev_sys[i].nice +
-                        prev_sys[i].idle + prev_sys[i].iowait +
-                        prev_sys[i].irq + prev_sys[i].softirq +
-                        prev_sys[i].steal + prev_sys[i].guest +
-                        prev_sys[i].guest_nice;
+        int now_time = now_sys[i]->usr + now_sys[i]->sys + now_sys[i]->nice +
+                       now_sys[i]->idle + now_sys[i]->iowait + now_sys[i]->irq +
+                       now_sys[i]->softirq + now_sys[i]->steal +
+                       now_sys[i]->guest + now_sys[i]->guest_nice;
+        int prev_time = prev_sys[i]->usr + prev_sys[i]->sys +
+                        prev_sys[i]->nice + prev_sys[i]->idle +
+                        prev_sys[i]->iowait + prev_sys[i]->irq +
+                        prev_sys[i]->softirq + prev_sys[i]->steal +
+                        prev_sys[i]->guest + prev_sys[i]->guest_nice;
         int all_time = now_time - prev_time;
         // int all_time = (sysconf(_SC_NPROCESSORS_ONLN) * env.delay *
         // sysconf(_SC_CLK_TCK));
@@ -345,12 +540,21 @@ static int read_stat(struct sys_cputime_t* prev_sys,
          * because there is an error between process waked up and running, when
          * sched delay occur , the sum of cpu rates more than 100%. */
 
-        sys_rec->cpu[i].usr =
-            (double)(now_sys[i].usr - prev_sys[i].usr) * 100 / all_time;
-        sys_rec->cpu[i].sys =
-            (double)(now_sys[i].sys - prev_sys[i].sys) * 100 / all_time;
-        sys_rec->cpu[i].iowait =
-            (double)(now_sys[i].iowait - prev_sys[i].iowait) * 100 / all_time;
+#define CALC_SHARE(TIME_TYPE)                                            \
+    sys_rec->cpu[i].TIME_TYPE =                                          \
+        (double)(now_sys[i]->TIME_TYPE - prev_sys[i]->TIME_TYPE) * 100 / \
+        all_time;
+
+        CALC_SHARE(usr)
+        CALC_SHARE(nice)
+        CALC_SHARE(sys)
+        CALC_SHARE(idle)
+        CALC_SHARE(iowait)
+        CALC_SHARE(irq)
+        CALC_SHARE(softirq)
+        CALC_SHARE(steal)
+        CALC_SHARE(guest)
+        CALC_SHARE(guest_nice)
     }
 cleanup:
     if (fp) fclose(fp);
@@ -377,7 +581,7 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
 
     DIR* dir = NULL;
     DIR* task_dir = NULL;
-    u_int64_t proc_num = 0;
+    u_int64_t nr_thread = 0;
     struct dirent* proc_de = NULL;
     struct dirent* task_de = NULL;
     long val;
@@ -385,6 +589,7 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
 
     dir = opendir("/proc");
     if (!dir) {
+        fprintf(stderr, "Failed open %s\n", "/proc");
         err = errno;
         goto cleanup;
     }
@@ -394,48 +599,39 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
             !strcmp(proc_de->d_name, ".."))
             continue;
         err = parse_long(proc_de->d_name, &val);
-
         if (err) continue;
+
         pid = val;
-        if (!env.thread_mode) {
-            pids[proc_num].pid = pid;
-            pids[proc_num++].tid = -1;
-        } else {
-            char taskpath[FILE_PATH_LEN];
-            snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
-            task_dir = opendir(taskpath);
-            if (!task_dir) {
-                if (errno == ENOENT) {
-                    continue;
-                }
-                err = errno;
-                goto cleanup;
+        char taskpath[FILE_PATH_LEN];
+        snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
+        task_dir = opendir(taskpath);
+        if (!task_dir) {
+            // fprintf(stderr, "Failed opendir %s\n", taskpath);
+            continue;
+        }
+
+        while ((task_de = readdir(task_dir)) != NULL) {
+            if (task_de->d_type != DT_DIR || !strcmp(task_de->d_name, ".") ||
+                !strcmp(task_de->d_name, ".."))
+                continue;
+            err = parse_long(task_de->d_name, &val);
+
+            if (err) {
+                fprintf(stderr, "Failed parse tid\n");
+                break;
             }
+            tid = val;
 
-            while ((task_de = readdir(task_dir)) != NULL) {
-                if (task_de->d_type != DT_DIR ||
-                    !strcmp(task_de->d_name, ".") ||
-                    !strcmp(task_de->d_name, ".."))
-                    continue;
-                err = parse_long(task_de->d_name, &val);
+            pids[nr_thread].pid = pid;
+            pids[nr_thread++].tid = tid;
+        }
 
-                if (err) {
-                    fprintf(stderr, "Failed parse tid\n");
-                    goto cleanup;
-                }
-                tid = val;
-
-                pids[proc_num].pid = pid;
-                pids[proc_num++].tid = tid;
-            }
-
-            if (task_dir) {
-                closedir(task_dir);
-                task_dir = NULL;
-            }
+        if (task_dir) {
+            closedir(task_dir);
+            task_dir = NULL;
         }
     }
-    *num = proc_num;
+    *num = nr_thread;
 cleanup:
     if (dir) closedir(dir);
     if (task_dir) closedir(task_dir);
@@ -443,17 +639,21 @@ cleanup:
 }
 
 static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
-                     struct task_cputime_t** now, struct task_record_t** rec) {
+                     struct task_cputime_t** now,
+                     struct R_task_record_t** rec) {
     struct proc_stat_t proc_info;
     char proc_path[FILE_PATH_LEN];
     struct task_cputime_t* data;
     FILE* fp = 0;
     int err = 0;
 
-    if (tid != -1) {
+    /* tid > 0: tid valid */
+    /* tid < 0 0: tid ignored */
+    if (tid > 0) {
         snprintf(proc_path, FILE_PATH_LEN, "/proc/%d/task/%d/stat", pid, tid);
         pid = tid;
     } else {
+        /* tid < 0 means env is the process mode */
         snprintf(proc_path, FILE_PATH_LEN, "/proc/%d/stat", pid);
     }
 
@@ -478,17 +678,25 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
         goto cleanup;
     }
 
+    fscanf(fp, "%d %s", &proc_info.pid, proc_info.comm);
+
+    /* process the situation comm contains space,eg. comm=(Signal Dispatch)  */
+    while (true) {
+        int len = strlen(proc_info.comm);
+        if (proc_info.comm[len - 1] == ')') break;
+        if (fscanf(fp, " %s", proc_info.comm + len) == EOF) goto cleanup;
+    }
+
     fscanf(fp,
-           "%d %s %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld "
+           " %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld "
            "%ld %ld %ld %llu",
-           &proc_info.pid, &proc_info.comm[0], &proc_info.state,
-           &proc_info.ppid, &proc_info.pgrp, &proc_info.session,
-           &proc_info.tty_nr, &proc_info.tpgid, &proc_info.flags,
-           &proc_info.minflt, &proc_info.cminflt, &proc_info.majflt,
-           &proc_info.cmajflt, &proc_info.utime, &proc_info.stime,
-           &proc_info.cutime, &proc_info.cstime, &proc_info.priority,
-           &proc_info.nice, &proc_info.num_threads, &proc_info.itrealvalue,
-           &proc_info.starttime);
+           &proc_info.state, &proc_info.ppid, &proc_info.pgrp,
+           &proc_info.session, &proc_info.tty_nr, &proc_info.tpgid,
+           &proc_info.flags, &proc_info.minflt, &proc_info.cminflt,
+           &proc_info.majflt, &proc_info.cmajflt, &proc_info.utime,
+           &proc_info.stime, &proc_info.cutime, &proc_info.cstime,
+           &proc_info.priority, &proc_info.nice, &proc_info.num_threads,
+           &proc_info.itrealvalue, &proc_info.starttime);
 
     data->utime = proc_info.utime;
     data->stime = proc_info.stime;
@@ -509,7 +717,7 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
         if (base != 0) {
             /* only process cpu utilization > 0 */
             if (udelta + sdelta > 0) {
-                *rec = calloc(1, sizeof(struct task_record_t));
+                *rec = calloc(1, sizeof(struct R_task_record_t));
                 (*rec)->pid = now[pid]->pid;
                 (*rec)->ppid = now[pid]->ppid;
                 (*rec)->runtime = run_time;
@@ -528,18 +736,18 @@ cleanup:
     return err;
 }
 
-static void sort_records(struct record_t* rec, int proc_num,
+static void sort_records(struct record_t* rec, int rec_num,
                          enum sort_type sort) {
-    struct task_record_t** records = rec->tasks;
+    struct R_task_record_t** records = rec->r_tasks;
     int i, j;
-    for (i = 0; i < proc_num; i++) {
-        for (j = i + 1; j < proc_num; j++) {
+    for (i = 0; i < rec_num; i++) {
+        for (j = i + 1; j < rec_num; j++) {
             if (!records[j] && !records[i]) {
                 continue;
             } else if (records[i] && !records[j]) {
                 continue;
             } else if (!records[i] && records[j]) {
-                swap(&records[i], &records[j], sizeof(struct task_record_t*));
+                swap(&records[i], &records[j], sizeof(struct R_task_record_t*));
             } else {
                 double lth, rth;
                 switch (sort) {
@@ -562,7 +770,7 @@ static void sort_records(struct record_t* rec, int proc_num,
 
                 if (lth < rth) {
                     swap(&records[i], &records[j],
-                         sizeof(struct task_record_t*));
+                         sizeof(struct R_task_record_t*));
                 }
             }
         }
@@ -612,18 +820,16 @@ static char* second2str(time_t ts, char* buf, int size) {
     return buf;
 }
 
-static void output(struct record_t* rec, int proc_num, FILE* dest) {
-    struct task_record_t** records = rec->tasks;
+static void output_ts(FILE* dest) {
+    char stime_str[BUF_SIZE] = {0};
+    time_t now = time(0);
+    fprintf(dest, "[TIME-STAMP] %s\n", ts2str(now, stime_str, BUF_SIZE));
+}
+
+static void output_sys_load(struct record_t* rec, FILE* dest) {
     struct sys_record_t* sys = &rec->sys;
     struct proc_fork_info_t* info = &(sys->most_fork_info);
-    char stime_str[BUF_SIZE] = {0};
-    char rtime_str[BUF_SIZE] = {0};
-
-    time_t now = time(0);
-    int i = 0;
-
-    fprintf(dest, "%s\n", ts2str(now, stime_str, BUF_SIZE));
-    fprintf(dest, "UTIL&LOAD\n");
+    fprintf(dest, "[UTIL&LOAD]\n");
     fprintf(dest, "%6s %6s %6s %6s %6s %6s %6s :%5s \n", "usr", "sys", "iowait",
             "load1", "R", "D", "fork", "proc");
 
@@ -632,22 +838,60 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
             sys->nr_D, sys->nr_fork);
     fprintf(dest, " : %s(%d) ppid=%d cnt=%lu \n", info->comm, info->pid,
             info->ppid, info->fork);
+}
 
-#ifdef DEBUG
-    fprintf(dest, "[ cpu ] %6s %6s %6s %10s\n", "usr", "sys", "iowait",
-            "delay(ns)");
+static void output_per_cpu(struct record_t* rec, FILE* dest) {
+    int i;
+    struct sys_record_t* sys = &rec->sys;
+
+    //  18.8 us, 14.1 sy,  0.0 ni, 65.6 id,  0.0 wa,  0.0 hi,  1.6 si,  0.0 st
+    fprintf(dest, "[PER-CPU]\n");
+    fprintf(dest, "%7s %6s %6s %6s %6s %6s %6s %6s %6s %10s\n", "cpu", "usr",
+            "sys", "nice", "idle", "iowait", "h-irq", "s-irq", "steal",
+            "delay(ms)");
     for (i = 1; i <= nr_cpu; i++) {
-        fprintf(dest, "[cpu-%d] %6.1f %6.1f %6.1f %10llu\n", i - 1,
-                sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].iowait,
-                sys->percpu_sched_delay[i - 1]);
+        char cpu_name[16];
+        snprintf(cpu_name, 16, "cpu-%d", i - 1);
+        fprintf(dest,
+                "%7s %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %10llu\n",
+                cpu_name, sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].nice,
+                sys->cpu[i].idle, sys->cpu[i].iowait, sys->cpu[i].irq,
+                sys->cpu[i].softirq, sys->cpu[i].steal,
+                sys->percpu_sched_delay[i - 1] / (1000 * 1000));
     }
-#endif
-    for (i = 0; i < proc_num; i++) {
+}
+
+static void output_cgroup(struct record_t* rec, int cgroup_num, FILE* dest) {
+    cgroup_cpu_stat_t* cgroups = rec->cgroups;
+
+    int i = 0;
+
+    for (i = 0; i < cgroup_num; i++) {
+        if (i == 0) {
+            fprintf(dest, "[CGROUP]\n");
+            fprintf(dest, "%20s %15s %15s %15s %15s %15s\n", "cgroup_name",
+                    "nr_periods", "nr_throttled", "throttled_time", "nr_burst",
+                    "burst_time");
+        }
+        fprintf(dest, "%20s %15d %15d %15llu %15d %15llu\n",
+                cgroups[i].cgroup_name, cgroups[i].nr_periods,
+                cgroups[i].nr_throttled, cgroups[i].throttled_time,
+                cgroups[i].nr_burst, cgroups[i].burst_time);
+    }
+}
+
+static void output_tasktop(struct record_t* rec, int rec_num, FILE* dest) {
+    struct R_task_record_t** records = rec->r_tasks;
+    int i;
+    char rtime_str[BUF_SIZE] = {0};
+    char stime_str[BUF_SIZE] = {0};
+
+    for (i = 0; i < rec_num; i++) {
         if (!records[i]) break;
 
         if (env.human) {
             if (i == 0) {
-                fprintf(dest, "TASKTOP\n");
+                fprintf(dest, "[TASKTOP]\n");
                 fprintf(dest, "%18s %6s %6s %20s %15s %6s %6s %6s\n", "COMMAND",
                         "PID", "PPID", "START", "RUN", "%UTIME", "%STIME",
                         "%CPU");
@@ -662,7 +906,7 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
                     records[i]->all_cpu_rate);
         } else {
             if (i == 0) {
-                fprintf(dest, "TASKTOP\n");
+                fprintf(dest, "[TASKTOP]\n");
                 fprintf(dest, "%18s %6s %6s %10s %10s %6s %6s %6s\n", "COMMAND",
                         "PID", "PPID", "START", "RUN", "%UTIME", "%STIME",
                         "%CPU");
@@ -676,14 +920,211 @@ static void output(struct record_t* rec, int proc_num, FILE* dest) {
                     records[i]->all_cpu_rate);
         }
     }
+}
+
+static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
+    int i;
+    struct D_task_record_t* d_tasks = rec->d_tasks;
+    char* str = calloc(STACK_CONTENT_LEN, sizeof(char));
+    for (i = 0; i < d_num; i++) {
+        if (i == 0) {
+            fprintf(dest, "[D-STASK]\n");
+            fprintf(dest, "%18s %6s %6s %6s\n", "COMMAND", "PID", "PPID",
+                    "STACK");
+        }
+        fprintf(dest, "%18s %6d %6d ", d_tasks[i].comm, d_tasks[i].tid,
+                d_tasks[i].pid);
+
+        strncpy(str, d_tasks[i].stack, STACK_CONTENT_LEN - 1);
+
+        const char delim[2] = "\n";
+        char* token;
+
+        token = strtok(str, delim);
+        fprintf(dest, "%s\n", token);
+
+        while (true) {
+            token = strtok(NULL, delim);
+            if (!token) break;
+            fprintf(dest, "%18s %6s %6s %s\n", "", "", "", token);
+        }
+    }
+
+    free(str);
+}
+
+static bool inline is_high_load1(struct record_t* rec) {
+#define THRESHOLD_LOAD1 nr_cpu * 1.5
+    return rec->sys.load1 >= THRESHOLD_LOAD1;
+}
+
+static bool inline is_high_R(struct record_t* rec) {
+#define THRESHOLD_R nr_cpu
+    return rec->sys.nr_R >= THRESHOLD_R;
+}
+
+static bool inline is_high_D(struct record_t* rec) {
+#define THRESHOLD_D 8
+    return rec->sys.nr_D >= THRESHOLD_D;
+}
+
+// static bool fork_detect(struct record_t* rec, FILE* dest) {
+// #define THRESHOLD_FORK_PS 2000
+//     return rec->sys.nr_fork >= THRESHOLD_FORK_PS;
+// }
+
+double inline calculate_sys(cpu_util_t* cpu) {
+    double sys_util = cpu->iowait + cpu->sys + cpu->softirq + cpu->irq;
+    return sys_util;
+}
+
+double inline calculate_overall(cpu_util_t* cpu) {
+    double overall_cpuutil = cpu->iowait + cpu->sys + cpu->softirq + cpu->irq +
+                             +cpu->nice + cpu->usr;
+    return overall_cpuutil;
+}
+
+static void inline is_high_overall_cpuutil(struct record_t* rec, FILE* dest) {
+#define THRESHOLD_CPU_OVERLOAD 55
+    cpu_util_t* cpu = rec->sys.cpu;
+    double overall_cpuutil = calculate_overall(cpu);
+    if (overall_cpuutil >= THRESHOLD_CPU_OVERLOAD) {
+        fprintf(dest, "WARN: CPU overall utilization is high.\n");
+    }
+}
+
+static void inline is_high_sys(struct record_t* rec, FILE* dest) {
+#define THRESHOLD_SYS 15
+    double sys_util = calculate_sys(rec->sys.cpu);
+    if (sys_util >= THRESHOLD_SYS) {
+        fprintf(dest, "INFO: Sys time of cpu is high.\n");
+    }
+}
+
+static void is_bind(struct record_t* rec, FILE* dest) {
+#define THRESHOLD_BIND 25
+    int i;
+    cpu_util_t* cpu = rec->sys.cpu;
+    double min_overall = calculate_overall(cpu);
+
+    for (i = 1; i <= nr_cpu; i++) {
+        double overall = calculate_overall(cpu + i);
+        if (overall < min_overall) min_overall = overall;
+    }
+
+    bool status[nr_cpu];
+    bool exist = false;
+    for (i = 1; i <= nr_cpu; i++) {
+        double overall = calculate_overall(cpu + i);
+        if (overall - min_overall > THRESHOLD_BIND) {
+            status[i - 1] = true;
+            exist = true;
+        } else {
+            status[i - 1] = false;
+        }
+    }
+
+    if (exist) {
+        fprintf(dest, "WARN: Some tasks bind cpu. Please check cpu: ");
+        for (i = 1; i <= nr_cpu; i++) {
+            if (status[i - 1]) {
+                fprintf(dest, " [%d]", i - 1);
+            }
+        }
+        fprintf(dest, "\n");
+    }
+}
+
+static void group_by_stack(struct record_t* rec, FILE* dest, int d_num) {
+#define PREFIX_LEN 64
+    D_task_record_t* dtask = rec->d_tasks;
+    int* counter = calloc(d_num, sizeof(int));
+    D_task_record_t** stack = calloc(d_num, sizeof(D_task_record_t*));
+    if (!counter || !stack) {
+        fprintf(stderr, "Failed calloc counter and stack.\n");
+        exit(1);
+    }
+
+    int empty_slot = 0;
+    int i, j;
+    for (i = 0; i < d_num; i++) {
+        D_task_record_t* s = dtask + i;
+        bool match = false;
+        for (j = 0; j < empty_slot; j++) {
+            if (stack[j]) {
+                if (!strncmp(stack[j]->stack, s->stack, 64)) {
+                    counter[j]++;
+                    match = true;
+                    break;
+                }
+            }
+        }
+
+        if (!match) {
+            stack[empty_slot] = s;
+            counter[empty_slot++] = 1;
+        }
+    }
+
+    int max_idx = -1;
+    int max_times = -1;
+    for (i = 0; i < empty_slot; i++) {
+        if (counter[i] > max_times) {
+            max_times = counter[i];
+            max_idx = i;
+        }
+    }
+
+    /* maybe there is no d-stack */
+    if (max_idx != -1) {
+        fprintf(dest, "WARN: The most stack, times=%d\n", max_times);
+        fprintf(dest, "%s", stack[max_idx]->stack);
+    }
+
+    free(stack);
+    free(counter);
+}
+
+static void load_analyse(struct record_t* rec, int rec_num, FILE* dest,
+                         int d_num, int cgroup_num) {
+    fprintf(dest, "[EXCEPTION&ADVICE]\n");
+
+    if (is_high_load1(rec)) {
+        fprintf(dest, "INFO: Load is abnormal.\n");
+        if (is_high_R(rec)) {
+            is_high_overall_cpuutil(rec, dest);
+
+            is_high_sys(rec, dest);
+
+            is_bind(rec, dest);
+        }
+
+        if (is_high_D(rec)) {
+            group_by_stack(rec, dest, d_num);
+        }
+    } else {
+        fprintf(dest, "INFO: Load is normal.\n");
+    }
+}
+
+static void output(struct record_t* rec, int rec_num, FILE* dest, int d_num,
+                   int cgroup_num) {
+    output_ts(dest);
+    output_sys_load(rec, dest);
+    output_per_cpu(rec, dest);
+    output_cgroup(rec, cgroup_num, dest);
+    output_tasktop(rec, rec_num, dest);
+    output_d_stack(rec, d_num, dest);
+
+    load_analyse(rec, rec_num, dest, d_num, cgroup_num);
     fflush(dest);
 }
 
-static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
+static void now_to_prev(struct id_pair_t* pids, int nr_thread, int pidmax,
                         struct task_cputime_t** prev_task,
                         struct task_cputime_t** now_task,
-                        struct sys_cputime_t* prev_sys,
-                        struct sys_cputime_t* now_sys) {
+                        struct sys_cputime_t** prev_sys,
+                        struct sys_cputime_t** now_sys) {
     int i;
     for (i = 0; i < pidmax; i++) {
         if (prev_task[i]) {
@@ -692,25 +1133,33 @@ static void now_to_prev(struct id_pair_t* pids, int proc_num, int pidmax,
         }
     }
 
-    for (i = 0; i < proc_num; i++) {
+    for (i = 0; i < nr_thread; i++) {
         int pid;
         if (env.thread_mode)
             pid = pids[i].tid;
-        else
+        else {
+            /* only move once */
+            if (pids[i].pid != pids[i].tid) continue;
             pid = pids[i].pid;
+        }
+
         swap(&prev_task[pid], &now_task[pid], sizeof(struct task_cputime_t*));
     }
 
-    swap(prev_sys, now_sys, sizeof(struct sys_cputime_t) * (nr_cpu + 1));
+    for (i = 0; i <= nr_cpu; i++) {
+        swap(&prev_sys[i], &now_sys[i], sizeof(struct sys_cputime_t*));
+    }
 }
 
-static int make_records(struct id_pair_t* pids, int proc_num,
+static int make_records(struct id_pair_t* pids, int nr_thread,
                         struct record_t* rec, struct task_cputime_t** prev_task,
-                        struct task_cputime_t** now_task) {
-    struct task_record_t** records = rec->tasks;
+                        struct task_cputime_t** now_task, int* rec_num) {
+    struct R_task_record_t** records = rec->r_tasks;
     int err = 0;
     u_int64_t i;
-    for (i = 0; i < proc_num; i++) {
+    int nr_rec = 0;
+
+    for (i = 0; i < nr_thread; i++) {
         struct id_pair_t* id = &pids[i];
 
         if (env.tid != -1) {
@@ -721,20 +1170,32 @@ static int make_records(struct id_pair_t* pids, int proc_num,
             }
         }
 
-        err = read_proc(id->pid, id->tid, prev_task, now_task, &records[i]);
+        /* many pair with the same pid, in process mode skip the trival read
+         */
+        if (!env.thread_mode && id->pid != id->tid) continue;
+
+        if (env.thread_mode) {
+            err = read_proc(id->pid, id->tid, prev_task, now_task,
+                            &records[nr_rec++]);
+        } else {
+            err =
+                read_proc(id->pid, -1, prev_task, now_task, &records[nr_rec++]);
+        }
+
         if (err) {
             fprintf(stderr, "Failed read proc\n");
             return err;
         }
     }
+    *rec_num = nr_rec;
 
     return err;
 }
 
-static void free_records(struct record_t* rec, int proc_num) {
-    struct task_record_t** records = rec->tasks;
+static void free_records(struct record_t* rec, int nr_thread) {
+    R_task_record_t** records = rec->r_tasks;
     int i;
-    for (i = 0; i < proc_num; i++) {
+    for (i = 0; i < nr_thread; i++) {
         if (records[i]) free(records[i]);
     }
     free(records);
@@ -786,7 +1247,7 @@ static int check_fork(int fork_map_fd, struct sys_record_t* sys_rec) {
 
         if (!next_key) continue;
 
-        total = total + info.fork;  // for debug
+        total = total + info.fork;
 
         if (max_fork < info.fork) {
             max_fork = info.fork;
@@ -799,17 +1260,16 @@ static int check_fork(int fork_map_fd, struct sys_record_t* sys_rec) {
 
 static void sigint_handler(int signo) { exiting = 1; }
 
+// #define SEG_TRAP
 int main(int argc, char** argv) {
-    int err = 0;
-    int fork_map_fd = -1;
+    int err = 0, fork_map_fd = -1, i = 0;
     FILE* stat_log = 0;
     struct tasktop_bpf* skel = 0;
     struct id_pair_t* pids = 0;
     struct task_cputime_t **prev_task = 0, **now_task = 0;
-    struct sys_cputime_t *prev_sys = 0, *now_sys = 0;
+    struct cgroup_cpu_stat_t** prev_cgroup = 0;
+    struct sys_cputime_t **prev_sys = 0, **now_sys = 0;
     struct record_t* rec = 0;
-
-    prev_delay = calloc(nr_cpu, sizeof(int));
 
     nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -850,15 +1310,33 @@ int main(int argc, char** argv) {
     rec = calloc(1, sizeof(struct record_t));
     rec->sys.cpu = calloc(nr_cpu + 1, sizeof(struct cpu_util_t));
     rec->sys.percpu_sched_delay = calloc(nr_cpu, sizeof(int));
+    rec->d_tasks = calloc(env.stack_limit, sizeof(struct D_task_record_t));
+    rec->cgroups = calloc(env.cgroup_limit, sizeof(cgroup_cpu_stat_t));
 
-    pids = calloc(pidmax, sizeof(struct id_pair_t));
-    prev_task = calloc(pidmax, sizeof(struct task_cputime_t*));
-    now_task = calloc(pidmax, sizeof(struct task_cputime_t*));
-    prev_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t));
-    now_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t));
-    if (!prev_task || !now_task) {
-        err = errno;
-        fprintf(stderr, "Failed calloc prev and now\n");
+    if (!rec || !rec->sys.cpu || !rec->sys.percpu_sched_delay ||
+        !rec->d_tasks || !rec->cgroups) {
+        err = 1;
+        fprintf(stderr, "Failed calloc memory\n");
+        goto cleanup;
+    }
+
+    prev_cgroup = calloc(env.cgroup_limit, sizeof(struct cgroup_cpu_stat_t*));
+    prev_delay = calloc(nr_cpu, sizeof(unsigned long long));
+    pids = calloc(pidmax + 1, sizeof(struct id_pair_t));
+    prev_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
+    now_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
+    prev_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
+    now_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
+
+    for (i = 0; i <= nr_cpu; i++) {
+        prev_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
+        now_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
+    }
+
+    if (!prev_task || !now_task || !prev_delay || !pids || !prev_sys ||
+        !now_sys) {
+        err = 1;
+        fprintf(stderr, "Failed calloc memory.\n");
         goto cleanup;
     }
 
@@ -872,13 +1350,13 @@ int main(int argc, char** argv) {
     skel = tasktop_bpf__open();
     if (!skel) {
         err = 1;
-        fprintf(stderr, "Failed to open BPF skeleton\n");
+        fprintf(stderr, "Failed to open BPF skeleton.\n");
         goto cleanup;
     }
 
     err = tasktop_bpf__load(skel);
     if (err) {
-        fprintf(stderr, "Failed to load BPF skeleton\n");
+        fprintf(stderr, "Failed to load BPF skeleton.\n");
         goto cleanup;
     }
 
@@ -886,59 +1364,67 @@ int main(int argc, char** argv) {
 
     err = tasktop_bpf__attach(skel);
     if (err) {
-        fprintf(stderr, "Failed to attach BPF skeleton\n");
+        fprintf(stderr, "Failed to attach BPF skeleton.\n");
         goto cleanup;
     }
 
     bool first = true;
     while (env.nr_iter-- && !exiting) {
-        read_cgroup_throttle();
+        u_int64_t nr_thread = 0;
+        int rec_num = 0;
+        int d_num = 0;
+        int cgroup_num = 0;
+
+#ifndef ONLY_THREAD
+        read_cgroup_throttle(rec->cgroups, &cgroup_num, prev_cgroup);
         read_sched_delay(&rec->sys);
         check_fork(fork_map_fd, &rec->sys);
         runnable_proc(&rec->sys);
         unint_proc(&rec->sys);
         read_stat(prev_sys, now_sys, &rec->sys);
+#endif
 
         /* get all process now */
-        u_int64_t proc_num;
-        err = read_all_pids(pids, &proc_num);
-        if (err) {
-            fprintf(stderr, "Failed read all pids.\n");
-            goto cleanup;
-        }
-        printf("procnum=%lu\n", proc_num);
+        read_all_pids(pids, &nr_thread);
 
-        rec->tasks = calloc(proc_num, sizeof(struct task_record_t*));
+        read_d_task(pids, nr_thread, &d_num, rec->d_tasks);
+
+#ifndef ONLY_THREAD
+        rec->r_tasks = calloc(nr_thread, sizeof(struct R_task_record_t*));
+
         /* if prev process info exist produce record*/
-        err = make_records(pids, proc_num, rec, prev_task, now_task);
+        err = make_records(pids, nr_thread, rec, prev_task, now_task, &rec_num);
         if (err) {
             fprintf(stderr, "Failed make records.\n");
             goto cleanup;
         }
 
         /* sort record by sort type */
-        sort_records(rec, proc_num, env.rec_sort);
+        sort_records(rec, rec_num, env.rec_sort);
 
         /* output record */
         if (!first)
-            output(rec, proc_num, stat_log);
+            output(rec, rec_num, stat_log, d_num, cgroup_num);
         else
             first = false;
 
-        free_records(rec, proc_num);
+        free_records(rec, nr_thread);
 
         /* update old info and free nonexist process info */
-        now_to_prev(pids, proc_num, pidmax, prev_task, now_task, prev_sys,
+        now_to_prev(pids, nr_thread, pidmax, prev_task, now_task, prev_sys,
                     now_sys);
-
+#ifdef STRESS_TEST
+        usleep(10000);
+#else
         if (env.nr_iter) sleep(env.delay);
+#endif
+#endif
     }
 
 cleanup:
-    tasktop_bpf__destroy(skel);
 
     if (pids) free(pids);
-    u_int64_t i;
+
     if (prev_task) {
         for (i = 0; i < pidmax; i++) {
             if (prev_task[i]) free(prev_task[i]);
@@ -955,5 +1441,6 @@ cleanup:
 
     if (stat_log) fclose(stat_log);
 
+    tasktop_bpf__destroy(skel);
     return err;
 }

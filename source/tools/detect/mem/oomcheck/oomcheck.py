@@ -696,6 +696,8 @@ def oom_output_msg(oom_result,num, summary):
     summary += oom_host_output(oom_result, num)
     reason = "diagnones result: %s "%(oom['reason'])
     reason += oom_cgroup_output_ext(oom_result, num)
+    if 'cmdline' in oom_result:
+        reason += oom_result['cmdline']
     ret, sss = oom_check_score(oom, oom_result)
     if ret == False:
         reason+= oom_check_dup(oom, oom_result)
@@ -909,6 +911,10 @@ def oom_dmesg_analyze(dmesgs, oom_result):
             oom_result['task'][task_name] = 0
         for line in dmesg:
             line = line.strip()
+            if "Command line" in line:
+                if "elfcorehdr" in line and "crashkernel" not in line:
+                    elf = line.split("elfcorehdr=")[1].split()[0]
+                    oom_result['cmdline'] = ". there is no space reserved in second kernel, elfcorehdr:%s" % elf
             if OOM_BEGIN_KEYWORD in line:
                 if meet_start:
                     oom_result['sub_msg'][oom_result['oom_total_num']]['oom_msg'] = dmesg[start_i: dmesg.index(line)]

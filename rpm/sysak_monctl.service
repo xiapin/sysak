@@ -1,0 +1,14 @@
+[Unit]
+Description=SysAK run all monitor service
+After=syslog.target
+
+[Service]
+Type=simple
+
+ExecStart=/usr/bin/sysak monctl &
+ExecStop=/usr/bin/killall monctl
+MemoryLimit=300M
+CPUQuota=60%
+
+[Install]
+WantedBy=multi-user.target
