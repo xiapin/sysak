@@ -104,6 +104,7 @@ local function installFd(ip, port)
 end
 
 local function setupSocket(host, port)
+    print(host)
     local ip = getIp(host)
     if ip then
         return installFd(ip, port)
@@ -113,7 +114,7 @@ local function setupSocket(host, port)
     end
 end
 
-function CcoHttpCli:_init_(fYaml, persistent)
+function CcoHttpCli:_init_(config, fYaml, persistent)
     local res = system:parseYaml(fYaml)
     local pushTo = res.pushTo
     self._host = pushTo.host
@@ -138,6 +139,7 @@ function CcoHttpCli:connect()
         else
             self.status = enumStat.connecting
         end
+        print("setup socket success")
         return true
     end
     return false
@@ -271,7 +273,7 @@ local function waitChuckSize(fread, s)
         if string.find(s, "\r\n") then
             return s
         end
-        local add = fread()
+        local add = fread() --add = nil，后续没有读到数据了
         if add then
             s = s .. add
         else
@@ -283,7 +285,8 @@ end
 local function readChunks(fread, tReq)
     local cells = {}
     local s = tReq.data
-    local ssize, size
+    print("s  "..s)
+    local size
     local len = 1
     local bodies, body
 
@@ -291,6 +294,7 @@ local function readChunks(fread, tReq)
         if len == 0 then
             break
         end
+        print("loop")
         s = waitChuckSize(fread, s)
         if s then
             size, s = unpack(pystring:split(s, "\r\n", 1))
@@ -325,8 +329,9 @@ local function waitHttpRest(fread, tReq)
         if waitDataRest(fread, rest, tReq) < 0 then
             return -2
         end
-    else  -- chunk mode
-        if #tReq.data > 0 then
+    elseif  tReq.header["Transfer-Encoding"]  then
+        -- chunk mode
+        if tReq.header["Transfer-Encoding"]=="chunked" and #tReq.data > 0 then
             if readChunks(fread, tReq) < 0 then
                 return -3
             end
@@ -520,8 +525,8 @@ function CcoHttpCli:work(cffi, efd)
             goto failed
         end
         self.status = enumStat.receiving
-        local fread = self:closureRead(fd)
-        local tReq = self:result(fread)
+        local fread = self:closureRead(fd) -- fread() = nil
+        local tReq = self:result(fread) --nil，fread = nil
         if tReq then
             self.status = enumStat.connected
             self:echo(tReq)

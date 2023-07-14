@@ -78,15 +78,15 @@ func metricSnappy(prome_ptr *string, ret *[]byte) int {
 
 
 func MockRemoteWrite() {
-	project := flag.String("project", "***", "")
-	metricStore := flag.String("metricstore", "***", "")
-	endpoint := flag.String("endpoint", "***", "")
-	akId := flag.String("akid", "***", "") // AccessKey信息。
-	akKey := flag.String("aksecret", "***", "")
+// 	project := flag.String("project", "unity-cn-shenzhen", "")
+// 	metricStore := flag.String("metricstore", "qiaoke-work", "")
+// 	endpoint := flag.String("endpoint", "cn-shenzhen.log.aliyuncs.com", "")
+	akId := flag.String("akid", "LTAI5tMjZfyTSMeAFeA19Xx4", "") // AccessKey信息。
+	akKey := flag.String("aksecret", "t0mQM4t3NqOPdiPpDbQwzcpj5a9P0R", "")
 	flag.Parse()
 
-	Url := fmt.Sprintf("https://%s.%s/prometheus/%s/%s/api/v1/write", *project, *endpoint, *project, *metricStore)
-
+// 	Url := fmt.Sprintf("https://%s.%s/prometheus/%s/%s/api/v1/write", *project, *endpoint, *project, *metricStore)
+    Url := "http://unity-cn-shenzhen.cn-shenzhen-intranet.log.aliyuncs.com/prometheus/unity-cn-shenzhen/qiaoke-work/api/v1/write"
 	var data []byte;
 	ret := &data;
 	var s = "sysak_proc_cpu_total{mode=\"user\",instance=\"i-wz9d3tqjhpb8esj8ps4z\"} 0.8\nsysak_proc_cpu_total{mode=\"total\",instance=\"i-wz9d3tqjhpb8esj8ps4z\"} 3960.0\nsysak_proc_cpu_total{mode=\"user2\",instance=\"i-wz9d3tqjhpb8iesj8ps4z\"} 0.9\n"

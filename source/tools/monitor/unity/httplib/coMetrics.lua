@@ -22,12 +22,19 @@ function CcoMetrics:_init_(fYaml)
     local _metrics = res.metrics
     self._mhead = _metrics.head
     self._title = _metrics.title
-    self._ak = 1
-    self._sk = 2
+
     self._transPro = CtransPro.new(self._instance, fYaml, false, false)
 
-    self._url = "http://127.0.0.1:3330/api/v1/write"
+    local sysconf = system:parseYaml("/etc/sysak/mySLS.yaml")
 
+    self._ak = sysconf.config.ak
+    self._sk = sysconf.config.sk
+    self._project = sysconf.config.project
+    self._endpoint = sysconf.config.endpoint
+    self._metricstore = sysconf.config.metricstore
+    self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"
+    print(self._url)
+    self._host = self._project .."." .. self._endpoint
     -- go ffi
     local ffi = require("sls_metric.native.ffi_lua")
     self.ffi = ffi.ffi
@@ -40,20 +47,18 @@ function CcoMetrics:_init_(fYaml)
 end
 
 function CcoMetrics:echo(tReq)
-    if tReq.code ~= "204" then
-        print(tReq.code, tReq.data)
-    end
+    --if tReq.code ~= "204" then
+    print(tReq.code, tReq.data)
+    --end
 end
 
 function CcoMetrics:trans(msgs)
     local res
     local c = 0
     local lines
-    local bodies = {}
 
     lines = msgs.lines
     res = self._transPro:export(lines)
-    print("trans finish")
     local prome = self.ffi.new("GoString")
     prome.p = res
     prome.n = #res
@@ -74,21 +79,22 @@ function CcoMetrics:trans(msgs)
     --return stream
 
     return self.foxffi.string(data, data_len)
-    --return "hello world"
+    --return "sysak_proc_cpu_total{mode=\"user\",instance=\"i-wz9d3tqjhpb8esj8ps4z\"} 0.8\nsysak_proc_cpu_total{mode=\"total\",instance=\"i-wz9d3tqjhpb8esj8ps4z\"} 3960.0\nsysak_proc_cpu_total{mode=\"user2\",instance=\"i-wz9d3tqjhpb8iesj8ps4z\"} 0.9\n"
 end
 
 function CcoMetrics:pack(body)
-    print("pack start ".. body)
     local line = self:packCliHead('POST', self._url)
+    local aksk = self._ak .. ":"..self._sk
+    local aksk64 = base64.encode(aksk)
+    print(aksk64)
     local head = {
         Host = self._host,
         ["Content-Encoding"] = "snappy",
         ["Content-Type"] = "application/x-protobuf",
-        ["X-Prometheus-Remote-Write-Version"] = "0.1.0",
-        --["Content-Length"] = #body,
-        --["Authorization"] = "Basic " .. base64.encode(self._ak .. ":"..self._sk)
+        --["X-Prometheus-Remote-Write-Version"] = "0.1.0",
+        ["Content-Length"] = #body,
+        ["Authorization"] = "Basic " .. aksk64,
     }
-
     local heads = self:packCliHeaders(head)
     print("pack finish")
     return pystring:join("\r\n", {line, heads, body})
