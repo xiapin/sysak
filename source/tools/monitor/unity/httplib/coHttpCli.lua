@@ -104,7 +104,6 @@ local function installFd(ip, port)
 end
 
 local function setupSocket(host, port)
-    print(host)
     local ip = getIp(host)
     if ip then
         return installFd(ip, port)
@@ -134,7 +133,6 @@ function CcoHttpCli:connect()
         else
             self.status = enumStat.connecting
         end
-        print("setup socket success")
         return true
     end
     return false
@@ -148,30 +146,6 @@ function CcoHttpCli:trans(msgs, body, filter)
     return ""
 end
 
---function CcoHttpCli:addInstance(line)   -- add instance id for line index.
---    local cells = line.ls
---    local hasInstance = false
---
---    if cells then
---        for _, cell in ipairs(cells) do
---            if cell.name == "instance" then
---                hasInstance = true
---            end
---        end
---    end
---
---    if not hasInstance then
---        local cell = {
---            name = "instance",
---            index = self._instance
---        }
---        if cells then
---            table.insert(cells, cell)
---        else
---            line.ls = {cell}
---        end
---    end
---end
 
 function CcoHttpCli:pack(body)
     local line = self:packCliHead('GET', self._url)
@@ -280,7 +254,6 @@ end
 local function readChunks(fread, tReq)
     local cells = {}
     local s = tReq.data
-    print("s  "..s)
     local size
     local len = 1
     local bodies, body
@@ -289,7 +262,6 @@ local function readChunks(fread, tReq)
         if len == 0 then
             break
         end
-        print("loop")
         s = waitChuckSize(fread, s)
         if s then
             size, s = unpack(pystring:split(s, "\r\n", 1))
