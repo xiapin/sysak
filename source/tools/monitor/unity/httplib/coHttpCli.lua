@@ -113,17 +113,12 @@ local function setupSocket(host, port)
     end
 end
 
-function CcoHttpCli:_init_(fYaml, persistent)
-    local res = system:parseYaml(fYaml)
-    local pushTo = res.pushTo
+function CcoHttpCli:_init_(pushTo, persistent)
+
     self._host = pushTo.host
     self._port = pushTo.port or 80
     self._url = pushTo.url or "/"
     self._persistent = persistent
-
-    local Cidentity = require("beaver.identity")
-    local inst = Cidentity.new(fYaml)
-    self._instance = inst:id()
 
     self.status = enumStat.closed
 end
@@ -151,30 +146,6 @@ function CcoHttpCli:trans(msgs, body, filter)
     return ""
 end
 
-function CcoHttpCli:addInstance(line)   -- add instance id for line index.
-    local cells = line.ls
-    local hasInstance = false
-
-    if cells then
-        for _, cell in ipairs(cells) do
-            if cell.name == "instance" then
-                hasInstance = true
-            end
-        end
-    end
-
-    if not hasInstance then
-        local cell = {
-            name = "instance",
-            index = self._instance
-        }
-        if cells then
-            table.insert(cells, cell)
-        else
-            line.ls = {cell}
-        end
-    end
-end
 
 function CcoHttpCli:pack(body)
     local line = self:packCliHead('GET', self._url)
@@ -271,7 +242,7 @@ local function waitChuckSize(fread, s)
         if string.find(s, "\r\n") then
             return s
         end
-        local add = fread()
+        local add = fread() --add = nil，后续没有读到数据了
         if add then
             s = s .. add
         else
@@ -283,7 +254,7 @@ end
 local function readChunks(fread, tReq)
     local cells = {}
     local s = tReq.data
-    local ssize, size
+    local size
     local len = 1
     local bodies, body
 
@@ -325,8 +296,9 @@ local function waitHttpRest(fread, tReq)
         if waitDataRest(fread, rest, tReq) < 0 then
             return -2
         end
-    else  -- chunk mode
-        if #tReq.data > 0 then
+    elseif  tReq.header["Transfer-Encoding"]  then
+        -- chunk mode
+        if tReq.header["Transfer-Encoding"]=="chunked" and #tReq.data > 0 then
             if readChunks(fread, tReq) < 0 then
                 return -3
             end
@@ -520,8 +492,8 @@ function CcoHttpCli:work(cffi, efd)
             goto failed
         end
         self.status = enumStat.receiving
-        local fread = self:closureRead(fd)
-        local tReq = self:result(fread)
+        local fread = self:closureRead(fd) -- fread() = nil
+        local tReq = self:result(fread) --nil，fread = nil
         if tReq then
             self.status = enumStat.connected
             self:echo(tReq)
