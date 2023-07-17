@@ -115,16 +115,11 @@ local function setupSocket(host, port)
 end
 
 function CcoHttpCli:_init_(pushTo, persistent)
-    --local res = system:parseYaml(fYaml)
-    --local pushTo = res.pushTo
+
     self._host = pushTo.host
     self._port = pushTo.port or 80
     self._url = pushTo.url or "/"
     self._persistent = persistent
-
-    local Cidentity = require("beaver.identity")
-    --local inst = Cidentity.new(fYaml)
-    --self._instance = inst:id()
 
     self.status = enumStat.closed
 end

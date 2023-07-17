@@ -5,14 +5,26 @@
 ---
 
 require("common.class")
-local CcoHttpCli = require("httplib.coHttpCli")
+local CcoHttpCliInst = require("httplib.coHttpCliInst")
 local pystring = require("common.pystring")
 local lineParse = require("common.lineParse")
+local system = require("common.system")
 
-local CcoInflux = class("coInflux", CcoHttpCli)
+local CcoInflux = class("coInflux", CcoHttpCliInst)
 
 function CcoInflux:_init_(fYaml)
-    CcoHttpCli._init_(self, fYaml)
+    local res = system:parseYaml(fYaml)
+    local pushInflux = {
+        host = res.pushTo.host,
+        url = res.pushTo.url,
+        port = res.pushTo.port
+    }
+
+    local Cidentity = require("beaver.identity")
+    local inst = Cidentity.new(fYaml)
+    local instance = inst:id()
+
+    CcoHttpCliInst._init_(self, instance, pushInflux)
 end
 
 function CcoInflux:echo(tReq)

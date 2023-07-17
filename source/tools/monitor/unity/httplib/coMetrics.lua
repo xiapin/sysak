@@ -6,7 +6,7 @@
 
 require("common.class")
 
-local CcoHttpCli = require("httplib.coHttpCli")
+local CcoHttpCliInst = require("httplib.coHttpCliInst")
 local system = require("common.system")
 local pystring = require("common.pystring")
 local lineParse = require("common.lineParse")
@@ -14,7 +14,7 @@ local CtransPro = require("common.transPro")
 local base64 = require("base64")
 
 
-local CcoMetrics = class("coMetrics", CcoHttpCli)
+local CcoMetrics = class("coMetrics", CcoHttpCliInst)
 
 function CcoMetrics:_init_(fYaml)
 
@@ -23,7 +23,9 @@ function CcoMetrics:_init_(fYaml)
     self._mhead = _metrics.head
     self._title = _metrics.title
 
-    self._transPro = CtransPro.new(self._instance, fYaml, false, false)
+    local Cidentity = require("beaver.identity")
+    local inst = Cidentity.new(fYaml)
+    local instance = inst:id()
 
     local sysconf = system:parseYaml("/etc/sysak/mySLS.yaml")
 
@@ -40,7 +42,7 @@ function CcoMetrics:_init_(fYaml)
         url = self._url,
         port = 80
     }
-    CcoHttpCli._init_(self, pushMetrics)
+    CcoHttpCliInst._init_(self, instance, pushMetrics)
     -- go ffi
     local ffi = require("sls_metric.native.ffi_lua")
     self.ffi = ffi.ffi
@@ -50,6 +52,8 @@ function CcoMetrics:_init_(fYaml)
     local foxFFI = require("tsdb.native.foxffi")
     self.foxffi = foxFFI.ffi
     self.foxcffi = foxFFI.cffi
+
+    self._transPro = CtransPro.new(instance, fYaml, false, false)
 end
 
 function CcoMetrics:echo(tReq)
