@@ -27,13 +27,11 @@ function CcoMetrics:_init_(fYaml)
     local inst = Cidentity.new(fYaml)
     local instance = inst:id()
 
-    local sysconf = system:parseYaml("/etc/sysak/mySLS.yaml")
-
-    self._ak = sysconf.config.ak
-    self._sk = sysconf.config.sk
-    self._project = sysconf.config.project
-    self._endpoint = sysconf.config.endpoint
-    self._metricstore = sysconf.config.metricstore
+    self._ak = res.pushTo.ak
+    self._sk = res.pushTo.sk
+    self._project = res.pushTo.project
+    self._endpoint = res.pushTo.endpoint
+    self._metricstore = res.pushTo.metricstore
     self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"
     self._host = self._project .."." .. self._endpoint
 
