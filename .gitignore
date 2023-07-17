@@ -5,7 +5,8 @@
 *.o.cmd
 *.ko
 *.ko.cmd
-*.idea
+**/.idea
+**/.DS_Store
 Module.symvers
 modules.builtin
 modules.order
