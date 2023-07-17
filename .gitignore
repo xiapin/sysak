@@ -6,7 +6,7 @@
 *.ko
 *.ko.cmd
 *.idea
-.idea/
+**/.idea/
 **/.DS_Store
 Module.symvers
 modules.builtin
