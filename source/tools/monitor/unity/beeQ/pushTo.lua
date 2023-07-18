@@ -6,13 +6,26 @@
 
 package.path = package.path .. ";../?.lua;"
 
+local system = require("common.system")
 local coCli = require("httplib.coCli")
 local coInflux = require("httplib.coInflux")
+local coMetrics = require("httplib.coMetrics")
+local coAutoMetrics =require("httplib.coAutoMetrics")
 
 function work(fd, fYaml)
+    local conf = system:parseYaml(fYaml)
+    local to = conf.pushTo.to
+    print(to)
     local frame = coCli.new(fd)
-    local c = coInflux.new(fYaml)
+    local _funcs = {
+        Influx = function(fYaml) return coInflux.new(fYaml) end,
+        Metrics = function(fYaml) return coMetrics.new(fYaml) end,
+        AutoMetrics = function(fYaml) return coAutoMetrics.new(fYaml) end
+    }
+    local c = _funcs[to](fYaml)
+    --local c = _funcs[to]("/etc/sysak/base.yaml")
     frame:poll(c)
+
     print("end push.")
     return 0
 end

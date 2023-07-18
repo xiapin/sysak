@@ -18,7 +18,7 @@ yaml_path=$1
 [ ! $yaml_path ] && yaml_path="/etc/sysak/base.yaml"
 
 #download sysak.ko
-sysak -oss -d
+#sysak -oss -d
 
 echo $yaml_yaml_path
 ./unity-mon $yaml_path

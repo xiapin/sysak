@@ -1,0 +1,1 @@
+rsync -avz -e 'ssh -p 1049' * root@100.82.20.22:/root/1ext/code/sysak
