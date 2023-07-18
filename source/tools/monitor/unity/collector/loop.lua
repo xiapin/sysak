@@ -16,7 +16,7 @@ local CguardDaemon = require("collector.guard.guardDaemon")
 local CguardSelfStat = require("collector.guard.guardSelfStat")
 local CpostPlugin = require("collector.postPlugin.postPlugin")
 local CforkRun = require("collector.execEngine.forkRun")
----local CpodFilter = require("collector.podMan.podFilter")
+local CpodFilter = require("collector.podMan.podFilter")
 local CpodsAll = require("collector.podMan.podsAll")
 local Cloop = class("loop")
 
@@ -52,11 +52,15 @@ function Cloop:loadLuaPlugin(res, proc_path, procffi)
         end
     end
     if res.container then
-        ---self._procs[c] = CpodFilter.new(res, self._proto, procffi, proc_path)
-        ---self._names[c] = "podFilter"
-        self._procs[c] = CpodsAll.new(res, self._proto, procffi, proc_path)
-        self._names[c] = "podMon"
-
+        if res.container.mode == "cgroup" then
+	    --print("mods1="..res.container.mode)
+            self._procs[c] = CpodFilter.new(res, self._proto, procffi, proc_path)
+            self._names[c] = "podFilter"
+        else
+	    --print("mods2="..res.container.mode)
+            self._procs[c] = CpodsAll.new(res, self._proto, procffi, proc_path)
+            self._names[c] = "podMon"
+        end
     end
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
 end

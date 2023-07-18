@@ -25,6 +25,7 @@ outline:
 
 container:
   mode: "pods"
+  #mode:"cgroup"
   #"cg_cpuacct_stat" is a substitute of cg_cpuacct_proc_stat
   luaPlugin: ["cg_memory_fail_cnt", "cg_memory_util", "cg_memory_dcmp_latency",
              "cg_memory_drcm_latency", "cg_cpuacct_wait_latency", "cg_cpuacct_proc_stat",
