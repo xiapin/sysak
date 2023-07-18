@@ -24,7 +24,8 @@ struct Env {
     int64_t nr_core;
     int64_t nr_channel;
     int64_t* socket_ref_core;
-} env = {.vm = false};
+    bool init_succ;
+} env = {.vm = false, .init_succ = true};
 
 typedef struct event {
     uint64_t rpq_occ;
@@ -475,8 +476,8 @@ void init_data() {
 }
 
 void free_data() {
-    free_socket_record(before.socket_record_arr);
-    free_socket_record(after.socket_record_arr);
+    if (before.socket_record_arr) free_socket_record(before.socket_record_arr);
+    if (after.socket_record_arr) free_socket_record(after.socket_record_arr);
 }
 
 int64_t get_perf_pmuid(int num) {
@@ -529,6 +530,9 @@ int init(void* arg) {
     int64_t* pmu_ids = 0;
     uint32_t* cfgs = 0;
 
+    bzero(&before, sizeof(before));
+    bzero(&after, sizeof(after));
+
     // check model
     if (!detect_model()) {
         fprintf(stderr, "Failed detect model.\n");
@@ -574,12 +578,14 @@ int init(void* arg) {
     // init data
     init_data();
 
+#ifdef DEBUG
     fprintf(stderr, "nr_socket=%d nr_core=%d nr_cpu=%d nr_channel=%d \n",
             env.nr_socket, env.nr_core, env.nr_cpu, env.nr_channel);
     int i = 0;
     for (i = 0; i < env.nr_socket; i++) {
         fprintf(stderr, "socket%d-ref cpu=%d\n", i, env.socket_ref_core[i]);
     }
+#endif
 
 cleanup:
 
@@ -593,6 +599,9 @@ cleanup:
         cfgs = 0;
     }
 
+    if (err) {
+        env.init_succ = false;
+    }
     return err;
 }
 
@@ -711,8 +720,13 @@ void print_record(record* rec) {
 #endif
 
 int call(int t, struct unity_lines* lines) {
+    if (!env.init_succ) {
+        return 0;
+    }
+
     struct unity_line* line;
     int32_t socket_id = 0, channel_id = 0, line_num = 0;
+
     read_imc();
 #ifdef DEBUG
     fprintf(stderr, "before.\n");
