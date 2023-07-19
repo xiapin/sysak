@@ -49,92 +49,92 @@ plugins:
 
 metrics:
   -
-    title: sysak_proc_cpu_total
+    title: sysom_proc_cpu_total
     from: cpu_total
     head: mode
     help: "cpu usage info for total."
     type: "gauge"
-  - title: sysak_proc_cpus
+  - title: sysom_proc_cpus
     from: cpus
     head: mode
     help: "cpu usage info for per-cpu."
     type: "gauge"
-  - title: sysak_proc_sirq
+  - title: sysom_proc_sirq
     from: sirq
     head: type
     help: "system soft irq times."
     type: "gauge"
-  - title: sysak_proc_stat_counters
+  - title: sysom_proc_stat_counters
     from: stat_counters
     head: counter
     help: "system state counter."
     type: "gauge"
-  - title: sysak_proc_meminfo
+  - title: sysom_proc_meminfo
     from: meminfo
     head: value
     help: "meminfo from /proc/meminfo."
     type: "gauge"
-  - title: sysak_proc_vmstat
+  - title: sysom_proc_vmstat
     from: vmstat
     head: value
     help: "vmstat info from /proc/vmstat."
     type: "gauge"
-  - title: sysak_proc_self_statm
+  - title: sysom_proc_self_statm
     from: self_statm
     head: value
     help: "statm info from /proc/self/statm."
     type: "gauge"
-  - title: sysak_proc_networks
+  - title: sysom_proc_networks
     from: networks
     head: counter
     help: "networks info from /proc/net/dev."
     type: "gauge"
-  - title: sysak_proc_disks
+  - title: sysom_proc_disks
     from: disks
     head: counter
     help: "disk info from /proc/diskstats."
     type: "gauge"
-  - title: sysak_proc_pkt_status
+  - title: sysom_proc_pkt_status
     from: pkt_status
     head: counter
     help: "net status info from /proc/net/snmp and /proc/net/status."
     type: "gauge"
-  - title: sysak_fs_stat
+  - title: sysom_fs_stat
     from: fs_stat
     head: counter
     help: "file system information."
     type: "gauge"
-  - title: sysak_sock_stat
+  - title: sysom_sock_stat
     from: sock_stat
     head: value
     help: "sock stat counters from /proc/net/sockstat"
     type: "gauge"
-  - title: sysak_proc_schedstat
+  - title: sysom_proc_schedstat
     from: proc_schedstat
     head: value
     help: "schedule state of percpu."
     type: "gauge"
-  - title: sysak_proc_loadavg
+  - title: sysom_proc_loadavg
     from: proc_loadavg
     head: value
     help: "loadavg of system from /proc/loadavg"
     type: "gauge"
-  - title: sysak_proc_buddyinfo
+  - title: sysom_proc_buddyinfo
     from: buddyinfo
     head: value
     help: "buddyinfo of system from /proc/buddyinfo"
     type: "gauge"
-  - title: sysak_IOMonIndForDisksIO
+  - title: sysom_IOMonIndForDisksIO
     from: IOMonIndForDisksIO
     head: value
     help: "Disk IO indicators and abnormal events"
     type: "gauge"
-  - title: sysak_IOMonIndForSystemIO
+  - title: sysom_IOMonIndForSystemIO
     from: IOMonIndForSystemIO
     head: value
     help: "System indicators and abnormal events about IO"
     type: "gauge"
-  - title: sysak_IOMonDiagLog
+  - title: sysom_IOMonDiagLog
     from: IOMonDiagLog
     head: value
     help: "Diagnose log for IO exception"
@@ -144,87 +144,87 @@ metrics:
     head: value
     help: "nosched/irqoff:sys and irqoff hold cpu and didn't scheduling"
     type: "gauge"
-  - title: sysak_cpu_dist
+  - title: sysom_cpu_dist
     from: cpu_dist
     head: value
     help: "task cpu sched dist."
     type: "gauge"
-  - title: sysak_net_health_hist
+  - title: sysom_net_health_hist
     from: net_health_hist
     head: value
     help: "net_health_hist"
     type: "gauge"
-  - title: sysak_net_health_count
+  - title: sysom_net_health_count
     from: net_health_count
     head: value
     help: "net_health_count"
     type: "gauge"
-  - title: sysak_net_retrans_count
+  - title: sysom_net_retrans_count
     from: net_retrans_count
     head: value
     help: "net_retrans_count"
     type: "gauge"
-  - title: sysak_gpuinfo
+  - title: sysom_gpuinfo
     from: gpuinfo
     head: value
     help: "gpuinfo of system from nvidia-smi"
     type: "gauge"
-  - title: sysak_uname
+  - title: sysom_uname
     from: uname
     head: value
     help: "uname info"
     type: "gauge"
-  - title: sysak_uptime
+  - title: sysom_uptime
     from: uptime
     head: value
     help: "uptime from /proc/uptime"
     type: "gauge"
-  - title: sysak_system_release
+  - title: sysom_system_release
     from: system_release
     head: value
     help: "system_release from /etc/os-release"
     type: "gauge"
-  - title: sysak_cgroups
+  - title: sysom_cgroups
     from: cgroups
     head: value
     help: "cgroup number."
     type: "gauge"
-  - title: sysak_per_sirqs
+  - title: sysom_per_sirqs
     from: per_sirqs
     head: value
     help: "per_sirqs."
     type: "gauge"
-  - title: sysak_softnets
+  - title: sysom_softnets
     from: softnets
     head: value
     help: "cgroup number."
     type: "gauge"
-  - title: sysak_interrupts
+  - title: sysom_interrupts
     from: interrupts
     head: value
     help: "interrupts."
     type: "gauge"
-  - title: sysak_net_ip_count
+  - title: sysom_net_ip_count
     from: net_ip_count
     head: value
     help: "net snmp net_ip_count"
     type: "gauge"
-  - title: sysak_net_icmp_count
+  - title: sysom_net_icmp_count
     from: net_icmp_count
     head: value
     help: "net snmp net_icmp_count"
     type: "gauge"
-  - title: sysak_net_udp_count
+  - title: sysom_net_udp_count
     from: net_udp_count
     head: value
     help: "net snmp net_udp_count"
     type: "gauge"
-  - title: sysak_net_tcp_count
+  - title: sysom_net_tcp_count
     from: net_tcp_count
     head: value
     help: "net snmp net_tcp_count"
     type: "gauge"
-  - title: sysak_net_tcp_ext_count
+  - title: sysom_net_tcp_ext_count
     from: net_tcp_ext_count
     head: value
     help: "net stat net_tcp_ext_count"
