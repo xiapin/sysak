@@ -12,7 +12,7 @@ local pystring = require("common.pystring")
 local lineParse = require("common.lineParse")
 local CtransPro = require("common.transPro")
 local base64 = require("base64")
-local aksk = require("common.aksk")
+local addition = require("common.addition")
 
 local CcoMetrics = class("coMetrics", CcoHttpCliInst)
 
@@ -27,9 +27,9 @@ function CcoMetrics:_init_(fYaml)
     local inst = Cidentity.new(fYaml)
     local instance = inst:id()
 
-    local addition = res.pushTo.addition
+    local _addition = res.pushTo.addition
 
-    self._ak, self._sk = aksk:decode(addition)
+    self._key1, self._key2 = addition:decode(_addition)
     self._project = res.pushTo.project
     self._endpoint = res.pushTo.endpoint
     self._metricstore = res.pushTo.metricstore
@@ -83,16 +83,15 @@ end
 
 function CcoMetrics:pack(body)
     local line = self:packCliHead('POST', self._url)
-    local aksk = self._ak .. ":"..self._sk
-    local aksk64 = base64.encode(aksk)
-    print(aksk64)
+    local keys = self._key1 .. ":"..self._key2
+    local keys64 = base64.encode(keys)
     local head = {
         Host = self._host,
         ["Content-Encoding"] = "snappy",
         ["Content-Type"] = "application/x-protobuf",
         --["X-Prometheus-Remote-Write-Version"] = "0.1.0",
         ["Content-Length"] = #body,
-        ["Authorization"] = "Basic " .. aksk64,
+        ["Authorization"] = "Basic " .. keys64,
     }
     local heads = self:packCliHeaders(head)
     print("pack finish")
