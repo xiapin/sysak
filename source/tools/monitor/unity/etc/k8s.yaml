@@ -53,7 +53,7 @@ container:
 
 
 luaPlugins: ["podmem","proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
-             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat","pod_allocpage",
+             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
              "proc_uptime", "proc_arp", "proc_cgroups", "proc_softirqs", "proc_softnet_stat",
 ]
 
