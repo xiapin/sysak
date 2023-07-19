@@ -174,14 +174,6 @@ local function setupPlugins(res, proto, pffi, mnt, ino)
                 name = "podns",
                 index = con.pod.namespace,
             },
-            {
-                name = "uid",
-                index = con.pod.uid,
-            },
-            {
-                name = "con_id",
-                index = string.sub(con.id, 1, 12)
-            },
         }
 
         for _, plugin in ipairs(res.container.luaPlugin) do
