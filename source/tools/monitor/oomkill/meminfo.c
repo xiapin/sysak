@@ -11,6 +11,9 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "globals.h"
 #include "meminfo.h"
@@ -252,6 +255,44 @@ int get_comm(int pid, char* out, size_t outlen)
     fix_truncated_utf8(out);
     return 0;
 }
+
+int get_cmdline(int pid, char *out, int out_len) {
+    char cmdline_file[128] = {0};
+    int fd;
+    int i;
+    ssize_t nread, total = 0;
+
+    sprintf(cmdline_file, "%s/%d/cmdline", procdir_path, pid);
+
+    fd = open(cmdline_file, O_RDONLY);
+    if (fd == -1) {
+        printf("Failed to open %s\n", cmdline_file);
+        return -1; 
+    }   
+
+    while ((nread = read(fd, out + total, out_len - total - 1)) > 0) {
+        total += nread;
+    }   
+
+    close(fd);
+
+    if (total == -1) {
+        printf("Failed to read %s\n", cmdline_file);
+        return -1; 
+    }   
+
+    // Replace '\0' with spaces when arguments are not separated by '\0'
+    for (i = 0; i < total; i++) {
+        if (out[i] == '\0') {
+            out[i] = ' ';
+        }   
+    }   
+
+    out[total] = '\0';
+
+    return 0;
+}
+
 
 // Get the effective uid (EUID) of `pid`.
 // Returns the uid (>= 0) or -errno on error.

@@ -1,14 +1,10 @@
-#ifndef UNITY_IMC_LATENCY_H
-#define UNITY_IMC_LATENCY_H
+#ifndef IMC_LATENCY_H
+#define IMC_LATENCY_H
 
 #include <linux/types.h>
 #include <stdbool.h>
 #include <linux/perf_event.h>
-#include "../plugin_head.h"
-
-int init(void* arg);
-int call(int t, struct unity_lines* lines);
-void deinit(void);
+#include <stdint.h>
 
 #define ULIMIT_RECOMMENDATION                                                 \
     ("try executing 'ulimit -n 1000000' to increase the limit on the number " \
@@ -96,6 +92,8 @@ enum INTEL_CPU_MODEL {
 #define MAX_IMC_ID 100
 #define GENERAL_REG_NUM 4
 #define FIXED_REG_NUM 1
+#define FILE_PATH_LEN 256
+#define DEFAUlT_PEROID 3
 
 typedef struct imc_event_t {
     struct perf_event_attr attr;
@@ -122,5 +120,37 @@ struct topology_ent {
     int64_t core_id;
     int64_t socket_id;
 };
+
+typedef struct event {
+    uint64_t rpq_occ;
+    uint64_t rpq_ins;
+    uint64_t wpq_occ;
+    uint64_t wpq_ins;
+    uint64_t dram_speed;
+} event;
+
+typedef struct channel_record {
+    uint64_t rpq_occ;
+    uint64_t rpq_ins;
+    uint64_t wpq_occ;
+    uint64_t wpq_ins;
+    double read_latency;
+    double write_latency;
+} channel_record;
+
+typedef struct socket_record {
+    channel_record* channel_record_arr;
+    uint64_t rpq_occ;
+    uint64_t rpq_ins;
+    uint64_t wpq_occ;
+    uint64_t wpq_ins;
+    double read_latency;
+    double write_latency;
+    uint64_t dram_clock;
+} socket_record;
+
+typedef struct record {
+    socket_record* socket_record_arr;
+} record;
 
 #endif

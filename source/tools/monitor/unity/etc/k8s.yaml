@@ -25,7 +25,11 @@ outline:
 
 container:
   mode: "pods"
-  luaPlugin: ["cg_cpu_cfs_quota","cg_mem_drcm_glob_latency","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency"]
+  #mode:"cgroup"
+  #"cg_cpuacct_stat" is a substitute of cg_cpuacct_proc_stat
+  luaPlugin: ["cg_memory_fail_cnt", "cg_memory_util", "cg_memory_dcmp_latency",
+             "cg_memory_drcm_latency", "cg_cpuacct_wait_latency", "cg_cpuacct_proc_stat",
+             "cg_cpu_stat", "cg_pmu_events", "cg_cpu_cfs_quota", "cg_mem_drcm_glob_latency"]
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -277,13 +281,12 @@ metrics:
     head: value
     help: "sysom_cg_memory_util"
     type: "gauge"
-  - title: sysom_cg_memgdrcm_latency
+  - title: sysom_cg_mem_glob_drcm_latency
     from: cgGlbDrcmLatency
     head: value
     help: "sysom global memory latency"
     type: "gauge"
-
-  - title: sysom_cg_memdrcm_latency
+  - title: sysom_cg_mem_drcm_latency
     from: cg_memdrcm_latency
     head: value
     help: "sysom_cg_memdrcm_latency"
@@ -292,6 +295,26 @@ metrics:
     from: cg_memmcmp_latency
     head: value
     help: "sysom_cg_memmcmp_latency"
+    type: "gauge"
+  - title: sysom_cg_mem_dcmp_latency
+    from: cg_memdcmp_latency
+    head: value
+    help: "sysom_cg_mem_dcmp_latency"
+    type: "gauge"
+  - title: sysom_cg_cpuacct_wait_latency
+    from: cg_wait_latency
+    head: value
+    help: "sysom_cg_cpuacct_wait_latency"
+    type: "gauge"
+  - title: sysom_cg_cpuacct_proc_stat
+    from: cg_cpuacct_proc_stat
+    head: value
+    help: "sysom_cg_cpuacct_proc_stat"
+    type: "gauge"
+  - title: sysom_cg_cpu_quota
+    from: cgCpuQuota
+    head: value
+    help: "quota_us,peroid_us and quota/period"
     type: "gauge"
   - title: sysom_cg_cpu_stat
     from: cg_cpu_stat
@@ -303,8 +326,8 @@ metrics:
     head: value
     help: "cpuacct/cpuacct.stat"
     type: "gauge"
-  - title: sysom_cg_cfs_quota
-    from: cgCpuQuota
+  - title: sysom_cg_pmu_events
+    from: pmu_cg_events
     head: value
-    help: "cfs quota"
+    help: "pmu events of cgroups"
     type: "gauge"

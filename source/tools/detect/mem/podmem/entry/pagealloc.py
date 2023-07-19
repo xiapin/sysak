@@ -197,7 +197,8 @@ def get_info(meminfo, result,cid):
         meminfo["podinfo"][podname] = {}
         meminfo["podinfo"][podname]["podname"] = podname
         meminfo["podinfo"][podname]["podns"] = podns
-        meminfo["podinfo"][podname]["mem"] = 0
+        meminfo["podinfo"][podname]["rxmem"] = 0
+        meminfo["podinfo"][podname]["txmem"] = 0
     return podname
 
 def pagemem_scan(meminfo, ns):
@@ -241,7 +242,10 @@ def pagemem_check(meminfo,ns):
             pid = info[1]
             task_pid = task+"-"+pid
             rx = int(line_list[2])
-            tx = int(line_list[3])
+            if line.find("LISTEN") >= 0:
+                tx = 0
+            else:
+                tx = int(line_list[3])
             rx_mem += rx
             tx_mem += tx
             if task_pid not in memTask.keys():
