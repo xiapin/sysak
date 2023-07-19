@@ -12,7 +12,7 @@ local pystring = require("common.pystring")
 local lineParse = require("common.lineParse")
 local CtransPro = require("common.transPro")
 local base64 = require("base64")
-
+local aksk = require("common.aksk")
 
 local CcoMetrics = class("coMetrics", CcoHttpCliInst)
 
@@ -27,8 +27,9 @@ function CcoMetrics:_init_(fYaml)
     local inst = Cidentity.new(fYaml)
     local instance = inst:id()
 
-    self._ak = res.pushTo.ak
-    self._sk = res.pushTo.sk
+    local addition = res.pushTo.addition
+
+    self._ak, self._sk = aksk:decode(addition)
     self._project = res.pushTo.project
     self._endpoint = res.pushTo.endpoint
     self._metricstore = res.pushTo.metricstore
@@ -76,18 +77,8 @@ function CcoMetrics:trans(msgs)
     local data_len = self.awesome.metricSnappy(prome,byte_ptr)
     data_len = tonumber(data_len)
     local data = self.ffi.cast("GoUint8*", byte_ptr.data)
-    --local stream = ""
-    --for i = 0, data_len do
-    --    --print(data[i])
-    --
-    --    stream = stream .. string.char(data[i])
-    --end
-    --
-    --print(stream)
-    --return stream
 
     return self.foxffi.string(data, data_len)
-    --return "sysak_proc_cpu_total{mode=\"user\",instance=\"i-wz9d3tqjhpb8esj8ps4z\"} 0.8\nsysak_proc_cpu_total{mode=\"total\",instance=\"i-wz9d3tqjhpb8esj8ps4z\"} 3960.0\nsysak_proc_cpu_total{mode=\"user2\",instance=\"i-wz9d3tqjhpb8iesj8ps4z\"} 0.9\n"
 end
 
 function CcoMetrics:pack(body)
