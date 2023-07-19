@@ -1,6 +1,6 @@
 objs := $(foreach n, $(mods), $(OBJPATH)/$(n))
 
-CFLAGS += $(EXTRA_CFLAGS) -I$(SRC)/lib/uapi/include
+CFLAGS += $(EXTRA_CFLAGS) $(INCLUDES) -I$(SRC)/lib/uapi/include
 LDFLAGS += $(EXTRA_LDFLAGS)
 
 ifeq ($(KERNEL_DEPEND), Y)
