@@ -30,8 +30,17 @@ function CguardSelfStat:_init_(proto, pffi, mnt, resYaml, jperiod)
 
     self._lastUser, self._lastSys, _, _ = readProc(self._path)
     self._period = jperiod
-    self._cpuLimit = resYaml.config.limit.cpu * jperiod / 100
-    self._memLimit = resYaml.config.limit.mem * 1024 * 1024
+
+    self._cpuLimit = nil
+    self._memLimit = nil
+    if resYaml.config.limit then
+        if resYaml.config.limit.cpu then
+            self._cpuLimit = resYaml.config.limit.cpu * jperiod / 100
+        end
+        if resYaml.config.limit.mem then
+            self._memLimit = resYaml.config.limit.mem * 1024 * 1024
+        end
+    end
 end
 
 local function rssRssAnon()
@@ -54,17 +63,17 @@ function CguardSelfStat:proc(elapsed, lines)
 
     local user, sys, vsize, rss = readProc(self._path)
     local _user, _sys = user - self._lastUser, sys - self._lastSys
-    local cpus = _user, _sys
+    local cpus = _user + _sys
 
     self._lastUser, self._lastSys = user, sys
-    if cpus > self._cpuLimit * elapsed then
-        print("last cpu usage overflow." .. cpus)
+    if self._cpuLimit and cpus > self._cpuLimit * elapsed then
+        print("last cpu usage overflow. user + sys jiffies: " .. cpus)
         os.exit(1)
     end
 
     local anon = rssRssAnon()
-    if anon > self._memLimit then
-        print("last mem usage overflow." .. rss)
+    if self._memLimit and anon > self._memLimit then
+        print("last mem usage overflow. rss bytes: " .. rss)
         os.exit(1)
     end
     local vs = {
