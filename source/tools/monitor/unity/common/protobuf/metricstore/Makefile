@@ -1,12 +1,11 @@
 SO := libmetricSnappy.so
 
-all: $(SO) install
+all:
+	echo "1"
+	bash ./build_shared.sh
 
-$(SO):
-	$(shell ./build_shared.sh)
-
-install: $(SO)
-	cp $(SO) ../../beeQ/lib
 
 clean:
 	rm -f $(SO)
+	rm go.mod
+	rm go.sum
