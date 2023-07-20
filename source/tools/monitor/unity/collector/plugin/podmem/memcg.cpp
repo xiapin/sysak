@@ -286,7 +286,7 @@ static int get_dentry_top()
         info->dirty = 0;
         info->inactive = 0;
         info->del = del;
-        info->cindoe = history_inodes[inode];
+        info->cinode = history_inodes[inode];
 
         info->size = i_size>>10;
         strncpy(info->filename, end, sizeof(info->filename) - 2);
