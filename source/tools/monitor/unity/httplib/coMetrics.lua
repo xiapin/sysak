@@ -43,7 +43,7 @@ function CcoMetrics:_init_(fYaml)
     }
     CcoHttpCliInst._init_(self, instance, pushMetrics)
     -- go ffi
-    local ffi = require("sls_metric.native.ffi_lua")
+    local ffi = require("common.protobuf.metricstore.ffi_lua")
     self.ffi = ffi.ffi
     self.awesome = ffi.awesome
 
