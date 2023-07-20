@@ -35,20 +35,22 @@ end
 function CpipeMon:setupPipe(fYaml)
     local res = system:parseYaml(fYaml)
 
-    for i, path in ipairs(res.outline) do
-        if unistd.access(path) then
-            unistd.unlink(path)
-        end
-        self._paths[i] = path
+    if res.outline then
+        for i, path in ipairs(res.outline) do
+            if unistd.access(path) then
+                unistd.unlink(path)
+            end
+            self._paths[i] = path
 
-        socket.unix = require("socket.unix")
-        local s = socket.unix.udp()
-        if s then
-            s:bind(path)
-            print("bind " .. path)
-            table.insert(self._socks, s)
-        else
-            error("create udp pipe failed.")
+            socket.unix = require("socket.unix")
+            local s = socket.unix.udp()
+            if s then
+                s:bind(path)
+                print("bind " .. path)
+                table.insert(self._socks, s)
+            else
+                error("create udp pipe failed.")
+            end
         end
     end
 end
