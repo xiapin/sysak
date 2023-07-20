@@ -75,16 +75,13 @@ cp collector/plugin.yaml ${APP}/collector/
 
 
 mkdir ${APP}/common
+mkdir ${APP}/common/protobuf
+mkdir ${APP}/common/protobuf/metricstore
 cp common/*.lua ${APP}/common/
+cp common/protobuf/metricstore/*.lua ${APP}/common/protobuf/metricstore/
 
 mkdir ${APP}/httplib
 cp httplib/*.lua ${APP}/httplib/
-
-mkdir ${APP}/sls_metric
-mkdir ${APP}/sls_metric/native
-cp sls_metric/native/*.so* ${APP}/sls_metric/native/
-cp sls_metric/native/*.lua ${APP}/sls_metric/native/
-cp sls_metric/*.lua ${APP}/sls_metric/
 
 mkdir ${APP}/tsdb
 mkdir ${APP}/tsdb/native
