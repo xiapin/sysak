@@ -32,7 +32,7 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 int create_hw_events(struct pcpu_hw_info *pc_hwi)
 {
 	int cpu, i, j, group_last, idx_fail;
-	int ret, pid, group_leader;
+	int ret = 0, pid, group_leader;
 	struct hw_info *hwi, *leader;
 	unsigned long flags = 0;
 
