@@ -133,7 +133,7 @@ static int get_filename(unsigned long dentry, char *filename, int len)
     return 0;
 }
 
-int get_top_dentry(unsigned long pfn, int top)
+int get_top_dentry(unsigned long pfn, int top, unsigned long cinode)
 {
     unsigned long page = PFN_TO_PAGE(pfn);
     map<unsigned long,struct file_info*>::iterator iter2;
@@ -171,7 +171,7 @@ int get_top_dentry(unsigned long pfn, int top)
         return 0;
 
     cachedset.insert(pair<unsigned long, int>(inode,cached*4));
-    history_inodes[inode] = 1;
+    history_inodes[inode] = cinode;
     if (cachedset.size() > top)
         cachedset.erase(--cachedset.end());
 }
@@ -286,6 +286,7 @@ static int get_dentry_top()
         info->dirty = 0;
         info->inactive = 0;
         info->del = del;
+        info->cindoe = history_inodes[inode];
 
         info->size = i_size>>10;
         strncpy(info->filename, end, sizeof(info->filename) - 2);
@@ -557,7 +558,7 @@ int scan_pageflags_nooutput(struct options *opt, char *res)
         shmem = !!(pageflag & (1 <<KPF_SWAPBACKED)); 
         inode = get_cgroup_inode(pfn);
         if (check_cgroup_inode(inode)) {
-            get_top_dentry(pfn, opt->top);
+            get_top_dentry(pfn, opt->top, inode);
         } 
     }
     get_dentry_top();
