@@ -7,7 +7,7 @@
   Restart=always
   RestartSec=10
   CPUQuota=30%
-  MemoryLimit=60M
+  MemoryLimit=300M
   ExecStart=/usr/local/sysak/.sysak_components/tools/dist/app/beeQ/run.sh
   ExecStop=kill -9 $(pidof unity-mon)
   ExecReload=kill -1 $(pidof unity-mon)

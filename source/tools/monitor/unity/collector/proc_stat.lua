@@ -14,6 +14,9 @@ function CprocStat:_init_(proto, pffi, mnt, pFile)
     CvProc._init_(self, proto, pffi, mnt,pFile or "proc/stat")
     self._funs = self:setupTable()
     self._cpuArr = {}
+    self._total_warn = 0
+    self._sys_warn = 0
+    self._user_warn = 0
 end
 
 function CprocStat:_cpuHead()
@@ -23,6 +26,12 @@ end
 
 function CprocStat:_procCpu(now, last)
     if last then
+        local user_thresh = 40
+        local sys_thresh = 25
+        local total_thresh = 55
+        local user_util = 0
+        local sys_util = 0
+        local warn = 0
         local vs = {}
         local sum = 0
         local index = self:_cpuHead()
@@ -37,10 +46,39 @@ function CprocStat:_procCpu(now, last)
             local total = tonumber(sum)
             for i = 1, #vs do
                 local v = tonumber(vs[i])
+
+		--for warn events
+		if index[i] == "user" or index[i] == "nice" then
+			user_util = user_util + v*100.0/total
+		end
+		if index[i] == "sys" or index[i] == "softirq" then
+			sys_util = sys_util + v*100.0/total
+		end
+		if index[i] == "idle" then
+			total_util = 100 - (v*100.0/total)
+		end
+
                 local cell = {name=index[i], value=tonumber(v * 100.0 / total)}
                 table.insert(res, cell)
             end
             table.insert(res, {name="total", value=total})
+	    --warn events
+	    if user_util > user_thresh then
+		self._user_warn = self._user_warn + 1
+	    end
+            local cell0 = {name="usr_warn", value=self._user_warn}
+	    table.insert(res, cell0) 
+	    if sys_util > sys_thresh then
+		self._sys_warn = self._sys_warn + 1
+	    end
+	    local cell1 = {name="sys_warn", value=self._sys_warn}
+            table.insert(res, cell1) 
+	    if total_util > user_thresh then
+		self._total_warn = self._total_warn + 1
+	    end
+            local cell2 = {name="total_warn", value=self._total_warn}
+	    table.insert(res, cell2)
+
             return res
         end
     end
