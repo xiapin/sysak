@@ -60,7 +60,9 @@ if [ \$? -eq 0 ]; then
 fi
 
 %postun
-rm -rf /usr/local/sysak
+if [ \$1 -eq 0 ]; then
+	rm -rf /usr/local/sysak
+fi
 
 %files
 /etc/sysak
