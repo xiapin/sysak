@@ -39,7 +39,7 @@ int calculate(const char* now, const char* prev) {
 
     // printf("now_val =%llu prev_val =%llu\n", now_val, prev_val);
     if (prev_val) {
-        ret = now_val > prev_val ? now_val - prev_val
+        ret = now_val >= prev_val ? now_val - prev_val
                                  : now_val + UINT64_MAX - prev_val;
         ret = ret / MB;
     }
