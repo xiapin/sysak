@@ -17,6 +17,8 @@ local CguardSelfStat = require("collector.guard.guardSelfStat")
 local CpostPlugin = require("collector.postPlugin.postPlugin")
 local CforkRun = require("collector.execEngine.forkRun")
 local CpodFilter = require("collector.podMan.podFilter")
+local CrdtManager = require("collector.rdt.rdtManager")
+---local CpodFilter = require("collector.podMan.podFilter")
 local CpodsAll = require("collector.podMan.podsAll")
 local Cloop = class("loop")
 
@@ -61,7 +63,14 @@ function Cloop:loadLuaPlugin(res, proc_path, procffi)
             self._procs[c] = CpodsAll.new(res, self._proto, procffi, proc_path)
             self._names[c] = "podMon"
         end
+        c = c + 1
     end
+
+    if res.resctrl then
+        self._procs[c] = CrdtManager.new(res, self._proto, procffi, proc_path)
+        c = c + 1
+    end
+
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
 end
 
