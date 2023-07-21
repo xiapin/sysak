@@ -789,6 +789,8 @@ static int subcmd_parse(int argc, char *argv[])
     if (!strcmp(argv[0], "-d")) {
         only_download = true;
         pre_module = true;
+        btf_depend = true;
+        goto exec;
     }
 
     if (strstr(prev_dep, "btf") != NULL) {
