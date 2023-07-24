@@ -89,6 +89,8 @@ local function setupCons(res)
         if blacklist[metadata.namespace] then
             goto continue
         end
+        
+        if not pod.status.qosClass then goto continue end
         local lpod = {name = metadata.name,
                       namespace = metadata.namespace,
                       uid = pystring:replace(metadata.uid, "-", "_"),
@@ -97,6 +99,7 @@ local function setupCons(res)
 
         local containerStatuses = pod.status.containerStatuses
         for _, con in ipairs(containerStatuses) do
+            if not con.containerID then goto cs_continue end
             local cell = {
                 pod = lpod,
                 name = con.name,
@@ -107,6 +110,7 @@ local function setupCons(res)
                 c = c + 1
                 cons[c] = cell
             end
+            ::cs_continue::
         end
         ::continue::
     end
@@ -133,6 +137,7 @@ function CpodsAll:getAllcons(procfs)
     for _, pod in ipairs(obj.items) do
         local metadata = pod.metadata
         --print(string.format("podns :%s, pod:%s",metadata.namespace, metadata.name))
+        if not pod.status.qosClass then goto continue end
         local lpod = {name = metadata.name,
                       namespace = metadata.namespace,
                       uid = pystring:replace(metadata.uid, "-", "_"),
@@ -140,6 +145,7 @@ function CpodsAll:getAllcons(procfs)
         }
         local containerStatuses = pod.status.containerStatuses
         for _, con in ipairs(containerStatuses) do
+            if not con.containerID then goto cs_continue end
             local cell = {
                 pod = lpod,
                 name = con.name,
@@ -150,7 +156,9 @@ function CpodsAll:getAllcons(procfs)
                 c = c + 1
                 cons[c] = cell
             end
+            ::cs_continue::
         end
+        ::continue::
     end
     return cons
 end
