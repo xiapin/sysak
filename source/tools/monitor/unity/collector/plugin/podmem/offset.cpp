@@ -152,7 +152,7 @@ static int download_btf(void)
     {
         sysak_path = getenv("SYSAK_WORK_PATH") ;
         sysak_path += "/tools/";
-        sysak_path += kernel;
+        //sysak_path += kernel;
     }
 
     snprintf(dw, LEN + LEN + LEN, "wget -T 5 -t 2 -q -O %s/vmlinux-%s https://sysom-cn-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",sysak_path.c_str(),  kernel, &region[3],&region[3],timeout.c_str(),arch, kernel);
@@ -185,7 +185,7 @@ int offset_init(void)
     cmd = string("uname -r").c_str();
     do_cmd(cmd, ver, LEN);
     if(getenv("SYSAK_WORK_PATH") != NULL)
-        sprintf(btf,"%s/tools/%s/vmlinux-%s", getenv("SYSAK_WORK_PATH"), ver, ver);
+        sprintf(btf,"%s/tools/vmlinux-%s", getenv("SYSAK_WORK_PATH"), ver);
     else
         sprintf(btf,"/boot/vmlinux-%s", ver);
 

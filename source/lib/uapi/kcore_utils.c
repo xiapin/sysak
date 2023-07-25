@@ -246,7 +246,7 @@ static int download_btf()
         memset(sysak_path, 0, sizeof(sysak_path));
         strcpy(sysak_path, tmp);
         strcat(sysak_path, "/tools/");
-        strcat(sysak_path, kernel);
+        //strcat(sysak_path, kernel);
     }
 
     snprintf(dw, LEN + LEN + LEN, "wget -T 5 -t 2 -q -O %s/vmlinux-%s https://sysom-cn-%s.oss-cn-%s%s.aliyuncs.com/home/hive/btf/%s/vmlinux-%s", sysak_path, kernel, &region[3],&region[3], timeout,arch, kernel);
@@ -278,7 +278,7 @@ char *prepare_btf_file()
     do_cmd(cmd, ver, LEN);
 
     if (getenv("SYSAK_WORK_PATH") != NULL)
-        sprintf(btf,"%s/tools/%s/vmlinux-%s", getenv("SYSAK_WORK_PATH"), ver, ver);
+        sprintf(btf,"%s/tools/vmlinux-%s", getenv("SYSAK_WORK_PATH"), ver);
     else
         sprintf(btf,"/boot/vmlinux-%s", ver);
 
