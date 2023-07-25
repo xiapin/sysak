@@ -9,7 +9,7 @@ require("common.class")
 local ChttpCli = require("httplib.httpCli")
 local system = require("common.system")
 local pystring = require("common.pystring")
-local Cinotifies = require("common.inotifies")
+local Pinotifies = require("common.inotifyPod")
 local unistd = require("posix.unistd")
 local json = require("cjson")
 
@@ -27,47 +27,44 @@ local function getRuntime(mnt)
     return "cri-containerd"
 end
 
-local function joinNPath(cell, runtime)
-    -- "/sys/fs/cgroup/cpu/kubepods.slice/kubepods-${qos}.slice/kubepods-${qos}-pod${podid}.slice/${runtime}-${cid}.scope"
-    local paths = {
-        "/kubepods.slice/kubepods-",
-        cell.pod.qos,
-        ".slice/kubepods-",
-        cell.pod.qos,
-        "-pod",
-        cell.pod.uid,
-        ".slice/",
-        runtime,
-        "-",
-        cell.id,
-        ".scope"
-    }
-    return pystring:join("", paths)
-end
+local function podPath(lpod)
+	local paths
+	if lpod.qos == "guaranteed" then
+		paths = {
+			"/kubepods.slice/kubepods-pod",
+			lpod.uid,
+			".slice/"
+		}
+	else
+		paths = {
+			"/kubepods.slice/kubepods-",
+			lpod.qos,
+			".slice/kubepods-",
+			lpod.qos,
+			"-pod",
+			lpod.uid,
+			".slice/"
+		}
+	end
+	return pystring:join("", paths)
+end 
 
-local function joinGPath(cell, runtime)
-    -- "/sys/fs/cgroup/cpu/kubepods.slice/kubepods-pod${podid}.slice/${runtime}-${cid}.scope"
-    local paths = {
-        "/kubepods.slice/kubepods-pod",
-        cell.pod.uid,
-        ".slice/",
-        runtime,
-        "-",
-        cell.id,
-        ".scope"
-    }
-    return pystring:join("", paths)
-end
-
-local function joinPath(cell, runtime)
-    if cell.pod.qos == "guaranteed" then
-        return joinGPath(cell, runtime)
-    else
-        return joinNPath(cell, runtime)
+local function joinContainerPath(pod_path, cell, runtime)
+    if pod_path == nil then 
+        pod_path = podPath(cell.pod)
     end
+
+    local paths = {
+        pod_path,
+        runtime,
+        "-",
+        cell.id,
+        ".scope"
+    }
+    return pystring:join("", paths)
 end
 
-local function setupCons(res)
+local function setupCons(res, ino)
     local mnt = res.config.proc_path
     local runtime = getRuntime(mnt)
     local cli = ChttpCli.new()
@@ -89,28 +86,35 @@ local function setupCons(res)
         if blacklist[metadata.namespace] then
             goto continue
         end
-        
-        if not pod.status.qosClass then goto continue end
+
+		if not pod.status.qosClass then goto continue end
         local lpod = {name = metadata.name,
                       namespace = metadata.namespace,
                       uid = pystring:replace(metadata.uid, "-", "_"),
                       qos = pystring:lower(pod.status.qosClass),
         }
+		
+		-- watch pod dirs(containers' changes in pod)
+        local pod_path = podPath(lpod)
+		local full_pod_path = mnt .. "sys/fs/cgroup/cpu" .. pod_path
+		if unistd.access(full_pod_path) == 0 then
+			ino:addPodWatch(full_pod_path)
+		end
 
         local containerStatuses = pod.status.containerStatuses
         for _, con in ipairs(containerStatuses) do
-            if not con.containerID then goto cs_continue end
+	        if not con.containerID then goto cs_continue end
             local cell = {
                 pod = lpod,
                 name = con.name,
                 id = spiltConId(con.containerID)
             }
-            cell.path = joinPath(cell, runtime)
+            cell.path = joinContainerPath(pod_path, cell, runtime)
             if unistd.access(mnt .. "sys/fs/cgroup/cpu/" .. cell.path) == 0 then
                 c = c + 1
                 cons[c] = cell
             end
-            ::cs_continue::
+	        ::cs_continue::
         end
         ::continue::
     end
@@ -151,7 +155,7 @@ function CpodsAll:getAllcons(procfs)
                 name = con.name,
                 id = spiltConId(con.containerID)
             }
-            cell.path = joinPath(cell, runtime)
+            cell.path = joinContainerPath(nil, cell, runtime)
             if unistd.access(mnt .. "/sys/fs/cgroup/memory/" .. cell.path) == 0 then
                 c = c + 1
                 cons[c] = cell
@@ -165,7 +169,7 @@ end
 
 local function setupPlugins(res, proto, pffi, mnt, ino)
     local c = 0
-    local cons = setupCons(res)
+    local cons = setupCons(res, ino)
     local plugins = {}
 
     for _, con in ipairs(cons) do
@@ -188,7 +192,8 @@ local function setupPlugins(res, proto, pffi, mnt, ino)
             local CProcs = require("collector.container." .. plugin)
             c = c + 1
             plugins[c] = CProcs.new(proto, pffi, mnt, con.path, ls)
-            ino:add(plugins[c].pFile)
+            -- no need to watch pFile, too many pod/container will exhaust system's inofity watchs
+            --ino:add(plugins[c].pFile)
         end
     end
 
@@ -202,31 +207,34 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
     self._pffi = pffi
     self._mnt = mnt
 
-    self._ino = Cinotifies.new()
+    self._ino = Pinotifies.new()
     self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
     
-    self._ino:add(mnt .. "sys/fs/cgroup/memory/kubepods.slice")
-    self._ino:add(mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-besteffort.slice")
-    self._ino:add(mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-burstable.slice")
+	self._ino:watchKubePod(mnt)
  
     print( "pods plugin add " .. #self._plugins)
 end
 
 function CpodsAll:proc(elapsed, lines)
     local rec = {}
-    if self._ino:isChange() or #self._plugins == 0 then
+	local is_change
+	local events
+	
+	is_change, events = self._ino:isChange()
+    if is_change or #self._plugins == 0 then
         print("cgroup changed.")
-        self._ino = Cinotifies.new()
-        self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
-        self._ino:add(self._mnt .. "sys/fs/cgroup/memory/kubepods.slice")
-        self._ino:add(self._mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-besteffort.slice")
-        self._ino:add(self._mnt .. "sys/fs/cgroup/memory/kubepods.slice/kubepods-burstable.slice")
+		if events ~= nil then 
+            -- reomeve inotify watch on deleted pod dirs
+			self._ino:RemoveDeletePodWatch(events)
+		end
+		self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
     end
+
     for i, plugin in ipairs(self._plugins) do
         --local res = plugin:proc(elapsed, lines)
         local stat, res = pcall(plugin.proc, plugin, elapsed, lines)
         if not stat or res == -1 then
-            table.insert(rec, i)
+	        table.insert(rec, i)
         end
     end
 
