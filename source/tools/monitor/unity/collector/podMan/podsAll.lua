@@ -9,7 +9,7 @@ require("common.class")
 local ChttpCli = require("httplib.httpCli")
 local system = require("common.system")
 local pystring = require("common.pystring")
-local Pinotifies = require("common.inotifyPod")
+local CinotifyPod = require("common.inotifyPod")
 local unistd = require("posix.unistd")
 local json = require("cjson")
 
@@ -207,7 +207,7 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
     self._pffi = pffi
     self._mnt = mnt
 
-    self._ino = Pinotifies.new()
+    self._ino = CinotifyPod.new()
     self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
     
 	self._ino:watchKubePod(mnt)

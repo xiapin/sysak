@@ -6,9 +6,9 @@ local dirent = require("posix.dirent")
 local pstat = require("posix.sys.stat")
 local inotify = require('inotify')
 
-local inotifyPod = class("inotifyPod", Cinotifies)
+local CinotifyPod = class("inotifyPod", Cinotifies)
 
-function inotifyPod:_init_()
+function CinotifyPod:_init_()
 	Cinotifies._init_(self, nil)
 	self.kube_pod_paths = {
 		"sys/fs/cgroup/cpu/kubepods.slice",
@@ -20,7 +20,7 @@ function inotifyPod:_init_()
 end
 
 -- watch kubepod dirs (to watch pods' changes)
-function inotifyPod:watchKubePod(mnt)
+function CinotifyPod:watchKubePod(mnt)
 	for _, path in ipairs(self.kube_pod_paths) do
 		local watch_path = mnt .. path
 		local w = self._handle:addwatch(watch_path, inotify.IN_CREATE, inotify.IN_MOVE, inotify.IN_DELETE)
@@ -37,7 +37,7 @@ function inotifyPod:watchKubePod(mnt)
 end
 
 -- watch pod's dir (to watch container's changes)
-function inotifyPod:addPodWatch(pod_path)
+function CinotifyPod:addPodWatch(pod_path)
 	if self._pod_ws[pod_path] ~= nil then 	
 		return
 	end
@@ -54,7 +54,7 @@ function inotifyPod:addPodWatch(pod_path)
 end
 
 -- check if the pod has been delete, if so, remove the watch
-function inotifyPod:RemoveDeletePodWatch(events)
+function CinotifyPod:RemoveDeletePodWatch(events)
 	local dp_paths = {}
 	for _, event in ipairs(events) do
 		-- todo: now pod creations can also pass this event.mask check
@@ -78,7 +78,7 @@ function inotifyPod:RemoveDeletePodWatch(events)
 	end
 end
 
-function inotifyPod:_del_()
+function CinotifyPod:_del_()
 	for _, w in ipairs(self._ws) do
         self._handle:rmwatch(w)
     end
@@ -88,7 +88,7 @@ function inotifyPod:_del_()
     self._handle:close()
 end
 
-function inotifyPod:isChange()
+function CinotifyPod:isChange()
 	local events = self._handle:read()
     if events ~=nil then
         if #events > 0 then
@@ -98,4 +98,4 @@ function inotifyPod:isChange()
     return false, nil
 end
 
-return inotifyPod 
+return CinotifyPod 
