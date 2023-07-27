@@ -3,16 +3,41 @@ local pystring = require("common.pystring")
 local unistd = require("posix.unistd")
 local CvProc = require("collector.vproc")
 
-local CgBlk = class("cgBlk", CvProc)
+local root = "sys/fs/cgroup/blkio/"
+local blkMetrics = {
+    {
+        path = "/blkio.throttle.io_service_bytes", 
+        metrics = "service_bytes"
+    },
+    {
+        path = "/blkio.throttle.io_serviced",
+        metrics = "serviced" 
+    },
+    {
+        path = "//blkio.throttle.total_bytes_queued",
+        metrics = "bytes_queued"
+    },
+    {
+        path = "/blkio.throttle.total_io_queued",
+        metrics = "io_queued"
+    },
+    {
+        path = "/blkio.throttle.io_wait_time",
+        metrics = "wait_time"
+    }
+}
 
-function CgBlk:_init_(proto, pffi, mnt, pFile, ls)
-    CvProc._init_(self, proto, pffi, mnt, pFile)
+local CgBlkIoStat = class("cg_blkio_stat", CvProc) 
+
+function CgBlkIoStat:_init_(proto, pffi, mnt, path, ls)
+    CvProc._init_(self, proto, pffi, mnt, nil)
     self.mnt = mnt
     self.ls = ls
+    self.path = path
 end
 
 -- get device name form (major, minor)
-function CgBlk:devNoToName(devNo)
+function CgBlkIoStat:devNoToName(devNo)
     local blkFile = self.mnt .. "sys/dev/block/" .. devNo
 
     if unistd.access(blkFile) == 0 then
@@ -26,7 +51,7 @@ function CgBlk:devNoToName(devNo)
     return devNo
 end
 
-function CgBlk:copyTable(original)
+function CgBlkIoStat:copyTable(original)
     local copy = {}
     for key, value in pairs(original) do
         copy[key] = value
@@ -34,7 +59,7 @@ function CgBlk:copyTable(original)
     return copy
 end
 
-function CgBlk:_proc(line, metrics, tableName)
+function CgBlkIoStat:_proc(line, metrics, tableName)
     local vs = {}
     local label = self:copyTable(self.ls)
     local cells = pystring:split(line)
@@ -68,8 +93,18 @@ function CgBlk:_proc(line, metrics, tableName)
     ::exit::
 end 
 
-function CgBlk:proc(elapsed)
+function CgBlkIoStat:proc(elapsed, lines)
+    local tableName = "cg_blkio_stat"
     CvProc.proc(self)
+
+    for _, blk_metrics in ipairs(blkMetrics) do
+        local cg_path = self.mnt .. root .. self.path .. blk_metrics.path
+        for line in io.lines(cg_path) do
+            self:_proc(line, blk_metrics.metrics, tableName)
+        end
+    end
+
+    self:push(lines)
 end
 
-return CgBlk
+return CgBlkIoStat
