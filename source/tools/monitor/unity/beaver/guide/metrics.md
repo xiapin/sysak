@@ -452,3 +452,14 @@ This table show the hist of the latency of direct memory compaction
 | :----- | ---- | :--------------- | :--------------------- | :-------------------------------- |
 | MB     |      | 内存带宽分配比例 | MB（Memory Bandwidth） | collector/rdt/plugin/rdt_size.lua |
 | L3     | byte | llc分配size      |                        | collector/rdt/plugin/rdt_size.lua |
+
+### con_net_stat 表
+
+| 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
+| :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
+| network_receive_bytes     | byte | container network receive bytes               |      | collector/container/con_net_stat.lua |
+| network_receive_packets | packet   | container network receive packets                |      | collector/container/con_net_stat.lua  |
+| network_receive_packets_dropped | packet   | container network dropped packets during receive |      | collector/container/con_net_stat.lua  |
+| network_transmit_bytes     | byte | container network transmit bytes               |      | collector/container/con_net_stat.lua |
+| network_transmit_packets | packet   | container network transmit packets                |      | collector/container/con_net_stat.lua  |
+| network_transmit_packets_dropped | packet   | container network dropped packets during transmittion |      | collector/container/con_net_stat.lua  |
