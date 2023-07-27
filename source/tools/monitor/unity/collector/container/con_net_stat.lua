@@ -103,27 +103,27 @@ function ConNetStat:proc(elapsed, lines)
         end
         
         values[k] = {
-            name = "network_receive_bytes",
+            name = "net_rx_bytes",
             value = RxBytes
         }
         values[k + 1] = {
-            name = "network_receive_packets",
+            name = "net_rx_packets",
             value = RxPackets
         }
         values[k + 2] = {
-            name = "network_receive_packets_dropped",
+            name = "net_rx_dropped",
             value = RxPacketsDrop
         }
         values[k + 3] = {
-            name = "network_transmit_bytes",
+            name = "net_tx_bytes",
             value = TxBytes
         }
         values[k + 4] = {
-            name = "network_transmit_packets",
+            name = "net_tx_packets",
             value = TxPackets
         }
         values[k + 5] = {
-            name = "network_transmit_packets_dropped",
+            name = "net_tx_dropped",
             value = TxPacketsDrop
         }
 
