@@ -714,6 +714,7 @@ void fox_free_buffer(char **pp) {
 
 void fox_del_man(struct fox_manager* pman) {
     if (pman->fd > 0) {
+        posix_fadvise(pman->fd, 0, 0, POSIX_FADV_DONTNEED);
         close(pman->fd);
         pman->fd = -1;
     }
