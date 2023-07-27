@@ -14,6 +14,8 @@ EXTRA_CGO_CFLAGS := -I$(abspath ./ebpf/src/libbpf/lib/include) \
 EXTRA_CGO_LDFLAGS := -L$(abspath ./ebpf/src/libbpf/lib/lib64) -lbpf \
 		-L$(abspath ./ebpf/src/bcc/lib/lib) -lbcc-syms -lstdc++ -lelf -lz \
 		-L$(abspath ./ebpf/src/lib) -lnginx
+.PHONY: all
+all: build goenv
 
 .PHONY: goenv
 goenv:
