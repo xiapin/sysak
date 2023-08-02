@@ -74,6 +74,12 @@ local function setupCons(res, ino)
     local content = cli:get("http://127.0.0.1:10255/pods")
     local obj = cli:jdecode(content.body)
     if not obj then 
+        local ca = io.open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        if not ca then
+            print("Get pod info error: service token not exist!")
+            return nil
+        end
+
         local cmd = ' curl -s -k -XGET https://127.0.0.1:10250/pods --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token) "'
         local f = io.popen(cmd,"r")
         local podsinfo = f:read("*a")
@@ -131,11 +137,17 @@ function CpodsAll:getAllcons(procfs)
     local content = cli:get("http://127.0.0.1:10255/pods")
     local obj = cli:jdecode(content.body)
     if not obj then 
+        local ca = io.open("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+        if not ca then
+            print("Get pod info error: service token not exist!")
+            return nil
+        end
+
         local cmd = ' curl -s -k -XGET https://127.0.0.1:10250/pods --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt --header "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token) "'
         local f = io.popen(cmd,"r")
         local podsinfo = f:read("*a")
         f:close()
-        obj = json.decode(podsinfo) 
+        obj = json.decode(podsinfo)
     end
 
     for _, pod in ipairs(obj.items) do
@@ -169,8 +181,12 @@ end
 
 local function setupPlugins(res, proto, pffi, mnt, ino)
     local c = 0
-    local cons = setupCons(res, ino)
     local plugins = {}
+
+    local cons = setupCons(res, ino)
+    if cons == nil then 
+        return nil
+    end
 
     for _, con in ipairs(cons) do
         local ls = {
@@ -209,6 +225,9 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
 
     self._ino = CinotifyPod.new()
     self._plugins = setupPlugins(self._resYaml, self._proto, self._pffi, self._mnt, self._ino)
+    if self._plugins == nil then
+        return
+    end
     
 	self._ino:watchKubePod(mnt)
  
@@ -219,6 +238,10 @@ function CpodsAll:proc(elapsed, lines)
     local rec = {}
 	local is_change
 	local events
+
+    if self._plugins == nil then
+        return
+    end
 	
 	is_change, events = self._ino:isChange()
     if is_change or #self._plugins == 0 then
