@@ -163,7 +163,7 @@ local function setupPlugins(res, proto, pffi, mnt, ino)
     for _, con in ipairs(cons) do
         local ls = {
             {
-                name = "podname",
+                name = "pod",
                 index = con.pod.name,
             },
             {
@@ -171,7 +171,7 @@ local function setupPlugins(res, proto, pffi, mnt, ino)
                 index = con.name.."-"..string.sub(con.id,0,4),
             },
             {
-                name = "podns",
+                name = "namespace",
                 index = con.pod.namespace,
             },
         }
