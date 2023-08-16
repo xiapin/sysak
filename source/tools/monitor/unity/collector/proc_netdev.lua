@@ -63,6 +63,9 @@ function CprocNetdev:_proc(line, elapsed)
     assert(data.no == 16)
 
     local ifName = string.gsub(self._ffi.string(data.s), ":", "")
+    if string.sub(ifName, 1, 3) ~= "eth" then
+        return
+    end
     local last = self._lastData[ifName]
 
     if last then
