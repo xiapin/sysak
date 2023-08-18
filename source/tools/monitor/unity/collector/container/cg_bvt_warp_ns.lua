@@ -12,7 +12,6 @@ function cgBvtWarpNs:_init_(proto, pffi, mnt, path, ls)
 end
 
 function cgBvtWarpNs:proc(elapsed, lines)
-    local c = 1
     CvProc.proc(self)
     local values = {}
 
@@ -24,7 +23,7 @@ function cgBvtWarpNs:proc(elapsed, lines)
     end
 
     for line in io.lines(self.pFile) do
-        values = {
+        values[1] = {
             name = 'bvt_warp_ns',
             value = tonumber(line)
         }
