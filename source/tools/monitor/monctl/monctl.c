@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #define DEFAULT_CONF_FILE_PATH      "/usr/local/sysak/monctl.conf"
 #define LEN_1024    1024
@@ -11,6 +13,7 @@
 #define LEN_32  32
 #define W_SPACE     " \t\r\n"
 #define MAX_MOD_NUM 32
+pid_t child_pid;
 
 struct module {
     char name[LEN_32];
@@ -24,6 +27,7 @@ struct command {
 
 struct module *mod_list[MAX_MOD_NUM] = {0};
 struct command *cmd_store[MAX_MOD_NUM] = {0};
+pid_t child_pids[MAX_MOD_NUM] = {0};
 int total_mod_num = 0;
 
 static void usage(void)
@@ -49,21 +53,16 @@ static void parse_mod(char *mod_name)
     tool_name = strstr(mod_name,"_");
     if (tool_name == '\0')
         return;
-    printf("tool_name is %s\n",tool_name);
-
 
     token = strtok(NULL, W_SPACE);
-    printf("token is %s\n",token);
     if (token && strcasecmp(token, "on") && strcasecmp(token, "enable")) {
         return;
     }
 
-    printf("total_mod_num is %d\n",total_mod_num);
     /* check if the mod load already */
     for ( i = 0; i < total_mod_num; i++ )
     {
         mod = mod_list[i];
-        printf("name is %s,i is %d\n",mod->name,i);
         if (!strcmp(mod->name, tool_name)) {
             return;
         }
@@ -95,7 +94,6 @@ static void parse_cmd(const char *cmd_name)
     for ( i = 0; i < total_mod_num; i++ )
     {
         mod = mod_list[i];
-        printf("mod->name is %s,tool_name is %s\n",mod->name, tool_name);
         if (!strcmp(mod->name, tool_name)) {
             cmd = cmd_store[i] = malloc(sizeof(struct command));
             if (cmd == NULL){
@@ -106,7 +104,6 @@ static void parse_cmd(const char *cmd_name)
             strncpy(cmd->name, tool_name, LEN_32);
             strncpy(cmd->cmd, cmd_name + strlen(cmd_name) + 1, LEN_512 - 1);
             cmd->cmd[LEN_512 - 1] = 0;
-            printf("cmd is %s\n",cmd->cmd);
         }
     }
 }
@@ -180,16 +177,65 @@ static void parse_config_file(const char *file_name)
     }
 }
 
+static void sig_handler(int sig, siginfo_t *info, void *act)
+{
+    int i;
+
+    for ( i = 0; i < total_mod_num; i++ )
+    {
+        if (child_pids[i] > 0 )
+            kill(-child_pids[i], sig);
+    }
+    exit(0);
+}
+
+static int register_sig_handler(void)
+{
+    struct sigaction act;
+    int ret = -1;
+
+    sigemptyset(&act.sa_mask);
+    act.sa_flags=SA_SIGINFO;
+    act.sa_sigaction=sig_handler;
+    printf("register_sig_handler\n");
+
+    if ( sigaction(SIGINT, &act, NULL) == 0 || sigaction(SIGQUIT, &act, NULL) == 0 ||
+            sigaction(SIGTERM, &act, NULL) == 0 )
+        ret = 0;
+
+    return ret;
+}
+
 static void exec_command(void)
 {
     int i;
+    int status;
     struct command *cmd;
+    pid_t pid, wpid;
 
     for ( i = 0; i < total_mod_num; i++ )
     {
         cmd = cmd_store[i];
-        system(cmd->cmd);
+        pid = fork();
+        if (pid < 0) {
+            continue;
+        } else if (pid == 0) {
+            //execl("/usr/bin/sh", "sh", "-c", cmd->cmd, NULL);
+            //system(cmd->cmd);
+            execl(cmd->cmd, NULL);
+            exit(0);
+        }
+        child_pids[i] = pid;
     }
+
+    if (register_sig_handler()){
+        printf("register sig failed!");
+        while ((wpid = wait(&status)) > 0);
+        return;
+    }
+    while ((wpid = wait(&status)) > 0)
+    while (1)
+        sleep(60);
 }
 
 int main(int argc, char **argv)
