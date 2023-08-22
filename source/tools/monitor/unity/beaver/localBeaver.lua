@@ -195,7 +195,7 @@ end
 function CLocalBeaver:ssl_write(fd, handle, stream)
     local ret
     local len = #stream
-    ret = self._cffi.ssl_write(handle, self._ffi.string(stream, len), len)
+    ret = self._cffi.ssl_write(handle, stream, len)
     assert(ret >= 0, "ssl_write return " .. ret)
 
     if ret < len then
@@ -211,7 +211,7 @@ function CLocalBeaver:ssl_write(fd, handle, stream)
                 if stream == nil then
                     return 1
                 end
-                ret = self._cffi.ssl_write(handle, self._ffi.string(stream, len), len)
+                ret = self._cffi.ssl_write(handle, stream, len)
                 assert(ret >= 0)
             end
         end

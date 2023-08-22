@@ -13,7 +13,7 @@ function CasyncHttps:_init_()
     CasyncHttp._init_(self)
 end
 
-function CasyncHttp:procSSLStream(fd, handle, stream, toWake)
+function CasyncHttps:procSSLStream(fd, handle, stream, toWake)
     local res, msg
     res = g_lb:ssl_write(fd, handle, stream)
     if res then
@@ -30,18 +30,34 @@ function CasyncHttp:procSSLStream(fd, handle, stream, toWake)
     g_lb:co_exit(fd)
 end
 
-function CasyncHttp:_get(fd)
+function CasyncHttps:handshake(fd, toWake)
     local res, msg
-    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
-
-    if self:assertConnect(fd, connecting, toWake) < 0 then
-        return
-    end
-
     local handle = g_lb:ssl_handshake(fd)
     if not handle then
         res, msg = coroutine.resume(toWake, "tls handshake failed.")
         g_lb:co_exit(fd)
+        return nil
+    end
+    return handle
+end
+
+function CasyncHttps:httpPre(fd, connecting, toWake)
+    if self:assertConnect(fd, connecting, toWake) < 0 then
+        return nil
+    end
+
+    local handle = self:handshake(fd, toWake)
+    if not handle then
+        return
+    end
+    return handle
+end
+
+function CasyncHttps:_get(fd)
+    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
+
+    local handle = self:httpPre(fd, connecting, toWake)
+    if not handle then
         return
     end
 
@@ -49,4 +65,28 @@ function CasyncHttp:_get(fd)
     self:procSSLStream(fd, handle, stream, toWake)
 end
 
-return CasyncHttp
+function CasyncHttps:_put(fd)
+    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
+
+    local handle = self:httpPre(fd, connecting, toWake)
+    if not handle then
+        return
+    end
+
+    local stream = self:pack('PUT', domain, uri, headers, body)
+    self:procSSLStream(fd, stream, toWake)
+end
+
+function CasyncHttp:_post(fd)
+    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
+
+    local handle = self:httpPre(fd, connecting, toWake)
+    if not handle then
+        return
+    end
+
+    local stream = self:pack('POST', domain, uri, headers, body)
+    self:procSSLStream(fd, stream, toWake)
+end
+
+return CasyncHttps

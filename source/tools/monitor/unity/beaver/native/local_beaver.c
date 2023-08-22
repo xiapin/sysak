@@ -122,7 +122,7 @@ int mod_fd(int efd, int fd, int wr) {
     struct epoll_event event;
     int ret;
 
-    event.events  =  wr ? EPOLLIN | EPOLLOUT : EPOLLIN;
+    event.events  =  wr ? EPOLLOUT | EPOLLERR : EPOLLIN | EPOLLERR;
     event.data.fd = fd;
 
     ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &event);
