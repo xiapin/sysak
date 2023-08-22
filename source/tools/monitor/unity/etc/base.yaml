@@ -46,6 +46,9 @@ plugins:
   -
     so: gpuinfo
     description: "collect gpuinfo"
+  -
+    so: libimc_latency
+    description: "IMC latency and bandwidth"
 
 metrics:
   -
@@ -228,4 +231,14 @@ metrics:
     from: net_tcp_ext_count
     head: value
     help: "net stat net_tcp_ext_count"
+    type: "gauge"
+  - title: sysom_imc_latency_channel
+    from: imc_channel_latency
+    head: value
+    help: "imc latency and bw for channels"
+    type: "gauge"
+  - title: sysom_imc_latency_socket
+    from: imc_socket_latency
+    head: value
+    help: "imc latency and bw for socket"
     type: "gauge"

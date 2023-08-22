@@ -11,6 +11,8 @@
 
 #include "imc_latency.h"
 
+#define NR_IMC	6
+
 // #define DEBUG
 
 struct Env {
@@ -32,6 +34,8 @@ typedef struct event {
     uint64_t rpq_ins;
     uint64_t wpq_occ;
     uint64_t wpq_ins;
+    uint64_t cas_rd;
+    uint64_t cas_wr;
     uint64_t dram_speed;
 } event;
 
@@ -40,6 +44,10 @@ typedef struct channel_record {
     uint64_t rpq_ins;
     uint64_t wpq_occ;
     uint64_t wpq_ins;
+    uint64_t cas_rd;
+    uint64_t cas_wr;
+    uint64_t cas_bw_rd;
+    uint64_t cas_bw_wr;
     double read_latency;
     double write_latency;
 } channel_record;
@@ -50,6 +58,10 @@ typedef struct socket_record {
     uint64_t rpq_ins;
     uint64_t wpq_occ;
     uint64_t wpq_ins;
+    uint64_t cas_rd;
+    uint64_t cas_wr;
+    uint64_t cas_bw_rd;
+    uint64_t cas_bw_wr;
     double read_latency;
     double write_latency;
     uint64_t dram_clock;
@@ -339,32 +351,48 @@ bool is_model_support() {
 
 uint32_t* get_ddr_latency_metric_config() {
     uint32_t* cfgs = 0;
-    cfgs = calloc(4, sizeof(uint32_t));
+    cfgs = calloc(NR_IMC, sizeof(uint32_t));
     if (!cfgs) {
         fprintf(stderr, "Failed calloc cfgs memory.\n");
         return NULL;
     }
 
     if (ICX == env.cpu_model || SPR == env.cpu_model) {
-        cfgs[0] = MC_CH_PCI_PMON_CTL_EVENT(0x80) +
+        cfgs[RPQ_OCC] = MC_CH_PCI_PMON_CTL_EVENT(0x80) +
                   MC_CH_PCI_PMON_CTL_UMASK(0);  // DRAM RPQ occupancy pch 0
-        cfgs[1] = MC_CH_PCI_PMON_CTL_EVENT(0x10) +
+        cfgs[RPQ_INS] = MC_CH_PCI_PMON_CTL_EVENT(0x10) +
                   MC_CH_PCI_PMON_CTL_UMASK(1);  // DRAM RPQ Insert.pch 0
-        cfgs[2] = MC_CH_PCI_PMON_CTL_EVENT(0x82) +
+        cfgs[WPQ_OCC] = MC_CH_PCI_PMON_CTL_EVENT(0x82) +
                   MC_CH_PCI_PMON_CTL_UMASK(0);  // DRAM WPQ Occupancy pch 0
-        cfgs[3] = MC_CH_PCI_PMON_CTL_EVENT(0x20) +
+        cfgs[WPQ_INS] = MC_CH_PCI_PMON_CTL_EVENT(0x20) +
                   MC_CH_PCI_PMON_CTL_UMASK(1);  // DRAM WPQ Insert.pch 0
     } else {
-        cfgs[0] = MC_CH_PCI_PMON_CTL_EVENT(0x80) +
+        cfgs[RPQ_OCC] = MC_CH_PCI_PMON_CTL_EVENT(0x80) +
                   MC_CH_PCI_PMON_CTL_UMASK(0);  // DRAM RPQ occupancy
-        cfgs[1] = MC_CH_PCI_PMON_CTL_EVENT(0x10) +
+        cfgs[RPQ_INS] = MC_CH_PCI_PMON_CTL_EVENT(0x10) +
                   MC_CH_PCI_PMON_CTL_UMASK(0);  // DRAM RPQ Insert
-        cfgs[2] = MC_CH_PCI_PMON_CTL_EVENT(0x81) +
+        cfgs[WPQ_OCC] = MC_CH_PCI_PMON_CTL_EVENT(0x81) +
                   MC_CH_PCI_PMON_CTL_UMASK(0);  // DRAM WPQ Occupancy
-        cfgs[3] = MC_CH_PCI_PMON_CTL_EVENT(0x20) +
+        cfgs[WPQ_INS] = MC_CH_PCI_PMON_CTL_EVENT(0x20) +
                   MC_CH_PCI_PMON_CTL_UMASK(0);  // DRAM WPQ Insert
     }
 
+	/* CAS_COUNT.RD and CAS_COUNT.WR */
+	switch(env.cpu_model) {
+	case KNL:
+		cfgs[CAS_RD] = MC_CH_PCI_PMON_CTL_EVENT(0x03) + MC_CH_PCI_PMON_CTL_UMASK(1);
+		cfgs[CAS_WR] = MC_CH_PCI_PMON_CTL_EVENT(0x03) + MC_CH_PCI_PMON_CTL_UMASK(2);
+	case SNOWRIDGE:
+	case ICX:
+		cfgs[CAS_RD] = MC_CH_PCI_PMON_CTL_EVENT(0x04) + MC_CH_PCI_PMON_CTL_UMASK(0x0f);
+		cfgs[CAS_WR] = MC_CH_PCI_PMON_CTL_EVENT(0x04) + MC_CH_PCI_PMON_CTL_UMASK(0x30);
+	case SPR:
+		cfgs[CAS_RD] = MC_CH_PCI_PMON_CTL_EVENT(0x05) + MC_CH_PCI_PMON_CTL_UMASK(0xcf);
+		cfgs[CAS_WR] = MC_CH_PCI_PMON_CTL_EVENT(0x05) + MC_CH_PCI_PMON_CTL_UMASK(0xf0);
+	default:
+		cfgs[CAS_RD] = MC_CH_PCI_PMON_CTL_EVENT(0x04) + MC_CH_PCI_PMON_CTL_UMASK(3);
+		cfgs[CAS_WR] = MC_CH_PCI_PMON_CTL_EVENT(0x04) + MC_CH_PCI_PMON_CTL_UMASK(12);
+	}
     return cfgs;
 }
 
@@ -628,11 +656,15 @@ void read_imc() {
             channel_ev->rpq_ins = read_reg(&grp->general_ev[RPQ_INS]);
             channel_ev->wpq_occ = read_reg(&grp->general_ev[WPQ_OCC]);
             channel_ev->wpq_ins = read_reg(&grp->general_ev[WPQ_INS]);
+            channel_ev->cas_rd = read_reg(&grp->general_ev[CAS_RD]);
+            channel_ev->cas_wr = read_reg(&grp->general_ev[CAS_WR]);
 
             socket_ev->rpq_occ += channel_ev->rpq_occ;
             socket_ev->rpq_ins += channel_ev->rpq_ins;
             socket_ev->wpq_occ += channel_ev->wpq_occ;
             socket_ev->wpq_ins += channel_ev->wpq_ins;
+            socket_ev->cas_rd += channel_ev->cas_rd;
+            socket_ev->cas_wr += channel_ev->cas_wr;
         }
     }
 
@@ -671,6 +703,17 @@ void read_imc() {
                          before_channel_ev->wpq_ins) /
                         dram_speed;
                 }
+
+		if (after_channel_ev->cas_rd - before_channel_ev->cas_rd > 0) {
+			after_channel_ev->cas_bw_rd =
+				(after_channel_ev->cas_rd -
+				before_channel_ev->cas_rd) * 64;
+		}
+		if (after_channel_ev->cas_wr - before_channel_ev->cas_wr > 0) {
+			after_channel_ev->cas_bw_wr =
+				(after_channel_ev->cas_wr -
+				before_channel_ev->cas_wr) * 64;
+		}
             }
 
             if (after_socket_ev->rpq_ins - before_socket_ev->rpq_ins > 0) {
@@ -686,6 +729,18 @@ void read_imc() {
                     (after_socket_ev->wpq_ins - before_socket_ev->wpq_ins) /
                     dram_speed;
             }
+
+            if (after_socket_ev->cas_rd - before_socket_ev->cas_rd > 0) {
+                after_socket_ev->cas_bw_rd =
+                    (after_socket_ev->cas_rd -
+			before_socket_ev->cas_rd) * 64;
+            }
+
+            if (after_socket_ev->cas_wr - before_socket_ev->cas_wr > 0) {
+                after_socket_ev->cas_bw_wr =
+                    (after_socket_ev->cas_wr -
+			before_socket_ev->cas_wr) * 64;
+            }
         }
     }
 }
@@ -694,9 +749,10 @@ void read_imc() {
 void print_socket(socket_record* rec) {
     fprintf(stderr,
             "rpq_occ=%ld rpq_ins=%ld wpq_occ=%ld wpq_ins=%ld dram_clocks=%ld "
-            "r_latency=%lf w_latency=%lf\n",
+            "r_latency=%lf w_latency=%lf, bw_rd=%ld, bw_wr=%ld\n",
             rec->rpq_occ, rec->rpq_ins, rec->wpq_occ, rec->wpq_ins,
-            rec->dram_clock, rec->read_latency, rec->write_latency);
+            rec->dram_clock, rec->read_latency, rec->write_latency,
+	    rec->cas_bw_rd, rec->cas_bw_wr);
 }
 
 void print_channel(channel_record* rec) {
@@ -749,6 +805,10 @@ int call(int t, struct unity_lines* lines) {
                         after.socket_record_arr[socket_id].read_latency);
         unity_set_value(line, 1, "wlat",
                         after.socket_record_arr[socket_id].write_latency);
+        unity_set_value(line, 2, "bw_rd",
+                        after.socket_record_arr[socket_id].cas_bw_rd);
+        unity_set_value(line, 3, "br_wr",
+                        after.socket_record_arr[socket_id].cas_bw_wr);
 
         for (channel_id = 0; channel_id < env.nr_channel; channel_id++) {
             char channel_name[32];
@@ -767,6 +827,14 @@ int call(int t, struct unity_lines* lines) {
                             after.socket_record_arr[socket_id]
                                 .channel_record_arr[channel_id]
                                 .write_latency);
+            unity_set_value(line, 2, "bw_rd",
+                            after.socket_record_arr[socket_id]
+                                .channel_record_arr[channel_id]
+                                .cas_bw_rd);
+            unity_set_value(line, 3, "bw_wr",
+                            after.socket_record_arr[socket_id]
+                                .channel_record_arr[channel_id]
+                                .cas_bw_wr);
         }
     }
 

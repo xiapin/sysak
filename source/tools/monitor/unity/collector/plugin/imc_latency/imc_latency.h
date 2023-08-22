@@ -91,10 +91,13 @@ enum INTEL_CPU_MODEL {
 #define RPQ_INS 1
 #define WPQ_OCC 2
 #define WPQ_INS 3
+#define CAS_RD	4
+#define CAS_WR	5
+
 
 #define BUF_SIZE 1024
 #define MAX_IMC_ID 100
-#define GENERAL_REG_NUM 4
+#define GENERAL_REG_NUM 6
 #define FIXED_REG_NUM 1
 
 typedef struct imc_event_t {
