@@ -289,7 +289,11 @@ function CasyncHttp:procStream(fd, stream, toWake)
     if res then
         local fread = g_lb:read(fd)
         local tReq = self:result(fread)
-        res, msg = coroutine.resume(toWake, tReq.data)
+        if tReq then
+            res, msg = coroutine.resume(toWake, tReq.data)
+        else
+            res, msg = coroutine.resume(toWake, 'procSSLStream no req.')
+        end
         assert(res, msg)
     else
         res, msg = coroutine.resume(toWake, "write failed.")
