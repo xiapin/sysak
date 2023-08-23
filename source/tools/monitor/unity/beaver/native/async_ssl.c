@@ -14,42 +14,26 @@
 #define BUFF_MAX 16384
 static SSL_CTX *sslContext = NULL;
 
-int ssl_read(void *handle, char **pp, int len)
+int ssl_read(void *handle, const char *buff, int len)
 {
     int ret = 0;
     int size = BUFF_MAX < len ? BUFF_MAX : len;
-    char *p = malloc(size);
 
-    if (p == NULL) {
-        ret = -ENOMEM;
-        fprintf(stderr, "ssl read malloc failed. %d, %s\n", errno, strerror(errno));
-        goto nomem;
-    }
-
-    ret = SSL_read((SSL *)handle, p, size);
+    ret = SSL_read((SSL *)handle, buff, size);
     if (ret < 0) {
         int err = SSL_get_error((SSL *)handle, ret);
         if (err == SSL_ERROR_WANT_READ) {
-            free(p);
             ret = 0;
             goto needContinue;
         }
         goto readFailed;
     }
 
-    *pp = p;
     return ret;
     needContinue:   // for to continue read.
     return ret;
     readFailed:
-    free(p);
-    nomem:
     return ret;
-}
-
-void ssl_free_buff(char ** pp) {
-    char *p = *pp;
-    free((void *)p);
 }
 
 int ssl_write(void *handle, const char *buff, int len) {

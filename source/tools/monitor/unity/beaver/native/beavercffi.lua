@@ -27,8 +27,7 @@ int poll_fds(int efd, int tmo, native_events_t* nes);
 int setsockopt_AP(int fd);
 void deinit(int efd);
 
-int ssl_read(void *handle, char **pp, int len);
-void ssl_free_buff(char ** pp);
+int ssl_read(void *handle, const char *buff, int len);
 int ssl_write(void *handle, const char *buff, int len);
 void *ssl_connect_pre(int fd);
 int ssl_connect(void * handle);
