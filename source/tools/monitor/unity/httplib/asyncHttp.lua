@@ -159,13 +159,17 @@ local function readChunks(fread, tReq)
         if s then
             size, s = unpack(pystring:split(s, "\r\n", 1))
             len = tonumber(size, 16)
-            bodies = waitChuckData(fread, s, len)
-            if bodies then
-                body = string.sub(bodies, 1, len)
-                s = string.sub(bodies, len + 2)
-                table.insert(cells, body)
+            if len then
+                bodies = waitChuckData(fread, s, len)
+                if bodies then
+                    body = string.sub(bodies, 1, len)
+                    s = string.sub(bodies, len + 2)
+                    table.insert(cells, body)
+                else
+                    return -2
+                end
             else
-                return -2
+                return -3
             end
         else
             return -1
