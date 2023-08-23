@@ -97,6 +97,9 @@ function rdtMgr:checkDirs()
             goto continue
         end
 
+        if mons == nil then
+            goto continue
+        end
         for _, monGroup in pairs(mons) do
             local relativePath = pystring:join("/", { resGrpName, "mon_groups", monGroup, "mon_data" })
             local absolutePath = self._top .. "/" .. relativePath
