@@ -63,7 +63,6 @@ end
 function Cengine:pushTask(e, msgs)
     local events = pystring:split(msgs, '\n')
     for _, msg in ipairs(events) do
-        print(msg)
         local res = cjson.decode(msg)
         local cmd = res.cmd
         if cmd == "mon_pid" then

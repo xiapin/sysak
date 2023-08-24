@@ -13,7 +13,7 @@ local json = cjson.new()
 function Cplugin:_init_(resYaml, ffi, proto_q, so, loop)
     self._ffi = ffi
     self._cffi = self._ffi.load(so)
-    self._cffi.init(proto_q)
+    self.alive = self._cffi.init(proto_q)
     self._so = so
     self._loop = loop or -1
     self.proc_fs = resYaml.config["proc_path"] or "/"
@@ -21,8 +21,10 @@ function Cplugin:_init_(resYaml, ffi, proto_q, so, loop)
 end
 
 function Cplugin:_del_()
-    print("uninstall " .. self._so)
-    self._cffi.deinit()
+    print("del " .. self._so)
+    if self.alive >= 0 then
+        self._cffi.deinit()
+    end
 end
 
 function Cplugin:load_label(unity_line, line)

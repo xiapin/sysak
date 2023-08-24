@@ -11,7 +11,10 @@ local CvProc = require("collector.vproc")
 local CprocBled = class("procArp", CvProc)
 
 function CprocBled:_init_(proto, pffi, mnt, pFile)
-    CvProc._init_(self, proto, pffi, mnt, pFile or "dummy")
+    --CvProc._init_(self, proto, pffi, mnt, pFile or "dummy")
+    CvProc._init_(self, proto)
+    print("a")
+
     self._record = 1
 end
 

@@ -22,8 +22,8 @@ local function checkChild(ppid, pid)
 
         for line in f:lines() do
             if pystring:startswith(line, "PPid:") then
-                local _, s = pystring:split(line, ":", 1)
-                if tonumber(pystring:strip(s)) == ppid then
+                local s = pystring:split(line, ":", 1)
+                if tonumber(pystring:strip(s[2])) == ppid then
                     ret = true
                 end
                 break

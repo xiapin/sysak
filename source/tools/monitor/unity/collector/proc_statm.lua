@@ -11,8 +11,7 @@ local CprocStatm = class("procStatm", CvProc)
 
 function CprocStatm:_init_(proto, pffi, mnt, pFile)
     CvProc._init_(self, proto, pffi, mnt, pFile or nil)
-    local pid = unistd.getpid()
-    self._fstatm = "/proc/" .. pid .. "/statm"
+    self._fstatm = "/proc/self/statm"
 end
 
 function CprocStatm:proc(elapsed, lines)
