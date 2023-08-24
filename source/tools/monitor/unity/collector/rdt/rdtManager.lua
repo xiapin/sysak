@@ -12,9 +12,16 @@ local rdtMgr = class("rdtManager")
 
 function rdtMgr:_init_(resYaml, proto, pffi, mnt)
     local dir = mnt .. resYaml.resctrl.path
+
+    -- print("dir=" .. dir)
     if unistd.access(dir) then
         self._top = dir
         self._path = resYaml.resctrl.path
+        self._enable = true
+    else
+        print("rdtManager: Machine or OS not support resctrl? Please check the resctrl path.\n")
+        self._enable = false
+        return
     end
 
     self._proto = proto
@@ -77,6 +84,9 @@ end
 function rdtMgr:checkDirs()
     local resDirs = {}
     local monDirs = {}
+    if self._resYaml.resctrl.group == nil then
+        return resDirs, monDirs
+    end
     for _, rdtGroup in pairs(self._resYaml.resctrl.group) do
         local resGrpName = rdtGroup.name
         local mons = rdtGroup.monitor
@@ -93,7 +103,7 @@ function rdtMgr:checkDirs()
                 end
             end
         else
-            print(string.format("No Exist %s", self._top .. "/" .. resGrpName));
+            print(string.format("rdtManager: Non-exist path %s", self._top .. "/" .. resGrpName));
             goto continue
         end
 
@@ -110,7 +120,7 @@ function rdtMgr:checkDirs()
                     table.insert(monDirs, pystring:join("/", { self._path, relativePath, f }))
                 end
             else
-                print(string.format("No Exist %s", absolutePath));
+                print(string.format("rdtManager: Non-exist path %s", absolutePath));
             end
         end
         ::continue::
@@ -119,11 +129,14 @@ function rdtMgr:checkDirs()
 end
 
 function rdtMgr:proc(elapsed, lines)
+    if not self._enable then
+        return
+    end
     -- print(string.format("rdtMgr: proc"))
     for i, plugin in ipairs(self._plugins) do
         local stat, res = pcall(plugin.proc, plugin, elapsed, lines)
         if not stat or res == -1 then
-            print("Fail: pcall plugin error.")
+            print("rdtManager: pcall plugin error.")
         end
     end
 end
