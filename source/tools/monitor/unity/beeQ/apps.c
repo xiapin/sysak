@@ -294,21 +294,21 @@ static int app_collector_work(void* q, void* proto_q) {
         goto endLoad;
     }
 
-    // call init.
+    // call work.
     lua_getglobal(L, "work");
     lua_pushlightuserdata(L, q);
     lua_pushlightuserdata(L, proto_q);
     lua_pushstring(L, g_yaml_file);
     lua_pushinteger(L, (int)gettidv1());
     ret = lua_pcall(L, 4, 1, err_func);
-    if (ret < 0) {
+    if (ret) {
         lua_check_ret(ret);
         goto endCall;
     }
 
     if (!lua_isnumber(L, -1)) {   // check
         errno = -EINVAL;
-        perror("function collectors.lua init must return a number.");
+        perror("function collectors.lua work must return a number.");
         goto endReturn;
     }
     lret = lua_tonumber(L, -1);

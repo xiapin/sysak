@@ -91,16 +91,19 @@ function CtransPro:export(datas)
             end
 
             for _, tFrom in ipairs(datas) do
-                local labels = system:deepcopy(tFrom.labels)
-                if not labels then
-                    labels = {}
+                if tFrom.vs then
+                    local labels = system:deepcopy(tFrom.labels)
+                    if not labels then
+                        labels = {}
+                    end
+                    labels.instance = self._instance
+                    for k, v in pairs(tFrom.vs) do
+                        labels[line.head] = v.name
+                        c = c + 1
+                        res[c] = self.pack_line(title, labels, v.value, 1)
+                    end
                 end
-                labels.instance = self._instance
-                for k, v in pairs(tFrom.vs) do
-                    labels[line.head] = v.name
-                    c = c + 1
-                    res[c] = self.pack_line(title, labels, v.value, 1)
-                end
+
             end
         end
     end

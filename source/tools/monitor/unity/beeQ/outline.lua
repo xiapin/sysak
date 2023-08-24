@@ -13,7 +13,6 @@ local pipe = nil
 function init(que, fYaml)
     local fYaml = fYaml or "../collector/plugin.yaml"
     pipe = CpipeMon.new(que, fYaml)
-
     if pipe then
         return 0
     end
