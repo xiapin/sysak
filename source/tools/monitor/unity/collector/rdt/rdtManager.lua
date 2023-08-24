@@ -12,8 +12,6 @@ local rdtMgr = class("rdtManager")
 
 function rdtMgr:_init_(resYaml, proto, pffi, mnt)
     local dir = mnt .. resYaml.resctrl.path
-
-    -- print("dir=" .. dir)
     if unistd.access(dir) then
         self._top = dir
         self._path = resYaml.resctrl.path
@@ -24,19 +22,85 @@ function rdtMgr:_init_(resYaml, proto, pffi, mnt)
         return
     end
 
+    self._verbose = false
     self._proto = proto
     self._pffi = pffi
     self._mnt = mnt
     self._resYaml = resYaml
+    if resYaml.resctrl.auto ~= nil and resYaml.resctrl.auto then
+        self._resDirs, self._monDirs = self:searchDirs()
+    else
+        self._resDirs, self._monDirs = self:checkDirs()
+    end
 
-    self._resDirs, self._monDirs = self:checkDirs()
     self._plugins = self:setupPlugins(proto, pffi, mnt)
+end
+
+function rdtMgr:isSystemFile(file)
+    local black_list = { "cpus_list", "info", "mon_data", "schemata", "tasks", "cpus", "id", "mode", "size", "mon_groups" }
+    for _, fname in ipairs(black_list) do
+        if file == fname then
+            return true
+        end
+    end
+    return false
+end
+
+function rdtMgr:searchDirs()
+    local topDir = self._top
+    local resDirs = {}
+    local monDirs = {}
+
+    table.insert(resDirs, topDir)
+
+    local fnames = self:getAllFiles(topDir)
+    -- get all res-group
+    for _, f in ipairs(fnames) do
+        if not self:isSystemFile(f) then
+            local path = topDir .. "/" .. f
+            table.insert(resDirs, path)
+            -- print("Add new res:" .. path)
+        end
+    end
+
+    for _, resDir in ipairs(resDirs) do
+        local monDataPath = resDir .. "/" .. "mon_data"
+        self:addAllMonDirs(monDirs, monDataPath)
+
+        local monGroupsPath = resDir .. "/" .. "mon_groups"
+        local files = self:getAllFiles(monGroupsPath)
+        for _, f in ipairs(files) do
+            local path = monGroupsPath .. "/" .. f .. "/mon_data"
+            self:addAllMonDirs(monDirs, path)
+        end
+    end
+
+    if self._verbose then
+        for _, value in ipairs(resDirs) do
+            print("res group: " .. value)
+        end
+        for _, value in ipairs(monDirs) do
+            print("mon group: " .. value)
+        end
+    end
+    return resDirs, monDirs
+end
+
+function rdtMgr:addAllMonDirs(monDirs, path)
+    local files = self:getAllFiles(path)
+    for _, fname in ipairs(files) do
+        local p = path .. "/" .. fname
+        table.insert(monDirs, p)
+        -- print("Add new mon: " .. path .. "/" .. fname)
+    end
 end
 
 function rdtMgr:setupPlugins(proto, pffi, mnt)
     local plugins = {}
     for i, path in ipairs(self._resDirs) do
         -- print(string.format("rdt plugin[%d] path=%s", i, path));
+
+        path = pystring:replace(path, self._mnt, "")
         for _, plugin in ipairs(self._resYaml.resctrl.resLuaPlugin) do
             local CProcs = require("collector.rdt.plugin." .. plugin)
             local lables = {
@@ -50,22 +114,62 @@ function rdtMgr:setupPlugins(proto, pffi, mnt)
     end
 
     for i, path in ipairs(self._monDirs) do
+        local lables
         -- print(string.format("mon plugin[%d] path=%s", i, path));
-        for _, plugin in ipairs(self._resYaml.resctrl.monLuaPlugin) do
-            local CProcs = require("collector.rdt.plugin." .. plugin)
-            local lables = {
+        path = pystring:replace(path, self._mnt, "")
+
+        if pystring:find(path, "mon_groups") ~= nil then
+            local podname = ''
+            local conname = ''
+            local items = pystring:split(path, '/')
+
+            for index, n in ipairs(items) do
+                if n == "mon_groups" then
+                    local str = items[index + 1]
+                    local ret = string.find(str, "#")
+
+                    if ret == nil then
+                        break
+                    end
+
+                    local strs = pystring:split(str, "#")
+                    podname = strs[1]
+                    conname = strs[2]
+                    break
+                end
+            end
+
+            lables = {
+                {
+                    name = "path",
+                    index = path
+                },
+                {
+                    name = "podname",
+                    index = podname
+                },
+                {
+                    name = "conname",
+                    index = conname
+                }
+            }
+        else
+            lables = {
                 {
                     name = "path",
                     index = path
                 }
             }
+        end
+        for _, plugin in ipairs(self._resYaml.resctrl.monLuaPlugin) do
+            local CProcs = require("collector.rdt.plugin." .. plugin)
             table.insert(plugins, CProcs.new(proto, pffi, mnt, path, lables))
         end
     end
     return plugins
 end
 
-local function getAllMonFiles(path)
+function rdtMgr:getAllFiles(path)
     local res = {}
 
     local ok, files = pcall(dirent.files, path)
@@ -94,7 +198,7 @@ function rdtMgr:checkDirs()
         local rdt_group_path = self._top .. "/" .. resGrpName
         if unistd.access(rdt_group_path) then
             table.insert(resDirs, pystring:join("/", { self._path, resGrpName }))
-            local fnames = getAllMonFiles(rdt_group_path .. "/" .. "mon_data")
+            local fnames = getAllFiles(rdt_group_path .. "/" .. "mon_data")
             for _, f in ipairs(fnames) do
                 if resGrpName ~= "" then
                     table.insert(monDirs, pystring:join("/", { self._path, resGrpName, "mon_data", f }))
@@ -115,7 +219,7 @@ function rdtMgr:checkDirs()
             local absolutePath = self._top .. "/" .. relativePath
 
             if unistd.access(absolutePath) then
-                local fnames = getAllMonFiles(absolutePath)
+                local fnames = getAllFiles(absolutePath)
                 for _, f in ipairs(fnames) do
                     table.insert(monDirs, pystring:join("/", { self._path, relativePath, f }))
                 end
