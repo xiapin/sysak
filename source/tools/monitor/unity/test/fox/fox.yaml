@@ -1,0 +1,4 @@
+config:
+  db:
+    rotate: 7  # tsdb file retention time, unit day
+    budget: 200 # max query buffer from tsdb.
