@@ -56,9 +56,10 @@ function CcoMetrics:_init_(fYaml)
 end
 
 function CcoMetrics:echo(tReq)
-    --if tReq.code ~= "204" then
-    print(tReq.code, tReq.data)
-    --end
+    --if tReq.code ~= "200" then
+    if string.sub(tReq.code,1,1) ~= "2" then
+        print(tReq.code, tReq.data)
+    end
 end
 
 function CcoMetrics:trans(msgs)

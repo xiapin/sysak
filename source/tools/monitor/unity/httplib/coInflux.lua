@@ -28,7 +28,8 @@ function CcoInflux:_init_(fYaml)
 end
 
 function CcoInflux:echo(tReq)
-    if tReq.code ~= "204" then
+    --if tReq.code ~= "200" then
+    if string.sub(tReq.code,1,1) ~= "2" then
         print(tReq.code, tReq.data)
     end
 end

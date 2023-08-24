@@ -11,6 +11,19 @@ require("common.class")
 
 local Cexport = class("Cexport")
 
+local function qFormDataDis(from,tData)
+    local res = {}
+    local len = #tData
+    local c = 0
+    for i = len, 1, -1 do
+        local line = tData[i]
+        if from == line.title then
+            c = c + 1
+            res[c] = line
+        end
+    end
+    return res
+end
 
 local function qFormData(from, tData)
     local res = {}
@@ -72,18 +85,22 @@ function Cexport:_init_(instance, fYaml)
     end
     self._tDescr = ms.metrics
     self._fox = CfoxTSDB.new(fYaml)
-    self._fox:_setupRead()
 end
 
 function Cexport:export()
     local qs = {}
-    self._fox:resize()
-    self._fox:qlast(self._freq, qs)
+    self._fox:qLastMetric(self._freq + 1, qs)
     local res = {}
     local c = 0
     for _, line in ipairs(self._tDescr) do
         local from = line.from
-        local tFroms = qFormData(from, qs)
+        local tFroms
+        if line.discrete then
+            tFroms = qFormDataDis(from, qs)
+        else
+            tFroms = qFormData(from, qs)
+        end
+
         if #tFroms then
             local title = line.title
             local help = string.format("# HELP %s %s", title, line.help)

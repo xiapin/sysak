@@ -8,10 +8,12 @@ require("common.class")
 local system = require("common.system")
 local ChttpApp = require("httplib.httpApp")
 local CfoxTSDB = require("tsdb.foxTSDB")
+local CfoxSQL = require("tsdb.foxSQL")
 local postQue = require("beeQ.postQue.postQue")
 local CpushLine = require("beaver.pushLine")
 local CasyncDns = require("httplib.asyncDns")
 local CasyncHttp = require("httplib.asyncHttp")
+local CasyncHttps = require("httplib.asyncHttps")
 local CasyncOSS = require("httplib.asyncOSS")
 local CurlApi = class("urlApi", ChttpApp)
 
@@ -25,6 +27,8 @@ function CurlApi:_init_(frame, que, fYaml)
     self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
     self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
     self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
+    self._urlCb["/api/sql"] = function(tReq) return self:qsql(tReq) end
+    self._urlCb["/api/ssl"] = function(tReq) return self:ssl(tReq) end
     self:_ossIntall(fYaml)
 
     self:_install(frame)
@@ -61,6 +65,32 @@ function CurlApi:oss(tReq)
         end
     else
         return "need uuid and content-length > 0." .. tReq.data, 400
+    end
+end
+
+local function reqSSL(https, host, uri, port)
+    port = port or 443
+    return https:get(host, uri, port)
+end
+
+function CurlApi:ssl(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local host = tJson.host
+        local uri = tJson.uri
+        if host and uri then
+            local https = CasyncHttps.new()
+            local stat, body = pcall(reqSSL, https, host, uri)
+            if stat then
+                return {body = body}
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
     end
 end
 
@@ -204,12 +234,30 @@ function CurlApi:qtable(tJson)
     return self.fox:qTabelNow(secs)
 end
 
+function CurlApi:qsql(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat then
+        local res = self.foxSQL:parse(tJson)
+        if res.error ~= nil or res.cursorpos ~= nil then
+            print("sql parse error")
+            return {}
+        end
+        return self.foxSQL:sql(res)
+    else
+        return {}
+    end
+
+
+end
+
 function CurlApi:_setupQs(fYaml)
     self.fox = CfoxTSDB.new(fYaml)
+    self.foxSQL = CfoxSQL.new(fYaml)
     self._q = {}
     self._q["last"] = function(tJson) return self:qlast(tJson) end
     self._q["table"] = function(tJson) return self:qtable(tJson) end
     self._q["date"] = function(tJson) return self:qdate(tJson) end
+    --self._q["sql"] = function(tJson) return self:qsql(tJson) end
 end
 
 function CurlApi:lquery(tJson)

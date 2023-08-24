@@ -268,7 +268,7 @@ function CasyncHttp:result(fread)
     return self:parse(fread, stream)
 end
 
-local function checkConnect(fd, connecting, toWake)
+function CasyncHttp:checkConnect(fd, connecting, toWake)
     local res, msg
     if connecting > 0 then
         local e = coroutine.yield()
@@ -280,6 +280,7 @@ local function checkConnect(fd, connecting, toWake)
             return -1
         end
     end
+    return 0
 end
 
 function CasyncHttp:procStream(fd, stream, toWake)
@@ -295,17 +296,6 @@ function CasyncHttp:procStream(fd, stream, toWake)
         assert(res, msg)
     end
     g_lb:co_exit(fd)
-end
-
-function CasyncHttp:_get(fd)
-    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
-
-    if checkConnect(fd, connecting, toWake) == -1 then
-        g_lb:co_exit(fd)
-        return
-    end
-    local stream = self:pack('GET', domain, uri, headers, body)
-    self:procStream(fd, stream, toWake)
 end
 
 function CasyncHttp:connect(domain, uri, port, headers, body, cb)
@@ -337,6 +327,29 @@ function CasyncHttp:connect(domain, uri, port, headers, body, cb)
     end
 end
 
+function CasyncHttp:assertConnect(fd, connecting, toWake)
+    local res, msg
+
+    if self:checkConnect(fd, connecting, toWake) == -1 then
+        g_lb:co_exit(fd)
+        res, msg = coroutine.resume(toWake, "domain connect failed.")
+        assert(res, msg)
+        return -1
+    end
+    return 0
+end
+
+function CasyncHttp:_get(fd)
+    local toWake, domain, uri, headers, body, connecting = coroutine.yield()
+
+    if self:assertConnect(fd, connecting, toWake) < 0 then
+        return
+    end
+
+    local stream = self:pack('GET', domain, uri, headers, body)
+    self:procStream(fd, stream, toWake)
+end
+
 function CasyncHttp:get(domain, uri, port)
     return self:connect(domain, uri, port, {}, "", self._get)
 end
@@ -344,10 +357,10 @@ end
 function CasyncHttp:_put(fd)
     local toWake, domain, uri, headers, body, connecting = coroutine.yield()
 
-    if checkConnect(fd, connecting, toWake) == -1 then
-        g_lb:co_exit(fd)
+    if self:assertConnect(fd, connecting, toWake) < 0 then
         return
     end
+
     local stream = self:pack('PUT', domain, uri, headers, body)
     self:procStream(fd, stream, toWake)
 end
@@ -359,10 +372,10 @@ end
 function CasyncHttp:_post(fd)
     local toWake, domain, uri, headers, body, connecting = coroutine.yield()
 
-    if checkConnect(fd, connecting, toWake) == -1 then
-        g_lb:co_exit(fd)
+    if self:assertConnect(fd, connecting, toWake) < 0 then
         return
     end
+
     local stream = self:pack('POST', domain, uri, headers, body)
     self:procStream(fd, stream, toWake)
 end

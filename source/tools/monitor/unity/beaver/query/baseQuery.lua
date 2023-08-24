@@ -88,13 +88,15 @@ local function packTimeLen(forms, session)
     table.insert(forms, formTLEnd)
 end
 
-local function packForm(session, tables)
+local function packForm(session, tables, us)
     local forms = {}
     packForm1(forms)
     packTimeFormat(forms, session)
     packTables(forms, session, tables)
     packTimeLen(forms, session)
     packForm2(forms)
+
+    table.insert(forms, string.format("<p>列表耗时：%d us</p>", us))
     return table.concat(forms, "\n")
 end
 
@@ -108,8 +110,10 @@ end
 
 function CbaseQuery:base(tReq)
     local res = {title="Beaver Query"}
+    local t1 = self._fox:get_us()
     self:qTables(tReq.session)
-    res.content = packForm(tReq.session, tReq.session.tables)
+    local t2 = self._fox:get_us()
+    res.content = packForm(tReq.session, tReq.session.tables, tonumber(t2 - t1))
     return res
 end
 
@@ -218,14 +222,16 @@ function CbaseQuery:baseQ(tReq)
     end
 
     if session.selTable == nil then
-        contents[1] = "查询表未设置，将跳转会设置页面."
+        contents[1] = "查询表未设置，将跳转回设置页面."
         contents[2] = '<meta http-equiv="refresh" content="3;url=/query/base" >'
         res.content = table.concat(contents, "\n")
         return res
     end
 
+    local t1 = self._fox:get_us()
     local ms = self._fox:qNow(tonumber(session.timeLen) * 60,
                             {session.selTable})
+    local t2 = self._fox:get_us()
     table.insert(contents, "# 反馈输入\n")
     table.insert(contents, "* 表名: " .. system:escMd(session.selTable))
     table.insert(contents, "* 时间戳: " .. session.gmt)
@@ -236,6 +242,7 @@ function CbaseQuery:baseQ(tReq)
 
     packDataTabel(contents, ms, session.gmt)
 
+    table.insert(contents, string.format("查表耗时 %dus", tonumber(t2 - t1)))
     table.insert(contents, "[返回](/query/base)")
     table.insert(contents, "[刷新](/query/baseQ)")
 
