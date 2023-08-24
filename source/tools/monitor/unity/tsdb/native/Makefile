@@ -1,6 +1,6 @@
 CC := gcc
 CFLAG := -g -fpic
-LDFLAG := -g -fpic -shared
+LDFLAG := -g -fpic -shared -L./ -lpg_query -lpthread
 OBJS := foxTSDB.o
 SO := libfoxTSDB.so
 
