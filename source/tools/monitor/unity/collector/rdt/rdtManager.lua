@@ -22,7 +22,7 @@ function rdtMgr:_init_(resYaml, proto, pffi, mnt)
         return
     end
 
-    self._verbose = true
+    self._verbose = false
     self._proto = proto
     self._pffi = pffi
     self._mnt = mnt
@@ -31,6 +31,7 @@ function rdtMgr:_init_(resYaml, proto, pffi, mnt)
 end
 
 function rdtMgr:resetPlugins(resYaml, proto, pffi, mnt)
+    self._ino = Cinotifies.new()
     if resYaml.resctrl.auto ~= nil and resYaml.resctrl.auto then
         self._resDirs, self._monDirs = self:searchDirs()
     else
@@ -39,11 +40,15 @@ function rdtMgr:resetPlugins(resYaml, proto, pffi, mnt)
 
     self._plugins = self:setupPlugins(proto, pffi, mnt)
 
-    if self._verbose then
-        for _, value in ipairs(self._resDirs) do
+    for _, value in ipairs(self._resDirs) do
+        self._ino:add(value)
+        self._ino:add(value .. "/" .. "mon_groups")
+        if self._verbose then
             print("res group: " .. value)
         end
-        for _, value in ipairs(self._monDirs) do
+    end
+    for _, value in ipairs(self._monDirs) do
+        if self._verbose then
             print("mon group: " .. value)
         end
     end
@@ -226,6 +231,12 @@ function rdtMgr:proc(elapsed, lines)
     if not self._enable then
         return
     end
+
+    if self._ino:isChange() or #self._plugins == 0 then
+        print("rdtManager: resctrl dirs changed.")
+        self:resetPlugins(self._resYaml, self._proto, self._pffi, self._mnt)
+    end
+
     -- print(string.format("rdtMgr: proc"))
     for i, plugin in ipairs(self._plugins) do
         local stat, res = pcall(plugin.proc, plugin, elapsed, lines)
