@@ -457,3 +457,18 @@ This table show the hist of the latency of direct memory compaction
 | :----- | ---- | :-------------------- | :--- | :------------------------------------------ |
 | rlat   | ns   | imc read ddr latency  | channel级     | collector/plugin/imc_latency/imc\_latency.c |
 | wlat   | ns   | imc write ddr latency | channel级     | collector/plugin/imc_latency/imc\_latency.c |
+
+### rdt_usage 表
+
+| 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
+| :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
+| llc_occ      | byte | llc occupancy                |      | collector/rdt/plugin/rdt_llc_occupancy.lua |
+| local_mem_bw | MB   | 本地内存带宽                 |      | collector/rdt/plugin/rdt_local_mem_bw.lua  |
+| total_mem_bw | MB   | Remote内存带宽+Local内存带宽 |      | collector/rdt/plugin/rdt_total_mem_bw.lua  |
+
+### rdt_alloc_policy 表
+
+| 指标名 | 单位 | 标签说明         | 备注                   | 源码路径                          |
+| :----- | ---- | :--------------- | :--------------------- | :-------------------------------- |
+| MB     |      | 内存带宽分配比例 | MB（Memory Bandwidth） | collector/rdt/plugin/rdt_size.lua |
+| L3     | byte | llc分配size      |                        | collector/rdt/plugin/rdt_size.lua |
