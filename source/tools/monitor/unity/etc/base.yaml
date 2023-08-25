@@ -1,58 +1,83 @@
 config:
-  freq: 15   # unit second
-  port: 8400  # bind port
+  freq: 15 # unit second
+  port: 8400 # bind port
   bind_addr: 0.0.0.0 # bind ip
-  backlog: 32  # listen backlog
-  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+  backlog: 32 # listen backlog
+  identity: # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     #    mode: curl
     #    url: "http://100.100.100.200/latest/meta-data/instance-id"
     #    name: test_specify
     mode: hostip
   #  real_timestamps: true
   #  unix_socket: "/tmp/sysom_unity.sock"
-  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  proc_path: / # in container mode, like -v /:/mnt/host , should use /mnt/host/
   db:
-    rotate: 7  # tsdb file retention time, unit day
+    rotate: 7 # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
   limit:
-    cpu: 30  # unit %
-    mem: 50  # unit mb
-    tasks: 10  # monitor 10 pid max.
+    cpu: 30 # unit %
+    mem: 50 # unit mb
+    tasks: 10 # monitor 10 pid max.
 
 outline:
   - /var/sysom/outline
 
-luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
-             "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
-             "proc_uptime", "proc_arp", "proc_cgroups", "proc_interrupts", "proc_softirqs", "proc_softnet_stat",
-]
+luaPlugins:
+  [
+    "proc_buddyinfo",
+    "proc_diskstats",
+    "proc_meminfo",
+    "proc_mounts",
+    "proc_netdev",
+    "proc_snmp_stat",
+    "proc_sockstat",
+    "proc_stat",
+    "proc_statm",
+    "proc_vmstat",
+    "proc_uptime",
+    "proc_arp",
+    "proc_cgroups",
+    "proc_interrupts",
+    "proc_softirqs",
+    "proc_softnet_stat",
+  ]
+
+resctrl:
+  path: "sys/fs/resctrl"
+
+  monLuaPlugin: ["rdt_llc_occupancy", "rdt_local_mem_bw", "rdt_total_mem_bw"]
+
+  resLuaPlugin: ["rdt_size"]
+
+  auto: true # search all mon-groups and res-group, it will ignore config arg group
+
+  # group:
+  #   - name: ""
+  #   - name: "LS"
+  #     # monitor: ["mon1", "mon2"]
+  #   - name: "BE"
+  #     monitor: ["pod3#con3"]
 
 plugins:
   - so: kmsg
     description: "collect dmesg info."
-  -
-    so: proc_schedstat
+  - so: proc_schedstat
     description: "collect schedule stat info of percpu"
-  -
-    so: proc_loadavg
+  - so: proc_loadavg
     description: "collect load avg"
   - so: net_health
     description: "tcp net health."
   - so: net_retrans
     description: "tcp retrans monitor."
-  -
-    so: unity_irqoff
+  - so: unity_irqoff
     description: "irqoff:detect irq turned off and can't response"
-  -
-    so: gpuinfo
+  - so: gpuinfo
     description: "collect gpuinfo"
-  -
-    so: libimc_latency
+  - so: libimc_latency
     description: "IMC latency and bandwidth"
 
 metrics:
-  -
-    title: sysom_proc_cpu_total
+  - title: sysom_proc_cpu_total
     from: cpu_total
     head: mode
     help: "cpu usage info for total."
@@ -241,4 +266,14 @@ metrics:
     from: imc_socket_latency
     head: value
     help: "imc latency and bw for socket"
+    type: "gauge"
+  - title: sysom_rdt_usage
+    from: rdt_usage
+    head: value
+    help: "RDT LLC and memory bandwidth usage"
+    type: "gauge"
+  - title: sysom_rdt_alloc_policy
+    from: rdt_alloc_policy
+    head: value
+    help: "RDT LLC and memory bandwidth allocation policy"
     type: "gauge"
