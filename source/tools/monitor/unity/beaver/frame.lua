@@ -121,6 +121,7 @@ function Cframe:echo404()
     local body = "Oops! The page may have flown to Mars!!!\n"
     local headers = self:packServerHeaders(tHead, #body)
     local tHttp = {stat, headers, body}
+    error("404")
     return pystring:join("\r\n", tHttp)
 end
 
@@ -152,7 +153,7 @@ function Cframe:proc(fread, session)
             local res, keep = obj:calls(tReq)
             return res, keep, tReq.session
         end
-
+        print(self._objs[tReq.path])
         return self:echo404(), false, {}
     end
 end

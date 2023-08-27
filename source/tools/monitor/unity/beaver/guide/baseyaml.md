@@ -7,6 +7,7 @@ config:
   port: 8400 # 监听端口
   bind_addr: 0.0.0.0  # 监听IP
   backlog: 32 # 服务监听队列长度
+  url_safe: close # 只开放必要的url，
   identity: # 实例id配置模式，当前支持以下五种模式
             # hostip: 获取主机IP
             # curl: 通过网络请求获取，需要指定url 参数，适合ECS场景

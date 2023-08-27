@@ -35,7 +35,7 @@ local function checkChild(ppid, pid)
     return ret
 end
 
-function CexecBase:_init_(cmd, args, seconds)
+function CexecBase:_init_(cmd, args, seconds) -- seconds超时时间
     self.cmd = cmd
     self._cnt = 0
     self._loop = seconds / interval

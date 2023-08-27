@@ -20,8 +20,11 @@ local CurlApi = class("urlApi", ChttpApp)
 function CurlApi:_init_(frame, que, fYaml)
     ChttpApp._init_(self)
     self._pushLine = CpushLine.new(que)
+    local res = system:parseYaml(fYaml)
+
     self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
     self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
+
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
     self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
     self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
@@ -29,6 +32,7 @@ function CurlApi:_init_(frame, que, fYaml)
     self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
     self._urlCb["/api/sql"] = function(tReq) return self:qsql(tReq) end
     self._urlCb["/api/ssl"] = function(tReq) return self:ssl(tReq) end
+    self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
     self:_ossIntall(fYaml)
 
     self:_install(frame)
@@ -96,6 +100,46 @@ end
 
 local function reqProxy(proxy, host, uri)
     return proxy:get(host, uri)
+end
+
+local function proxyPost(proxy, host, uri, headers, body)
+    return proxy:post(host, uri, headers, body)
+end
+
+function CurlApi:diag(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local host = tJson.host
+        local uri = tJson.uri
+        --local headers = tJson.headers
+        local body = tJson.body
+        local headers = {
+            accept = "application/json",
+            ["Content-Type"] = "application/json",
+            authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzA0MzYwMi43NDc1NDh9.pm78vETkFeR8xX-TFA4ROVjVzO_VlfUuwUA3TzTxpfA"
+        }
+
+        if host and uri then
+            local stat, body = pcall(proxyPost, self._proxy, host, uri, headers, self:jencode(body))
+            if stat then
+                body = self:jdecode(body)
+                system:dumps(body)
+                if body.code == 200 then
+                    local s = self:jencode(body.data)
+                    --TODO：除了data，service_name也要传
+                    postQue.post(s)
+                    print("postque")
+                end
+                return {body = body}
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
 end
 
 function CurlApi:proxy(tReq)

@@ -47,6 +47,8 @@ function Cengine:run(e, res, diag)
     local args = res.args
     local second = res.second or diag.time
     if diag.cmd then
+        -- TODO: cmd要加bin/bash之类的
+        -- TODO: 调用execBase去诊断，继承一下，改cmd。不用execDiag
         local exec = CexecDiag.new(diag.cmd, args, second, self._que, diag.report, res.uid)
         exec:addEvents(e)
     end
@@ -64,6 +66,8 @@ function Cengine:pushTask(e, msgs)
     local events = pystring:split(msgs, '\n')
     for _, msg in ipairs(events) do
         local res = cjson.decode(msg)
+        --TODO: 加一个函数调用,处理postque的data
+        --TODO: 配置yaml，根据service_name设置阻塞和运行时间
         local cmd = res.cmd
         if cmd == "mon_pid" then
             self._task:add(res.pid, res.loop)
@@ -78,7 +82,7 @@ function Cengine:pushTask(e, msgs)
             local diag = self._resDiag[exec]
             if diag then
                 system:dumps(diag)
-                if self._diags[exec] then
+                if self._diags[exec] then --实现阻塞
                     print("cmd " .. exec .. " is blocking.")
                 else
                     self:run(e, res, diag)
@@ -100,7 +104,7 @@ function Cengine:proc(t, event, msgs)
     self:pushTask(event, msgs)
 end
 
-function Cengine:checkDiag()
+function Cengine:checkDiag() --
     local toDel = {}
     for k, v in pairs(self._diags) do
         if v > 0 then

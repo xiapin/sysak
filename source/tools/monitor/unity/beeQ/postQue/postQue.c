@@ -13,20 +13,21 @@
 struct unity_postQue {
     int num;
     pthread_mutex_t mtx;
-    char msgs[UNITY_POSTQUE_NUM][UNITY_POSTQUE_MSG_SIZE];
+    char* msgs[UNITY_POSTQUE_NUM];
 };
 
 static struct unity_postQue que;
 
-int postQue_pull(char *msg) {
+int postQue_pull(char *msg, int size) {
     int ret;
     int i;
 
     pthread_mutex_lock(&que.mtx);
     ret = que.num;
     for (i = 0; i < ret; i ++) {
-        strcat(msg, que.msgs[i]);
-        strcat(msg, "\n");
+        strncat(msg, que.msgs[i], size);
+        free(que.msgs[i]);
+        strncat(msg, "\n", size);
     }
     que.num = 0;
     pthread_mutex_unlock(&que.mtx);
@@ -41,12 +42,13 @@ int postQue_pull(char *msg) {
 int postQue_post(const char *msg) {
     int ret = 0;
     int len = strlen(msg);
-    if (len >= UNITY_POSTQUE_MSG_SIZE) {
-        return -EINVAL;
-    }
-
+//    if (len >= UNITY_POSTQUE_MSG_SIZE) {
+//        return -EINVAL;
+//    }
     pthread_mutex_lock(&que.mtx);
     if (que.num < UNITY_POSTQUE_NUM) {
+        printf("\nmsgsize  %d\n", len+1);
+        que.msgs[que.num] = (char*) malloc(len+1);
         strcpy(que.msgs[que.num], msg);
         que.num ++;
     } else {
