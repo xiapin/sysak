@@ -11,4 +11,5 @@ local ChttpCli = require("httplib.httpCli")
 local cli = ChttpCli.new()
 local url = "http://127.0.0.1:8400/api/line"
 local res = cli:postLine(url, "lineTable,index=abc value=1")
+assert(res.code == "200")
 system:dumps(res)
