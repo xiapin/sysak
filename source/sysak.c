@@ -328,6 +328,7 @@ static int down_install(const char *component_name)
     char ko_path[MAX_WORK_PATH_LEN];
     char ko_file[MAX_WORK_PATH_LEN];
     char btf_file[MAX_WORK_PATH_LEN];
+    int retry_cnt = 0;
     int ret = 0;
 
     if (!get_server_addr())
@@ -346,31 +347,57 @@ static int down_install(const char *component_name)
         //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s 1&>/dev/null",
         //        sysak_components_server, machine, module_tag, module_path, kern_version);
         if (oss_get_components){
+retry_ko_oss:
             sprintf(download_cmd, "wget -T 5 -t 2 -q -O %s/%s/sysak.ko %s-%s.oss-%s-internal.aliyuncs.com/home/hive/sysak/modules/%s/sysak-%s.ko",
                     module_path, kern_version, sysak_oss_server, &region[0], &region[0], machine, kern_version);
         }
         else
+retry_ko:
             sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
                     sysak_components_server, machine, kern_version, module_path, kern_version);
         //printf("%s ... \n", download_cmd);
+
         ret = system(download_cmd);
         if (access(ko_file,0) == 0)
             ret = 0;
+        else if (retry_cnt == 0){
+            if (oss_get_components){
+                retry_cnt++;
+                goto retry_ko;
+            }
+            else {
+                retry_cnt++;
+                goto retry_ko_oss;
+            }
+        }
         return ret;
+
     } else if (strcmp(component_name, "btf") == 0) {
 	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
         if (oss_get_components){
+retry_btf_oss:
             sprintf(download_cmd, "wget -T 5 -t 2 -q -P %s %s-%s.oss-%s-internal.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",
                     tools_path, sysak_oss_server, &region[0], &region[0], machine, kern_version);
         }
         else
+retry_btf:
 	        sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
                     sysak_components_server, machine, kern_version, tools_path);
         //printf("%s ... \n", download_cmd);
         ret = system(download_cmd);
         if (access(btf_file,0) == 0)
             ret = 0;
+        else if (retry_cnt == 0){
+            if (oss_get_components){
+                retry_cnt++;
+                goto retry_btf;
+            }
+            else {
+                retry_cnt++;
+                goto retry_btf_oss;
+            }
+        }
         return ret;
     } else {
         return down_install_ext_tools(component_name);
