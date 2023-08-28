@@ -331,6 +331,10 @@ static int down_install(const char *component_name)
     int retry_cnt = 0;
     int ret = 0;
 
+    sprintf(ko_path, "%s/%s", module_path, kern_version);
+    sprintf(ko_file, "%s/%s/%s", module_path, kern_version, "sysak.ko");
+    sprintf(btf_file, "%s/vmlinux-%s", tools_path, kern_version);
+
     if (!get_server_addr())
         return -1;
 
@@ -338,9 +342,6 @@ static int down_install(const char *component_name)
         if (!get_module_tag())
             return -1;
 
-        sprintf(ko_path, "%s/%s", module_path, kern_version);
-        sprintf(ko_file, "%s/%s/%s", module_path, kern_version, "sysak.ko");
-        sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
         if (access(ko_path,0) != 0)
             mkdir(ko_path, 0755 );
 
