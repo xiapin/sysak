@@ -696,8 +696,10 @@ void read_imc() {
     }
 
     if (before_ts) {
+#define UINT48_MAX 281474976710655U   /* (1 << 48) - 1 */
 #define LAT(dest, occ, ins, speed) dest = (occ) / (ins) / (speed);
-#define DELTA(val1, val2) val1 >= val2 ? val1 - val2 : UINT64_MAX - val2 + val1;
+#define DELTA(val1, val2) \
+    (val1) >= (val2) ? (val1) - (val2) : UINT48_MAX - (val2) + (val1);
 
         double delta = after_ts - before_ts;
         double dram_speed;
@@ -724,6 +726,13 @@ void read_imc() {
                                               before_channel_ev->wpq_occ);
                 uint64_t delta_wpqins = DELTA(after_channel_ev->wpq_ins,
                                               before_channel_ev->wpq_ins);
+                uint64_t delta_wr =
+                    DELTA(after_channel_ev->cas_wr, before_channel_ev->cas_wr);
+                uint64_t delta_rd =
+                    DELTA(after_channel_ev->cas_rd, before_channel_ev->cas_rd);
+
+                after_channel_ev->cas_bw_rd = delta_rd * 64;
+                after_channel_ev->cas_bw_wr = delta_wr * 64;
 
                 LAT(after_channel_ev->read_latency, delta_rpqocc, delta_rpqins,
                     dram_speed);
@@ -736,23 +745,15 @@ void read_imc() {
                 after_socket_ev->wpq_occ += delta_wpqocc;
                 after_socket_ev->rpq_ins += delta_rpqins;
                 after_socket_ev->wpq_ins += delta_wpqins;
+                after_socket_ev->cas_rd += delta_rd;
+                after_socket_ev->cas_wr += delta_wr;
 
                 after_node->rpq_occ += delta_rpqocc;
                 after_node->wpq_occ += delta_wpqocc;
                 after_node->rpq_ins += delta_rpqins;
                 after_node->wpq_ins += delta_wpqins;
-
-                if (after_channel_ev->cas_rd - before_channel_ev->cas_rd > 0) {
-                    after_channel_ev->cas_bw_rd =
-                        (after_channel_ev->cas_rd - before_channel_ev->cas_rd) *
-                        64;
-                }
-                if (after_channel_ev->cas_wr - before_channel_ev->cas_wr > 0) {
-                    after_channel_ev->cas_bw_wr =
-                        (after_channel_ev->cas_wr - before_channel_ev->cas_wr) *
-                        64;
-                }
             }
+
             LAT(after_socket_ev->read_latency, after_socket_ev->rpq_occ,
                 after_socket_ev->rpq_ins, dram_speed);
             LAT(after_socket_ev->write_latency, after_socket_ev->wpq_occ,
@@ -761,15 +762,9 @@ void read_imc() {
                 after_socket_ev->wpq_occ + after_socket_ev->rpq_occ,
                 after_socket_ev->wpq_ins + after_socket_ev->rpq_ins,
                 dram_speed);
-            if (after_socket_ev->cas_rd - before_socket_ev->cas_rd > 0) {
-                after_socket_ev->cas_bw_rd =
-                    (after_socket_ev->cas_rd - before_socket_ev->cas_rd) * 64;
-            }
 
-            if (after_socket_ev->cas_wr - before_socket_ev->cas_wr > 0) {
-                after_socket_ev->cas_bw_wr =
-                    (after_socket_ev->cas_wr - before_socket_ev->cas_wr) * 64;
-            }
+            after_socket_ev->cas_bw_wr = after_socket_ev->cas_wr * 64;
+            after_socket_ev->cas_bw_rd = after_socket_ev->cas_rd * 64;
         }
         LAT(after_node->read_latency, after_node->rpq_occ, after_node->rpq_ins,
             dram_speed);
