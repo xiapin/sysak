@@ -4,6 +4,7 @@ config:
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
   daemon: ture
+  url_safe: close
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     #    mode: curl
     #    url: "http://100.100.100.200/latest/meta-data/instance-id"

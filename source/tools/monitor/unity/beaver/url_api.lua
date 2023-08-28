@@ -21,9 +21,10 @@ function CurlApi:_init_(frame, que, fYaml)
     ChttpApp._init_(self)
     self._pushLine = CpushLine.new(que)
     local res = system:parseYaml(fYaml)
-
-    self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
-    self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
+    if res.config.url_safe ~= "close" then
+        self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
+        self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
+    end
 
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
     self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
