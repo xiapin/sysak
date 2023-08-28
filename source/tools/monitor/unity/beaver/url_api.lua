@@ -116,7 +116,7 @@ function CurlApi:diag(tReq)
         local headers = {
             accept = "application/json",
             ["Content-Type"] = "application/json",
-            authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzA0MzYwMi43NDc1NDh9.pm78vETkFeR8xX-TFA4ROVjVzO_VlfUuwUA3TzTxpfA"
+            authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzM2NTA3Mi41NTI5MzU4fQ.AYOiJR2tLuGmzlqvx4vFVZTfyaWX_xImegk9Qo1bJbg"
         }
         local service_name = body.service_name
 

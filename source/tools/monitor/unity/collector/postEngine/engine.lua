@@ -13,6 +13,7 @@ local system = require("common.system")
 local cjson = require("cjson.safe")
 local CexecBase = require("collector.postEngine.execBase")
 local CexecDiag = require("collector.postEngine.execDiag")
+local CexecJobs = require("collector.postEngine.execJobs")
 local Cengine = class("engine", CvProto)
 
 local diagExec = {
@@ -66,22 +67,17 @@ function Cengine:run(e, res, diag)
 end
 
 function Cengine:runJobs(e, res, diag)
-    --local args = res.args
+    print("runjobs")
+    local cmd = {res.jobs.cmd}
     local time = diag.time
     if res.jobs.cmd then
         -- TODO: cmd要加bin/bash之类的
         -- TODO: 调用execBase去诊断，继承一下，改cmd。不用execDiag
-        local exec = CexecDiag.new(diag.cmd, args, second, self._que, diag.report, res.uid)
+        local exec = CexecJobs.new("/bin/bash", cmd, time, res.service_name)
         exec:addEvents(e)
     end
-    local so = diag.so
-    if so then
-        for plugin, loop in pairs(so) do
-            print(plugin, loop)
-            self._main.soPlugins:add(plugin, loop)
-        end
-    end
-    self._diags[res.exec] = diag.block
+
+    self._jobs[res.service_name] = diag.block
 end
 
 function Cengine:pushTask(e, msgs)
@@ -93,8 +89,8 @@ function Cengine:pushTask(e, msgs)
         local service_name = res.service_name
 
         local cmd = res.cmd
-        if service_name ~= nil and self._jobs then
-            local diag = self._jobs[service_name]
+        if service_name ~= nil and self._fYamlJobs then
+            local diag = self._fYamlJobs[service_name]
             if diag then
                 system:dumps(diag)
                 if self._jobs[service_name] then
@@ -153,12 +149,27 @@ function Cengine:checkDiag() --
     end
 end
 
+function Cengine:checkJobs() --
+    local toDel = {}
+    for k, v in pairs(self._jobs) do
+        if v > 0 then
+            self._jobs[k] = v - 1
+        else
+            table.insert(toDel, k)
+        end
+    end
+    for _, k in ipairs(toDel) do
+        self._jobs[k] = nil
+    end
+end
+
 function Cengine:work(t, event)
     local msgs = postQue.pull()
     if msgs then
         self:proc(t, event, msgs)
     end
     self:checkDiag()
+    self:checkJobs()
 end
 
 return Cengine
