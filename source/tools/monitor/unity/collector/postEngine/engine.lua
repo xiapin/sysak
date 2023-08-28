@@ -33,6 +33,9 @@ function Cengine:_init_(que, proto_q, fYaml, tid)
     local res = system:parseYaml(fYaml)
     self._resDiag = res.diagnose
     self._diags = {}
+
+    self._fYamlJobs = res.jobs
+    self._jobs = {}
 end
 
 function Cengine:setMainloop(main)
@@ -62,14 +65,46 @@ function Cengine:run(e, res, diag)
     self._diags[res.exec] = diag.block
 end
 
+function Cengine:runJobs(e, res, diag)
+    --local args = res.args
+    local time = diag.time
+    if res.jobs.cmd then
+        -- TODO: cmd要加bin/bash之类的
+        -- TODO: 调用execBase去诊断，继承一下，改cmd。不用execDiag
+        local exec = CexecDiag.new(diag.cmd, args, second, self._que, diag.report, res.uid)
+        exec:addEvents(e)
+    end
+    local so = diag.so
+    if so then
+        for plugin, loop in pairs(so) do
+            print(plugin, loop)
+            self._main.soPlugins:add(plugin, loop)
+        end
+    end
+    self._diags[res.exec] = diag.block
+end
+
 function Cengine:pushTask(e, msgs)
     local events = pystring:split(msgs, '\n')
     for _, msg in ipairs(events) do
         local res = cjson.decode(msg)
         --TODO: 加一个函数调用,处理postque的data
         --TODO: 配置yaml，根据service_name设置阻塞和运行时间
+        local service_name = res.service_name
+
         local cmd = res.cmd
-        if cmd == "mon_pid" then
+        if service_name ~= nil and self._jobs then
+            local diag = self._jobs[service_name]
+            if diag then
+                system:dumps(diag)
+                if self._jobs[service_name] then
+                    print(service_name .. " is blocking")
+                else
+                    self:runJobs(e,res,diag)
+                end
+            end
+
+        elseif cmd == "mon_pid" then
             self._task:add(res.pid, res.loop)
         elseif cmd == "exec" then  -- exec a cmd
             local execCmd = res.exec

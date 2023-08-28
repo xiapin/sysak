@@ -118,6 +118,7 @@ function CurlApi:diag(tReq)
             ["Content-Type"] = "application/json",
             authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzA0MzYwMi43NDc1NDh9.pm78vETkFeR8xX-TFA4ROVjVzO_VlfUuwUA3TzTxpfA"
         }
+        local service_name = body.service_name
 
         if host and uri then
             local stat, body = pcall(proxyPost, self._proxy, host, uri, headers, self:jencode(body))
@@ -125,10 +126,11 @@ function CurlApi:diag(tReq)
                 body = self:jdecode(body)
                 system:dumps(body)
                 if body.code == 200 then
-                    local s = self:jencode(body.data)
+                    local data = body.data
+                    data["service_name"] = service_name
+                    local s = self:jencode(data)
                     --TODO：除了data，service_name也要传
                     postQue.post(s)
-                    print("postque")
                 end
                 return {body = body}
             else
