@@ -686,12 +686,12 @@ void read_imc() {
             channel_ev->cas_rd = read_reg(&grp->general_ev[CAS_RD]);
             channel_ev->cas_wr = read_reg(&grp->general_ev[CAS_WR]);
 
-            socket_ev->rpq_occ += channel_ev->rpq_occ;
-            socket_ev->rpq_ins += channel_ev->rpq_ins;
-            socket_ev->wpq_occ += channel_ev->wpq_occ;
-            socket_ev->wpq_ins += channel_ev->wpq_ins;
-            socket_ev->cas_rd += channel_ev->cas_rd;
-            socket_ev->cas_wr += channel_ev->cas_wr;
+            // socket_ev->rpq_occ += channel_ev->rpq_occ;
+            // socket_ev->rpq_ins += channel_ev->rpq_ins;
+            // socket_ev->wpq_occ += channel_ev->wpq_occ;
+            // socket_ev->wpq_ins += channel_ev->wpq_ins;
+            // socket_ev->cas_rd += channel_ev->cas_rd;
+            // socket_ev->cas_wr += channel_ev->cas_wr;
         }
     }
 
