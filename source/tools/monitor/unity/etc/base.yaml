@@ -393,6 +393,6 @@ observe:
   period: 20000
 
 jobs:
-  mem_graph:
+  memgraph:
     block: 60
     time: 30

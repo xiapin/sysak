@@ -7,6 +7,8 @@
 require("common.class")
 
 local CcoMetrics = require("httplib.coMetrics")
+local CcoHttpCliInst = require("httplib.coHttpCliInst")
+local CtransPro = require("common.transPro")
 
 local CcoAutoMetrics = class("coAutoMetrics", CcoMetrics)
 
@@ -26,6 +28,26 @@ function CcoAutoMetrics:_init_(fYaml)
     self._url = "/prometheus/" .. self._project .. "/" .. self._metricstore .. "/api/v1/write"
     self._host = self._project .. "." .. self._endpoint
 
+    local pushMetrics = {
+        host = self._host,
+        url = self._url,
+        port = 80
+    }
+    local Cidentity = require("beaver.identity")
+    local inst = Cidentity.new(fYaml)
+    local instance = inst:id()
+    CcoHttpCliInst._init_(self, instance, pushMetrics)
+    -- go ffi
+    local ffi = require("common.protobuf.metricstore.ffi_lua")
+    self.ffi = ffi.ffi
+    self.awesome = ffi.awesome
+
+    --fox ffi
+    local foxFFI = require("tsdb.native.foxffi")
+    self.foxffi = foxFFI.ffi
+    self.foxcffi = foxFFI.cffi
+
+    self._transPro = CtransPro.new(instance, fYaml, false, false)
 end
 
 return CcoAutoMetrics

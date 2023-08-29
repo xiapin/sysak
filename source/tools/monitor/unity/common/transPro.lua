@@ -10,6 +10,20 @@ require("common.class")
 
 local CtransPro = class("CtransPro")
 
+local function qFormDataDis(from,tData)
+    local res = {}
+    local len = #tData
+    local c = 0
+    for i = len, 1, -1 do
+        local line = tData[i]
+        if from == line.title then
+            c = c + 1
+            res[c] = line
+        end
+    end
+    return res
+end
+
 local function qFormData(from, tData)
     local res = {}
     local len = #tData
@@ -17,7 +31,6 @@ local function qFormData(from, tData)
     local c = 0
     for i = len, 1, -1 do
         local line = tData[i]
-        print(line.title)
         if from == line.title then
             if last == 0 or last == line.time then
                 c = c + 1
@@ -70,15 +83,38 @@ function CtransPro:_init_(instance, fYaml, help, timestamps)
         self.pack_line = packLine
     end
     self._tDescr = ms.metrics
-    print(self._tDescr)
+
+end
+
+local function checkLine(blacklist, whitelist, labels)
+    if blacklist then
+        for k, v in pairs(blacklist) do
+            if labels[k] and labels[k]:match(v)~=nil then
+                return false
+            end
+
+        end
+    elseif whitelist then
+        for k, v in pairs(whitelist) do
+            if labels[k] and labels[k]:match(v)==nil then
+                return false
+            end
+        end
+    end
+    return true
+
 end
 
 function CtransPro:export(datas)
     local res = {}
     local c = 0
     for _, line in ipairs(self._tDescr) do
-        --local from = line.from -- cpu_total
-        --local tFroms = qFormData(from, datas)
+        local from = line.from -- cpu_total
+        if line.discrete then
+            datas = qFormDataDis(from, datas)
+        else
+            datas = qFormData(from, datas)
+        end
         if #datas then
             local title = line.title --sysak_proc_cpu_total
             if self._help then
@@ -90,27 +126,35 @@ function CtransPro:export(datas)
                 res[c] = sType
             end
 
+            local blacklist = line.blacklist
+            local whitelist = line.whitelist
+            if blacklist and whitelist then
+                print("cannot set both blacklist and whitelist! ")
+                goto continue
+            end
             for _, tFrom in ipairs(datas) do
-                if tFrom.vs then
+                if tFrom.values then
                     local labels = system:deepcopy(tFrom.labels)
                     if not labels then
                         labels = {}
                     end
                     labels.instance = self._instance
-                    for k, v in pairs(tFrom.vs) do
-                        labels[line.head] = v.name
-                        c = c + 1
-                        res[c] = self.pack_line(title, labels, v.value, 1)
-                    end
-                end
+                    for k, v in pairs(tFrom.values) do
+                        labels[line.head] = k
+                        if checkLine(blacklist, whitelist, labels)==true then
 
+                            c = c + 1
+                            res[c] = self.pack_line(title, labels, v, 1)
+                        end
+
+                    end
+
+                end
             end
+            ::continue::
         end
     end
-    --c = c + 1
-    --res[c] = ""
     local lines = pystring:join("\n", res)
-    --print(lines)
     return lines
 end
 

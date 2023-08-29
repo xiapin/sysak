@@ -15,13 +15,13 @@ local coAutoMetrics =require("httplib.coAutoMetrics")
 function work(fd, fYaml)
     local conf = system:parseYaml(fYaml)
     local to = conf.pushTo.to
-    print(to)
     local frame = coCli.new(fd)
     local _funcs = {
         Influx = function(fYaml) return coInflux.new(fYaml) end,
         Metrics = function(fYaml) return coMetrics.new(fYaml) end,
         AutoMetrics = function(fYaml) return coAutoMetrics.new(fYaml) end
     }
+    print(to)
     local c = _funcs[to](fYaml)
     --local c = _funcs[to]("/etc/sysak/base.yaml")
     frame:poll(c)

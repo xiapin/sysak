@@ -54,6 +54,12 @@ metrics:   # export 导出的 metrics 列表
     help: "cpu usage info for total." # help 说明
     type: "gauge"     # 数据类型
     discrete: true # 数据是否为离散的，不定义则默认为false
+    blacklist: 设置数据上传的黑名单，黑名单和白名单不可同时设置
+      cpu: "cpu1$" # 按照lua的正则表达式进行设置https://cloud.tencent.com/developer/article/1546591
+      value: "block"
+    whitelist: 设置数据上传的白名单，黑名单和白名单不可同时设置
+      cpu: "cpu1$" # 
+      value: "block"
 
 observe:  # 数据观测设置
   comms:  # 需要观测的进程名

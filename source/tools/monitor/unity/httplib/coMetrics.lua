@@ -33,26 +33,30 @@ function CcoMetrics:_init_(fYaml)
     self._project = res.pushTo.project
     self._endpoint = res.pushTo.endpoint
     self._metricstore = res.pushTo.metricstore
-    self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"
-    self._host = self._project .."." .. self._endpoint
 
-    local pushMetrics = {
-        host = self._host,
-        url = self._url,
-        port = 80
-    }
-    CcoHttpCliInst._init_(self, instance, pushMetrics)
-    -- go ffi
-    local ffi = require("common.protobuf.metricstore.ffi_lua")
-    self.ffi = ffi.ffi
-    self.awesome = ffi.awesome
+    if self._project and self._endpoint and self._metricstore then
+        self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"
+        self._host = self._project .."." .. self._endpoint
 
-    --fox ffi
-    local foxFFI = require("tsdb.native.foxffi")
-    self.foxffi = foxFFI.ffi
-    self.foxcffi = foxFFI.cffi
+        local pushMetrics = {
+            host = self._host,
+            url = self._url,
+            port = 80
+        }
+        CcoHttpCliInst._init_(self, instance, pushMetrics)
+        -- go ffi
+        local ffi = require("common.protobuf.metricstore.ffi_lua")
+        self.ffi = ffi.ffi
+        self.awesome = ffi.awesome
 
-    self._transPro = CtransPro.new(instance, fYaml, false, false)
+        --fox ffi
+        local foxFFI = require("tsdb.native.foxffi")
+        self.foxffi = foxFFI.ffi
+        self.foxcffi = foxFFI.cffi
+
+        self._transPro = CtransPro.new(instance, fYaml, false, false)
+    end
+
 end
 
 function CcoMetrics:echo(tReq)
@@ -62,12 +66,41 @@ function CcoMetrics:echo(tReq)
     end
 end
 
+local function transLines(lines)
+    if not lines then
+        return {}
+    end
+    local res = {}
+    local c = 1
+    for _, line in ipairs(lines) do
+        local cell = {title = line.line}
+        local labels = {}
+        if line.ls then
+            for _, vlabel in ipairs(line.ls) do
+                labels[vlabel.name] = vlabel.index
+            end
+        end
+        cell.labels = labels
+
+        local values = {}
+        if line.vs then
+            for _, vvalue in ipairs(line.vs) do
+                values[vvalue.name] = vvalue.value
+            end
+        end
+        cell.values = values
+        res[c] = cell
+        c = c+1
+    end
+    return res
+end
+
 function CcoMetrics:trans(msgs)
     local res
     local c = 0
     local lines
 
-    lines = msgs.lines
+    lines = transLines(msgs.lines)
     res = self._transPro:export(lines)
     local prome = self.ffi.new("GoString")
     prome.p = res

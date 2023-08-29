@@ -24,16 +24,18 @@ function CurlApi:_init_(frame, que, fYaml)
     if res.config.url_safe ~= "close" then
         self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
         self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
+        self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
+        self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
+        self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
+        self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
+        self._urlCb["/api/ssl"] = function(tReq) return self:ssl(tReq) end
+        self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
     end
 
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
-    self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
-    self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
-    self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
-    self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
+
     self._urlCb["/api/sql"] = function(tReq) return self:qsql(tReq) end
-    self._urlCb["/api/ssl"] = function(tReq) return self:ssl(tReq) end
-    self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
+
     self:_ossIntall(fYaml)
 
     self:_install(frame)
