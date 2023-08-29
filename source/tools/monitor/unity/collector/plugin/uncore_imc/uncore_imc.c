@@ -10,7 +10,7 @@
 #include <linux/types.h>
 #include <sys/time.h>
 
-#include "imc_latency.h"
+#include "uncore_imc.h"
 
 #define NR_IMC 6
 
@@ -841,7 +841,7 @@ int call(int t, struct unity_lines *lines) {
         snprintf(socket_name, 32, "%d", socket_id);
 
         line = unity_get_line(lines, (1 + env.nr_channel) * socket_id);
-        unity_set_table(line, "imc_socket_latency");
+        unity_set_table(line, "imc_socket_event");
         unity_set_index(line, 0, "socket", socket_name);
         unity_set_value(line, 0, "rlat",
                         after.socket_record_arr[socket_id].read_latency);
@@ -860,7 +860,7 @@ int call(int t, struct unity_lines *lines) {
 
             line = unity_get_line(
                 lines, (1 + env.nr_channel) * socket_id + 1 + channel_id);
-            unity_set_table(line, "imc_channel_latency");
+            unity_set_table(line, "imc_channel_event");
             unity_set_index(line, 0, "socket", socket_name);
             unity_set_index(line, 1, "channel", channel_name);
             unity_set_value(line, 0, "rlat",
@@ -887,7 +887,7 @@ int call(int t, struct unity_lines *lines) {
     }
 
     line = unity_get_line(lines, line_num - 1);
-    unity_set_table(line, "imc_node_latency");
+    unity_set_table(line, "imc_node_event");
     unity_set_value(line, 0, "rlat", after.node->read_latency);
     unity_set_value(line, 1, "wlat", after.node->write_latency);
     unity_set_value(line, 2, "avglat", after.node->avg_latency);

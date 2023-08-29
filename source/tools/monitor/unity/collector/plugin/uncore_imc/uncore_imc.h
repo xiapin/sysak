@@ -1,5 +1,5 @@
-#ifndef UNITY_IMC_LATENCY_H
-#define UNITY_IMC_LATENCY_H
+#ifndef UNITY_UNCORE_IMC_H
+#define UNITY_UNCORE_IMC_H
 
 #include <linux/types.h>
 #include <stdbool.h>
