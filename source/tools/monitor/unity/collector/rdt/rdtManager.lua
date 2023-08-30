@@ -110,7 +110,7 @@ function rdtMgr:setupPlugins(proto, pffi, mnt)
     for i, path in ipairs(self._resDirs) do
         -- print(string.format("rdt plugin[%d] path=%s", i, path));
 
-        path = pystring:replace(path, self._mnt, "")
+        path = pystring:lstrip(path, self._mnt)
         for _, plugin in ipairs(self._resYaml.resctrl.resLuaPlugin) do
             local CProcs = require("collector.rdt.plugin." .. plugin)
             local lables = {
@@ -125,7 +125,7 @@ function rdtMgr:setupPlugins(proto, pffi, mnt)
 
     for i, path in ipairs(self._monDirs) do
         -- print(string.format("mon plugin[%d] path=%s", i, path));
-        path = pystring:replace(path, self._mnt, "")
+        path = pystring:lstrip(path, self._mnt)
         local lables = {
             {
                 name = "path",
