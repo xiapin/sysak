@@ -17,6 +17,9 @@ function CexecJobs:_init_(cmd, args, seconds, service_name)
     self.cmd = service_name
 end
 
+function CexecJobs:readIn()
+    return unistd.read(self._fIn, 1024)
+end
 
 
 return CexecJobs

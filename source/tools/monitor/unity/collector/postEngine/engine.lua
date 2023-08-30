@@ -73,8 +73,11 @@ function Cengine:runJobs(e, res, diag)
     if res.jobs.cmd then
         -- TODO: cmd要加bin/bash之类的
         -- TODO: 调用execBase去诊断，继承一下，改cmd。不用execDiag
-        local exec = CexecJobs.new("/bin/bash", cmd, time, res.service_name)
+        --local exec = CexecJobs.new("/bin/bash", cmd, time, res.service_name)
+        local exec = CexecJobs.new("/bin/bash", "sysak memgraph", time, res.service_name)
         exec:addEvents(e)
+        local s = exec:readIn()
+        print("s  "..s)
     end
 
     self._jobs[res.service_name] = diag.block

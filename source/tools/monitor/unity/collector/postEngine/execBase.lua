@@ -41,7 +41,11 @@ function CexecBase:_init_(cmd, args, seconds) -- seconds超时时间
     self._loop = seconds / interval
 
     self._ppid = unistd.getpid()
-    self._pid = exec.run(cmd, args)
+
+    self._fIn, self._fOut = unistd.pipe()
+    assert(self._fIn, "creat pipe failed.")
+
+    self._pid = exec.run(cmd, args, self._fIn, self._fOut)
 end
 
 function CexecBase:addEvents(e)
