@@ -21,7 +21,7 @@ function CurlApi:_init_(frame, que, fYaml)
     ChttpApp._init_(self)
     self._pushLine = CpushLine.new(que)
     local res = system:parseYaml(fYaml)
-    if res.config.url_safe ~= "close" then
+    if res.config.url_safe==nil or res.config.url_safe ~= "close" then
         self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
         self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
         self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
@@ -119,7 +119,7 @@ function CurlApi:diag(tReq)
         local headers = {
             accept = "application/json",
             ["Content-Type"] = "application/json",
-            authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzM2NTA3Mi41NTI5MzU4fQ.AYOiJR2tLuGmzlqvx4vFVZTfyaWX_xImegk9Qo1bJbg"
+            authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzUzNzkxMy41MDI4NTV9.p4hFe5uFZCufMMdOIka1X38V1FRW06eaTPFGpe0MjGQ"
         }
         local service_name = body.service_name
 

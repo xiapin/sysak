@@ -47,7 +47,6 @@ int postQue_post(const char *msg) {
 //    }
     pthread_mutex_lock(&que.mtx);
     if (que.num < UNITY_POSTQUE_NUM) {
-        printf("\nmsgsize  %d\n", len+1);
         que.msgs[que.num] = (char*) malloc(len+1);
         strcpy(que.msgs[que.num], msg);
         que.num ++;

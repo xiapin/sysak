@@ -68,18 +68,18 @@ end
 
 function Cengine:runJobs(e, res, diag)
     print("runjobs")
-    local cmd = {res.jobs.cmd}
+    local cmd = {res.jobs[1].cmd}
     local time = diag.time
     if res.jobs.cmd then
         -- TODO: cmd要加bin/bash之类的
         -- TODO: 调用execBase去诊断，继承一下，改cmd。不用execDiag
         --local exec = CexecJobs.new("/bin/bash", cmd, time, res.service_name)
-        local exec = CexecJobs.new("/bin/bash", "sysak memgraph", time, res.service_name)
+        local exec = CexecJobs.new("/bin/bash", "sysak memgraph ", time, res.service_name)
         exec:addEvents(e)
+        print("11111")
         local s = exec:readIn()
         print("s  "..s)
     end
-
     self._jobs[res.service_name] = diag.block
 end
 
@@ -135,6 +135,7 @@ function Cengine:proc(t, event, msgs)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 
+    print("pushTack")
     self:pushTask(event, msgs)
 end
 
@@ -169,6 +170,7 @@ end
 function Cengine:work(t, event)
     local msgs = postQue.pull()
     if msgs then
+        print("have msgs")
         self:proc(t, event, msgs)
     end
     self:checkDiag()
