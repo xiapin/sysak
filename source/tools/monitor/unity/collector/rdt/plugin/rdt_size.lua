@@ -14,13 +14,17 @@ function rdt_size:proc(elapsed, lines)
     if not unistd.access(self.pFile) then
         return
     end
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> da420a785a7fd6df5483298a5b6910649a0ab723
     CvProc.proc(self)
     -- MB:0=100;1=100
     -- L3:0=fff;1=fff
     for line in io.lines(self.pFile) do
         local arr = pystring:split(line, ":")
-        local type = arr[1]                      -- MB or L3
+        local type = pystring:strip(arr[1], ' ') -- MB or L3
         local info = pystring:split(arr[2], ";") -- 0=100;1=100
 
         for _, resouce in ipairs(info) do
@@ -38,7 +42,11 @@ function rdt_size:proc(elapsed, lines)
             table.insert(values, v)
             local labels = system:deepcopy(self.labels)
             table.insert(labels, { name = "socket", index = socketId })
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> da420a785a7fd6df5483298a5b6910649a0ab723
             self:appendLine(self:_packProto("rdt_alloc_policy", labels, values))
         end
     end

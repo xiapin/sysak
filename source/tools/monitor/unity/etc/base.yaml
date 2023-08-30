@@ -3,7 +3,7 @@ config:
   port: 8400  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
-  daemon: ture
+  daemon: true
   url_safe: close
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     #    mode: curl
@@ -12,9 +12,9 @@ config:
     mode: hostip
   #  real_timestamps: true
   #  unix_socket: "/tmp/sysom_unity.sock"
-  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  proc_path: / # in container mode, like -v /:/mnt/host , should use /mnt/host/
   db:
-    rotate: 7  # tsdb file retention time, unit day
+    rotate: 7 # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
   limit:
     cpu: 30  # unit %
@@ -56,21 +56,34 @@ luaPlugins: ["podmem", "proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc
              "proc_uptime", "proc_arp", "proc_cgroups", "proc_softirqs", "proc_softnet_stat",
 ]
 
+resctrl:
+  path: "sys/fs/resctrl"
+
+  monLuaPlugin: ["rdt_llc_occupancy", "rdt_local_mem_bw", "rdt_total_mem_bw"]
+
+  resLuaPlugin: ["rdt_size"]
+
+  auto: true # search all mon-groups and res-group, it will ignore config arg group
+
+  # group:
+  #   - name: ""
+  #   - name: "LS"
+  #     # monitor: ["mon1", "mon2"]
+  #   - name: "BE"
+  #     monitor: ["pod3#con3"]
+
 plugins:
   - so: kmsg
     description: "collect dmesg info."
-  -
-    so: proc_schedstat
+  - so: proc_schedstat
     description: "collect schedule stat info of percpu"
-  -
-    so: proc_loadavg
+  - so: proc_loadavg
     description: "collect load avg"
   - so: net_health
     description: "tcp net health."
   - so: net_retrans
     description: "tcp retrans monitor."
-  -
-    so: unity_irqoff
+  - so: unity_irqoff
     description: "irqoff:detect irq turned off and can't response"
   -
     so: unity_nosched
@@ -78,8 +91,7 @@ plugins:
   -
     so: gpuinfo
     description: "collect gpuinfo"
-  -
-    so: libimc_latency
+  - so: libimc_latency
     description: "IMC latency and bandwidth"
 
 metrics:
@@ -386,13 +398,23 @@ metrics:
     head: value
     help: "imc latency and bw for socket"
     type: "gauge"
+  - title: sysom_rdt_usage
+    from: rdt_usage
+    head: value
+    help: "RDT LLC and memory bandwidth usage"
+    type: "gauge"
+  - title: sysom_rdt_alloc_policy
+    from: rdt_alloc_policy
+    head: value
+    help: "RDT LLC and memory bandwidth allocation policy"
+    type: "gauge"
 observe:
-  comms:
-    java: "cgroup"
-    mysqld: "cgroup"
-  period: 20000
+    comms:
+        java: "cgroup"
+        mysqld: "cgroup"
+    period: 20000
 
 jobs:
-  memgraph:
-    block: 60
-    time: 30
+    memgraph:
+        block: 60
+        time: 30

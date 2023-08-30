@@ -36,7 +36,7 @@ function cgPmu:_drcName()
 end
 
 function cgPmu:_compName()
-	return {"CPI", "IPC", "MPI", "l3LoadMisRate", 
+	return {"CPI", "MPI", "IPC", "l3LoadMisRate", 
 		"l3StoreMisRate", "l3MisRate"}
 end
 

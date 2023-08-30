@@ -46,27 +46,6 @@
 | iowait | % | iowait百分比 |  | collector/proc\_stat.lua |
 
 
-### cpus 表
-
-* 对应export 指标 sysak\_proc\_cpus
-* 属性标签: mode
-
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :--- | ---: | :---- | :---- | :--- |
-| cpu_name |  | CPU 名称 |  | collector/proc\_stat.lua |
-| softirq | % | 软中断百分比 |  | collector/proc\_stat.lua |
-| user | % | 用户态占用率百分比 |  | collector/proc\_stat.lua |
-| guestnice | % | guestnice百分比 |  | collector/proc\_stat.lua |
-| guest | % |guest百分比 |  | collector/proc\_stat.lua |
-| steal | % |steal百分比 |  | collector/proc\_stat.lua |
-| hardirq | % | 硬中断百分比 |  | collector/proc\_stat.lua |
-| nice | % | nice百分比 |  | collector/proc\_stat.lua |
-| idle | % | idle百分比 |  | collector/proc\_stat.lua |
-| sys | % | sys百分比 |  | collector/proc\_stat.lua |
-| iowait | % | iowait百分比 |  | collector/proc\_stat.lua |
-
-
 ### stat\_counters表
 
 * 对应export 指标 sysak\_proc\_stat\_counters
@@ -93,21 +72,6 @@
 | load5  | - | load5 |  | collector/proc\_load.lua |
 | load10  | - | load10 |  | collector/proc\_load.lua |
 | plit | - | plit |  | collector/proc\_load.lua |
-
-
-### proc\_loadavg 表
-
-* 对应 export 指标： sysak\_proc\_loadavg
-* 属性标签：value
-
-| 指标名      | 单位 | 标签说明 | 备注 | 源码路径 |
-|:---------| ---: | :---- | :---- | :--- |
-| runq | - | rq队列长度 |  | collector/proc\_load.lua |
-| load1  | - | load1 |  | collector/proc\_load.lua |
-| load5  | - | load5 |  | collector/proc\_load.lua |
-| load10  | - | load10 |  | collector/proc\_load.lua |
-| plit | - | plit |  | collector/proc\_load.lua |
-
 
 ### meminfo 表
 
