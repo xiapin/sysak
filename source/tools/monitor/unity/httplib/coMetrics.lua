@@ -128,7 +128,6 @@ function CcoMetrics:pack(body)
         ["Authorization"] = "Basic " .. keys64,
     }
     local heads = self:packCliHeaders(head)
-    print("pack finish")
     return pystring:join("\r\n", {line, heads, body})
 end
 

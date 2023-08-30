@@ -9,6 +9,7 @@ local unistd = require("posix.unistd")
 local cjson = require("cjson.safe")
 local CprotoData = require("common.protoData")
 local CexecBase = require("collector.postEngine.execBase")
+local pwait = require("posix.sys.wait")
 
 local CexecJobs = class("execJobs", CexecBase)
 
@@ -18,6 +19,7 @@ function CexecJobs:_init_(cmd, args, seconds, service_name)
 end
 
 function CexecJobs:readIn()
+    pwait.wait(self._pid)
     return unistd.read(self._fIn, 1024)
 end
 

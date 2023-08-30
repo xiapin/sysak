@@ -84,10 +84,13 @@ local function addContent(content, c, line)
     return c + 1
 end
 
-function ChttpReq:postFormData(Url, fData)
-    local headers = {
-        ["Content-Type"] = "multipart/form-data"
-    }
+function ChttpReq:postFormData(Url, headers, fData)
+    if not headers["accept"] then
+        headers["accept"] = "application/json"
+    end
+    if not headers["Content-Type"] then
+        headers["Content-Type"] = "multipart/form-data"
+    end
 
     local boundary = "----" .. system:randomStr(32)
     local c = 1
@@ -100,14 +103,14 @@ function ChttpReq:postFormData(Url, fData)
             c = addContent(content, c, "")
             c = addContent(content, c, v[2])
         else
-            c = addContent(content, c, string.format('content-disposition: form-data; name="%s"', k))
+            c = addContent(content, c, string.format('Content-Disposition: form-data; name="%s"', k))
             c = addContent(content, c, "")
             c = addContent(content, c, v)
         end
     end
     addContent(content, c, boundary .. "--")
-    local s = table.concat(content, "\n")
-    headers["Content-type"] = string.format("multipart/form-data; boundary=%s", boundary)
+    local s = table.concat(content, "\r\n")
+    headers["Content-Type"] = string.format("multipart/form-data; boundary=%s", boundary)
     return self:post(Url, s, headers)
 end
 

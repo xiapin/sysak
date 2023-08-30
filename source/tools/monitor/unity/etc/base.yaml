@@ -392,7 +392,10 @@ observe:
     mysqld: "cgroup"
   period: 20000
 
-jobs:
-  memgraph:
-    block: 60
-    time: 30
+diagnose:
+  host: ""
+  token: ""
+  jobs:
+    memgraph:
+      block: 60
+      time: 30

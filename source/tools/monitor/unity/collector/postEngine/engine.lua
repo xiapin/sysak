@@ -14,6 +14,7 @@ local cjson = require("cjson.safe")
 local CexecBase = require("collector.postEngine.execBase")
 local CexecDiag = require("collector.postEngine.execDiag")
 local CexecJobs = require("collector.postEngine.execJobs")
+local ChttpReq = require("httplib.httpReq")
 local Cengine = class("engine", CvProto)
 
 local diagExec = {
@@ -23,6 +24,8 @@ local diagExec = {
                                   "/var/log/sysak/iosdiag/hangdetect/result.log.seq"}}},
     net_edge = {block = 5 * 60, time = 60, so = {virtiostat = 5 * 3}},
 }
+
+
 
 function Cengine:_init_(que, proto_q, fYaml, tid)
     CvProto._init_(self, CprotoData.new(que))
@@ -35,8 +38,10 @@ function Cengine:_init_(que, proto_q, fYaml, tid)
     self._resDiag = res.diagnose
     self._diags = {}
 
-    self._fYamlJobs = res.jobs
+    self._fYamlJobs = res.diagnose.jobs
     self._jobs = {}
+    self._auth = res.diagnose.token
+    self._host = res.diagnose.host
 end
 
 function Cengine:setMainloop(main)
@@ -47,12 +52,25 @@ function Cengine:setTask(taskMons)
     self._task = taskMons
 end
 
+function Cengine:postReq(s, data)
+    local req = ChttpReq.new()
+    local url = self._host .. "/api/v1/tasks/sbs_task_result/"
+    local formData = {
+        task_id = data.task_id,
+        result = s
+    }
+    local headers = {
+        accept = "application/json",
+        ["Content-Type"] = "multipart/form-data",
+        authorization = self._auth
+    }
+    req:postFormData(url,headers,formData)
+end
+
 function Cengine:run(e, res, diag)
     local args = res.args
     local second = res.second or diag.time
     if diag.cmd then
-        -- TODO: cmd要加bin/bash之类的
-        -- TODO: 调用execBase去诊断，继承一下，改cmd。不用execDiag
         local exec = CexecDiag.new(diag.cmd, args, second, self._que, diag.report, res.uid)
         exec:addEvents(e)
     end
@@ -67,40 +85,43 @@ function Cengine:run(e, res, diag)
 end
 
 function Cengine:runJobs(e, res, diag)
-    print("runjobs")
-    local cmd = {res.jobs[1].cmd}
-    local time = diag.time
-    if res.jobs.cmd then
-        -- TODO: cmd要加bin/bash之类的
-        -- TODO: 调用execBase去诊断，继承一下，改cmd。不用execDiag
-        --local exec = CexecJobs.new("/bin/bash", cmd, time, res.service_name)
-        local exec = CexecJobs.new("/bin/bash", "sysak memgraph ", time, res.service_name)
-        exec:addEvents(e)
-        print("11111")
-        local s = exec:readIn()
-        print("s  "..s)
+    local cmd = res.jobs[1].cmd
+    local time
+    if diag and diag.time then
+        time = diag.time
+    else
+        time = 30
     end
-    self._jobs[res.service_name] = diag.block
+
+    if cmd then
+        local exec = CexecJobs.new("/bin/bash", {"-c",cmd}, time, res.service_name)
+        --local exec = CexecJobs.new("/bin/bash", {"-c","sysak memgraph"}, time, res.service_name)
+        exec:addEvents(e)
+        local s = exec:readIn()
+        self:postReq(s, res)
+    end
+    if diag and diag.block then
+        self._jobs[res.service_name] = diag.block
+    else
+        self._jobs[res.service_name] = 60
+    end
+
 end
 
 function Cengine:pushTask(e, msgs)
     local events = pystring:split(msgs, '\n')
     for _, msg in ipairs(events) do
         local res = cjson.decode(msg)
-        --TODO: 加一个函数调用,处理postque的data
-        --TODO: 配置yaml，根据service_name设置阻塞和运行时间
+
         local service_name = res.service_name
 
         local cmd = res.cmd
-        if service_name ~= nil and self._fYamlJobs then
+        if service_name ~= nil then
             local diag = self._fYamlJobs[service_name]
-            if diag then
-                system:dumps(diag)
-                if self._jobs[service_name] then
-                    print(service_name .. " is blocking")
-                else
-                    self:runJobs(e,res,diag)
-                end
+            if self._jobs[service_name] then
+                print(service_name .. " is blocking")
+            else
+                self:runJobs(e,res,diag)
             end
 
         elseif cmd == "mon_pid" then
@@ -135,7 +156,6 @@ function Cengine:proc(t, event, msgs)
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
 
-    print("pushTack")
     self:pushTask(event, msgs)
 end
 
@@ -170,7 +190,6 @@ end
 function Cengine:work(t, event)
     local msgs = postQue.pull()
     if msgs then
-        print("have msgs")
         self:proc(t, event, msgs)
     end
     self:checkDiag()

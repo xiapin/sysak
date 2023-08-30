@@ -41,6 +41,7 @@ function CurlApi:_init_(frame, que, fYaml)
     self:_install(frame)
     self:_setupQs(fYaml)
     self._proxy = CasyncHttp.new()
+    self._auth = res.diagnose.token
 end
 
 function CurlApi:_ossIntall(fYaml)
@@ -119,7 +120,7 @@ function CurlApi:diag(tReq)
         local headers = {
             accept = "application/json",
             ["Content-Type"] = "application/json",
-            authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzUzNzkxMy41MDI4NTV9.p4hFe5uFZCufMMdOIka1X38V1FRW06eaTPFGpe0MjGQ"
+            authorization = self._auth
         }
         local service_name = body.service_name
 
