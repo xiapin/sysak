@@ -18,7 +18,7 @@ local headers = {
     --authorization = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsImV4cCI6MTY5MzA0MzYwMi43NDc1NDh9.pm78vETkFeR8xX-TFA4ROVjVzO_VlfUuwUA3TzTxpfA"
 }
 local body = {
-    service_name = "memgraph",
+    service_name = "iofsstat",
     params = {
         instance= "127.0.0.1"
     }

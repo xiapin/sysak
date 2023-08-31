@@ -5,7 +5,7 @@ import random
 import json
 
 def post_test(d):
-    url = "http://127.0.0.1:3350/api/sql"
+    url = "http://127.0.0.1:8400/api/sql"
     res = requests.post(url, json=d)
     ret = res.content.decode()
     print(ret)
