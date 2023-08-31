@@ -73,7 +73,7 @@ plugins:
     description: "irqoff:detect irq turned off and can't response"
   - so: gpuinfo
     description: "collect gpuinfo"
-  - so: libimc_latency
+  - so: uncore_imc
     description: "IMC latency and bandwidth"
 
 metrics:
@@ -257,15 +257,20 @@ metrics:
     head: value
     help: "net stat net_tcp_ext_count"
     type: "gauge"
-  - title: sysom_imc_latency_channel
-    from: imc_channel_latency
+  - title: sysom_imc_event_channel
+    from: imc_channel_event
     head: value
     help: "imc latency and bw for channels"
     type: "gauge"
-  - title: sysom_imc_latency_socket
-    from: imc_socket_latency
+  - title: sysom_imc_event_socket
+    from: imc_socket_event
     head: value
     help: "imc latency and bw for socket"
+    type: "gauge"
+  - title: sysom_imc_event_node
+    from: imc_node_event
+    head: value
+    help: "imc latency and bw for node"
     type: "gauge"
   - title: sysom_rdt_usage
     from: rdt_usage

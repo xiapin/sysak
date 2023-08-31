@@ -1,8 +1,8 @@
 CC := gcc
 CFLAG := -g -fpic
 LDFLAG := -g -fpic -shared
-OBJS := imc_latency.o
-SO := libimc_latency.so
+OBJS := uncore_imc.o
+SO := libuncore_imc.so
 
 all: $(SO) install
 

@@ -408,19 +408,35 @@ This table show the hist of the latency of direct memory compaction
 | llc_miss_rate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
 | llc_cache_mpi | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
 
-### imc_socket_latency 表
 
-| 指标名 | 单位 | 标签说明              | 备注 | 源码路径                                    |
-| :----- | ---- | :-------------------- | :--- | :------------------------------------------ |
-| rlat   | ns   | imc read ddr latency  |  socket级    | collector/plugin/imc_latency/imc\_latency.c |
-| wlat   | ns   | imc write ddr latency |  socket级    | collector/plugin/imc_latency/imc\_latency.c |
+### imc_node_event 表
 
-### imc_channel_latency 表
+| 指标名 | 单位 | 标签说明              | 备注   | 源码路径                                 |
+| :----- | ---- | :-------------------- | :----- | :--------------------------------------- |
+| rlat   | ns   | imc read ddr latency  | node级 | collector/plugin/uncore_imc/uncore_imc.c |
+| wlat   | ns   | imc write ddr latency | node级 | collector/plugin/uncore_imc/uncore_imc.c |
+| avglat | ns   | imc avg ddr latency   | node级 | collector/plugin/uncore_imc/uncore_imc.c |
 
-| 指标名 | 单位 | 标签说明              | 备注 | 源码路径                                    |
-| :----- | ---- | :-------------------- | :--- | :------------------------------------------ |
-| rlat   | ns   | imc read ddr latency  | channel级     | collector/plugin/imc_latency/imc\_latency.c |
-| wlat   | ns   | imc write ddr latency | channel级     | collector/plugin/imc_latency/imc\_latency.c |
+### imc_socket_event 表
+
+| 指标名 | 单位 | 标签说明              | 备注     | 源码路径                                 |
+| :----- | ---- | :-------------------- | :------- | :--------------------------------------- |
+| rlat   | ns   | imc read ddr latency  | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| wlat   | ns   | imc write ddr latency | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| avglat | ns   | imc avg ddr latency   | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_rd  | byte | imc read bandwidth    | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_wr  | byte | imc write bandwidth   | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+
+### imc_channel_event 表
+
+| 指标名 | 单位 | 标签说明              | 备注      | 源码路径                                 |
+| :----- | ---- | :-------------------- | :-------- | :--------------------------------------- |
+| rlat   | ns   | imc read ddr latency  | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| wlat   | ns   | imc write ddr latency | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| avglat | ns   | imc avg ddr latency   | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_rd  | byte | imc read bandwidth    | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_wr  | byte | imc write bandwidth   | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+
 
 ### rdt_usage 表
 
