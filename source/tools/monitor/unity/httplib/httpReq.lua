@@ -92,11 +92,11 @@ function ChttpReq:postFormData(Url, headers, fData)
         headers["Content-Type"] = "multipart/form-data"
     end
 
-    local boundary = "----" .. system:randomStr(32)
+    local boundary = system:randomStr(32)
     local c = 1
     local content = {}
     for k, v in pairs(fData) do
-        c = addContent(content, c, boundary)   -- add boundary
+        c = addContent(content, c, "--" .. boundary)   -- add boundary
         if type(v) == "table" then -- file: name, stream, type
             c = addContent(content, c, string.format('Content-Disposition: form-data; name="%s"; filename="%s"', k, v[1]))
             c = addContent(content, c, string.format('Content-Type: %s', v[3]))
@@ -108,7 +108,7 @@ function ChttpReq:postFormData(Url, headers, fData)
             c = addContent(content, c, v)
         end
     end
-    addContent(content, c, boundary .. "--")
+    addContent(content, c, "--" .. boundary .. "--")
     local s = table.concat(content, "\r\n")
     headers["Content-Type"] = string.format("multipart/form-data; boundary=%s", boundary)
     return self:post(Url, s, headers)

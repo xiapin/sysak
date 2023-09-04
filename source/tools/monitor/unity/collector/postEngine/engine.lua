@@ -57,7 +57,7 @@ function Cengine:postReq(s, data)
     local url = self._host .. "/api/v1/tasks/sbs_task_result/"
     local formData = {
         task_id = data.task_id,
-        result = s
+        results = s
     }
     local headers = {
         accept = "application/json",

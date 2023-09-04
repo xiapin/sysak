@@ -6,3 +6,5 @@
 5. [bpf\ map 开发](/guide/bpf.md)
 6. [bpf perf 开发](/guide/bpf_perf.md)
 7. [外部行协议写入](/guide/outLine.md)
+8. [数据查询接口](/guide/dataquery.md)
+9. [诊断接口](/guide/diagnose.md)

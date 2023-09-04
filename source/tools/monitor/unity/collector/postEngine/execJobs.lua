@@ -20,7 +20,7 @@ end
 
 function CexecJobs:readIn()
     pwait.wait(self._pid)
-    return unistd.read(self._fIn, 1024)
+    return unistd.read(self._fIn, 10240)
 end
 
 

@@ -400,6 +400,7 @@
 * 属性标签：value
 
 This table show the hist of the latency of direct memory reclamation
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | memDrcm_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
@@ -438,6 +439,7 @@ This table show the hist of the latency of direct memory reclamation
 * 属性标签：value
 
 This table show the hist of the latency of direct memory compaction
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | memDcmp_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
