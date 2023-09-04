@@ -16,7 +16,7 @@ config:
     budget: 200 # max query buffer from tsdb.
   limit:
     cpu: 30 # unit %
-    mem: 50 # unit mb
+    mem: 100 # unit mb
     tasks: 10 # monitor 10 pid max.
 
 outline:
@@ -75,6 +75,8 @@ plugins:
     description: "collect gpuinfo"
   - so: uncore_imc
     description: "IMC latency and bandwidth"
+  - so: pmu_events
+    description: "collect pmu events"
 
 metrics:
   - title: sysom_proc_cpu_total
@@ -281,4 +283,14 @@ metrics:
     from: rdt_alloc_policy
     head: value
     help: "RDT LLC and memory bandwidth allocation policy"
+    type: "gauge"
+  - title: sysom_pmu_events
+    from: pmu_events
+    head: value
+    help: "pmu events, such as  cycles/instructions, llc events"
+    type: "gauge"
+  - title: sysom_pmu_events_percpu
+    from: pmu_events_percpu
+    head: value
+    help: "pmu events of percpu"
     type: "gauge"
