@@ -39,16 +39,16 @@ const char *argp_program_version = "tracesig 0.1";
 const char argp_program_doc[] =
 "Catch the delay of a syscall more than threshold.\n"
 "\n"
-"USAGE: tracesig [--help] <[-f a.log]> \n"
+"USAGE: tracesig [--help] <[-f a.log]> duration\n"
 "\n"
 "EXAMPLES:\n"
 "    tracesig            # run forever, detect delay more than 10ms(default)\n"
+"    tracesig 10         # run for 10 seconds\n"
 "    tracesig -c bash    # check the victim who's name is bash\n"
 "    tracesig -f a.log   #save the log to a.log\n";
 
 static const struct argp_option opts[] = {
 	{ "file", 'f', "FILE", 0, "log file"},
-	{ "span", 's', "SPAN", 0, "How long to run"},
 	{ "comm", 'c', "COMM", 0, "Name of the victim"},
 	{ "verbose", 'v', NULL, 0, "Verbose debug output" },
 	{ NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help" },
