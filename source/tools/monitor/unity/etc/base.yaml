@@ -91,8 +91,10 @@ plugins:
   -
     so: gpuinfo
     description: "collect gpuinfo"
-  - so: libimc_latency
+  - so: uncore_imc
     description: "IMC latency and bandwidth"
+  - so: pmu_events
+    description: "collect pmu events"
 
 metrics:
   - title: sysom_java_app
@@ -333,42 +335,42 @@ metrics:
     head: value
     help: "file cache for pod"
     type: "gauge"
-  - title: sysom_cg_memfail_cnt
+  - title: sysom_container_memfail_cnt
     from: cg_memfail_cnt
     head: value
-    help: "sysom_cg_memFail_cnt"
+    help: "sysom_container_memFail_cnt"
     type: "gauge"
-  - title: sysom_cg_memUtil
+  - title: sysom_container_memUtil
     from: cg_memory_util
     head: value
-    help: "sysom_cg_memory_util"
+    help: "sysom_container_memory_util"
     type: "gauge"
-  - title: sysom_cg_memgdrcm_latency
+  - title: sysom_container_memgdrcm_latency
     from: cgGlbDrcmLatency
     head: value
     help: "sysom global memory latency"
     type: "gauge"
-  - title: sysom_cg_memdrcm_latency
+  - title: sysom_container_memdrcm_latency
     from: cg_memdrcm_latency
     head: value
-    help: "sysom_cg_memdrcm_latency"
+    help: "sysom_container_memdrcm_latency"
     type: "gauge"
-  - title: sysom_cg_memmcmp_latency
+  - title: sysom_container_memmcmp_latency
     from: cg_memmcmp_latency
     head: value
-    help: "sysom_cg_memmcmp_latency"
+    help: "sysom_container_memmcmp_latency"
     type: "gauge"
-  - title: sysom_cg_cpu_stat
+  - title: sysom_container_cpu_stat
     from: cg_cpu_stat
     head: value
-    help: "sysom_cg_cpu_stat"
+    help: "sysom_container_cpu_stat"
     type: "gauge"
-  - title: sysom_cg_cpuacct_stat
+  - title: sysom_container_cpuacct_stat
     from: cg_cpuacct_stat
     head: value
     help: "cpuacct/cpuacct.stat"
     type: "gauge"
-  - title: sysom_cg_cfs_quota
+  - title: sysom_container_cfs_quota
     from: cgCpuQuota
     head: value
     help: "cfs quota"
@@ -378,12 +380,12 @@ metrics:
     head: value
     help: "network stat of containers"
     type: "gauge"
-  - title: sysom_cg_blkio_stat
+  - title: sysom_container_blkio_stat
     from: cg_blkio_stat
     head: value
     help: "io stat from blkio cgroup"
     type: "gauge"
-  - title: sysom_cg_cpuacct_wait_latency
+  - title: sysom_container_cpuacct_wait_latency
     from: cg_wait_latency
     head: value
     help: "wait_latency of cgroups"
@@ -393,10 +395,15 @@ metrics:
     head: value
     help: "imc latency and bw for channels"
     type: "gauge"
-  - title: sysom_imc_latency_socket
-    from: imc_socket_latency
+  - title: sysom_imc_event_socket
+    from: imc_socket_event
     head: value
     help: "imc latency and bw for socket"
+    type: "gauge"
+  - title: sysom_imc_event_node
+    from: imc_node_event
+    head: value
+    help: "imc latency and bw for node"
     type: "gauge"
   - title: sysom_rdt_usage
     from: rdt_usage
@@ -408,6 +415,17 @@ metrics:
     head: value
     help: "RDT LLC and memory bandwidth allocation policy"
     type: "gauge"
+  - title: sysom_pmu_events
+    from: pmu_events
+    head: value
+    help: "pmu events, such as  cycles/instructions, llc events"
+    type: "gauge"
+  - title: sysom_pmu_events_percpu
+    from: pmu_events_percpu
+    head: value
+    help: "pmu events of percpu"
+    type: "gauge"
+
 observe:
     comms:
         java: "cgroup"

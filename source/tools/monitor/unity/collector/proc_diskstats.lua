@@ -4,7 +4,7 @@
 --- DateTime: 2022/12/16 11:49 PM
 ---
 
-require("common.class")
+require("common.class")   
 local system = require("common.system")
 local CvProc = require("collector.vproc")
 
@@ -14,14 +14,15 @@ function CprocDiskstats:_init_(proto, pffi, mnt, pFile)
     CvProc._init_(self, proto, pffi, mnt, pFile or "proc/diskstats")
     self._lastData = {}
     self._lastDisk = {}
-    self._diskVNum = 11
+    self._diskVNum = 15
 end
 
 function CprocDiskstats:_diskIndex()
     return {
         "reads", "rmerge", "rkb", "rmsec",
         "writes", "wmerge", "wkb", "wmsec",
-        "inflight", "time", "backlog"
+        "inflight", "time", "backlog",
+        "discards", "dmerge", "dkb", "dmsec"
     }
 end
 
@@ -29,11 +30,13 @@ function CprocDiskstats:_diffIndex()
     return {
         "reads", "rmerge", "rkb", "rmsec",
         "writes", "wmerge", "wkb", "wmsec",
+        "discards", "dmerge", "dkb", "dmsec",
         "backlog", "xfers"
     }
 end
 
 -- "reads", "rmerge", "rkb", "rmsec", "writes", "wmerge", "wkb", "wmsec",  "inflight", "time", "backlog"
+-- "discards", "dmerge", "dkb", "dmsec"
 function CprocDiskstats:_getNewValue(data)
     local now = {}
     local index = self:_diskIndex()
@@ -44,6 +47,8 @@ function CprocDiskstats:_getNewValue(data)
 
     now["rkb"] = now["rkb"] / 2  -- sectors = 512 bytes
     now['wkb'] = now['wkb'] / 2
+    now['dkb'] = now['dkb'] / 2
+
     now['xfers'] = now['reads'] + now['writes']
     if now['xfers'] == 0 then
         now['bsize'] = 0
@@ -89,6 +94,48 @@ function CprocDiskstats:_calcDiff(disk_name, now, last, elapsed)
         value = (now["time"] - last["time"]) / elapsed
     }
     table.insert(protoTable.vs, cell)
+
+    local read_lat = 0
+    if now["reads"] - last["reads"] == 0 
+    then
+        read_lat = 0
+    else
+        read_lat = (now["rmsec"] - last["rmsec"]) / (now["reads"] - last["reads"])
+    end
+
+    cell = {
+        name = "read_lat",
+        value = read_lat
+    }
+    table.insert(protoTable.vs, cell)
+
+    local write_lat = 0
+    if now["writes"] - last["writes"] == 0 
+    then
+        write_lat = 0
+    else
+        write_lat = (now["wmsec"] - last["wmsec"]) / (now["writes"] - last["writes"])
+    end
+
+    cell = {
+        name = "write_lat",
+        value = write_lat
+    }
+    table.insert(protoTable.vs, cell)
+
+    local discard_lat = 0
+    if now["discards"] - last["discards"] == 0 
+    then
+        discard_lat = 0
+    else
+        discard_lat = (now["dmsec"] - last["dmsec"]) / (now["discards"] - last["discards"])
+    end
+    cell = {
+        name = "discard_lat",
+        value = discard_lat
+    }
+    table.insert(protoTable.vs, cell)
+
     self:appendLine(protoTable)
 end
 
@@ -113,18 +160,18 @@ function CprocDiskstats:checkLastDisks()
 end
 
 function CprocDiskstats:_proc(line, elapsed)
-    local data = self._ffi.new("var_string_t")
+    local data = self._ffi.new("var_string_t") 
     assert(self._cffi.var_input_string(self._ffi.string(line), data) == 0)
-    assert(data.no >= 14)
+    assert(data.no >= 14) 
 
-    local disk_name = self._ffi.string(data.s[2])
+    local disk_name = self._ffi.string(data.s[2]) 
     self:_calcDisk(disk_name, data, elapsed)
 end
 
 function CprocDiskstats:proc(elapsed, lines)
     CvProc.proc(self)
-    for line in io.lines(self.pFile) do
-        self:_proc(line, elapsed)
+    for line in io.lines(self.pFile) do 
+        self:_proc(line, elapsed) 
     end
     self:checkLastDisks()
     self:push(lines)
