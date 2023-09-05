@@ -129,7 +129,30 @@ res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
 
+## filecache
+
+### 需要的参数
+instance：诊断的实例IP
+
+value：需要诊断的容器ID,Pod名,cgroup
+
+type：需要诊断的类型(容器,POD,cgroup, host, all(所有容器))
+
+### 诊断示例
+```python
+import json
+import requests
+
+url = "http://127.0.0.1:8400/api/diag"
+params = {"instance" : "127.0.0.1", "value" : "30001a90d0ff", "type" : "container"}
+body = {"service_name": "filecache", "params": params}
+data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+res = requests.post(url, data=json.dumps(data))
+print(res.content, res)
+```
+
 ## oomcheck
+### 需要的参数
 instance：诊断的实例IP
 
 time：需要诊断OOM的时间点，默认为最近一次
@@ -185,7 +208,7 @@ import json
 import requests
 
 url = "http://127.0.0.1:8400/api/diag"
-params = {"origin_instance" : "127.0.0.1", "target_instance" : "192.168.0.1", "pack_num" : 5, "time_gap" : 10, "type" : "icmp"}
+params = {"origin_instance" : "127.0.0.1", "target_instance" : "192.168.0.1", "pkg_num" : 5, "time_gap" : 10, "type" : "icmp"}
 body = {"service_name": "pingtrace", "params": params}
 data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
 res = requests.post(url, data=json.dumps(data))
@@ -246,7 +269,7 @@ import json
 import requests
 
 url = "http://127.0.0.1:8400/api/diag"
-params = {"instance" : "127.0.0.1", "timeout" : 5}
+params = {"instance" : "127.0.0.1", "timeout" : 1}
 body = {"service_name": "taskprofile", "params": params}
 data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
 res = requests.post(url, data=json.dumps(data))
