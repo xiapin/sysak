@@ -23,7 +23,7 @@ struct env {
 	.threshold = 50*1000*1000,	/* 10ms */
 };
 
-static int nr_cpus;
+static int nr_cpus, irqoff_live;
 struct sched_jit_summary summary, prev;
 struct bpf_link **sw_mlinks, **hw_mlinks= NULL;
 
@@ -169,11 +169,12 @@ int init(void *arg)
 {
 	int err;
 
+	irqoff_live = 0;
 	nr_cpus = libbpf_num_possible_cpus();
 	if (nr_cpus < 0) {
 		fprintf(stderr, "failed to get # of possible cpus: '%s'!\n",
 			strerror(-nr_cpus));
-		return nr_cpus;
+		return 0;
 	}
 
 	bump_memlock_rlimit1();
@@ -182,7 +183,7 @@ int init(void *arg)
 	if (!sw_mlinks) {
 		err = errno;
 		fprintf(stderr, "failed to alloc sw_mlinks or rlinks\n");
-		return err;
+		return 0;
 	}
 
 	hw_mlinks = calloc(nr_cpus, sizeof(*hw_mlinks));
@@ -190,18 +191,18 @@ int init(void *arg)
 		err = errno;
 		fprintf(stderr, "failed to alloc hw_mlinks or rlinks\n");
 		free(sw_mlinks);
-		return err;
+		return 0;
 	}
 
 	unity_irqoff = unity_irqoff_bpf__open_and_load();
 	if (!unity_irqoff) {
 		err = errno;
 		fprintf(stderr, "failed to open and/or load BPF object\n");
-		return err;
+		return 0;
 	}
 
 	irqoff_handler(arg, unity_irqoff);
-
+	irqoff_live = 1;
 	return 0;
 }
 #define delta(sum, value)	\
@@ -210,6 +211,8 @@ int call(int t, struct unity_lines *lines)
 {
 	struct unity_line *line;
 
+	if (!irqoff_live)
+		return 0;
 	unity_alloc_lines(lines, 1);
 	line = unity_get_line(lines, 0);
 	unity_set_table(line, "sched_moni_jitter");
