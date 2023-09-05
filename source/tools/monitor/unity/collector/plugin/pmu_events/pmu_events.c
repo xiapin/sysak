@@ -31,15 +31,15 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 	return ret;
 }
 
-static void bump_memlock_rlimit(void)
+static void bump_nofile_rlimit(void)
 {
 	struct rlimit rlim_new = {
 		.rlim_cur	= RLIM_INFINITY,
 		.rlim_max	= RLIM_INFINITY,
 	};
 
-	if (setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
-		fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
+	if (setrlimit(RLIMIT_NOFILE, &rlim_new)) {
+		fprintf(stderr, "Failed to increase RLIMIT_NOFILE limit!\n");
 		exit(1);
 	}
 }
@@ -64,7 +64,7 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 	leader = NULL;
 	group_leader = -1;
 	j = 0;
-	bump_memlock_rlimit();
+	bump_nofile_rlimit();
 	group_last = groupidx[0];
 	for (i = 0; i < NR_EVENTS; i++) {
 		/* The next PERF types */

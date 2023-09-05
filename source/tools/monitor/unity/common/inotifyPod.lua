@@ -61,7 +61,7 @@ function CinotifyPod:RemoveDeletePodWatch(events)
 		-- add another check in line 73 to filter creation temporary
 		if bit.band(event.mask, inotify.IN_DELETE) then 
 			for wd, kube_path in pairs(self._kpp_map) do
-				if event.wd == wd and event.name then
+				if event.wd == wd then
 					local d_path = kube_path .. "/" .. event.name .. "/"
 					--print("delete_pod_path: " .. d_path)
 					table.insert(dp_paths, d_path)
