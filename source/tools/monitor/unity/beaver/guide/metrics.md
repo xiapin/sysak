@@ -372,7 +372,30 @@ This table show the hist of the latency of direct memory reclamation
 | memDrcm_lat_100to500ms | - | times 100to500ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
 | memDrcm_lat_500to1000ms | - | times 500msto1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
 | memDrcm_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
- 
+
+### cg_blkio_stat 表
+
+* 对应 export 指标： sysom\_
+* 属性标签：value
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| writes_service_bytes | byte | 容器中写字节数 | device对应容器进行IO的块设备名  | collector/container/cg\_blkio\_stat.lua | 
+| reads_service_bytes | byte | 容器中读字节数 |  | collector/container/cg\_blkio\_stat.lua | 
+| total_service_bytes | byte | 容器所有IO操作（read, write, sync, async）的字节数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_serviced | I/Os | 容器中写IO个数 |  | collector/container/cg\_blkio\_stat.lua | 
+| reads_serviced | I/Os| 容器中读IO个数|  | collector/container/cg\_blkio\_stat.lua | 
+| total_serviced | I/Os | 容器中所有IO操作（read, write, sync, async）的个数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_bytes_queued | byte |  容器中写排队的IO字节数 | | collector/container/cg\_blkio\_stat.lua | 
+| reads_bytes_queued | byte | 容器中读排队的IO字节数|  | collector/container/cg\_blkio\_stat.lua | 
+| total_bytes_queued | byte | 容器所有IO操作（read, write, sync, async）的排队字节数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_io_queued | I/Os |  容器中写排队IO个数 || collector/container/cg\_blkio\_stat.lua | 
+| reads_io_queued | I/Os | 容器中读排队IO个数|  | collector/container/cg\_blkio\_stat.lua | 
+| total_io_queued | I/Os | 容器中对所有IO操作（read, write, sync, async）排队个数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_wait_time | ns |  容器中写I/O在调度队列中等待的时间 || collector/container/cg\_blkio\_stat.lua | 
+| reads_wait_time | ns | 容器中读I/O在调度队列中等待的时间|  | collector/container/cg\_blkio\_stat.lua | 
+| total_wait_time | ns | 容器中对所有IO操作（read, write, sync, async）在调度队列中等待的时间 |  | collector/container/cg\_blkio\_stat.lua |
+
 ### cg_memmcmp_latency 表
 
 * 对应 export 指标： sysak\_
@@ -452,3 +475,14 @@ This table show the hist of the latency of direct memory compaction
 | :----- | ---- | :--------------- | :--------------------- | :-------------------------------- |
 | MB     |      | 内存带宽分配比例 | MB（Memory Bandwidth） | collector/rdt/plugin/rdt_size.lua |
 | L3     | byte | llc分配size      |                        | collector/rdt/plugin/rdt_size.lua |
+
+### con_net_stat 表
+
+| 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
+| :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
+| net_rx_bytes     | byte | 容器对应网口接收字节数   | interface对应容器中的网口（如eth0）| collector/container/con_net_stat.lua |
+| net_rx_packets | packet   | 容器对应网口接收数据包数                |      | collector/container/con_net_stat.lua  |
+| net_rx_dropped | packet   | 容器对应网口接收端丢包数 |      | collector/container/con_net_stat.lua  |
+| net_tx_bytes     | byte | 容器对应网口发送字节数               |      | collector/container/con_net_stat.lua |
+| net_tx_packets | packet   | 容器对应网口发送数据包数                |      | collector/container/con_net_stat.lua  |
+| net_tx_dropped | packet   | 容器对应网口发送端丢包数 |      | collector/container/con_net_stat.lua  |

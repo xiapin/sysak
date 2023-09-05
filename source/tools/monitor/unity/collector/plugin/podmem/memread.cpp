@@ -420,7 +420,7 @@ char* scanall()
     char *outputres = NULL;
     
     opt.rate = 100;
-    opt.top = 10;
+    opt.top = 5;
     int count = memcg_cgroup_file(filename);
     if (count < 0)
           return NULL;

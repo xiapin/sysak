@@ -49,6 +49,9 @@ end
 
 function CPodMem:get_allcons()
     local cri_cons = podman:getAllcons(self.root_fs)
+    if cri_cons == nil then
+        return -1
+    end
     for _,v in pairs(cri_cons) do
         if not self.blacklist[v['pod']['namespace']] then
             local path =  self.root_fs .. "/sys/fs/cgroup/memory/" .. v['path']
@@ -57,6 +60,7 @@ function CPodMem:get_allcons()
             self.inodes[inode] = v['name']..v['pod']['name']
         end
     end
+    return 0
 end
 
 function CPodMem:proc(elapsed, lines)
@@ -64,7 +68,10 @@ function CPodMem:proc(elapsed, lines)
     self.allcons = {}
     self.inodes = {}
     self.podmemres = {}
-    self:get_allcons()
+    local res = self:get_allcons()
+    if res == -1 then
+        return
+    end
     -- for k,v in pairs(self.inodes) do print(k,v) end
     -- for k,v in pairs(self.allcons) do for k1,v1 in pairs(v) do print(k,k1,v1) end end
     local fs = io.open("/tmp/.memcg.txt", "w")
