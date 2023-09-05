@@ -79,7 +79,7 @@ local function tryConnect(fd, tConn)
         if errno == 115 then
             return 1
         else
-            print(string.format("socket connect failed, report:%d, %s", err, errno))
+            print(string.format("socket connect failed, report:%d, %s", errno, err))
             return
         end
     else

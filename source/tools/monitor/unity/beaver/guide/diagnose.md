@@ -25,7 +25,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "timeout" : 5, "threshold" : 10}
 body = {"service_name": "iohang", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -45,7 +45,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "timeout" : 5}
 body = {"service_name": "iofsstat", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -68,7 +68,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "timeout" : 5, "threshold" : 10}
 body = {"service_name": "iolatency", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -88,7 +88,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "time" : 5}
 body = {"service_name": "jitter", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -106,7 +106,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1"}
 body = {"service_name": "loadtask", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -124,7 +124,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1"}
 body = {"service_name": "memgraph", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -146,7 +146,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "value" : "30001a90d0ff", "type" : "container"}
 body = {"service_name": "filecache", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -165,7 +165,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1"}
 body = {"service_name": "oomcheck", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -185,7 +185,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "time" : 5}
 body = {"service_name": "packetdrop", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -210,7 +210,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"origin_instance" : "127.0.0.1", "target_instance" : "192.168.0.1", "pkg_num" : 5, "time_gap" : 10, "type" : "icmp"}
 body = {"service_name": "pingtrace", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -231,7 +231,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "time" : 5}
 body = {"service_name": "retran", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -251,7 +251,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "time" : 5}
 body = {"service_name": "schedmoni", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
@@ -271,7 +271,7 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "timeout" : 1}
 body = {"service_name": "taskprofile", "params": params}
-data = {"host" : "192.168.0.121", "uri": "/api/v1/tasks/sbs_task_create/", "body": body}
+data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
