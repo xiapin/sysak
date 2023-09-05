@@ -46,8 +46,6 @@ typedef struct channel_record {
     uint64_t wpq_ins;
     uint64_t cas_rd;
     uint64_t cas_wr;
-    uint64_t cas_bw_rd;
-    uint64_t cas_bw_wr;
     double read_latency;
     double write_latency;
     double avg_latency;
@@ -61,8 +59,6 @@ typedef struct socket_record {
     uint64_t wpq_ins;
     uint64_t cas_rd;
     uint64_t cas_wr;
-    uint64_t cas_bw_rd;
-    uint64_t cas_bw_wr;
     double read_latency;
     double write_latency;
     double avg_latency;
@@ -696,7 +692,7 @@ void read_imc() {
     }
 
     if (before_ts) {
-#define UINT48_MAX 281474976710655U   /* (1 << 48) - 1 */
+#define UINT48_MAX 281474976710655U /* (1 << 48) - 1 */
 #define LAT(dest, occ, ins, speed) dest = (occ) / (ins) / (speed);
 #define DELTA(val1, val2) \
     (val1) >= (val2) ? (val1) - (val2) : UINT48_MAX - (val2) + (val1);
@@ -731,8 +727,8 @@ void read_imc() {
                 uint64_t delta_rd =
                     DELTA(after_channel_ev->cas_rd, before_channel_ev->cas_rd);
 
-                after_channel_ev->cas_bw_rd = delta_rd * 64;
-                after_channel_ev->cas_bw_wr = delta_wr * 64;
+                after_channel_ev->cas_rd = delta_rd;
+                after_channel_ev->cas_wr = delta_wr;
 
                 LAT(after_channel_ev->read_latency, delta_rpqocc, delta_rpqins,
                     dram_speed);
@@ -762,9 +758,6 @@ void read_imc() {
                 after_socket_ev->wpq_occ + after_socket_ev->rpq_occ,
                 after_socket_ev->wpq_ins + after_socket_ev->rpq_ins,
                 dram_speed);
-
-            after_socket_ev->cas_bw_wr = after_socket_ev->cas_wr * 64;
-            after_socket_ev->cas_bw_rd = after_socket_ev->cas_rd * 64;
         }
         LAT(after_node->read_latency, after_node->rpq_occ, after_node->rpq_ins,
             dram_speed);
@@ -783,8 +776,8 @@ void print_socket(socket_record *rec) {
         "rpq_occ=%ld rpq_ins=%ld wpq_occ=%ld wpq_ins=%ld dram_clocks=%ld "
         "r_latency=%lf w_latency=%lf avg_latency=%lf, bw_rd=%ld, bw_wr=%ld\n",
         rec->rpq_occ, rec->rpq_ins, rec->wpq_occ, rec->wpq_ins, rec->dram_clock,
-        rec->read_latency, rec->write_latency, rec->avg_latency, rec->cas_bw_rd,
-        rec->cas_bw_wr);
+        rec->read_latency, rec->write_latency, rec->avg_latency, rec->cas_rd,
+        rec->cas_wr);
 }
 
 void print_channel(channel_record *rec) {
@@ -850,9 +843,9 @@ int call(int t, struct unity_lines *lines) {
         unity_set_value(line, 2, "avglat",
                         after.socket_record_arr[socket_id].avg_latency);
         unity_set_value(line, 3, "bw_rd",
-                        after.socket_record_arr[socket_id].cas_bw_rd);
-        unity_set_value(line, 4, "br_wr",
-                        after.socket_record_arr[socket_id].cas_bw_wr);
+                        after.socket_record_arr[socket_id].cas_rd * 64);
+        unity_set_value(line, 4, "bw_wr",
+                        after.socket_record_arr[socket_id].cas_wr * 64);
 
         for (channel_id = 0; channel_id < env.nr_channel; channel_id++) {
             char channel_name[32];
@@ -877,12 +870,14 @@ int call(int t, struct unity_lines *lines) {
                                 .avg_latency);
             unity_set_value(line, 3, "bw_rd",
                             after.socket_record_arr[socket_id]
-                                .channel_record_arr[channel_id]
-                                .cas_bw_rd);
+                                    .channel_record_arr[channel_id]
+                                    .cas_rd *
+                                64);
             unity_set_value(line, 4, "bw_wr",
                             after.socket_record_arr[socket_id]
-                                .channel_record_arr[channel_id]
-                                .cas_bw_wr);
+                                    .channel_record_arr[channel_id]
+                                    .cas_wr *
+                                64);
         }
     }
 
