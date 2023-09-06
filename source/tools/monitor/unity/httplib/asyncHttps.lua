@@ -81,7 +81,7 @@ function CasyncHttps:_put(fd)
     self:procSSLStream(fd, stream, toWake)
 end
 
-function CasyncHttp:_post(fd)
+function CasyncHttps:_post(fd)
     local toWake, domain, uri, headers, body, connecting = coroutine.yield()
 
     local handle = self:httpPre(fd, connecting, toWake)
