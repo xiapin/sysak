@@ -14,7 +14,7 @@ local blkMetrics = {
         metrics = "serviced" 
     },
     {
-        path = "//blkio.throttle.total_bytes_queued",
+        path = "/blkio.throttle.total_bytes_queued",
         metrics = "bytes_queued"
     },
     {
@@ -63,7 +63,7 @@ function CgBlkIoStat:_proc(line, metrics, tableName)
     local vs = {}
     local label = self:copyTable(self.ls)
     local cells = pystring:split(line)
-    -- skip last line
+    -- skip last line(容器启动后未做任何IO操作，cgroup中会没有数据导致本轮采集没有数据)
     if #cells == 2 then goto exit end
 
     local op = cells[2]
