@@ -275,3 +275,22 @@ data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)
 ```
+## jruntime
+
+### 需要的参数
+instance:需要诊断的实例IP
+
+nums：要诊断的进程数量，但是格式为字符串
+
+### 诊断示例
+```python
+import json
+import requests
+
+url = "http://127.0.0.1:8400/api/diag"
+params = {"instance" : "127.0.0.1", "nums" : "3"}
+body = {"service_name": "jruntime", "params": params}
+data = {"body": body}
+res = requests.post(url, data=json.dumps(data))
+print(res.content, res)
+```
