@@ -17,7 +17,7 @@ function CpodsAll:setupPlugins()
         if con.pod then    -- k8s environment
             ls = {
                 {
-                    name = "podname",
+                    name = "pod",
                     index = con.pod.name,
                 },
                 {
@@ -25,7 +25,7 @@ function CpodsAll:setupPlugins()
                     index = con.name.."-"..string.sub(con.id,0,4),
                 },
                 {
-                    name = "podns",
+                    name = "namespace",
                     index = con.pod.namespace,
                 },
             }
