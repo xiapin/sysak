@@ -67,5 +67,13 @@ observe:  # 数据观测设置
     mysqld: "cgroup"
     ···
   period: 60  # 监测进程的刷新间隔
+ 
+diagnose:  # 诊断功能设置
+  host:  # sysom中心端ip，example http：//111.111.111.111
+  token: ""  访问sysom中心端的加密后的token
+  jobs:  # 具体诊断项目的设置，不设置会将对应的block和time设置为默认值
+    memgraph:  #  诊断的service_name
+      block: 60  # 阻塞时间，单位秒
+      time: 30   # 执行时间，单位秒
 ````
 
