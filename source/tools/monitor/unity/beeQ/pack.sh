@@ -59,6 +59,7 @@ mkdir ${APP}/collector/postEngine
 mkdir ${APP}/collector/execEngine
 mkdir ${APP}/collector/podMan
 mkdir ${APP}/collector/container
+mkdir ${APP}/collector/podMan/runtime
 mkdir ${APP}/collector/io
 mkdir ${APP}/collector/rdt
 mkdir ${APP}/collector/rdt/plugin
@@ -75,6 +76,7 @@ cp collector/execEngine/*.lua ${APP}/collector/execEngine
 cp collector/container/*.lua ${APP}/collector/container/
 cp collector/postPlugin/*.lua ${APP}/collector/postPlugin
 cp collector/podMan/*.lua ${APP}/collector/podMan
+cp collector/podMan/runtime/*.lua ${APP}/collector/podMan/runtime
 cp collector/io/*.lua ${APP}/collector/io
 cp collector/rdt/*.lua ${APP}/collector/rdt
 cp collector/rdt/plugin/*.lua ${APP}/collector/rdt/plugin
