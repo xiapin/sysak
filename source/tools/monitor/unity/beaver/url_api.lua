@@ -149,7 +149,7 @@ function CurlApi:diag(tReq)
                     --TODO：除了data，service_name也要传
                     postQue.post(s)
                 end
-                return {body = body}
+                return {task_id = body.data.task_id}
             else
                 return "bad req dns " .. body, 400
             end

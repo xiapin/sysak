@@ -105,7 +105,7 @@ function Cengine:runJobs(e, res, diag)
     local isFile = false
     local filename
     local filepath
-    if res.jobs[1].fetch_file_list then
+    if #res.jobs[1].fetch_file_list~=0  then
         isFile = true
         filename = res.jobs[1].fetch_file_list[1].name
         filepath = res.jobs[1].fetch_file_list[1].remote_path
