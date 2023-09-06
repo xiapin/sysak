@@ -109,6 +109,10 @@ function CpodsAll:proc(elapsed, lines)
     local rec = {}
 	local is_change
 
+    if not self._runtime then
+        return
+    end
+
 	is_change = self._runtime:cgroupChanged()
     if is_change or not self._plugins then
 		self._plugins = self:setupPlugins()
