@@ -144,7 +144,7 @@ function CcoCli:pushMsg(coOut, bytes)
 
     ok, msg = coroutine.resume(coOut, lines)
     if not ok then
-        print(string.format("coOut run failed %s", msg))
+        print(string.format("coOut run failed %s, check your yaml", msg))
     end
     return ok
 end
