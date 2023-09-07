@@ -34,8 +34,9 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 static void bump_nofile_rlimit(void)
 {
 	struct rlimit rlim_new = {
-		.rlim_cur	= RLIM_INFINITY,
-		.rlim_max	= RLIM_INFINITY,
+		/* NOFILE is limited by sysctl_nr_file, which is 1024*1024 by default  */
+		.rlim_cur	= 1024*1024,
+		.rlim_max	= 1024*1024,
 	};
 
 	if (setrlimit(RLIMIT_NOFILE, &rlim_new)) {
@@ -63,7 +64,6 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 	leader = NULL;
 	group_leader = -1;
 	j = 0;
-	bump_nofile_rlimit();
 	group_last = groupidx[0];
 	for (i = 0; i < NR_EVENTS; i++) {
 		/* The next PERF types */
@@ -165,7 +165,7 @@ int init(void * arg)
 		ret = errno;
 		printf("WARN: pmu_events install FAIL sysconf\n");
 		init_fail = ret;
-		return 0;
+		return 1;
 	}
 
 	pmue = pme_new(nr_cpus);
@@ -174,7 +174,7 @@ int init(void * arg)
 		glb_pme = pmue;
 	} else {
 		init_fail = -1;
-		return 0;
+		return 1;
 	}
 #if 0
 	pmue = (struct pmu_events *)arg;
@@ -185,13 +185,14 @@ int init(void * arg)
 		if (cgroup_fd < 0) {
 			printf(" open %s fail\n", origpath);
 			init_fail = cgroup_fd;
-			return 0;
+			return 1;
 		}
 		flags = PERF_FLAG_PID_CGROUP;
 	} else {
 		cgroup_fd = -1;
 		flags = 0;
 	}
+	bump_nofile_rlimit();
 	for (i = 0; i < nr_cpus; i++) {
 		pcpu_hwi[i].cpu = i;
 		pcpu_hwi[i].pid = cgroup_fd;
@@ -199,7 +200,7 @@ int init(void * arg)
 		ret = create_hw_events(&pcpu_hwi[i]);
 		if (ret) {
 			init_fail = ret;
-			return 0;
+			return 1;
 		}
 	}
 	printf("pmu_events plugin install.\n");
