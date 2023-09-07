@@ -116,7 +116,7 @@ function CtransPro:export(datas)
         else
             tFroms = qFormData(from, datas)
         end
-        if #tFroms then
+        if #tFroms~=0 then
             local title = line.title --sysak_proc_cpu_total
             if self._help then
                 local help = string.format("# HELP %s %s", title, line.help)
