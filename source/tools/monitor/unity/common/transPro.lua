@@ -110,12 +110,13 @@ function CtransPro:export(datas)
     local c = 0
     for _, line in ipairs(self._tDescr) do
         local from = line.from -- cpu_total
+        local tFroms
         if line.discrete then
-            datas = qFormDataDis(from, datas)
+            tFroms = qFormDataDis(from, datas)
         else
-            datas = qFormData(from, datas)
+            tFroms = qFormData(from, datas)
         end
-        if #datas then
+        if #tFroms then
             local title = line.title --sysak_proc_cpu_total
             if self._help then
                 local help = string.format("# HELP %s %s", title, line.help)
@@ -132,7 +133,7 @@ function CtransPro:export(datas)
                 print("cannot set both blacklist and whitelist! ")
                 goto continue
             end
-            for _, tFrom in ipairs(datas) do
+            for _, tFrom in ipairs(tFroms) do
                 if tFrom.values then
                     local labels = system:deepcopy(tFrom.labels)
                     if not labels then
