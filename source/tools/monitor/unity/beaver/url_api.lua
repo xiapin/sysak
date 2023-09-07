@@ -29,7 +29,12 @@ function CurlApi:_init_(frame, que, fYaml)
         self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
         self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
         self._urlCb["/api/ssl"] = function(tReq) return self:ssl(tReq) end
-        self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
+        if res.diagnose then
+            self._diagAuth = res.diagnose.token
+            self._diagHost = res.diagnose.host
+            self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
+        end
+
     end
 
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
@@ -43,8 +48,7 @@ function CurlApi:_init_(frame, que, fYaml)
     self._proxyhttp = CasyncHttp.new()
     self._proxyhttps = CasyncHttps.new()
 
-    self._diagAuth = res.diagnose.token
-    self._diagHost = res.diagnose.host
+
 end
 
 function CurlApi:_ossIntall(fYaml)
