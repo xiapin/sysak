@@ -38,10 +38,13 @@ function Cengine:_init_(que, proto_q, fYaml, tid)
     self._resDiag = res.diagnose
     self._diags = {}
 
-    self._fYamlJobs = res.diagnose.jobs
-    self._jobs = {}
-    self._auth = res.diagnose.token
-    self._host = res.diagnose.host
+    if self._resDiag then
+        self._fYamlJobs = res.diagnose.jobs
+        self._jobs = {}
+        self._auth = res.diagnose.token
+        self._host = res.diagnose.host
+    end
+
 end
 
 function Cengine:setMainloop(main)
