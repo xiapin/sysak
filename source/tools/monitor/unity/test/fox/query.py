@@ -50,4 +50,3 @@ if __name__ == "__main__":
     # q_table()
     q_by_table()
     # q_by_date()
-    q_by_sql()
