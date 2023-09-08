@@ -282,13 +282,17 @@ instance:需要诊断的实例IP
 
 nums：要诊断的进程数量，但是格式为字符串
 
+pids：进程pid列表
+
+global：全局热点是否开启，"on"为开启，"off"为关闭，不设置则默认开启。
+
 ### 诊断示例
 ```python
 import json
 import requests
 
 url = "http://127.0.0.1:8400/api/diag"
-params = {"instance" : "127.0.0.1", "nums" : "3"}
+params = {"instance" : "127.0.0.1", "nums" : "3", "pids" : "", "global" : "on"}
 body = {"service_name": "jruntime", "params": params}
 data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
