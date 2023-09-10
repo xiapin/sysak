@@ -21,7 +21,7 @@ function ChttpApp:echo(tRet, keep, code)
         ["Content-Type"] = "application/json",
         ["Connection"] = (keep and "keep-alive") or "close"
     }
-    local body = self:jencode(tRet)
+    local body = self:jencode(tRet) or "None."
     local headers = self:packServerHeaders(tHead, #body)
     local tHttp = {stat, headers, body}
     return pystring:join("\r\n", tHttp)

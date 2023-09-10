@@ -230,8 +230,8 @@ function CfoxTSDB:_write(tables, buff)
     local streamLen = #stream
 
     assert(self.cffi.fox_write(self._man, date, now,
-                    self.ffi.string(tableStream, tableLen), tableLen,
-                    self.ffi.string(stream, streamLen), streamLen) > 0 )
+                    tableStream, tableLen,
+                    stream, streamLen) > 0 )
 
     if self._man.new_day > 0 then
         self:rotateDb()
@@ -273,7 +273,6 @@ function CfoxTSDB:_setupRead(us)
         local names = self:fileNames()
         addWatch(self._ino, self._ino_ws, names.iname)
     end
-
 
     return res
 end

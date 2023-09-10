@@ -29,7 +29,12 @@ function CurlApi:_init_(frame, que, fYaml)
         self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
         self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
         self._urlCb["/api/ssl"] = function(tReq) return self:ssl(tReq) end
-        self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
+        if res.diagnose then
+            self._diagAuth = res.diagnose.token
+            self._diagHost = res.diagnose.host
+            self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
+        end
+
     end
 
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
@@ -40,8 +45,10 @@ function CurlApi:_init_(frame, que, fYaml)
 
     self:_install(frame)
     self:_setupQs(fYaml)
-    self._proxy = CasyncHttp.new()
-    self._auth = res.diagnose.token
+    self._proxyhttp = CasyncHttp.new()
+    self._proxyhttps = CasyncHttps.new()
+
+
 end
 
 function CurlApi:_ossIntall(fYaml)
@@ -113,22 +120,32 @@ end
 function CurlApi:diag(tReq)
     local stat, tJson = pcall(self.getJson, self, tReq)
     if stat and tJson then
-        local host = tJson.host
-        local uri = tJson.uri
+        local host = self._diagHost
+        local uri = "/api/v1/tasks/sbs_task_create/"
+        if not host then
+            host = tJson.host
+        end
         --local headers = tJson.headers
-        local body = tJson.body
+        local reqbody = tJson.body
         local headers = {
             accept = "application/json",
             ["Content-Type"] = "application/json",
-            authorization = self._auth
+            authorization = self._diagAuth
         }
-        local service_name = body.service_name
+        local service_name = reqbody.service_name
 
         if host and uri then
-            local stat, body = pcall(proxyPost, self._proxy, host, uri, headers, self:jencode(body))
+            local stat
+            local body
+            if string.sub(host,1,5) == "https" then
+                host = string.sub(host,9)
+                stat, body = pcall(proxyPost, self._proxyhttps, host, uri, headers, self:jencode(reqbody))
+            else
+                host = string.sub(host,8)
+                stat, body = pcall(proxyPost, self._proxyhttp, host, uri, headers, self:jencode(reqbody))
+            end
             if stat then
                 body = self:jdecode(body)
-                system:dumps(body)
                 if body.code == 200 then
                     local data = body.data
                     data["service_name"] = service_name

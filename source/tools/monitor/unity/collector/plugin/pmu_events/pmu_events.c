@@ -40,7 +40,6 @@ static void bump_nofile_rlimit(void)
 
 	if (setrlimit(RLIMIT_NOFILE, &rlim_new)) {
 		fprintf(stderr, "Failed to increase RLIMIT_NOFILE limit!\n");
-		exit(1);
 	}
 }
 

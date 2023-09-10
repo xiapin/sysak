@@ -79,7 +79,7 @@ local function tryConnect(fd, tConn)
         if errno == 115 then
             return 1
         else
-            print(string.format("socket connect failed, report:%d, %s", err, errno))
+            print(string.format("socket connect failed, report:%d, %s", errno, err))
             return
         end
     else
@@ -159,13 +159,17 @@ local function readChunks(fread, tReq)
         if s then
             size, s = unpack(pystring:split(s, "\r\n", 1))
             len = tonumber(size, 16)
-            bodies = waitChuckData(fread, s, len)
-            if bodies then
-                body = string.sub(bodies, 1, len)
-                s = string.sub(bodies, len + 2)
-                table.insert(cells, body)
+            if len then
+                bodies = waitChuckData(fread, s, len)
+                if bodies then
+                    body = string.sub(bodies, 1, len)
+                    s = string.sub(bodies, len + 2)
+                    table.insert(cells, body)
+                else
+                    return -2
+                end
             else
-                return -2
+                return -3
             end
         else
             return -1
@@ -289,7 +293,11 @@ function CasyncHttp:procStream(fd, stream, toWake)
     if res then
         local fread = g_lb:read(fd)
         local tReq = self:result(fread)
-        res, msg = coroutine.resume(toWake, tReq.data)
+        if tReq then
+            res, msg = coroutine.resume(toWake, tReq.data)
+        else
+            res, msg = coroutine.resume(toWake, 'procSSLStream no req.')
+        end
         assert(res, msg)
     else
         res, msg = coroutine.resume(toWake, "write failed.")

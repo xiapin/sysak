@@ -173,11 +173,11 @@ function CLocalBeaver:ssl_read(handle, maxLen)
         if e.ev_close > 0 then
             return nil
         elseif e.ev_in > 0 then
-            local data = self._ffi.new("char* [1]")
-            local ret = self._cffi.ssl_read(handle, data, maxLen)
+            local size = 16 * 1024
+            local data = self._ffi.new("char[?]", size)
+            local ret = self._cffi.ssl_read(handle, data, size)
             if ret > 0 then
-                local s = self._ffi.string(data[0], ret)
-                self._cffi.ssl_free_buff(data)
+                local s = self._ffi.string(data, ret)
                 return s
             elseif ret == 0 then
                 return ""
@@ -195,7 +195,7 @@ end
 function CLocalBeaver:ssl_write(fd, handle, stream)
     local ret
     local len = #stream
-    ret = self._cffi.ssl_write(handle, self._ffi.string(stream, len), len)
+    ret = self._cffi.ssl_write(handle, stream, len)
     assert(ret >= 0, "ssl_write return " .. ret)
 
     if ret < len then
@@ -211,7 +211,7 @@ function CLocalBeaver:ssl_write(fd, handle, stream)
                 if stream == nil then
                     return 1
                 end
-                ret = self._cffi.ssl_write(handle, self._ffi.string(stream, len), len)
+                ret = self._cffi.ssl_write(handle, stream, len)
                 assert(ret >= 0)
             end
         end
