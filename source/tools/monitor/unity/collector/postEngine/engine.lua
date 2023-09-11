@@ -239,7 +239,10 @@ function Cengine:work(t, event)
         self:proc(t, event, msgs)
     end
     self:checkDiag()
-    self:checkJobs()
+    if self._resDiag then
+        self:checkJobs()
+    end
+
 end
 
 return Cengine
