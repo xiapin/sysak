@@ -68,10 +68,9 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
 
     --[[
         遍历yaml中所有容器运行时，只要其中某一个可用，则使用该运行时
-        k8sApi(K8s环境，包括k8s+containerd, k8s+docker, k8s+CRI-O)), 
-        docker(单节点非k8s(ecs)容器环境)
-
-        todo: 不管是k8s环境还是单ECS环境，都从容器运行时sock获取pod/contianer信息
+        cri-containerd: 通过cri接口从containerd.sock获取pod和容器信息
+        k8sApi: K8s环境，通过10250端口获得pod信息，包括k8s+containerd, k8s+docker, k8s+CRI-O)), 
+        docker: 单节点非k8s(ecs)容器环境
     ]]
     for _, runtime in ipairs(self._resYaml.container.runtime) do
         local runtime_module = require("collector.podMan.runtime." .. runtime)

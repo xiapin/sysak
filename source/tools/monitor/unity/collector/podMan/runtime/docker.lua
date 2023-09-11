@@ -15,12 +15,27 @@ function Cdocker:_init_(resYaml, mnt)
     self._mnt = mnt
     self._api = docker_api.new('localhost', defualt_endpoint)
     self._ino = {}
+    self._cgroupDriver = "cgroupfs"
+end
+
+function Cdocker:getCgroupDriver()
+    local qresp, err = self._api:get_system_info()
+    if err or not qresp then
+        print("Get docker cgroup driver failed!", err)
+        return "cgroupfs" -- default is "cgroupfs"
+    end
+    return qresp["CgroupDriver"]
 end
 
 function Cdocker:initInotify()
+    local cgroupDriver = self:getCgroupDriver()
+    -- in docker, default watch /sys/fs/cgroup/cpu/docker (cgroupfs driver)
+    local cg_path = self._cgTopDir .. docker
+    if cgroupDriver == "systemd" then
+        cg_path = self._cgTopDir .. "system.slice"
+    end
     self._ino = Cinotifies.new()
-    -- in docker, watch /sys/fs/cgroup/cpu/docker is enough to capture container change
-    self._ino:add(self._cgTopDir .. docker)
+    self._ino:add(cg_path)
 end
 
 function Cdocker:checkRuntime()

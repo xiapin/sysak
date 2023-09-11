@@ -1,3 +1,4 @@
+require("common.class")
 local unistd = require("posix.unistd")
 local json = require("cjson")
 local https = require("ssl.https")

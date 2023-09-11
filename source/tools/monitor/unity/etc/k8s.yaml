@@ -19,13 +19,14 @@ config:
     cpu: 90  # unit %
     mem: 200  # unit mb
     tasks: 10  # monitor 10 pid max.
+    cellLimit: -1 # set guard limit time. guard time is unlimit when cellLimit is -1,default is 50(ms)
 
 outline:
   - /var/sysom/outline
 
 container:
   mode: "pods"
-  runtime: ["k8sApi", "docker"]
+  runtime: ["cri_containerd", "k8sApi", "docker"]
   luaPlugin: ["cg_cpu_cfs_quota","cg_mem_drcm_glob_latency","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency",
               "con_net_stat", "cg_blkio_stat", "podmem"]
   directCgPath:
