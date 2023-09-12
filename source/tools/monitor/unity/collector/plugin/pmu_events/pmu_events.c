@@ -20,7 +20,6 @@ char *value_str[] = {"cycles", "instructions", "CPI",
 /*char origpath[]="/mnt/host/sys/fs/cgroup/perf_event/system.slice/"; */
 char *origpath = NULL;	/* defalt to host events */
 
-static int init_fail;
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 			   int cpu, int group_fd, unsigned long flags)
 {
@@ -164,8 +163,7 @@ int init(void * arg)
 	if (nr_cpus <= 0) {
 		ret = errno;
 		printf("WARN: pmu_events install FAIL sysconf\n");
-		init_fail = ret;
-		return 1;
+		return -ret;
 	}
 
 	pmue = pme_new(nr_cpus);
@@ -173,8 +171,7 @@ int init(void * arg)
 		pcpu_hwi = pmue->pcpu_hwi;
 		glb_pme = pmue;
 	} else {
-		init_fail = -1;
-		return 1;
+		return -1;
 	}
 #if 0
 	pmue = (struct pmu_events *)arg;
@@ -184,8 +181,7 @@ int init(void * arg)
 		cgroup_fd = open(origpath, O_RDONLY);
 		if (cgroup_fd < 0) {
 			printf(" open %s fail\n", origpath);
-			init_fail = cgroup_fd;
-			return 1;
+			return cgroup_fd;
 		}
 		flags = PERF_FLAG_PID_CGROUP;
 	} else {
@@ -199,12 +195,10 @@ int init(void * arg)
 		pcpu_hwi[i].flags = flags;
 		ret = create_hw_events(&pcpu_hwi[i]);
 		if (ret) {
-			init_fail = ret;
-			return 1;
+			return ret;
 		}
 	}
 	printf("pmu_events plugin install.\n");
-	init_fail = 0;
 	return 0;
 }
 
@@ -269,9 +263,6 @@ int call(int t, struct unity_lines* lines)
 	double summ[NR_EVENTS];
 	struct pcpu_hw_info *pcp_hw;
 
-	if (init_fail) {
-		return init_fail;
-	}
 	pcp_hw = glb_pme->pcpu_hwi;
 	for (i = 0; i < nr_cpus; i++) {
 		collect(&pcp_hw[i], summ);
