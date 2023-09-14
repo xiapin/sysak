@@ -1,7 +1,7 @@
 # site
 /etc/sysak/base.yaml
 # 各字段含义
-````
+```yaml
 config:
   freq: 20  # 采集间隔 
   port: 8400 # 监听端口
@@ -75,5 +75,19 @@ diagnose:  # 诊断功能设置
     memgraph:  #  诊断的service_name
       block: 60  # 阻塞时间，单位秒
       time: 30   # 执行时间，单位秒
+
+resctrl:
+  path: "sys/fs/resctrl" # resctrl文件系统的挂载路径
+
+  monLuaPlugin: ["rdt_llc_occupancy", "rdt_local_mem_bw", "rdt_total_mem_bw"] # 监控事件的采集插件名
+
+  resLuaPlugin: ["rdt_size"] # RDT资源分配策略的采集插件
+
+  auto: true # 如果存在atuo并且auto为true表示自动递归搜索所有RDT资源组和监控组，否则只采集group字段指定的相关路径
+
+  group:                        # 显式指定采集路径，当auto为false或者不存在auto时有效
+    - name: ""                  #resctrl根目录下的资源组名 "" --> /sys/fs/resctrl/
+    - name: "LS"                #resctrl根目录下的资源组名 "" --> /sys/fs/resctrl/LS
+      monitor: ["mon1", "mon2"] # 资源组mon_groups目录下手动创建的监控组 "mon1" --> /sys/fs/resctrl/LS/mon_groups/mon1
 ````
 
