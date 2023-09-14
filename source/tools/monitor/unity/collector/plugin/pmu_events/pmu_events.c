@@ -13,10 +13,10 @@ struct pcpu_hw_info *gpcpu_hwi;
 struct pmu_events *glb_pme;
 char *events_str[] = {"cycles", "ins", "refCyc",
 			"llcLoadMis", "llcStoreMis",
-			"llcLoad", "llcStore"};
+			"llcLoad", "llcStore", "splitLock"};
 char *value_str[] = {"cycles", "instructions", "CPI",
 			"llc_load_ref", "llc_load_miss", "LLC_LMISS_RATE"
-			"llc_store_ref", "llc_store_miss", "LLC_SMIRSS_RATE"};
+			"llc_store_ref", "llc_store_miss", "LLC_SMIRSS_RATE", "splitLock"};
 /*char origpath[]="/mnt/host/sys/fs/cgroup/perf_event/system.slice/"; */
 char *origpath = NULL;	/* defalt to host events */
 
