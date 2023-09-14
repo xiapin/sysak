@@ -80,6 +80,8 @@ plugins:
     description: "IMC latency and bandwidth"
   - so: pmu_events
     description: "collect pmu events"
+  - so: cpufreq
+    description: "collect cpu frequence of perf cpu"
 
 metrics:
   - title: sysom_java_app
@@ -408,6 +410,11 @@ metrics:
     from: pmu_events_percpu
     head: value
     help: "pmu events of percpu"
+    type: "gauge"
+  - title: sysom_cpu_freq
+    from: cpufreq
+    head: value
+    help: "the frequence of percpu"
     type: "gauge"
 
 observe:
