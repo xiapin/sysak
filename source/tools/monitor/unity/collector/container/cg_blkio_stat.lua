@@ -2,31 +2,9 @@ require("common.class")
 local pystring = require("common.pystring")
 local unistd = require("posix.unistd")
 local CvProc = require("collector.vproc")
+local utsname = require("posix.sys.utsname")
 
 local root = "sys/fs/cgroup/blkio/"
-local blkMetrics = {
-    {
-        path = "/blkio.throttle.io_service_bytes", 
-        metrics = "service_bytes"
-    },
-    {
-        path = "/blkio.throttle.io_serviced",
-        metrics = "serviced" 
-    },
-    {
-        path = "/blkio.throttle.total_bytes_queued",
-        metrics = "bytes_queued"
-    },
-    {
-        path = "/blkio.throttle.total_io_queued",
-        metrics = "io_queued"
-    },
-    {
-        path = "/blkio.throttle.io_wait_time",
-        metrics = "wait_time"
-    }
-}
-
 local CgBlkIoStat = class("cg_blkio_stat", CvProc) 
 
 function CgBlkIoStat:_init_(proto, pffi, mnt, path, ls)
@@ -63,7 +41,7 @@ function CgBlkIoStat:_proc(line, metrics, tableName)
     local vs = {}
     local label = self:copyTable(self.ls)
     local cells = pystring:split(line)
-    -- skip last line(容器启动后未做任何IO操作，cgroup中会没有数据导致本轮采集没有数据)
+    -- skip last line
     if #cells == 2 then goto exit end
 
     local op = cells[2]
@@ -96,6 +74,58 @@ end
 function CgBlkIoStat:proc(elapsed, lines)
     local tableName = "cg_blkio_stat"
     CvProc.proc(self)
+
+    local distro = utsname.uname()
+    if not distro then
+        print("cg_blk_stat: get distro error!")
+        return
+    end
+
+    local blkMetrics = {}
+    local release = distro.release
+    if not string.match(release, "^3.10") then
+        blkMetrics = {
+            {
+                path = "/blkio.throttle.io_service_bytes",
+                metrics = "service_bytes"
+            },
+            {
+                path = "/blkio.throttle.io_serviced",
+                metrics = "serviced"
+            },
+            {
+                path = "//blkio.throttle.total_bytes_queued",
+                metrics = "bytes_queued"
+            },
+            {
+                path = "/blkio.throttle.total_io_queued",
+                metrics = "io_queued"
+            },
+            {
+                path = "/blkio.throttle.io_wait_time",
+                metrics = "wait_time"
+            }
+        }
+    else
+        blkMetrics = {
+            {
+                path = "/blkio.throttle.io_service_bytes",
+                metrics = "service_bytes"
+            },
+            {
+                path = "/blkio.throttle.io_serviced",
+                metrics = "serviced"
+            },
+            {
+                path = "/blkio.io_queued",
+                metrics = "io_queued"
+            },
+            {
+                path = "/blkio.io_wait_time",
+                metrics = "wait_time"
+            }
+        }
+    end
 
     for _, blk_metrics in ipairs(blkMetrics) do
         local cg_path = self.mnt .. root .. self.path .. blk_metrics.path

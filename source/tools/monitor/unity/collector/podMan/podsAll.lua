@@ -71,6 +71,7 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
         cri-containerd: 通过cri接口从containerd.sock获取pod和容器信息
         k8sApi: K8s环境，通过10250端口获得pod信息，包括k8s+containerd, k8s+docker, k8s+CRI-O)), 
         docker: 单节点非k8s(ecs)容器环境
+        Todo: cri-docker, cri-o，添加时只需要按模版编写lua调用go暴露的cri接口即可
     ]]
     for _, runtime in ipairs(self._resYaml.container.runtime) do
         local runtime_module = require("collector.podMan.runtime." .. runtime)

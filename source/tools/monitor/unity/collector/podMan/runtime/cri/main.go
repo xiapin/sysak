@@ -20,7 +20,7 @@ func GetContainerInfos(endpoints []string) ([]ContainerInfo, error) {
 func CGetContainerInfosfunc(endpoint *C.char) *C.char {
 	ep := C.GoString(endpoint)
 	endpoints := []string{ep}
-	fmt.Println(endpoints)
+	//fmt.Println(endpoints)
 	infos, err := GetContainerInfos(endpoints)
 	if err != nil {
 		fmt.Printf("cri: get container info failed: %v", err)
@@ -36,7 +36,7 @@ func CGetContainerInfosfunc(endpoint *C.char) *C.char {
 //export CheckRuntime
 func CheckRuntime(endpoint_ptr *string) int {
 	endpoints := []string{*endpoint_ptr}
-	fmt.Println(endpoints)
+	//fmt.Println(endpoints)
 	c, err := newCri(endpoints)
 	defer c.Shutdown()
 	if err != nil {

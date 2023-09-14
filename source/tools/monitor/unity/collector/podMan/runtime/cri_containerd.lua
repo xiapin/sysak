@@ -64,6 +64,7 @@ function CcriContainerd:queryPodsInfo()
     local resptr = self._awsome.CGetContainerInfosfunc(self._valid_endpoint)
     if not resptr then return nil end
     local infoString = self._ffi.string(resptr)
+    self._ffi.C.free(resptr)
     return cjson.decode(infoString)
 end
 
