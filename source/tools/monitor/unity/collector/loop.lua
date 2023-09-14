@@ -102,7 +102,6 @@ function Cloop:loadLuaPlugin(res, proc_path, procffi)
                 print("add podMon failed. " .. msg)
             end
         end
-        c = c + 1
     end
 
     if res.resctrl then

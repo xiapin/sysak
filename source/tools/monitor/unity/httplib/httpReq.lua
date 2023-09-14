@@ -97,7 +97,7 @@ function ChttpReq:postFormData(Url, headers, fData)
     local content = {}
     for k, v in pairs(fData) do
         c = addContent(content, c, "--" .. boundary)   -- add boundary
-        if type(v) == "table" then -- file: name, stream, type
+        if type(v) == "table" then -- file: name, stream, type   -- files:["j"]
             c = addContent(content, c, string.format('Content-Disposition: form-data; name="%s"; filename="%s"', k, v[1]))
             c = addContent(content, c, string.format('Content-Type: %s', v[3]))
             c = addContent(content, c, "")

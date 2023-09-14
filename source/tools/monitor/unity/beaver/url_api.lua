@@ -127,6 +127,15 @@ function CurlApi:diag(tReq)
         end
         --local headers = tJson.headers
         local reqbody = tJson.body
+        
+        if system:keyIsIn(reqbody, "params") == false then
+            reqbody["params"] = {
+                instance = "127.0.0.1"
+            }
+        elseif system:keyIsIn(reqbody.params, "instance") == false then
+            reqbody.params["instance"] = "127.0.0.1"
+        end
+
         local headers = {
             accept = "application/json",
             ["Content-Type"] = "application/json",
@@ -150,10 +159,12 @@ function CurlApi:diag(tReq)
                     local data = body.data
                     data["service_name"] = service_name
                     local s = self:jencode(data)
-                    --TODO：除了data，service_name也要传
                     postQue.post(s)
+                else
+                    print(body.message)
+                    return {code = body.code, message = body.message}
                 end
-                return {body = body}
+                return {task_id = body.data.task_id}
             else
                 return "bad req dns " .. body, 400
             end
