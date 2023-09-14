@@ -38,10 +38,13 @@ function Cengine:_init_(que, proto_q, fYaml, tid)
     self._resDiag = res.diagnose
     self._diags = {}
 
-    self._fYamlJobs = res.diagnose.jobs
-    self._jobs = {}
-    self._auth = res.diagnose.token
-    self._host = res.diagnose.host
+    if self._resDiag then
+        self._fYamlJobs = res.diagnose.jobs
+        self._jobs = {}
+        self._auth = res.diagnose.token
+        self._host = res.diagnose.host
+    end
+
 end
 
 function Cengine:setMainloop(main)
@@ -58,6 +61,22 @@ function Cengine:postReq(s, data)
     local formData = {
         task_id = data.task_id,
         results = s
+    }
+    local headers = {
+        accept = "application/json",
+        ["Content-Type"] = "multipart/form-data",
+        authorization = self._auth
+    }
+    req:postFormData(url,headers,formData)
+end
+
+function Cengine:postReqFile(s, data)
+    local req = ChttpReq.new()
+    local url = self._host .. "/api/v1/tasks/sbs_task_result/"
+    local formData = {
+        task_id = data.task_id,
+        files = s,
+        results = ""
     }
     local headers = {
         accept = "application/json",
@@ -86,6 +105,15 @@ end
 
 function Cengine:runJobs(e, res, diag)
     local cmd = res.jobs[1].cmd
+    local isFile = false
+    local filename
+    local filepath
+    if #res.jobs[1].fetch_file_list~=0  then
+        isFile = true
+        filename = res.jobs[1].fetch_file_list[1].name
+        filepath = res.jobs[1].fetch_file_list[1].remote_path
+    end
+
     local time
     if diag and diag.time then
         time = diag.time
@@ -97,8 +125,26 @@ function Cengine:runJobs(e, res, diag)
         local exec = CexecJobs.new("/bin/bash", {"-c",cmd}, time, res.service_name)
         --local exec = CexecJobs.new("/bin/bash", {"-c","sysak memgraph"}, time, res.service_name)
         exec:addEvents(e)
-        local s = exec:readIn()
-        self:postReq(s, res)
+        if isFile then
+            local file = io.open(filepath, "rb")
+            if file then
+                local content = file:read("*a")
+                file:close()
+                local s = {
+                    filename,
+                    content,
+                    "application/octet-stream"
+                }
+                self:postReqFile(s, res)
+            else
+                print("无法打开文件" .. filepath)
+            end
+
+        else
+            local s = exec:readIn()
+            self:postReq(s, res)
+        end
+
     end
     if diag and diag.block then
         self._jobs[res.service_name] = diag.block
@@ -193,7 +239,10 @@ function Cengine:work(t, event)
         self:proc(t, event, msgs)
     end
     self:checkDiag()
-    self:checkJobs()
+    if self._resDiag then
+        self:checkJobs()
+    end
+
 end
 
 return Cengine

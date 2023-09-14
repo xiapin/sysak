@@ -3,6 +3,8 @@
 
 上传诊断命令时需要带上对应的参数
 
+其中，instance如果不传，默认为"127.0.0.1"
+
 具体如下
 ## iohang
 
@@ -271,6 +273,29 @@ import requests
 url = "http://127.0.0.1:8400/api/diag"
 params = {"instance" : "127.0.0.1", "timeout" : 1}
 body = {"service_name": "taskprofile", "params": params}
+data = {"body": body}
+res = requests.post(url, data=json.dumps(data))
+print(res.content, res)
+```
+## jruntime
+
+### 需要的参数
+instance:需要诊断的实例IP
+
+nums：显示top nums 的进程诊断结果，格式为字符串，设置了nums就不需要设置pids
+
+pids：进程pid列表，格式为字符串，设置了nums的话pids不会生效
+
+global：全局热点是否开启，"on"为开启，"off"为关闭，不设置则默认开启。
+
+### 诊断示例
+```python
+import json
+import requests
+
+url = "http://127.0.0.1:8400/api/diag"
+params = {"instance" : "127.0.0.1", "pids" : "12267", "global" : "on"}
+body = {"service_name": "jruntime", "params": params}
 data = {"body": body}
 res = requests.post(url, data=json.dumps(data))
 print(res.content, res)

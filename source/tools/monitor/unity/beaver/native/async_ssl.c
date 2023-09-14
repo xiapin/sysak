@@ -82,6 +82,8 @@ int ssl_connect(void * handle) {
 
     err = SSL_get_error(h, ret);
     switch (err) {
+        case 0:
+            return 0;
         case SSL_ERROR_WANT_WRITE:  //waite write.
             return 1;
         case SSL_ERROR_WANT_READ:

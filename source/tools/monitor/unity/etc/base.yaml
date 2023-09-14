@@ -22,7 +22,7 @@ config:
     tasks: 10  # monitor 10 pid max.
     cellLimit: -1 # set guard limit time. guard time is unlimit when cellLimit is -1,default is 50(ms)
 
-pushTo: 
+pushTo:
   to: "Influx"
   host: "192.168.0.127"
   port: 80
