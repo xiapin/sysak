@@ -15,10 +15,8 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include "../plugin_head.h"
-#define	NR_GROUP	2
-#define NR_EVENTS	7
-#define NR_CELL	2
-
+#define	NR_GROUP	3
+#define NR_EVENTS	8
 
 #ifdef DEBUG
 /* for test */
@@ -51,6 +49,7 @@ __u32 hw_types[] = {
 	PERF_TYPE_HW_CACHE,
 	PERF_TYPE_HW_CACHE,
 	PERF_TYPE_HW_CACHE,
+	PERF_TYPE_RAW,
 };
 
 __u64 hw_configs[] = {
@@ -69,11 +68,13 @@ __u64 hw_configs[] = {
 	PERF_COUNT_HW_CACHE_LL			<<  0  |
 	(PERF_COUNT_HW_CACHE_OP_WRITE		<<  8) |
 	(PERF_COUNT_HW_CACHE_RESULT_ACCESS	<< 16),
+	0x10f4,
 };
 
 int groupidx[NR_EVENTS] = {
 	0,0,0,0,0,
 	1,1,
+	1,
 };
 
 enum {
@@ -84,6 +85,7 @@ enum {
 	LLC_STORE_MISS,
 	LLC_LOAD_REF,
 	LLC_STORE_REF,
+	SPLIT_LOCK,
 };
 
 struct hw_info {
