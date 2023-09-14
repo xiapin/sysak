@@ -22,11 +22,11 @@ config:
     tasks: 10  # monitor 10 pid max.
     cellLimit: -1 # set guard limit time. guard time is unlimit when cellLimit is -1,default is 50(ms)
 
-pushTo:
-  to: "Influx"
-  host: "192.168.0.127"
-  port: 80
-  url: "/api/v1/cec_proxy/proxy/line_protocol"
+#pushTo:
+#  to: "Influx"
+#  host: "192.168.0.127"
+#  port: 80
+#  url: "/api/v1/cec_proxy/proxy/line_protocol"
 
 outline:
   - /var/sysom/outline
