@@ -3,6 +3,7 @@ MAINTAINER "liaozhaoyan <zhaoyan.lzy@alibaba-inc.com>"
 WORKDIR /root/
 RUN source /opt/rh/devtoolset-9/enable && \
     yum install -y make wget lua-devel unzip git numactl-devel m4 && \
+    yum install -y golang && \
     mkdir /root/build && \
     cd /root/build && \
     git clone https://gitee.com/chuyansz/sysak.git && \
@@ -35,6 +36,7 @@ RUN source /opt/rh/devtoolset-9/enable && \
     luarocks install luaposix 35.1-1 && \
     luarocks install http && \
     luarocks install inotify && \
+    luarocks install luafilesystem && \
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/ && \
     cd ../beeQ/ && \
     make
