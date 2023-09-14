@@ -1080,6 +1080,7 @@ def oom_diagnose(sn, data, mode):
         oom_result['max_total'] = {'rss':0,'task':"",'score':0,'cnt':0}
         dmesgs = data['dmesg']
         if OOM_BEGIN_KEYWORD in dmesgs or  pid_pattern.search(dmesgs) is not None:
+            submsg = ''
             oom_dmesg_analyze(dmesgs, oom_result)
             oom_result['summary'] += "total oom: %s\n"%oom_result['oom_total_num']
 
