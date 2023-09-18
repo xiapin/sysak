@@ -314,6 +314,27 @@
 | util           | 占比 | IO繁忙度 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
 | await          | ms |  平均每个IO的延迟 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
 
+### disks表
+* 对应 export 指标： sysom\_proc\_disks
+* 属性标签：counter
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| disk_name | - | 磁盘或分区名 | - | collector/proc\_diskstats.lua |
+| busy | % | 该磁盘非空闲的时间比例 | - | collector/proc\_diskstats.lua |
+| inflight | 个 | 正在进行中的IO请求个数 | - | collector/proc\_diskstats.lua |
+| xfers | 次 | 读写总次数 | - | collector/proc\_diskstats.lua |
+| bsize | B | 平均每次IO的字节数 | - | collector/proc\_diskstats.lua |
+| reads | 次 | 读请求次数 | - | collector/proc\_diskstats.lua |
+| writes | 次 | 写请求次数 | - | collector/proc\_diskstats.lua |
+| rmerge | 次 | 合并后的读请求数 | - | collector/proc\_diskstats.lua |
+| wmerge | 次 | 合并后的写请求数 | - | collector/proc\_diskstats.lua |
+| rkb | KB | 写的总流量大小 | - | collector/proc\_diskstats.lua |
+| wkb | KB | 写的总流量大小 | - | collector/proc\_diskstats.lua |
+| rmsec | ms | 所有读请求总耗时 | - | collector/proc\_diskstats.lua |
+| wmsec | ms | 所有写请求总耗时 | - | collector/proc\_diskstats.lua |
+
+
 ### IOMonIndForSystemIO 表 
 统计系统IO异常
 
