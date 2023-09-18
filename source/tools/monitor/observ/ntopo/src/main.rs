@@ -94,7 +94,7 @@ fn main() {
     let mut pids = Pids::default();
 
     loop {
-        std::thread::sleep(std::time::Duration::from_secs(3));
+        std::thread::sleep(std::time::Duration::from_secs(30));
 
         pids.update(&pidsmap);
 
@@ -116,7 +116,6 @@ fn main() {
         }
 
         let data_string = data.join("\n");
-        // println!("{}", data_string);
         unix_sock_send("/var/sysom/outline", &data_string);
     }
 }
