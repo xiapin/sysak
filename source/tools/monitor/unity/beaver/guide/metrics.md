@@ -340,7 +340,7 @@
 
 ### cg_proc_stat 表
 
-* 对应 export 指标： sysom\_
+* 对应 export 指标： sysom\_container\_proc\_stat
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
