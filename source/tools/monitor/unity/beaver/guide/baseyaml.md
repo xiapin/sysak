@@ -56,10 +56,10 @@ metrics:   # export 导出的 metrics 列表
     discrete: true # 数据是否为离散的，不定义则默认为false
     blacklist: 设置数据上传的黑名单，黑名单和白名单不可同时设置
       cpu: "cpu1$" # 按照lua的正则表达式进行设置 https://www.cnblogs.com/meamin9/p/4502461.html
-      value: "block"
+      mode: "softirq"
     whitelist: 设置数据上传的白名单，黑名单和白名单不可同时设置
-      cpu: "cpu1$" # 
-      value: "block"
+      cpu: "cpu1$" # 行协议中tag的限制，对应<tag_key>:<tag_value>
+      mode: "softirq" # 行协议中field的限制的写法，对应  字段名:<field_key>
 
 observe:  # 数据观测设置
   comms:  # 需要观测的进程名

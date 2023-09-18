@@ -21,7 +21,7 @@ function Cexport:_init_(instance, fYaml)
     self._timestamps = ms.config.real_timestamps
 
     self._tDescr = ms.metrics
-    self._transPro = CtransPro.new(instance, fYaml, false, false)
+    self._transPro = CtransPro.new(instance, fYaml, true, self._timestamps)
     self._fox = CfoxTSDB.new(fYaml)
 end
 

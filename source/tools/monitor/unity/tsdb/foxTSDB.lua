@@ -303,9 +303,16 @@ local function loadFoxTable(ffi, cffi, pman)
     assert(ret >= 0)
     if ret > 0 then
         local stream = ffi.string(data[0], ret)
-        local ustr = snappy.decompress(stream)
-        tables = json.decode(ustr)
-        cffi.fox_free_buffer(data)
+        --local ustr = snappy.decompress(stream)
+        --tables = json.decode(ustr)
+        --cffi.fox_free_buffer(data)
+        local stat, ustr = pcall(snappy.decompress, stream)
+        if stat and ustr ~= nil then
+            tables = json.decode(ustr)
+            cffi.fox_free_buffer(data)
+        else
+            print("foxTSDB loadFoxTable: snappy error")
+        end
     end
     return tables
 end
@@ -319,10 +326,16 @@ local function loadFoxData(ffi, cffi, pman, proto)
     assert(ret >= 0)
     if ret > 0 then
         local stream = ffi.string(data[0], ret)
-        local ustr = snappy.decompress(stream)
-        lines = proto:decode(ustr)
-        lines['time'] = tonumber(us[0])
-        cffi.fox_free_buffer(data)
+        --local ustr = snappy.decompress(stream)
+        local stat, ustr = pcall(snappy.decompress, stream)
+        if stat and ustr ~= nil then
+            lines = proto:decode(ustr)
+            lines['time'] = tonumber(us[0])
+            cffi.fox_free_buffer(data)
+        else
+            print("foxTSDB loadfoxData: snappy error")
+        end
+
     end
 
     return lines
