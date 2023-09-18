@@ -693,7 +693,13 @@ void read_imc() {
 
     if (before_ts) {
 #define UINT48_MAX 281474976710655U /* (1 << 48) - 1 */
-#define LAT(dest, occ, ins, speed) dest = (occ) / (ins) / (speed);
+#define LAT(dest, occ, ins, speed) ({		\
+	if ((ins != 0) && (speed !=0))		\
+	dest = (occ) / (ins) / (speed);		\
+	else					\
+	dest = 0;				\
+})
+
 #define DELTA(val1, val2) \
     (val1) >= (val2) ? (val1) - (val2) : UINT48_MAX - (val2) + (val1);
 
