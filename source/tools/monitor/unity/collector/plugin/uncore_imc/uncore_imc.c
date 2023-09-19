@@ -14,7 +14,6 @@
 
 #define NR_IMC 6
 
-// #define DEBUG
 struct Env {
     uint32_t max_cpuid;
     int32_t cpu_model;
@@ -29,58 +28,30 @@ struct Env {
     bool init_succ;
 } env = {.vm = false, .init_succ = true};
 
-typedef struct event {
-    uint64_t rpq_occ;
-    uint64_t rpq_ins;
-    uint64_t wpq_occ;
-    uint64_t wpq_ins;
-    uint64_t cas_rd;
-    uint64_t cas_wr;
-    uint64_t dram_speed;
-} event;
+// #define DEBUG
+#ifdef DEBUG
+void print_metric(metric *m) {
+    printf("rlat=%lf wlat=%lf avglat=%lf bw_rd=%ld bw_wr=%ld\n", m->rlat,
+           m->wlat, m->avglat, m->bw_rd, m->bw_wr);
+}
 
-typedef struct channel_record {
-    uint64_t rpq_occ;
-    uint64_t rpq_ins;
-    uint64_t wpq_occ;
-    uint64_t wpq_ins;
-    uint64_t cas_rd;
-    uint64_t cas_wr;
-    double read_latency;
-    double write_latency;
-    double avg_latency;
-} channel_record;
-
-typedef struct socket_record {
-    channel_record *channel_record_arr;
-    uint64_t rpq_occ;
-    uint64_t rpq_ins;
-    uint64_t wpq_occ;
-    uint64_t wpq_ins;
-    uint64_t cas_rd;
-    uint64_t cas_wr;
-    double read_latency;
-    double write_latency;
-    double avg_latency;
-    uint64_t dram_clock;
-} socket_record;
-
-typedef struct node_record {
-    uint64_t rpq_occ;
-    uint64_t rpq_ins;
-    uint64_t wpq_occ;
-    uint64_t wpq_ins;
-    double read_latency;
-    double write_latency;
-    double avg_latency;
-} node_record;
-
-typedef struct record {
-    socket_record *socket_record_arr;
-    node_record *node;
-} record;
+void print_result(result res) {
+    int i, j;
+    for (int i = 0; i < env.nr_socket; i++) {
+        // for (int j = 0; j < env.nr_channel; j++) {
+        //     printf("socket=%d channel=%d\n", i, j);
+        //     print_metric(&res.channel[i][j]);
+        // }
+        printf("socket=%d\n", i);
+        print_metric(&res.socket[i]);
+    }
+    printf("node:\n");
+    print_metric(res.node);
+}
+#endif
 
 record before, after;
+result res;
 
 time_t before_ts = 0, after_ts = 0;
 imc_pmu *pmus = 0;
@@ -429,6 +400,7 @@ struct perf_event_attr init_perf_event_attr(bool group) {
 
 void init_imc_event(imc_event *event, int pmu_id, int core_id, bool fixed) {
     struct perf_event_attr attr = init_perf_event_attr(false);
+
     attr.type = pmu_id;
     event->attr = attr;
     event->fixed = fixed;
@@ -499,36 +471,55 @@ void program_imc(uint32_t *cfgs, imc_pmu *pmus) {
     }
 }
 
-socket_record *alloc_socket_record() {
-    int skt_id = 0;
-    socket_record *rec = calloc(env.nr_socket, sizeof(socket_record));
-    for (skt_id = 0; skt_id < env.nr_socket; skt_id++) {
-        rec[skt_id].channel_record_arr =
-            calloc(env.nr_channel, sizeof(channel_record));
+reg_event **alloc_record() {
+    int i = 0;
+    reg_event **ret = calloc(env.nr_socket, sizeof(reg_event *));
+    for (i = 0; i < env.nr_socket; i++) {
+        ret[i] = calloc(env.nr_channel, sizeof(reg_event));
     }
-    return rec;
+    return ret;
 }
 
-void free_socket_record(socket_record *rec) {
-    int skt_id = 0;
-    for (skt_id = 0; skt_id < env.nr_socket; skt_id++) {
-        free(rec[skt_id].channel_record_arr);
+void free_record(reg_event **data) {
+    int i = 0;
+    for (i = 0; i < env.nr_socket; i++) {
+        free(data[i]);
     }
-    free(rec);
+    free(data);
+}
+
+void alloc_result() {
+    int i = 0;
+    res.channel = calloc(env.nr_socket, sizeof(metric *));
+    for (i = 0; i < env.nr_socket; i++) {
+        res.channel[i] = calloc(env.nr_channel, sizeof(metric));
+    }
+
+    res.socket = calloc(env.nr_socket, sizeof(metric));
+    res.node = calloc(1, sizeof(metric));
+}
+
+void free_result() {
+    int i = 0;
+    for (i = 0; i < env.nr_socket; i++) {
+        free(res.channel[i]);
+    }
+    free(res.channel);
+
+    if (res.socket) free(res.socket);
+    if (res.node) free(res.node);
 }
 
 void init_data() {
-    before.socket_record_arr = alloc_socket_record();
-    after.socket_record_arr = alloc_socket_record();
-    before.node = calloc(1, sizeof(node_record));
-    after.node = calloc(1, sizeof(node_record));
+    before.regs = alloc_record();
+    after.regs = alloc_record();
+    alloc_result();
 }
 
 void free_data() {
-    if (before.socket_record_arr) free_socket_record(before.socket_record_arr);
-    if (after.socket_record_arr) free_socket_record(after.socket_record_arr);
-    if (before.node) free(before.node);
-    if (after.node) free(after.node);
+    free_record(before.regs);
+    free_record(after.regs);
+    free_result();
 }
 
 int64_t get_perf_pmuid(int num) {
@@ -638,7 +629,6 @@ int init(void *arg) {
 #endif
 
 cleanup:
-
     if (pmu_ids) {
         free(pmu_ids);
         pmu_ids = 0;
@@ -656,185 +646,133 @@ cleanup:
 }
 
 void read_imc() {
-    int skt_id = 0, pmu_id = 0, counter_id = 0;
-    after_ts = time(0);
-    node_record *after_node = after.node;
+    int skt_id = 0, pmu_id = 0;
 
     for (skt_id = 0; skt_id < env.nr_socket; skt_id++) {
         imc_pmu *pmu = pmus + skt_id;
-        socket_record *socket_ev = &after.socket_record_arr[skt_id];
         for (pmu_id = 0; pmu_id < pmu->nr_grp; pmu_id++) {
             imc_reg_group *grp = pmu->reg_groups + pmu_id;
-            channel_record *channel_ev =
-                &after.socket_record_arr[skt_id].channel_record_arr[pmu_id];
+            reg_event *reg_ev = after.regs[skt_id] + pmu_id;
             /* enabel and reset fixed counter(DRAM clock) */
-            if (pmu_id == 0) {
-                socket_ev->dram_clock = read_reg(&grp->fixed_ev);
-                if (env.cpu_model == ICX || env.cpu_model == SNOWRIDGE) {
-                    socket_ev->dram_clock = 2 * socket_ev->dram_clock;
-                }
+            reg_ev->dram_clock = read_reg(&grp->fixed_ev);
+            if (env.cpu_model == ICX || env.cpu_model == SNOWRIDGE) {
+                reg_ev->dram_clock = 2 * reg_ev->dram_clock;
             }
 
-            channel_ev->rpq_occ = read_reg(&grp->general_ev[RPQ_OCC]);
-            channel_ev->rpq_ins = read_reg(&grp->general_ev[RPQ_INS]);
-            channel_ev->wpq_occ = read_reg(&grp->general_ev[WPQ_OCC]);
-            channel_ev->wpq_ins = read_reg(&grp->general_ev[WPQ_INS]);
-            channel_ev->cas_rd = read_reg(&grp->general_ev[CAS_RD]);
-            channel_ev->cas_wr = read_reg(&grp->general_ev[CAS_WR]);
-
-            // socket_ev->rpq_occ += channel_ev->rpq_occ;
-            // socket_ev->rpq_ins += channel_ev->rpq_ins;
-            // socket_ev->wpq_occ += channel_ev->wpq_occ;
-            // socket_ev->wpq_ins += channel_ev->wpq_ins;
-            // socket_ev->cas_rd += channel_ev->cas_rd;
-            // socket_ev->cas_wr += channel_ev->cas_wr;
+            reg_ev->rpq_occ = read_reg(&grp->general_ev[RPQ_OCC]);
+            reg_ev->rpq_ins = read_reg(&grp->general_ev[RPQ_INS]);
+            reg_ev->wpq_occ = read_reg(&grp->general_ev[WPQ_OCC]);
+            reg_ev->wpq_ins = read_reg(&grp->general_ev[WPQ_INS]);
+            reg_ev->cas_rd = read_reg(&grp->general_ev[CAS_RD]);
+            reg_ev->cas_wr = read_reg(&grp->general_ev[CAS_WR]);
         }
     }
+}
 
+void calculate_metric() {
+    int skt_id = 0, pmu_id = 0;
+    after_ts = time(0);
     if (before_ts) {
 #define UINT48_MAX 281474976710655U /* (1 << 48) - 1 */
-#define LAT(dest, occ, ins, speed) ({		\
-	if ((ins != 0) && (speed !=0))		\
-	dest = (occ) / (ins) / (speed);		\
-	else					\
-	dest = 0;				\
-})
+#define LAT(dest, occ, ins, speed)          \
+    ({                                      \
+        if ((ins != 0) && (speed != 0))     \
+            dest = (occ) / (ins) / (speed); \
+        else                                \
+            dest = 0;                       \
+    })
 
 #define DELTA(val1, val2) \
     (val1) >= (val2) ? (val1) - (val2) : UINT48_MAX - (val2) + (val1);
 
         double delta = after_ts - before_ts;
         double dram_speed;
+        reg_event node_reg_ev;
+        bzero(&node_reg_ev, sizeof(reg_event));
+
         for (skt_id = 0; skt_id < env.nr_socket; skt_id++) {
-            socket_record *before_socket_ev = &before.socket_record_arr[skt_id];
-            socket_record *after_socket_ev = &after.socket_record_arr[skt_id];
-
             imc_pmu *pmu = pmus + skt_id;
-            dram_speed =
-                (after_socket_ev->dram_clock - before_socket_ev->dram_clock) /
-                (delta * (double)1e9);
-
+            reg_event skt_reg_ev;
+            bzero(&skt_reg_ev, sizeof(skt_reg_ev));
             for (pmu_id = 0; pmu_id < pmu->nr_grp; pmu_id++) {
-                channel_record *before_channel_ev =
-                    &before_socket_ev->channel_record_arr[pmu_id];
-                channel_record *after_channel_ev =
-                    &after_socket_ev->channel_record_arr[pmu_id];
+                reg_event *before_reg_ev = before.regs[skt_id] + pmu_id;
+                reg_event *after_reg_ev = after.regs[skt_id] + pmu_id;
+                if (pmu_id == 0) {
+                    uint64_t clock = DELTA(after_reg_ev->dram_clock,
+                                           before_reg_ev->dram_clock);
+                    dram_speed = (clock) / (delta * (double)1e9);
+                }
+                // calculate the channel delta value
 
-                uint64_t delta_rpqocc = DELTA(after_channel_ev->rpq_occ,
-                                              before_channel_ev->rpq_occ);
-                uint64_t delta_rpqins = DELTA(after_channel_ev->rpq_ins,
-                                              before_channel_ev->rpq_ins);
-                uint64_t delta_wpqocc = DELTA(after_channel_ev->wpq_occ,
-                                              before_channel_ev->wpq_occ);
-                uint64_t delta_wpqins = DELTA(after_channel_ev->wpq_ins,
-                                              before_channel_ev->wpq_ins);
+                uint64_t delta_rpqocc =
+                    DELTA(after_reg_ev->rpq_occ, before_reg_ev->rpq_occ);
+                uint64_t delta_rpqins =
+                    DELTA(after_reg_ev->rpq_ins, before_reg_ev->rpq_ins);
+                uint64_t delta_wpqocc =
+                    DELTA(after_reg_ev->wpq_occ, before_reg_ev->wpq_occ);
+                uint64_t delta_wpqins =
+                    DELTA(after_reg_ev->wpq_ins, before_reg_ev->wpq_ins);
                 uint64_t delta_wr =
-                    DELTA(after_channel_ev->cas_wr, before_channel_ev->cas_wr);
+                    DELTA(after_reg_ev->cas_wr, before_reg_ev->cas_wr);
                 uint64_t delta_rd =
-                    DELTA(after_channel_ev->cas_rd, before_channel_ev->cas_rd);
+                    DELTA(after_reg_ev->cas_rd, before_reg_ev->cas_rd);
 
-                after_channel_ev->cas_rd = delta_rd;
-                after_channel_ev->cas_wr = delta_wr;
+                // calculate the channel metric
+                res.channel[skt_id][pmu_id].bw_wr = delta_wr * 64;
+                res.channel[skt_id][pmu_id].bw_rd = delta_rd * 64;
 
-                LAT(after_channel_ev->read_latency, delta_rpqocc, delta_rpqins,
+                LAT(res.channel[skt_id][pmu_id].rlat, delta_rpqocc,
+                    delta_rpqins, dram_speed);
+                LAT(res.channel[skt_id][pmu_id].wlat, delta_wpqocc,
+                    delta_wpqins, dram_speed);
+                LAT(res.channel[skt_id][pmu_id].avglat,
+                    delta_rpqocc + delta_wpqocc, delta_wpqins + delta_rpqins,
                     dram_speed);
-                LAT(after_channel_ev->write_latency, delta_wpqocc, delta_wpqins,
-                    dram_speed);
-                LAT(after_channel_ev->avg_latency, delta_rpqocc + delta_wpqocc,
-                    delta_wpqins + delta_rpqins, dram_speed);
 
-                after_socket_ev->rpq_occ += delta_rpqocc;
-                after_socket_ev->wpq_occ += delta_wpqocc;
-                after_socket_ev->rpq_ins += delta_rpqins;
-                after_socket_ev->wpq_ins += delta_wpqins;
-                after_socket_ev->cas_rd += delta_rd;
-                after_socket_ev->cas_wr += delta_wr;
-
-                after_node->rpq_occ += delta_rpqocc;
-                after_node->wpq_occ += delta_wpqocc;
-                after_node->rpq_ins += delta_rpqins;
-                after_node->wpq_ins += delta_wpqins;
+                // accumulate the socket delta value
+                skt_reg_ev.rpq_occ += delta_rpqocc;
+                skt_reg_ev.rpq_ins += delta_rpqins;
+                skt_reg_ev.wpq_occ += delta_wpqocc;
+                skt_reg_ev.wpq_ins += delta_wpqins;
+                skt_reg_ev.cas_wr += delta_wr;
+                skt_reg_ev.cas_rd += delta_rd;
             }
 
-            LAT(after_socket_ev->read_latency, after_socket_ev->rpq_occ,
-                after_socket_ev->rpq_ins, dram_speed);
-            LAT(after_socket_ev->write_latency, after_socket_ev->wpq_occ,
-                after_socket_ev->wpq_ins, dram_speed);
-            LAT(after_socket_ev->avg_latency,
-                after_socket_ev->wpq_occ + after_socket_ev->rpq_occ,
-                after_socket_ev->wpq_ins + after_socket_ev->rpq_ins,
+            // calculate the socket metric
+            LAT(res.socket[skt_id].rlat, skt_reg_ev.rpq_occ, skt_reg_ev.rpq_ins,
                 dram_speed);
+            LAT(res.socket[skt_id].wlat, skt_reg_ev.wpq_occ, skt_reg_ev.wpq_ins,
+                dram_speed);
+            LAT(res.socket[skt_id].avglat,
+                skt_reg_ev.wpq_occ + skt_reg_ev.rpq_occ,
+                skt_reg_ev.wpq_ins + skt_reg_ev.rpq_ins, dram_speed);
+            res.socket[skt_id].bw_rd = skt_reg_ev.cas_rd * 64;
+            res.socket[skt_id].bw_wr = skt_reg_ev.cas_wr * 64;
+            // accumulate the node delta value
+            node_reg_ev.rpq_occ += skt_reg_ev.rpq_occ;
+            node_reg_ev.rpq_ins += skt_reg_ev.rpq_ins;
+            node_reg_ev.wpq_occ += skt_reg_ev.wpq_occ;
+            node_reg_ev.wpq_ins += skt_reg_ev.wpq_ins;
+            node_reg_ev.cas_wr += skt_reg_ev.cas_wr;
+            node_reg_ev.cas_rd += skt_reg_ev.cas_rd;
         }
-        LAT(after_node->read_latency, after_node->rpq_occ, after_node->rpq_ins,
+        // calculate the node metric
+        LAT(res.node->rlat, node_reg_ev.rpq_occ, node_reg_ev.rpq_ins,
             dram_speed);
-        LAT(after_node->write_latency, after_node->wpq_occ, after_node->wpq_ins,
+        LAT(res.node->wlat, node_reg_ev.wpq_occ, node_reg_ev.wpq_ins,
             dram_speed);
-        LAT(after_node->avg_latency,
-            (after_node->wpq_occ + after_node->rpq_occ),
-            after_node->wpq_ins + after_node->rpq_ins, dram_speed);
+        LAT(res.node->avglat, node_reg_ev.wpq_occ + node_reg_ev.rpq_occ,
+            node_reg_ev.wpq_ins + node_reg_ev.rpq_ins, dram_speed);
+        res.node->bw_rd = node_reg_ev.cas_rd * 64;
+        res.node->bw_wr = node_reg_ev.cas_wr * 64;
     }
 }
 
-#ifdef DEBUG
-void print_socket(socket_record *rec) {
-    fprintf(
-        stderr,
-        "rpq_occ=%ld rpq_ins=%ld wpq_occ=%ld wpq_ins=%ld dram_clocks=%ld "
-        "r_latency=%lf w_latency=%lf avg_latency=%lf, bw_rd=%ld, bw_wr=%ld\n",
-        rec->rpq_occ, rec->rpq_ins, rec->wpq_occ, rec->wpq_ins, rec->dram_clock,
-        rec->read_latency, rec->write_latency, rec->avg_latency, rec->cas_rd,
-        rec->cas_wr);
-}
-
-void print_channel(channel_record *rec) {
-    fprintf(stderr,
-            "rpq_occ=%ld rpq_ins=%ld wpq_occ=%ld wpq_ins=%ld r_latency = % lf "
-            "w_latency = % lf avg=%lf\n ",
-            rec->rpq_occ, rec->rpq_ins, rec->wpq_occ, rec->wpq_ins,
-            rec->read_latency, rec->write_latency, rec->avg_latency);
-}
-
-void print_node(node_record *rec) {
-    fprintf(stderr,
-            "rpq_occ=%ld rpq_ins=%ld wpq_occ=%ld wpq_ins=%ld r_latency = % lf "
-            "w_latency = % lf avg=%lf\n ",
-            rec->rpq_occ, rec->rpq_ins, rec->wpq_occ, rec->wpq_ins,
-            rec->read_latency, rec->write_latency, rec->avg_latency);
-}
-
-void print_record(record *rec) {
-    int i = 0;
-    int j = 0;
-    for (i = 0; i < env.nr_socket; i++) {
-        print_socket(&rec->socket_record_arr[i]);
-        for (j = 0; j < env.nr_channel; j++) {
-            print_channel(&rec->socket_record_arr[i].channel_record_arr[j]);
-        }
-    }
-    print_node(rec->node);
-}
-#endif
-
-int call(int t, struct unity_lines *lines) {
-    if (!env.init_succ) {
-        return 0;
-    }
-
+void setup_table(int t, struct unity_lines *lines) {
     struct unity_line *line;
     int32_t socket_id = 0, channel_id = 0, line_num = 0;
-
-    read_imc();
-#ifdef DEBUG
-    fprintf(stderr, "before.\n");
-    print_record(&before);
-
-    fprintf(stderr, "after.\n");
-    print_record(&after);
-#endif
-
     line_num = env.nr_socket * (1 + env.nr_channel) + 1;
     unity_alloc_lines(lines, line_num);
-
     for (socket_id = 0; socket_id < env.nr_socket; socket_id++) {
         char socket_name[32];
         snprintf(socket_name, 32, "%d", socket_id);
@@ -842,16 +780,11 @@ int call(int t, struct unity_lines *lines) {
         line = unity_get_line(lines, (1 + env.nr_channel) * socket_id);
         unity_set_table(line, "imc_socket_event");
         unity_set_index(line, 0, "socket", socket_name);
-        unity_set_value(line, 0, "rlat",
-                        after.socket_record_arr[socket_id].read_latency);
-        unity_set_value(line, 1, "wlat",
-                        after.socket_record_arr[socket_id].write_latency);
-        unity_set_value(line, 2, "avglat",
-                        after.socket_record_arr[socket_id].avg_latency);
-        unity_set_value(line, 3, "bw_rd",
-                        after.socket_record_arr[socket_id].cas_rd * 64);
-        unity_set_value(line, 4, "bw_wr",
-                        after.socket_record_arr[socket_id].cas_wr * 64);
+        unity_set_value(line, 0, "rlat", res.socket[socket_id].rlat);
+        unity_set_value(line, 1, "wlat", res.socket[socket_id].wlat);
+        unity_set_value(line, 2, "avglat", res.socket[socket_id].avglat);
+        unity_set_value(line, 3, "bw_rd", res.socket[socket_id].bw_rd);
+        unity_set_value(line, 4, "bw_wr", res.socket[socket_id].bw_wr);
 
         for (channel_id = 0; channel_id < env.nr_channel; channel_id++) {
             char channel_name[32];
@@ -863,54 +796,52 @@ int call(int t, struct unity_lines *lines) {
             unity_set_index(line, 0, "socket", socket_name);
             unity_set_index(line, 1, "channel", channel_name);
             unity_set_value(line, 0, "rlat",
-                            after.socket_record_arr[socket_id]
-                                .channel_record_arr[channel_id]
-                                .read_latency);
+                            res.channel[socket_id][channel_id].rlat);
             unity_set_value(line, 1, "wlat",
-                            after.socket_record_arr[socket_id]
-                                .channel_record_arr[channel_id]
-                                .write_latency);
+                            res.channel[socket_id][channel_id].wlat);
             unity_set_value(line, 2, "avglat",
-                            after.socket_record_arr[socket_id]
-                                .channel_record_arr[channel_id]
-                                .avg_latency);
+                            res.channel[socket_id][channel_id].avglat);
             unity_set_value(line, 3, "bw_rd",
-                            after.socket_record_arr[socket_id]
-                                    .channel_record_arr[channel_id]
-                                    .cas_rd *
-                                64);
+                            res.channel[socket_id][channel_id].bw_rd);
             unity_set_value(line, 4, "bw_wr",
-                            after.socket_record_arr[socket_id]
-                                    .channel_record_arr[channel_id]
-                                    .cas_wr *
-                                64);
+                            res.channel[socket_id][channel_id].bw_wr);
         }
     }
 
     line = unity_get_line(lines, line_num - 1);
     unity_set_table(line, "imc_node_event");
-    unity_set_value(line, 0, "rlat", after.node->read_latency);
-    unity_set_value(line, 1, "wlat", after.node->write_latency);
-    unity_set_value(line, 2, "avglat", after.node->avg_latency);
+    unity_set_value(line, 0, "rlat", res.node->rlat);
+    unity_set_value(line, 1, "wlat", res.node->wlat);
+    unity_set_value(line, 2, "avglat", res.node->avglat);
+    unity_set_value(line, 3, "bw_rd", res.node->bw_rd);
+    unity_set_value(line, 4, "bw_wr", res.node->bw_wr);
+}
 
+void swap_regs() {
     /* swap data */
-    socket_record *tmp = before.socket_record_arr;
-    node_record *node_tmp = before.node;
-    before.socket_record_arr = after.socket_record_arr;
-    before.node = after.node;
-
-    after.socket_record_arr = tmp;
-    after.node = node_tmp;
+    reg_event **tmp = before.regs;
+    before.regs = after.regs;
+    after.regs = tmp;
 
     /* clear after data */
-    free_socket_record(after.socket_record_arr);
-    after.socket_record_arr = alloc_socket_record();
-    free(after.node);
-    after.node = calloc(1, sizeof(node_record));
+    free(after.regs);
+    after.regs = alloc_record();
+}
 
+int call(int t, struct unity_lines *lines) {
+    if (!env.init_succ) {
+        return 0;
+    }
+    read_imc();
+    calculate_metric();
+#ifdef DEBUG
+    print_result(res);
+#endif
+
+    setup_table(t, lines);
+    swap_regs();
     /* reset before timestamp */
     before_ts = after_ts;
-
     return 0;
 }
 
