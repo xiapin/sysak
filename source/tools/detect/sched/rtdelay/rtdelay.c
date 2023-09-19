@@ -21,7 +21,7 @@ static volatile bool exiting = false;
 
 #define debug_print 0
 
-#define output_sysom 1
+static volatile int output_sysom = 1;
 
 static struct env
 {
@@ -278,13 +278,6 @@ static void offcpu_analyse(struct ksyms *ksyms,
     request->offcpu_SERVER_t = val_on.server_delta;
     k_t.read_ts = key->read_ts;
 
-#if 0
-    printf("buf = %s\n", val_on.buf);
-#endif
-
-#if debug_print
-    printf("k_t.read_ts:%ld\n", k_t.read_ts);
-#endif
     // find reason for offcpu
     err = bpf_map_lookup_elem(rfd, &key->read_ts, &head);
     if (err < 0)
@@ -294,9 +287,6 @@ static void offcpu_analyse(struct ksyms *ksyms,
     }
     while (head.kern_stack_id != 0)
     {
-#if debug_print
-        printf("stack_id:=%d\n", head.kern_stack_id);
-#endif
         k_t.kern_stack_id = head.kern_stack_id;
         // find existing reason
         enum OFFCPU_REASON off_reason;
@@ -315,9 +305,6 @@ static void offcpu_analyse(struct ksyms *ksyms,
             return;
         }
         add_offcpu_delta(request, off_reason, val_off.delta);
-#if debug_print
-        printf("=====>offcpu_reason=%d,%d\n", off_reason, val_off.delta);
-#endif
         // next stacks
         err = bpf_map_lookup_elem(rsfd, &head, &stack_next);
         if (err == ENOENT)
@@ -342,9 +329,14 @@ static void analyse(struct ksyms *ksyms,
 {
     struct read_key lookup_key = {}, next_key;
     int err, ifd_on;
+    struct tm *beijing_time;
+    char buffer[80];
 
     ifd_on = bpf_map__fd(obj->maps.info_on);
-    printf("[");
+    if (output_sysom)
+        printf("[");
+    else
+        printf("RT时延分析如下:\n");
 
     while (!bpf_map_get_next_key(ifd_on, &lookup_key, &next_key))
     {
@@ -360,15 +352,21 @@ static void analyse(struct ksyms *ksyms,
         lookup_key = next_key;
 
         if (!output_sysom)
-            printf("read_ts:%lld, on:%lld, runqueue:%lld, rt_latency:%lld, futex:%lld, lock:%lld, io:%lld, net:%lld, server:%lld, other:%lld\n", r.read_ts, r.oncpu_t, r.runqueue_t, r.rtlatency_t, r.offcpu_FUTEX_t, r.offcpu_LOCK_t, r.offcpu_IO_t, r.offcpu_NET_t, r.offcpu_SERVER_t, r.offcpu_OTHER_t);
+        {
+            beijing_time = localtime(&r.read_ts);
+            strftime(buffer, 80, "%Y-%m-%d %H:%M:%S", beijing_time);
+            printf("%s %8s", buffer, " ");
+            printf("RT时延:%lld\n cpu时间:%lld, 运行队列:%lld,  futex:%lld, mutex:%lld, 存储:%lld, 网络:%lld, server端:%lld, 其他:%lld\n", r.rtlatency_t, r.oncpu_t, r.runqueue_t, r.offcpu_FUTEX_t, r.offcpu_LOCK_t, r.offcpu_IO_t, r.offcpu_NET_t, r.offcpu_SERVER_t, r.offcpu_OTHER_t);
+        }
         else
             printf("{\"read_ts\":%lld, \"on\":%lld, \"runqueue\":%lld, \"rt_latency\":%lld, \"futex\":%lld, \"lock\":%lld, \"io\":%lld, \"net\":%lld, \"server\":%lld, \"other\":%lld},\n", r.read_ts, r.oncpu_t, r.runqueue_t, r.rtlatency_t, r.offcpu_FUTEX_t, r.offcpu_LOCK_t, r.offcpu_IO_t, r.offcpu_NET_t, r.offcpu_SERVER_t, r.offcpu_OTHER_t);
     }
 
-    printf("{}]");
+    if (output_sysom)
+        printf("{}]");
 }
 
-int rtdelay(pid_t pid, pid_t server_pid, int duration)
+int rtdelay(pid_t pid, pid_t server_pid, int duration, int json_out)
 {
     initData(&FL);
 
@@ -404,6 +402,7 @@ int rtdelay(pid_t pid, pid_t server_pid, int duration)
     argfd = bpf_map__fd(skel->maps.argmap);
     bpfarg.targ_tgid = pid;
     bpfarg.server_pid = server_pid;
+    output_sysom = json_out;
     bpf_map_update_elem(argfd, &key, &bpfarg, 0);
 
     ksyms = ksyms__load();
