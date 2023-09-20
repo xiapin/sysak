@@ -207,6 +207,8 @@ function CfoxTSDB:setupWrite()
         local v = foxTime.year * 10000 + foxTime.mon * 100 + foxTime.mday
         local fname = string.format("%08d.fox", v)
         pcall(unistd.unlink, "./" .. fname)
+        fname = string.format("%08d.foxi", v)
+        pcall(unistd.unlink, "./" .. fname)
         ret = self.cffi.fox_setup_write(self._man, date, us)
     end
     assert(ret == 0)
