@@ -8,7 +8,7 @@ local ffi = require("ffi")
 local cffi = ffi.load('foxTSDB')
 
 ffi.cdef [[
-typedef unsigned long fox_time_t;
+typedef signed long fox_time_t;
 typedef size_t fox_off_t;
 
 struct foxDate {
