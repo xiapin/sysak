@@ -353,6 +353,7 @@ function CurlApi:query(tReq)
         if cStat then
             return ms
         else
+            print("query return :", ms)
             return {}
         end
     else
