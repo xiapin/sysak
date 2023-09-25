@@ -1,0 +1,5 @@
+requests==2.27.1
+pyinstaller==3.5
+netifaces==0.11.0
+nsenter==0.2
+icmplib==2.1.1
