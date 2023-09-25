@@ -49,6 +49,7 @@ binary:
 clean:
 	make -C $(SRC)/lib clean
 	make -C $(SRC)/tools/monitor/mservice/master clean
+	make -C $(SRC)/tools/monitor/unity clean
 	rm -rf $(OBJPATH)
 clean_middle:
 	make -C $(SRC)/lib clean
