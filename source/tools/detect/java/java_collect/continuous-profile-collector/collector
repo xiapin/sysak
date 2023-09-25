@@ -1,0 +1,169 @@
+#!/bin/sh
+
+die () {
+  echo
+  echo "$*"
+  echo
+  exit 1
+} >&2
+
+error() {
+  echo
+  echo "ERROR: $*"
+} >&2
+
+checkJava() {
+  set +eu
+  if [ -n "$JAVA_HOME" ]; then
+    JAVA_CMD=$JAVA_HOME/bin/java
+    if [ ! -x "$JAVA_CMD" ]; then
+      die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+
+  Please set the JAVA_HOME variable in your environment to match the
+  location of your Java installation."
+    fi
+  else
+    JAVA_CMD=java
+    which java > /dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+
+  Please set the JAVA_HOME variable in your environment to match the
+  location of your Java installation."
+  fi
+  set -eu
+}
+
+set -eu
+
+usage() {
+  echo
+  echo "Usage: $0 [options] <pid>          run collecting for target process"
+  echo "    or $0 new-config               create a configuration from template"
+  echo
+  echo "Options:"
+  echo "  -d duration                      run collecting for <duration> seconds"
+  echo "  -c configuration_path            config file"
+  echo
+  exit 1
+} >&2
+
+jattach() {
+  set +e
+  "$JATTACH" "$PID" load instrument false "$COLLECTOR=$1" >/dev/null
+  RET=$?
+
+  # Check if jattach failed
+  if [ $RET -ne 0 ]; then
+    if [ $RET -eq 255 ]; then
+      error "Failed to inject collector into $PID"
+    fi
+    exit $RET
+  fi
+
+  set -e
+}
+
+check_if_terminated() {
+  if ! kill -0 "$PID" 2>/dev/null; then
+    exit 0
+  fi
+}
+
+SCRIPT_BIN="$0"
+while [ -h "$SCRIPT_BIN" ]; do
+  SCRIPT_BIN="$(readlink "$SCRIPT_BIN")"
+done
+SCRIPT_DIR="$(
+  cd "$(dirname "$SCRIPT_BIN")" >/dev/null 2>&1
+  pwd -P
+)"
+
+JATTACH=$SCRIPT_DIR/jattach
+COLLECTOR=$SCRIPT_DIR/continuous-profile-collector-agent.jar
+CONFIGURATION_PATH=$SCRIPT_DIR/configuration.toml
+PID=""
+
+newConfig() {
+  set +e
+  checkJava
+  "$JAVA_CMD" -cp "$COLLECTOR" "com.alibaba.cpc.ConfigurationGenerator" "$SCRIPT_DIR"
+  RET=$?
+  if [ $RET -ne 0 ]; then
+    die "Failed to generate configuration"
+  fi
+  set -e
+}
+
+if [ $# -eq 1 ]; then
+  if [ "$1" = "new-config" ]; then
+    newConfig
+    exit 0
+  fi
+fi
+
+genJattach() {
+  set +e
+  checkJava
+  "$JAVA_CMD" -cp "$COLLECTOR" "com.alibaba.cpc.JattachExtractor" "$SCRIPT_DIR"
+  RET=$?
+  if [ $RET -ne 0 ]; then
+    die "Failed to generate jattach"
+  fi
+
+  chmod +x $JATTACH
+  set -e
+}
+
+if [ ! -f "$JATTACH" ]; then
+  genJattach
+fi
+
+DURATION=10
+while [ $# -gt 0 ]; do
+  case $1 in
+  -h | "-?")
+    usage
+    ;;
+  -d)
+    DURATION="$2"
+    shift
+    ;;
+  -c)
+    CONFIGURATION_PATH="$SCRIPT_DIR/$2"
+    shift
+    ;;
+  [0-9]*)
+    PID="$1"
+    ;;
+  -*)
+    error "Unrecognized option: $1"
+    usage
+    ;;
+  esac
+  shift
+done
+
+if [ ! -f "$CONFIGURATION_PATH" ]; then
+  error "config file not found: $CONFIGURATION_PATH"
+  exit 1
+fi
+
+if [ "$PID" = "" ]; then
+  error "No process specified"
+  usage
+fi
+
+jattach "configuration_path=$CONFIGURATION_PATH"
+echo Collecting for "$DURATION" seconds >&2
+set +e
+trap 'DURATION=0' INT
+
+while [ "$DURATION" -gt 0 ]; do
+  DURATION=$((DURATION - 1))
+  check_if_terminated
+  sleep 1
+done
+
+set -e
+trap - INT
+echo Done >&2
+jattach ""
