@@ -9,21 +9,28 @@
 #define REQ_OP_MASK		((1 << REQ_OP_BITS) - 1)
 #define MAX_STACK_DEPTH		12
 
-enum ioroute_type{
+enum ioroute_type {
 	IO_START_POINT,
 	IO_ISSUE_DRIVER_POINT,
 	IO_ISSUE_DEVICE_POINT,
 	IO_RESPONCE_DRIVER_POINT,
 	IO_COMPLETE_TIME_POINT,
+	IO_DONE_POINT,
 	MAX_POINT,
+};
+
+enum operating_mode {
+	DIAGNOSTIC_MODE,
+	MONITOR_MODE,
 };
 
 struct iosdiag_req {
 	pid_t pid;
+	unsigned int queue_id;
 	char comm[16];
 	char diskname[32];
 	unsigned long long ts[MAX_POINT];
-	unsigned int cpu[3];
+	unsigned int cpu[4];
 	//unsigned int complete;
 	//unsigned int cmd_flags;
 	char op[8];
@@ -41,7 +48,7 @@ struct iosdiag_key {
 	unsigned long sector;
 };
 
-int iosdiag_init(char *module_name);
-int iosdiag_run(int timeout, char *output_file);
+int iosdiag_init(char *module_name, unsigned int attach_interval);
+int iosdiag_run(int timeout, int mode, char *output_file);
 void iosdiag_exit(char *module_name);
 #endif

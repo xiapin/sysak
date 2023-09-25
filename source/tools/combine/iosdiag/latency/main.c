@@ -22,6 +22,8 @@ static void usage(void)
 		"latency [OPTION] disk_devname       Detect IO latency in specified disk\n"
 		"latency -t ms disk_devname          Set IO latency threshold(default 1000ms)\n"
 		"latency -T sec disk_devname         How long to detect IO latency(default 10s)\n"
+		"latency -a sec disk_devname         The period of time in the detach state(default 0s)\n"
+		"latency -m disk_devname             Monitor mode, sending high-latency IO events to unity\n"
 		"latency -f log disk_devname         Specify the output file log\n"
 		"latency -v                          Display debug log during load bpf\n"
 		"\ne.g.\n"
@@ -47,12 +49,22 @@ int main(int argc, char *argv[])
 {
 	int ch;
 	int timeout_s = 10, threshold_ms = 1000;
+	unsigned int attach_s = 0;
+	int operating_mode = DIAGNOSTIC_MODE;
 	char *result_dir = "/var/log/sysak/iosdiag/latency";
 	char *devname;
 	char resultfile_path[256];
 
-	while ((ch = getopt(argc, argv, "T:t:f:hv")) != -1) {
+	while ((ch = getopt(argc, argv, "a:mT:t:f:hv")) != -1) {
 		switch (ch) {
+			case 'a':
+				attach_s = (unsigned int)strtoul(optarg, NULL, 0);
+				if (attach_s < 0)
+					attach_s = 0;
+				break;		
+			case 'm':
+				operating_mode = MONITOR_MODE;
+				break;
 			case 'T':
 				timeout_s = (unsigned int)strtoul(optarg, NULL, 0);
 				if (timeout_s <= 0)
@@ -74,12 +86,12 @@ int main(int argc, char *argv[])
 	}
 	devname = argv[argc - 1];
 	g_threshold_us = threshold_ms * 1000;
-	if (iosdiag_init(devname)) {
+	if (iosdiag_init(devname, attach_s)) {
 		fprintf(stderr, "iosdiag_init fail\n");
 		return -1;
 	}
 	sprintf(resultfile_path, "%s/result.log.seq", result_dir);
-	iosdiag_run(timeout_s, resultfile_path);
+	iosdiag_run(timeout_s, operating_mode, resultfile_path);
 	iosdiag_exit(devname);
 	return 0;
 }

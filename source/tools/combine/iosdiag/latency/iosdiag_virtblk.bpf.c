@@ -9,11 +9,21 @@ struct bpf_map_def SEC("maps") iosdiag_virtblk_maps = {
 
 SEC("kprobe/virtio_queue_rq")
 int kprobe_virtio_queue_rq(struct pt_regs *ctx)
-{
+{	
+	struct blk_mq_hw_ctx *hctx =
+		(struct blk_mq_hw_ctx *)PT_REGS_PARM1(ctx);
 	struct blk_mq_queue_data *bd =
 		(struct blk_mq_queue_data *)PT_REGS_PARM2(ctx);
 	bool kick;
 	unsigned long req_addr;
+	unsigned int queue_id;
+	struct request *req;
+
+	struct iosdiag_req *ioreq;
+	struct iosdiag_req new_ioreq = {0};
+	struct iosdiag_key key = {0};
+	sector_t sector;
+
 	pid_t pid = bpf_get_current_pid_tgid();
 
 	bpf_probe_read(&kick, sizeof(bool), &bd->last);
@@ -25,7 +35,24 @@ int kprobe_virtio_queue_rq(struct pt_regs *ctx)
 		//bpf_printk("kprobe_virtio_queue_rq: con't get request");
 		return 0;
 	}
+
+	bpf_probe_read(&queue_id, sizeof(unsigned int), &hctx->queue_num);
+	bpf_probe_read(&req, sizeof(struct request *), &bd->rq);
+	if (!req) {
+		return 0;
+	}
+	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
+
+	init_iosdiag_key(sector, &key);
+	ioreq = (struct iosdiag_req *)bpf_map_lookup_elem(&iosdiag_maps, &key);
+	if (ioreq) {
+		ioreq->queue_id = queue_id;
+	} else
+		return 0;
+
 	bpf_map_update_elem(&iosdiag_virtblk_maps, &pid, &req_addr, BPF_ANY);
+	bpf_map_update_elem(&iosdiag_maps, &key, ioreq, BPF_ANY);
+
 	return 0;
 }
 

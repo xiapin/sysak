@@ -79,10 +79,12 @@ trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_typ
 {
 	struct iosdiag_req *ioreq;
 	struct iosdiag_req new_ioreq = {0};
+	struct iosdiag_req data = {0};
 	struct iosdiag_key key = {0};
 	unsigned long long now = bpf_ktime_get_ns();
 	sector_t sector;
 	struct gendisk *rq_disk;
+	int complete = 0;
 
 	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
 	init_iosdiag_key(sector, &key);
@@ -95,7 +97,17 @@ trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_typ
 			bpf_probe_read(ioreq->diskname, sizeof(ioreq->diskname), &rq_disk->disk_name);
 		}
 		if (type == IO_RESPONCE_DRIVER_POINT)
-			ioreq->cpu[1] = bpf_get_smp_processor_id();
+			ioreq->cpu[2] = bpf_get_smp_processor_id();
+		if (type == IO_DONE_POINT){
+			if (ioreq->ts[IO_ISSUE_DEVICE_POINT] &&
+		    	ioreq->ts[IO_RESPONCE_DRIVER_POINT])
+				complete = 1;
+			    //bpf_printk("kprobe_blk_account_io_done!");
+		}
+		if (complete) {
+			memcpy(&data, ioreq, sizeof(data));
+			bpf_perf_event_output(ctx, &iosdiag_maps_notify, 0xffffffffULL, &data, sizeof(data));
+		}
 	} else
 		return 0;
 	bpf_map_update_elem(&iosdiag_maps, &key, ioreq, BPF_ANY);
@@ -123,7 +135,10 @@ int tracepoint_block_getrq(struct block_getrq_args *args)
 	if (target_devt && args->dev != target_devt)
 		return 0;
 
-	new_ioreq.cpu[0] = new_ioreq.cpu[1] = new_ioreq.cpu[2] = -1;
+	new_ioreq.cpu[0] = -1;
+	new_ioreq.cpu[1] = -1;
+	new_ioreq.cpu[2] = -1;
+	new_ioreq.cpu[3] = -1;
 	init_iosdiag_key(args->sector, &key);
 	if (pid)
 		memcpy(new_ioreq.comm, args->comm, sizeof(args->comm));
@@ -172,6 +187,7 @@ int tracepoint_block_rq_issue(struct block_rq_issue_args *args)
 			ioreq->data_len = args->bytes;
 		else if (args->nr_sector)
 			ioreq->data_len = args->nr_sector * 512;
+		ioreq->cpu[1] = bpf_get_smp_processor_id();
 	} else
 		return 0;
 	bpf_map_update_elem(&iosdiag_maps, &key, ioreq, BPF_ANY);
@@ -206,17 +222,32 @@ int tracepoint_block_rq_complete(struct block_rq_complete_args *args)
 	if (ioreq) {
 		if (!ioreq->ts[IO_COMPLETE_TIME_POINT])
 			ioreq->ts[IO_COMPLETE_TIME_POINT] = now;
-		if (ioreq->ts[IO_ISSUE_DEVICE_POINT] &&
-		    ioreq->ts[IO_RESPONCE_DRIVER_POINT])
-				complete = 1;
-		ioreq->cpu[2] = bpf_get_smp_processor_id();
+		ioreq->cpu[3] = bpf_get_smp_processor_id();
 	} else
 		return 0;
-	if (complete) {
-		memcpy(&data, ioreq, sizeof(data));
-		bpf_perf_event_output(args, &iosdiag_maps_notify, 0xffffffffULL, &data, sizeof(data));
+		
+	bpf_map_update_elem(&iosdiag_maps, &key, ioreq, BPF_ANY);
+	return 0;
+}
+
+SEC("kprobe/blk_account_io_done")
+int kprobe_blk_account_io_done(struct pt_regs *ctx)
+{
+	struct request *req = (struct request *)PT_REGS_PARM1(ctx);
+	struct iosdiag_key key = {0};
+	sector_t sector;
+
+	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
+	init_iosdiag_key(sector, &key);
+
+	if (!req) {
+		//bpf_printk("kprobe_blk_account_io_done: con't get request");
+		return 0;
 	}
+
+	trace_io_driver_route(ctx, req, IO_DONE_POINT);
 	bpf_map_delete_elem(&iosdiag_maps, &key);
 	return 0;
 }
+
 #endif
