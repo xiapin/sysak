@@ -23,11 +23,9 @@ config:
     cellLimit: -1 # set guard limit time. guard time is unlimit when cellLimit is -1,default is 50(ms)
 
 forkRun:
-  - cmd: "/bin/bash"
+  - cmd: "../../../ntopo"
     args:
-      [
-        "../../../ntopo/ntopo.sh",
-      ]
+      []
   - cmd: "../../../sql-obs"
     args:
       []
