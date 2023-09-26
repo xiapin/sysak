@@ -49,10 +49,9 @@ type appOsMetrics struct {
     MemReclaimLatency       float64 `json:"memReclaimLatency"`
     PkgDrops                float64 `json:"pkgDrops"`
     RequestCount            float64  `json:"requestCount"`
-    NetSendTraffic          uint64  `json:"netSendTraffic"`
-    NetRecTraffic           uint64  `json:"netRecTraffic"`
-    ResponseTimeP95         uint64  `json:"responseTimeP95"`
-    ResponseTimeP99         uint64  `json:"responseTimeP99"`
+    NetSendTraffic          float64  `json:"netSendTraffic"`
+    NetRecTraffic           float64  `json:"netRecTraffic"`
+    ResponseTimeMax         uint64  `json:"responseTimeMax"`
     ResponseTimeAvg         uint64  `json:"responseTimeAvg"`
 }
 
@@ -83,7 +82,7 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         "nr_involuntary_switches", "delay", "write_bytes", "read_bytes", "IOwait",
         "majflt",
     }
-    rtMap := common.GetAppLatency("sysom_metrics_ntopo_request")
+    rtMap := common.GetAppLatency("sysom_metrics_ntopo_node")
     for index, line := range common.GetAppMetrics(
         "observe", labelName, metricsName) {
         metric := line.(map[string]interface{})
@@ -125,11 +124,10 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         // retrans, _ = metric["retran"]           // null
         if _, ok := rtMap[containerId]; ok {
             m.RequestCount = float64(rtMap[containerId][0]) / 30.0
-            m.NetRecTraffic = rtMap[containerId][1]
-            m.NetSendTraffic = rtMap[containerId][2]
-            m.ResponseTimeP95 = rtMap[containerId][3]
-            m.ResponseTimeP99 = rtMap[containerId][4]
-            m.ResponseTimeAvg = rtMap[containerId][5]
+            m.NetRecTraffic = float64(rtMap[containerId][1]) / 30.0
+            m.NetSendTraffic = float64(rtMap[containerId][2]) / 30.0
+            m.ResponseTimeAvg = rtMap[containerId][3]
+            m.ResponseTimeMax = rtMap[containerId][4]
         }
         if m.CpuTotal > 0 {
             analyzer.MarkEventsNotify(

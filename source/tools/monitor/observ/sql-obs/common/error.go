@@ -51,11 +51,25 @@ type MyError struct {
     line int
 }
 
+const Max_Print_Error_Cnt = 50
+var printErrorLimit int = 0
+
 func (e *MyError) Error() string {
     return fmt.Sprintf("[%s:%d] %s: %s", e.file, e.line, e.fun, e.err.Error())
 }
 
+func checkPrintLimit() bool {
+    if printErrorLimit >= (Max_Print_Error_Cnt + 1) {
+        if printErrorLimit == (Max_Print_Error_Cnt + 1) {
+            PrintOnlyErrMsg("start limit error log output")
+        }
+        return true
+    }
+    return false
+}
+
 func newMyError(err error, skip ...int) error {
+    printErrorLimit += 1
     skipTrace := 2
     if len(skip) > 0 {
         skipTrace = skip[0]
@@ -74,12 +88,17 @@ func newMyError(err error, skip ...int) error {
 
 func PrintOnlyErrMsg(errMsg string, a ...interface{}) error {
     err := newMyError(errors.New("error: " + fmt.Sprintf(errMsg, a...)), 2)
-    fmt.Println(err)
+    if !checkPrintLimit() {
+        fmt.Println(err)
+    }
     return err
 }
 
 func PrintDefinedErr(err ErrorCode, msg ...string) {
     errMsg := "unkown error"
+    if checkPrintLimit() {
+        return
+    }
     for i := 0; i < len(dErrTlb); i++ {
         if err == dErrTlb[i].err {
             errMsg = dErrTlb[i].errMsg
@@ -96,5 +115,8 @@ func PrintDefinedErr(err ErrorCode, msg ...string) {
 }
 
 func PrintSysError(err error) {
+    if checkPrintLimit() {
+        return
+    }
     fmt.Println(newMyError(err))
 }

@@ -5,5 +5,6 @@ import (
 )
 
 func StartTracing() {
-	fmt.Println("start tracing")
+    fmt.Println("start tracing")
+    StartTracingSql()
 }
