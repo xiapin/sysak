@@ -149,15 +149,14 @@ func GetAppMetrics(table string,
     return result
 }
 
-func GetAppLatency(table string) map[string]*[6]uint64 {
+func GetAppLatency(table string) map[string]*[5]uint64 {
     m, err := qByTable(table, queryPeriod)
     if err != nil {
         PrintOnlyErrMsg("Can't get ntopo rt info.")
         return nil
     }
 
-    result := make(map[string]*[6]uint64)
-    buckets := make(map[string]*[]uint64)
+    result := make(map[string]*[5]uint64)
 
     for _, line := range m {
         if line["labels"].(map[string]interface{})["APP"].(string) != "MYSQL" {
@@ -167,41 +166,18 @@ func GetAppLatency(table string) map[string]*[6]uint64 {
         containerID := line["labels"].(
         map[string]interface{})["ContainerID"].(string)[0:12]
         if _, ok := result[containerID]; !ok {
-            result[containerID] = &[6]uint64{}
-            buckets[containerID] = BuildBucket()
+            result[containerID] = &[5]uint64{}
         }
-        result[containerID][0] += 1                                                                           // count
-        result[containerID][1] += uint64(line["values"].(
-            map[string]interface{})["ReqBytes"].(float64))  // req bytes
-        result[containerID][2] += uint64(line["values"].(
-            map[string]interface{})["RespBytes"].(float64)) // resp bytes
-        InsertBucket(uint64(line["values"].(
-            map[string]interface{})["Latency"].(float64)),
-            buckets[containerID])
-        result[containerID][5] += uint64(line["values"].(
-            map[string]interface{})["Latency"].(float64))
+        result[containerID][0] = uint64(line["labels"].(
+            map[string]interface{})["Requests"].(float64)) // count
+        result[containerID][1] = uint64(line["labels"].(
+            map[string]interface{})["InBytes"].(float64))  // req bytes
+        result[containerID][2] = uint64(line["labels"].(
+            map[string]interface{})["OutBytes"].(float64)) // resp bytes
+        result[containerID][3] = uint64(line["labels"].(
+            map[string]interface{})["AvgRT"].(float64))
+        result[containerID][4] = uint64(line["labels"].(
+            map[string]interface{})["MaxRT"].(float64))
     }
-
-    // fmt.Println("========")
-    for key, bucket := range buckets {
-        // fmt.Println(key, "request count:", result[key][0])
-        if result[key][0] > 0 {
-            result[key][1] /= result[key][0] // avg request bytes
-            result[key][2] /= result[key][0] // avg response bytes
-            result[key][5] /= result[key][0]
-        }
-        result[key][3] = GetPercentile(
-            bucket, 95, result[key][0]) // P95: ns
-        result[key][4] = GetPercentile(
-            bucket, 99, result[key][0]) // P99: ns
-        // result[key][0] =
-        //     (result[key][0] + uint64(queryPeriod)) / uint64(queryPeriod) // req count
-    }
-    // fmt.Println("========")
-
-    // for key, value := range result {
-    //     fmt.Println(key)
-    //     fmt.Println(*value)
-    // }
     return result
 }
