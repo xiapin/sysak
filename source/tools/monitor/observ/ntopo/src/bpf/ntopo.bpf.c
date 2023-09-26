@@ -43,12 +43,12 @@ struct
 
 static inline void debug_sock_role(struct sock_info *info)
 {
-        __bpf_printk("role: %d\n", info->role);
+        // __bpf_printk("role: %d\n", info->role);
 }
 
 static inline void debug_pid_info(struct pid_info *info)
 {
-        __bpf_printk("container id: %s\n", info->container_id);
+        // __bpf_printk("container id: %s\n", info->container_id);
 }
 
 static inline void set_addr_pair_by_sock(struct sock *sk, struct addrpair *ap)
@@ -128,6 +128,7 @@ static inline void update_nodes(struct sock_info *info, int role, int rt)
                 return;
 
         ninfo->pid = info->pid;
+        ninfo->requests++;
         if (role == ROLE_CLIENT)
         {
                 ninfo->client_tot_rt_hz += 1;
@@ -136,6 +137,8 @@ static inline void update_nodes(struct sock_info *info, int role, int rt)
                 {
                         ninfo->client_addr = info->ap.saddr;
                         ninfo->server_addr = info->ap.daddr;
+                        ninfo->sport = info->ap.sport;
+                        ninfo->dport = info->ap.dport;
                         ninfo->client_max_rt_us = rt;
                 }
         }
@@ -145,12 +148,14 @@ static inline void update_nodes(struct sock_info *info, int role, int rt)
                 ninfo->server_tot_rt_us += rt;
                 if (rt > ninfo->server_max_rt_us)
                 {
-                        ninfo->client_addr = info->ap.daddr;
                         ninfo->server_addr = info->ap.saddr;
                         ninfo->client_addr = info->ap.daddr;
+                        ninfo->sport = info->ap.dport;
+                        ninfo->dport = info->ap.sport;
                         ninfo->server_max_rt_us = rt;
                 }
         }
+
 }
 
 static inline bool try_add_sock(struct sock *sk)
@@ -169,6 +174,7 @@ static inline bool try_add_sock(struct sock *sk)
         set_addr_pair_by_sock(sk, &info.ap);
         if (info.ap.saddr == info.ap.daddr)
                 return false;
+
         info.role = get_sock_role(&info, sk);
         // if (info.role == ROLE_SERVER) {
         //         int tmp;

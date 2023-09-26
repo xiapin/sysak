@@ -6,8 +6,12 @@ use std::os::unix::net::UnixListener;
 use libbpf_rs::MapHandle;
 
 pub fn unix_sock_send(addr: &str, data: &String) {
-    match UnixDatagram::bind(addr) {
-        Ok(sock) => {
+    if data.len() == 0 {
+        return;
+    }
+    let sock = UnixDatagram::unbound().expect("failed to create unix sock");
+    match sock.connect(addr) {
+        Ok(()) => {
             if let Err(e) = sock.send(&data.as_bytes()) {
                 println!("failed to send data to sock: {addr}, error: {e}, data: {data}");
             }
