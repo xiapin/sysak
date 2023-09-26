@@ -261,6 +261,19 @@
 | time\_squeeze | 个 | cpu，对应CPU号 | 函数 net\_rx\_action 调用次数. | collector/proc\_softnet\_stat.lua |
 | flow\_limit\_count | 个 | cpu，对应CPU号 | 达到 flow limit 的次数. | collector/proc\_softnet\_stat.lua |
 
+
+### con_net_stat 表
+
+| 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
+| :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
+| net_rx_bytes     | byte | 容器对应网口接收字节数   | interface对应容器中的网口（如eth0）| collector/container/con_net_stat.lua |
+| net_rx_packets | packet   | 容器对应网口接收数据包数                |      | collector/container/con_net_stat.lua  |
+| net_rx_dropped | packet   | 容器对应网口接收端丢包数 |      | collector/container/con_net_stat.lua  |
+| net_tx_bytes     | byte | 容器对应网口发送字节数               |      | collector/container/con_net_stat.lua |
+| net_tx_packets | packet   | 容器对应网口发送数据包数                |      | collector/container/con_net_stat.lua  |
+| net_tx_dropped | packet   | 容器对应网口发送端丢包数 |      | collector/container/con_net_stat.lua  |
+
+
 ### cgroups 表
 
 * 对应 export 指标： sysak\_cgroups
@@ -316,17 +329,18 @@
 
 ### cg_cpu_stat 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_cpu\_stat
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | nr_throttled | - | total throttled number |  | collector/container/cg\_cpu\_stat.lua | 
 | throttled_time | ms | total throttled time |  | collector/container/cg\_cpu\_stat.lua | 
+| nr_periods | - | total period number |  | collector/container/cg\_cpu\_stat.lua |
 
 ### cg_proc_stat 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_proc\_stat
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
@@ -351,7 +365,7 @@
  
 ### cg_memfail_cnt 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_memfail\_cnt
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
@@ -360,7 +374,7 @@
  
 ### cg_memdrcm_latency 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_memdrcm\_latency
 * 属性标签：value
 
 This table show the hist of the latency of direct memory reclamation
@@ -376,7 +390,7 @@ This table show the hist of the latency of direct memory reclamation
 
 ### cg_blkio_stat 表
 
-* 对应 export 指标： sysom\_
+* 对应 export 指标： sysom\_container\_blkio\_stat
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
@@ -399,7 +413,7 @@ This table show the hist of the latency of direct memory reclamation
 
 ### cg_memmcmp_latency 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_memmcmp\_latency
 * 属性标签：value
 
 This table show the hist of the latency of direct memory compaction
@@ -415,26 +429,29 @@ This table show the hist of the latency of direct memory compaction
  
 ### pmu_events 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_pmu\_events
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
-| cpu_cycles | - | cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| instructions | - | instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| ipc | - | instructions per cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| cpi | - | cycles per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_store_ref | - | llc stroe hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_store_miss | - | llc stroe miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_load_ref | - | llc load hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_load_miss | - | llc load miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_rmiss_rate | - | llc load miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_wmiss_rate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_miss_rate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_cache_mpi | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| cycles | - | cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| ins | - | instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| IPC | - | instructions per cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| CPI | - | cycles per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcStore | - | llc stroe hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcStoreMis | - | llc stroe miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcLoad | - | llc load hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcLoadMis | - | llc load miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| l3LoadMisRate | - | llc load miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| l3StoreMisRate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| l3MisRate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| MPI | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
 
 
 ### imc_node_event 表
+
+* 对应 export 指标： sysom\_imc\_event\_node
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明              | 备注   | 源码路径                                 |
 | :----- | ---- | :-------------------- | :----- | :--------------------------------------- |
@@ -443,6 +460,9 @@ This table show the hist of the latency of direct memory compaction
 | avglat | ns   | imc avg ddr latency   | node级 | collector/plugin/uncore_imc/uncore_imc.c |
 
 ### imc_socket_event 表
+
+* 对应 export 指标： sysom\_imc\_event\_socket
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明              | 备注     | 源码路径                                 |
 | :----- | ---- | :-------------------- | :------- | :--------------------------------------- |
@@ -453,6 +473,9 @@ This table show the hist of the latency of direct memory compaction
 | bw_wr  | byte | imc write bandwidth   | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
 
 ### imc_channel_event 表
+
+* 对应 export 指标： sysom\_imc\_channel\_event
+* 属性标签：value
 
 | 指标名 | 单位 | 标签说明              | 备注      | 源码路径                                 |
 | :----- | ---- | :-------------------- | :-------- | :--------------------------------------- |
@@ -465,6 +488,9 @@ This table show the hist of the latency of direct memory compaction
 
 ### rdt_usage 表
 
+* 对应 export 指标： sysom\_rdt\_usage
+* 属性标签：value
+
 | 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
 | :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
 | llc_occ      | byte | llc occupancy                |      | collector/rdt/plugin/rdt_llc_occupancy.lua |
@@ -473,18 +499,11 @@ This table show the hist of the latency of direct memory compaction
 
 ### rdt_alloc_policy 表
 
+* 对应 export 指标： sysom\_rdt\_alloc\_policy
+* 属性标签：value
+
 | 指标名 | 单位 | 标签说明         | 备注                   | 源码路径                          |
 | :----- | ---- | :--------------- | :--------------------- | :-------------------------------- |
 | MB     |      | 内存带宽分配比例 | MB（Memory Bandwidth） | collector/rdt/plugin/rdt_size.lua |
 | L3     | byte | llc分配size      |                        | collector/rdt/plugin/rdt_size.lua |
 
-### con_net_stat 表
-
-| 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
-| :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
-| net_rx_bytes     | byte | 容器对应网口接收字节数   | interface对应容器中的网口（如eth0）| collector/container/con_net_stat.lua |
-| net_rx_packets | packet   | 容器对应网口接收数据包数                |      | collector/container/con_net_stat.lua  |
-| net_rx_dropped | packet   | 容器对应网口接收端丢包数 |      | collector/container/con_net_stat.lua  |
-| net_tx_bytes     | byte | 容器对应网口发送字节数               |      | collector/container/con_net_stat.lua |
-| net_tx_packets | packet   | 容器对应网口发送数据包数                |      | collector/container/con_net_stat.lua  |
-| net_tx_dropped | packet   | 容器对应网口发送端丢包数 |      | collector/container/con_net_stat.lua  |
