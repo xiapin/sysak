@@ -126,4 +126,32 @@ struct topology_ent {
     int64_t socket_id;
 };
 
+typedef struct reg_event {
+    uint64_t rpq_occ;
+    uint64_t rpq_ins;
+    uint64_t wpq_occ;
+    uint64_t wpq_ins;
+    uint64_t cas_rd;
+    uint64_t cas_wr;
+    uint64_t dram_clock;
+} reg_event;
+
+typedef struct record {
+    reg_event **regs;
+} record;
+
+typedef struct metric {
+    double rlat;
+    double wlat;
+    double avglat;
+    uint64_t bw_rd;
+    uint64_t bw_wr;
+} metric;
+
+typedef struct result {
+    metric *node;
+    metric *socket;
+    metric **channel;
+} result;
+
 #endif

@@ -18,11 +18,20 @@ local inotify = require('inotify')
 
 local CfoxTSDB = class("CfoxTSDB")
 
+local function get_timezone_offset()
+    local ts = os.time()
+    local utcdate   = os.date("!*t", ts)
+    local localdate = os.date("*t", ts)
+    localdate.isdst = false -- this is the trick
+    return os.difftime(os.time(localdate), os.time(utcdate))
+end
+
 local json = cjson.new()
 function CfoxTSDB:_init_(fYaml)
     self.ffi = foxFFI.ffi
     self.cffi = foxFFI.cffi
     self._proto = CprotoData.new(nil)
+    self.tz_sec = get_timezone_offset()
     self:setupConf(fYaml)
 end
 
@@ -85,7 +94,7 @@ function CfoxTSDB:getDate()
 end
 
 function CfoxTSDB:makeStamp(foxTime)
-    return self.cffi.make_stamp(foxTime)
+    return self.cffi.make_stamp(foxTime) + self.tz_sec * 1e6
 end
 
 function CfoxTSDB:date2str(date)
@@ -197,6 +206,8 @@ function CfoxTSDB:setupWrite()
         local foxTime = self:getDateFrom_us(usec)
         local v = foxTime.year * 10000 + foxTime.mon * 100 + foxTime.mday
         local fname = string.format("%08d.fox", v)
+        pcall(unistd.unlink, "./" .. fname)
+        fname = string.format("%08d.foxi", v)
         pcall(unistd.unlink, "./" .. fname)
         ret = self.cffi.fox_setup_write(self._man, date, us)
     end
