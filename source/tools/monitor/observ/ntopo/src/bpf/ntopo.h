@@ -52,6 +52,8 @@ struct node_info
         unsigned int pid;
         unsigned int client_addr;
         unsigned int server_addr;
+        unsigned short sport;
+        unsigned short dport;
         unsigned int client_max_rt_us;
         unsigned int client_min_rt_us;
         unsigned int client_tot_rt_us;
@@ -61,6 +63,8 @@ struct node_info
         unsigned int server_min_rt_us;
         unsigned int server_tot_rt_us;
         unsigned int server_tot_rt_hz;
+
+        unsigned int requests;
 };
 
 struct pid_info
