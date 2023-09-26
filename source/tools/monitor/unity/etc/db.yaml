@@ -1,0 +1,106 @@
+config:
+  freq: 30   # unit second
+  port: 8400  # bind port
+  bind_addr: 0.0.0.0 # bind ip
+  backlog: 32  # listen backlog
+  daemon: true
+  url_safe: close
+  identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
+    #    mode: curl
+    #    url: "http://100.100.100.200/latest/meta-data/instance-id"
+    #    name: test_specify
+    mode: hostip
+  #  real_timestamps: true
+  #  unix_socket: "/tmp/sysom_unity.sock"
+  proc_path: / # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  db:
+    rotate: 7 # tsdb file retention time, unit day
+    budget: 200 # max query buffer from tsdb.
+  limit:
+    cpu: 30  # unit %
+    mem: 50  # unit mb
+    tasks: 10  # monitor 10 pid max.
+    cellLimit: -1 # set guard limit time. guard time is unlimit when cellLimit is -1,default is 50(ms)
+
+forkRun:
+  - cmd: "../../../sql-obs"
+    args:
+      []
+
+pushTo:
+  to: "Influx"
+  host: "192.168.0.127"
+  port: 80
+  url: "/api/v1/cec_proxy/proxy/line_protocol"
+
+outline:
+  - /var/sysom/outline
+
+
+luaPlugins: ["proc_diskstats"]
+
+  # group:
+  #   - name: ""
+  #   - name: "LS"
+  #     # monitor: ["mon1", "mon2"]
+  #   - name: "BE"
+  #     monitor: ["pod3#con3"]
+
+
+metrics:
+  - title: sysom_observe
+    from: observe
+    head: value
+    help: "application observe."
+    type: "gauge"
+  - title: sysom_proc_disks
+    from: disks
+    head: counter
+    help: "disk info from /proc/diskstats."
+    type: "gauge"
+  - title: sysom_ntopo_node
+    from: sysom_metrics_ntopo_node
+    head: mode
+    help: "net topology node"
+    type: "gauge"
+  - title: sysom_ntopo_edge
+    from: sysom_metrics_ntopo_edge
+    head: mode
+    help: "net topology edge"
+    type: "gauge"
+  - title: sysom_obser_app_rt_ntopo
+    from: sysom_metrics_ntopo_request
+    head: value
+    help: rt and req/resp bytes of apps
+    type: "gauge"
+    discrete: true
+  - title: sysom_obser_mysqld_os
+    from: sysom_obser_metrics_mysqld_os
+    head: value
+    help: "os level metrics of mysqld"
+    type: "gauge"
+  - title: sysom_obser_mysqld_process
+    from: sysom_obser_metrics_mysqld_process
+    head: value
+    help: "process level metrics of mysqld"
+    type: "gauge"
+  - title: sysom_obser_mysqld_innodb
+    from: sysom_obser_metrics_mysqld_innodb
+    head: value
+    help: "innodb metrics of mysqld"
+    type: "gauge"
+  - title: sysom_obser_mysqld_alarm
+    from: sysom_obser_mysqld_alarm
+    head: value
+    help: "alarm on process exception of mysqld"
+    type: "gauge"
+  - title: sysom_obser_os_alarm
+    from: sysom_obser_os_alarm
+    head: value
+    help: "alarm on os exception of mysqld"
+    type: "gauge"
+
+observe:
+  comms:
+    mysqld: "cgroup"
+  period: 20000
