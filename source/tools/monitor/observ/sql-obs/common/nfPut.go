@@ -2,7 +2,6 @@ package common
 
 import (
     "encoding/json"
-    "fmt"
     //"fmt"
     "net"
     "os"
@@ -35,7 +34,6 @@ func newCnfPut(path string) error {
         return err
     }
     gCnfPut.sock, err = net.DialUnix("unixgram", nil, addr)
-    // gCnfPut.sock, err = net.Dial("unixgram", path)
     if err != nil {
         PrintSysError(err)
         return err
@@ -52,8 +50,6 @@ func (c *CnfPut) puts(s string) error {
     }
 
     if _, err := c.sock.Write([]byte(s)); err != nil {
-        //fmt.Println(s)
-        fmt.Printf("output: %s\n", s)
         PrintSysError(err)
         return err
     }

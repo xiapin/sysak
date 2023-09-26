@@ -2,7 +2,6 @@ package common
 
 import (
     "encoding/json"
-    "errors"
     "fmt"
     "io/ioutil"
     "net/http"
@@ -49,6 +48,7 @@ func getMetricsFromUnity(table string, metrics []string,
     }
     m, err := qByTable(table, queryPeriod)
     if err != nil {
+        PrintSysError(err)
         return nil
     }
     result := make([]interface{}, len(m))
@@ -76,7 +76,7 @@ func GetSingleMetrics[T interface{}](
     m := GetSingleMetricsMulti[T](table, metrics)
     if m == nil {
         var zero T
-        return zero, errors.New("get metrics fail!")
+        return zero, PrintOnlyErrMsg("get metrics fail!")
     }
     return m[0], nil
 }
@@ -105,6 +105,7 @@ func GetIOMetrics(table string, metrics []string,
     }
     m, err := qByTable(table, queryPeriod)
     if err != nil {
+        PrintSysError(err)
         return nil
     }
     result := make([]interface{}, 0)
@@ -127,7 +128,7 @@ func GetAppMetrics(table string,
     labels []string, metrics []string) []interface{} {
     m, err := qByTable(table, queryPeriod)
     if err != nil {
-        fmt.Println(err)
+        PrintSysError(err)
         return nil
     }
     result := make([]interface{}, 0)
@@ -152,12 +153,11 @@ func GetAppMetrics(table string,
 func GetAppLatency(table string) map[string]*[5]uint64 {
     m, err := qByTable(table, queryPeriod)
     if err != nil {
-        PrintOnlyErrMsg("Can't get ntopo rt info.")
+        PrintSysError(err)
         return nil
     }
 
     result := make(map[string]*[5]uint64)
-
     for _, line := range m {
         if line["labels"].(map[string]interface{})["APP"].(string) != "MYSQL" {
             continue
