@@ -72,22 +72,27 @@ type globalOsMetrics struct {
     ResponseTime     float64 `json:"responseTime"`
 }
 
+var labelsRT = []string{
+    "Requests", "InBytes", "OutBytes", "AvgRT", "MaxRT"}
+var metricsName = []string{
+        "cpu_total", "cpu_user", "cpu_sys", "nr_voluntary_switches",
+        "nr_involuntary_switches", "delay", "write_bytes", "read_bytes", "IOwait",
+        "majflt",
+    }
 func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
     info := make([][]string, 0)
     labelName := []string{
         "cgroup", "pid",
     }
-    metricsName := []string{
-        "cpu_total", "cpu_user", "cpu_sys", "nr_voluntary_switches",
-        "nr_involuntary_switches", "delay", "write_bytes", "read_bytes", "IOwait",
-        "majflt",
-    }
-    rtMap := common.GetAppLatency("sysom_metrics_ntopo_node")
+    rtMap := common.GetAppLatency("sysom_metrics_ntopo_node", labelsRT)
     for index, line := range common.GetAppMetrics(
-        "observe", labelName, metricsName) {
+        "observe", "mysqld", labelName, metricsName) {
         metric := line.(map[string]interface{})
         pid, _ := strconv.Atoi(metric["pid"].(string))
         containerId := metric["cgroup"].(string)
+        if len(containerId) < 1 {
+            containerId = "NULL"
+        }
         info = append(info, []string{
             metric["pid"].(string),
             common.GetAppInstanceMemberByPid(pid, "PodId").(string),
@@ -123,11 +128,16 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         // m.PkgDrops, _ := metric["drops"]         // null
         // retrans, _ = metric["retran"]           // null
         if _, ok := rtMap[containerId]; ok {
-            m.RequestCount = float64(rtMap[containerId][0]) / 30.0
-            m.NetRecTraffic = float64(rtMap[containerId][1]) / 30.0
-            m.NetSendTraffic = float64(rtMap[containerId][2]) / 30.0
-            m.ResponseTimeAvg = rtMap[containerId][3]
-            m.ResponseTimeMax = rtMap[containerId][4]
+            num, _ := strconv.ParseFloat(rtMap[containerId]["Requests"], 64)
+            m.RequestCount = num / 30.0
+            num, _ = strconv.ParseFloat(rtMap[containerId]["InBytes"], 64)
+            m.NetRecTraffic = num / 30.0
+            num, _ = strconv.ParseFloat(rtMap[containerId]["OutBytes"], 64)
+            m.NetSendTraffic = num / 30.0
+            m.ResponseTimeAvg, _ = 
+                strconv.ParseUint(rtMap[containerId]["AvgRT"], 10, 64)
+            m.ResponseTimeMax, _ = 
+                strconv.ParseUint(rtMap[containerId]["MaxRT"], 10, 64)
         }
         if m.CpuTotal > 0 {
             analyzer.MarkEventsNotify(
