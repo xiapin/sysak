@@ -298,7 +298,7 @@ func osChkNetProcessRTEvents(data []interface{}) {
         common.ExportData(GetMetricsEventsDesc(argvs[0].(int), "",
             "", "", "", "", argvs[6].(string), extra))
     }
-    data[3] = (data[3].(float64) / 1000000.0)
+    data[3] = (data[3].(float64) / 1000.0)
     chkProcessMetricsGeneral(Notify_Process_RT_Type, "responseTimeAvg",
         " server RT over 100ms(%.2fms)", 100, data, rtEventExportHandler)
 }
