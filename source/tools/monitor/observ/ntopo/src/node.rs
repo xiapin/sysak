@@ -151,8 +151,8 @@ impl Node {
             title: Default::default(),
             icon: IconKind::Mysql,
 
-            in_bytes: 0,
-            out_bytes: 0,
+            in_bytes: info.in_bytes as i64,
+            out_bytes: info.out_bytes as i64,
 
             server_ip: Ipv4Addr::from(u32::from_be(info.server_addr)).to_string(),
             client_max_rt: info.client_max_rt_us,

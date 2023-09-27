@@ -26,6 +26,8 @@ struct sock_info
         unsigned long long ingress_max;
         unsigned long long egress_min;
         unsigned long long egress_max;
+        unsigned long long in_bytes;
+        unsigned long long out_bytes;
 };
 
 struct edge_info_key

@@ -127,6 +127,10 @@ static inline void update_nodes(struct sock_info *info, int role, int rt)
         if (!ninfo)
                 return;
 
+        ninfo->in_bytes += info->in_bytes;
+        ninfo->out_bytes += info->out_bytes;
+        info->in_bytes = 0;
+        info->out_bytes = 0;
         ninfo->pid = info->pid;
         ninfo->requests++;
         if (role == ROLE_CLIENT)
@@ -233,8 +237,8 @@ static inline void handle_server_close(struct sock_info *info, u64 ts)
 }
 
 // int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
-SEC("kprobe/tcp_sendmsg")
-int BPF_KPROBE(kprobe_tcp_sendmsg, struct sock *sk)
+SEC("kprobe/tcp_sendmsg_locked")
+int BPF_KPROBE(kprobe_tcp_sendmsg_locked, struct sock *sk, struct msghdr *msg, size_t size)
 {
         struct sock_info *info = bpf_map_lookup_elem(&socks, &sk);
         if (!info)
@@ -249,12 +253,14 @@ int BPF_KPROBE(kprobe_tcp_sendmsg, struct sock *sk)
         else
                 handle_server_send_response(info, ts);
 
+        info->out_bytes += size;
         if (info->egress_min == 0)
                 info->egress_min = ts;
         info->egress_max = ts;
         return 0;
 }
 
+#if 0
 struct tcp_rcv_space_adjust_args
 {
         u32 pad[2];
@@ -279,6 +285,31 @@ int tracepoint_tcp_rcv_space_adjust(struct tcp_rcv_space_adjust_args *ctx)
         else
                 handle_server_recv_request(info, ts);
 
+        if (info->ingress_min == 0)
+                info->ingress_min = ts;
+        info->ingress_max = ts;
+        return 0;
+}
+#endif
+
+SEC("kprobe/tcp_cleanup_rbuf")
+int BPF_KPROBE(kprobe_tcp_cleanup_rbuf, struct sock *sk, int copied)
+{
+        struct sock_info *info = bpf_map_lookup_elem(&socks, &sk);
+        if (!info)
+                if (try_add_sock(sk))
+                        info = bpf_map_lookup_elem(&socks, &sk);
+        if (!info)
+                return 0;
+
+        u64 ts = bpf_ktime_get_ns();
+        enum role role = get_sock_role(info, sk);
+        if (role == ROLE_CLIENT)
+                handle_client_recv_response(info, ts);
+        else
+                handle_server_recv_request(info, ts);
+
+        info->in_bytes += copied;
         if (info->ingress_min == 0)
                 info->ingress_min = ts;
         info->ingress_max = ts;
