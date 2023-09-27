@@ -14,17 +14,45 @@ impl Pid {
         assert!(head.is_empty(), "Data was not aligned");
         let info = &body[0];
 
+        // 0-9a-f
+        let mut container_id = unsafe {
+            String::from_utf8_unchecked(info.container_id.to_vec())
+                .trim_matches(char::from(0))
+                .to_owned()
+        };
+
+        let mut start = 0;
+        loop {
+            let mut matches = 0;
+            for c in container_id[start..].chars() {
+                if matches == 12 {
+                    break;
+                }
+                if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') {
+                    matches += 1;
+                    continue;
+                }
+                break;
+            }
+
+            if matches != 12 {
+                if start >= container_id.len() {
+                    break;
+                }
+            } else {
+                container_id = container_id[start..(start + 12)].to_owned();
+                break;
+            }
+            start += 1;
+        }
+
         Pid {
             comm: unsafe {
                 String::from_utf8_unchecked(info.comm.to_vec())
                     .trim_matches(char::from(0))
                     .to_owned()
             },
-            container_id: unsafe {
-                String::from_utf8_unchecked(info.container_id.to_vec())
-                    .trim_matches(char::from(0))
-                    .to_owned()
-            },
+            container_id,
         }
     }
 }

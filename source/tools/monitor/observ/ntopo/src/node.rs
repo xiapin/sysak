@@ -112,11 +112,7 @@ impl Node {
 
     pub fn set_pid_info(&mut self, pids: &Pids) {
         if let Some(pi) = pids.pids.get(&self.pid) {
-            if pi.container_id.len() > 12 {
-                self.container_id = pi.container_id[0..12].to_owned();
-            } else {
-                self.container_id = pi.container_id.clone();
-            }
+            self.container_id = pi.container_id.clone();
             self.comm = pi.comm.clone();
         }
     }
@@ -151,8 +147,8 @@ impl Node {
             title: Default::default(),
             icon: IconKind::Mysql,
 
-            in_bytes: 0,
-            out_bytes: 0,
+            in_bytes: info.in_bytes as i64,
+            out_bytes: info.out_bytes as i64,
 
             server_ip: Ipv4Addr::from(u32::from_be(info.server_addr)).to_string(),
             client_max_rt: info.client_max_rt_us,

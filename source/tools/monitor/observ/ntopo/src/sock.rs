@@ -23,6 +23,7 @@ pub fn unix_sock_send(addr: &str, data: &String) {
 }
 
 pub fn unix_sock_recv(pidsmap: &MapHandle, addr: &str) {
+    let _ = std::fs::remove_file(addr);
     let listen = UnixListener::bind(addr).expect("failed to listen unix sock");
 
     for stream in listen.incoming() {
