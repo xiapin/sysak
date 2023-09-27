@@ -124,7 +124,7 @@ func GetIOMetrics(table string, metrics []string,
     return result
 }
 
-func GetAppMetrics(table string,
+func GetAppMetrics(table string, appName string,
     labels []string, metrics []string) []interface{} {
     m, err := qByTable(table, queryPeriod)
     if err != nil {
@@ -134,7 +134,7 @@ func GetAppMetrics(table string,
     result := make([]interface{}, 0)
     for _, value := range m {
         name := value["labels"].(map[string]interface{})["comm"].(string)
-        if name != "mysqld" {
+        if name != appName {
             continue
         }
         result = append(result, make(map[string]interface{}))
@@ -150,34 +150,32 @@ func GetAppMetrics(table string,
     return result
 }
 
-func GetAppLatency(table string) map[string]*[5]uint64 {
+func GetAppLatency(table string, labels []string) map[string]map[string]string {
     m, err := qByTable(table, queryPeriod)
     if err != nil {
         PrintSysError(err)
         return nil
     }
 
-    result := make(map[string]*[5]uint64)
+    result := make(map[string]map[string]string)
     for _, line := range m {
         if line["labels"].(map[string]interface{})["APP"].(string) != "MYSQL" {
             continue
         }
-        // fmt.Println(line)
         containerID := line["labels"].(
-        map[string]interface{})["ContainerID"].(string)[0:12]
-        if _, ok := result[containerID]; !ok {
-            result[containerID] = &[5]uint64{}
+        map[string]interface{})["ContainerID"].(string)
+        if len(containerID) > 0 {
+            containerID = containerID[:12]
+        } else {
+            containerID = "NULL"
         }
-        result[containerID][0] = uint64(line["labels"].(
-            map[string]interface{})["Requests"].(float64)) // count
-        result[containerID][1] = uint64(line["labels"].(
-            map[string]interface{})["InBytes"].(float64))  // req bytes
-        result[containerID][2] = uint64(line["labels"].(
-            map[string]interface{})["OutBytes"].(float64)) // resp bytes
-        result[containerID][3] = uint64(line["labels"].(
-            map[string]interface{})["AvgRT"].(float64))
-        result[containerID][4] = uint64(line["labels"].(
-            map[string]interface{})["MaxRT"].(float64))
+        if _, ok := result[containerID]; !ok {
+            result[containerID] = map[string]string{}
+        }
+        for _, label := range labels {
+            result[containerID][label] = 
+                line["labels"].(map[string]interface{})[label].(string)
+        }
     }
     return result
 }
