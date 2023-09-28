@@ -10,8 +10,6 @@
 #define KERN_STACKID_FLAGS      (0 | BPF_F_FAST_STACK_CMP)
 #define MAX_PARAM_ENTRIES   8192
 
-#define DEBUG_PRINT 0
-
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 const   uint64_t NSEC_PER_SEC = 1000000000L;
@@ -70,7 +68,7 @@ struct {
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __type(key, u32);
+    __type(key, int);
     __type(value, u64);
     __uint(max_entries, MAX_PARAM_ENTRIES);
     __uint(map_flags, BPF_F_NO_PREALLOC);
@@ -101,7 +99,7 @@ struct internal_key_server {
 };
 
 struct r_fd {
-  u32 fd;
+  int fd;
 };
 
 struct {
@@ -173,7 +171,7 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u32);
-	__type(value, u32);
+	__type(value, int);
 	__uint(max_entries, MAX_ENTRIES);
 } send_sockfd SEC(".maps");
 
@@ -237,9 +235,9 @@ static bool allow_record_tgid(uint32_t tgid)
   /*filter with tgid*/
     pid_t targ_tgid;
     struct bpfarg *argp;
-        targ_tgid = GETARG_FROM_ARRYMAP(argmap, argp, pid_t, targ_tgid,-1);
-        if (targ_tgid != -1 && targ_tgid != tgid)
-            return false;
+    targ_tgid = GETARG_FROM_ARRYMAP(argmap, argp, pid_t, targ_tgid,-1);
+    if (targ_tgid != -1 && targ_tgid != tgid)
+        return false;
     return true;
 }
 
@@ -273,7 +271,7 @@ static u64 get_readts(uint32_t pid){
     return ts;
 }
 
-static u32 get_org_fd(uint32_t pid){
+static int get_org_fd(uint32_t pid){
     u64 read_ts = get_readts(pid);
     if (read_ts){
         struct r_fd *orig_fd;
@@ -311,6 +309,7 @@ static void handle_read(uint64_t id,int fd, void *ctx){
     struct r_fd orig_fd={};
     orig_fd.fd = fd;
     bpf_map_update_elem(&request_fd, &pid, &orig_fd,0);
+
 }
 
 
@@ -395,9 +394,19 @@ cleanup:
   
 }
 
-SEC("tracepoint/syscalls/sys_enter_read")
+struct sys_enter_read_args {
+	struct trace_entry ent;
+    long __syscall_nr;
+	long fd;
+    long buf;
+    long count;
+	char __data[0];
+};
+
+
+SEC("tp/syscalls/sys_enter_read")
 // ssize_t read(int fd, void *buf, size_t count);
-int tp_sys_enter_read(struct trace_event_raw_sys_enter *ctx)
+int tp__sys_enter_read(struct sys_enter_read_args *ctx)
 {
     uint64_t id = bpf_get_current_pid_tgid();
     if (!allow_record(id)) {
@@ -405,15 +414,18 @@ int tp_sys_enter_read(struct trace_event_raw_sys_enter *ctx)
     }
     struct data_param_t read_param = {};
     read_param.syscall_func = FuncRead;
-    read_param.fd = ctx->args[0];
-    read_param.buf = (const char *)ctx->args[1];
+    read_param.fd = (int)ctx->fd;
+    // bpf_probe_read(&read_param.fd, sizeof(read_param.fd), &ctx->fd);
+    read_param.buf = (const char*)ctx->buf;
     bpf_map_update_elem(&read_param_map, &id, &read_param, BPF_ANY);
+
     return 0;
 
 server_process:
     /* server端是否能匹配到从connaddr_map来的请求 */
     if (is_server_pid(id)){
-        int sockfd = ctx->args[0];
+        int sockfd;
+        sockfd = (int)ctx->fd;
         handle_server_read(sockfd, ctx);
     }
     return 0;
@@ -431,21 +443,13 @@ int tp_sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
     struct data_param_t *read_param = bpf_map_lookup_elem(&read_param_map, &id);
     if (read_param != NULL && read_param->real_conn && read_param->buf ) {
         if (allow_record(id)){
-            u32 *sock_fd;
+            int *sock_fd;
             sock_fd = bpf_map_lookup_elem(&send_sockfd,&pid);
             if (sock_fd && *sock_fd==read_param->fd){
                 // bpf_map_delete_elem(&send_sockfd,&pid);
             }else{
-#if DEBUG_PRINT
-    struct perf_oncpu p_o;
-    p_o.delta = pid;
-    p_o.now_ts = sock_fd;
-    p_o.read_ts = 44;
-    bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-#endif 
                 handle_read(id,read_param->fd,ctx);
             }
-
         }
 
     }
@@ -455,30 +459,28 @@ int tp_sys_exit_read(struct trace_event_raw_sys_exit *ctx) {
     return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_write")
-int tp_sys_enter_write(struct trace_event_raw_sys_enter *ctx) 
+struct sys_enter_write_args {
+	struct trace_entry ent;
+    long __syscall_nr;
+	long  fd;
+    long *buf;
+    long count;
+	char __data[0];
+};
+
+SEC("tp/syscalls/sys_enter_write")
+int tp_sys_enter_write(struct sys_enter_write_args *ctx) 
 {
     uint64_t id = bpf_get_current_pid_tgid();
 
-    if (!allow_record(id)) {
-        goto server_process;
-    }
+    if (!allow_record(id))
+        return 0;
 
     struct data_param_t write_param = {};
     write_param.syscall_func = FuncWrite;
-    write_param.fd = ctx->args[0];
-    write_param.iov=(const struct iovec *)ctx->args[1];
-    write_param.iovlen=ctx->args[2];
+    write_param.fd = (int)ctx->fd;
+    write_param.iovlen = (size_t)ctx->count;
     bpf_map_update_elem(&write_param_map, &id, &write_param, BPF_ANY);
-    return 0;
-
-server_process:
-    if (!is_server_pid(id)){
-        return 0;
-    }
-
-    int sockfd = ctx->args[0];
-
     return 0;
 }
 
@@ -515,16 +517,6 @@ int BPF_KPROBE(kprobe_security_socket_recvmsg, struct socket *sock, void *msg, i
     if (read_param != NULL) {
         read_param->real_conn = true;
     }
-
-#if DEBUG_PRINT
-    struct perf_oncpu p_o;
-    if (read_param){
-        p_o.delta = pid;
-        p_o.now_ts = read_param->fd;
-        p_o.read_ts = 55;
-        bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-    }
-#endif 
 
 server_process:
     if (!is_server_pid(id))
@@ -563,29 +555,7 @@ int BPF_KPROBE(kprobe_security_socket_sendmsg, struct socket *sock, void *msg, i
     u16 sport = sk_c.skc_num;
     u16 dport = sk_c.skc_dport;
 
-#if DEBUG_PRINT
-    struct perf_oncpu p_o;
-    p_o.delta = pid;
-    p_o.now_ts = sport;
-    p_o.read_ts = 11;
-    bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-#endif 
-#if DEBUG_PRINT
-    if (write_param){
-        p_o.delta = pid;
-        p_o.now_ts = write_param->fd;
-        p_o.read_ts = 22;
-        bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-    }
-#endif 
-#if DEBUG_PRINT
-    p_o.delta = pid;
-    p_o.now_ts = dport;
-    p_o.read_ts = 33;
-    bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-#endif 
-
-    u32 fd = get_org_fd(pid);
+    int fd = get_org_fd(pid);
     read_ts = get_readts(pid);
     if (fd && write_param && fd != write_param->fd){
         bpf_map_update_elem(&port_readts_map, &sport, &read_ts, 0);
@@ -606,39 +576,48 @@ server_process:
     return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_connect")
-int tp_sys_enter_connect(struct trace_event_raw_sys_enter *ctx)
+struct sys_enter_connect_args {
+    struct trace_entry ent;
+    long __syscall_nr;
+    long fd;
+    struct sockaddr *uservaddr;
+    long addrlen;
+	char __data[0];
+};
+
+SEC("tp/syscalls/sys_enter_connect")
+int tp_sys_enter_connect(struct sys_enter_connect_args *ctx)
 {
     uint64_t id = bpf_get_current_pid_tgid();
     uint32_t pid = id;
     if (allow_record(id)) {
-        int fd = ctx->args[0];
+        int fd = (int)ctx->fd;
         bpf_map_update_elem(&send_sockfd, &pid, &fd,0);
-
-#if DEBUG_PRINT
-    struct perf_oncpu p_o;
-    p_o.delta = pid;
-    p_o.now_ts = fd;
-    p_o.read_ts = 222222;
-    bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-#endif 
     }
     return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_sendmsg")
+struct sys_enter_sendmsg_args {
+    struct trace_entry ent;
+    long __syscall_nr;
+    long fd;
+    struct user_msghdr * msg;
+    long flags;
+	char __data[0];
+};
+
+SEC("tp/syscalls/sys_enter_sendmsg")
 // ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
-int tp_sys_enter_sendmsg(struct trace_event_raw_sys_enter *ctx)
+int tp_sys_enter_sendmsg(struct sys_enter_sendmsg_args *ctx)
 {
     uint64_t id = bpf_get_current_pid_tgid();
     uint32_t pid = id;
-    int sockfd = ctx->args[0];
+    int sockfd = (int)ctx->fd;
     if (allow_record(id)) {        
         struct data_param_t write_param = {};
         write_param.syscall_func = FuncSendMsg;
         write_param.fd = sockfd;
         bpf_map_update_elem(&write_param_map, &id, &write_param, BPF_ANY);
-
     }
 
     return 0;
@@ -663,19 +642,28 @@ int tp_sys_exit_sendmsg(struct trace_event_raw_sys_exit *ctx)
     return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_recvmsg")
+struct sys_enter_recvmsg_args {
+    struct trace_entry ent;
+    long __syscall_nr;
+    long fd;
+    struct user_msghdr * msg;
+    long flags;
+	char __data[0];
+};
+
+SEC("tp/syscalls/sys_enter_recvmsg")
 // ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
-int tp_sys_enter_recvmsg(struct trace_event_raw_sys_enter *ctx)
+int tp_sys_enter_recvmsg(struct sys_enter_recvmsg_args *ctx)
 {
     uint64_t id = bpf_get_current_pid_tgid();
     if (allow_record(id)) {
         struct data_param_t read_param = {};
         read_param.syscall_func = FuncRecvMsg;
-        read_param.fd = ctx->args[0];
+        read_param.fd = (int)ctx->fd;
         bpf_map_update_elem(&read_param_map, &id, &read_param, BPF_ANY);
     }    
     if (is_server_pid(id)){
-        int sockfd = ctx->args[0];
+        int sockfd = (int)ctx->fd;
         handle_server_read(sockfd, ctx);
     }
     return 0;    
@@ -689,18 +677,11 @@ int tp_sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx)
     if (allow_record(id)) {
         struct data_param_t *read_param = bpf_map_lookup_elem(&read_param_map, &id);
         if (read_param != NULL) {
-            u32 *sock_fd;
+            int *sock_fd;
             sock_fd = bpf_map_lookup_elem(&send_sockfd,&pid);
             if (sock_fd && *sock_fd==read_param->fd){
                 // bpf_map_delete_elem(&send_sockfd,&pid);
             }else{
-#if DEBUG_PRINT
-    struct perf_oncpu p_o;
-    p_o.delta = pid;
-    p_o.now_ts = sock_fd;
-    p_o.read_ts = 44;
-    bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-#endif 
                 handle_read(id, read_param->fd, ctx);
             }
         }
@@ -709,23 +690,33 @@ int tp_sys_exit_recvmsg(struct trace_event_raw_sys_exit *ctx)
     return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_sendto")
+struct sys_enter_sendto_args {
+    struct trace_entry ent;
+    long __syscall_nr;
+    long fd;
+    long buff;
+    long len;
+    long flags;
+    struct sockaddr *addr;
+    long addr_len;
+	char __data[0];
+};
+
+SEC("tp/syscalls/sys_enter_sendto")
 // ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
 //                const struct sockaddr *dest_addr, socklen_t addrlen);
-int tp_sys_enter_sendto(struct trace_event_raw_sys_enter *ctx)
+int tp_sys_enter_sendto(struct sys_enter_sendto_args *ctx)
 {
     uint64_t id = bpf_get_current_pid_tgid();
     uint32_t pid = id;
-    int sockfd = ctx->args[0];
+    int sockfd = (int)ctx->fd;
 
     if (allow_record(id)) {
-
         struct data_param_t write_param = {};
         write_param.syscall_func = FuncSendTo;
         write_param.fd = sockfd;
-        write_param.buf = (const char *)ctx->args[1];
+        // write_param.buf = (const char *)_(ctx->buff);
         bpf_map_update_elem(&write_param_map, &id, &write_param, BPF_ANY);
-    
     }    
 
     return 0;
@@ -751,22 +742,34 @@ int tp_sys_exit_sendto(struct trace_event_raw_sys_exit *ctx)
     return 0;
 }
 
-SEC("tracepoint/syscalls/sys_enter_recvfrom")
+struct sys_enter_recvfrom_args {
+    struct trace_entry ent;
+    long __syscall_nr; 
+    long fd;
+    long ubuf;
+    long size;
+    long flags;
+    long addr;
+    long addr_len;
+	char __data[0];
+};
+
+SEC("tp/syscalls/sys_enter_recvfrom")
 // ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
-//                  struct sockaddr *src_addr, socklen_t *addrlen);
-int tp_sys_enter_recvfrom(struct trace_event_raw_sys_enter *ctx)
+//                  struct sockaddr *src_addr, socklen_td *addrlen);
+int tp_sys_enter_recvfrom(struct sys_enter_recvfrom_args *ctx)
 {
     uint64_t id = bpf_get_current_pid_tgid();
 
     if (allow_record(id)) {
         struct data_param_t read_param = {};
         read_param.syscall_func = FuncRecvFrom;
-        read_param.fd = ctx->args[0];
-        read_param.buf = (const char *)ctx->args[1];
+        read_param.fd = (int)ctx->fd;
+        read_param.buf = (const char *)ctx->ubuf;
         bpf_map_update_elem(&read_param_map, &id, &read_param, BPF_ANY);
     }    
     if (is_server_pid(id)){
-        int sockfd = ctx->args[0];
+        int sockfd = (int)ctx->fd;
         handle_server_read(sockfd, ctx);
     }
 
@@ -781,18 +784,11 @@ int tp_sys_exit_recvfrom(struct  trace_event_raw_sys_exit *ctx)
   struct data_param_t *read_param = bpf_map_lookup_elem(&read_param_map, &id);
   if (read_param != NULL && read_param->real_conn && read_param->buf) {
         if (allow_record(id)){
-            u32 *sock_fd;
+            int *sock_fd;
             sock_fd = bpf_map_lookup_elem(&send_sockfd,&pid);
             if (sock_fd && *sock_fd==read_param->fd){
                 // bpf_map_delete_elem(&send_sockfd,&pid);
             }else{
-#if DEBUG_PRINT
-    struct perf_oncpu p_o;
-    p_o.delta = pid;
-    p_o.now_ts = sock_fd;
-    p_o.read_ts = 44;
-    bpf_perf_event_output(ctx, &oncpu_poll_map, BPF_F_CURRENT_CPU, &p_o, sizeof(p_o));
-#endif 
                 handle_read(id,read_param->fd,ctx);
             }
 
@@ -803,7 +799,6 @@ int tp_sys_exit_recvfrom(struct  trace_event_raw_sys_exit *ctx)
   return 0;
 
 }
-
 
 struct sched_switch_tp_args {
 	struct trace_entry ent;
