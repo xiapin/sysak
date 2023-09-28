@@ -127,17 +127,19 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         // m.MemUsedLayout, _ = metric["mem_used"] // null
         // m.PkgDrops, _ := metric["drops"]         // null
         // retrans, _ = metric["retran"]           // null
-        if _, ok := rtMap[containerId]; ok {
-            num, _ := strconv.ParseFloat(rtMap[containerId]["Requests"], 64)
-            m.RequestCount = num / 30.0
-            num, _ = strconv.ParseFloat(rtMap[containerId]["InBytes"], 64)
-            m.NetRecTraffic = num / 30.0
-            num, _ = strconv.ParseFloat(rtMap[containerId]["OutBytes"], 64)
-            m.NetSendTraffic = num / 30.0
-            m.ResponseTimeAvg, _ = 
-                strconv.ParseUint(rtMap[containerId]["AvgRT"], 10, 64)
-            m.ResponseTimeMax, _ = 
-                strconv.ParseUint(rtMap[containerId]["MaxRT"], 10, 64)
+        if rtMap != nil {
+            if _, ok := rtMap[containerId]; ok {
+                num, _ := strconv.ParseFloat(rtMap[containerId]["Requests"], 64)
+                m.RequestCount = num / 30.0
+                num, _ = strconv.ParseFloat(rtMap[containerId]["InBytes"], 64)
+                m.NetRecTraffic = num / 30.0
+                num, _ = strconv.ParseFloat(rtMap[containerId]["OutBytes"], 64)
+                m.NetSendTraffic = num / 30.0
+                m.ResponseTimeAvg, _ = 
+                    strconv.ParseUint(rtMap[containerId]["AvgRT"], 10, 64)
+                m.ResponseTimeMax, _ = 
+                    strconv.ParseUint(rtMap[containerId]["MaxRT"], 10, 64)
+            }
         }
         if m.CpuTotal > 0 {
             analyzer.MarkEventsNotify(
@@ -259,6 +261,7 @@ func exportAlarmStatics() {
 func StartOsBaseMonitor() {
     var osMetrics globalOsMetrics
     for {
+        duration := 30 * time.Second
         startTime := time.Now()
         var appMetrics []*appOsMetrics
         info, _ := updateAppMetrics(&appMetrics)
@@ -266,7 +269,10 @@ func StartOsBaseMonitor() {
         exportAppMetrics(appMetrics, info)
         exportOSMetrics(&osMetrics)
         exportAlarmStatics()
-        endTime := time.Now()
-        time.Sleep(30 * time.Second - endTime.Sub(startTime))
+        costTime := time.Now().Sub(startTime)
+        if costTime < duration {
+            duration -= costTime
+        }
+        time.Sleep(duration)
     }
 }

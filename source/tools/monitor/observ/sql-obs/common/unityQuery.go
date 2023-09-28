@@ -1,6 +1,8 @@
 package common
 
 import (
+    "context"
+    "time"
     "encoding/json"
     "fmt"
     "io/ioutil"
@@ -15,12 +17,15 @@ var queryUrl string = "http://127.0.0.1:8400/api/query"
 var queryPeriod = 30
 
 func qByTable(table string, timeSecs int) ([]map[string]interface{}, error) {
-    var m []map[string]interface{}
+    timeout := 3 * time.Second
+    ctx, cancel := context.WithTimeout(context.Background(), timeout)
+    defer cancel()
 
+    var m []map[string]interface{}
     payload := strings.NewReader(fmt.Sprintf(
         "{\"mode\": \"last\", \"time\": \"%ds\", \"table\": [\"%s\"]}",
         timeSecs, table))
-    req, err := http.NewRequest("POST", queryUrl, payload)
+    req, err := http.NewRequestWithContext(ctx, "POST", queryUrl, payload)
     if err != nil {
         return nil, err
     }
