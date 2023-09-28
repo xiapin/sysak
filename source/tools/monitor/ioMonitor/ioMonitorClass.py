@@ -298,7 +298,7 @@ class ioMonitorClass(object):
         self.fDiskStats.seek(0)
         for stat in self.fDiskStats.readlines():
             stat = stat.split()
-            if os.path.exists('/sys/block/'+stat[2]) == False:
+            if os.path.exists('/sys/block/'+stat[2]) == False or stat[2].startswith("loop"):
                 if stat[2] in fieldDicts.keys():
                     self._removeDiskMonitor(stat[2])
                 continue
@@ -335,7 +335,7 @@ class ioMonitorClass(object):
         self.fDiskStats.seek(0)
         for stat in self.fDiskStats.readlines():
             stat = stat.split()
-            if os.path.exists('/sys/block/'+stat[2]) == False:
+            if os.path.exists('/sys/block/'+stat[2]) == False or stat[2].startswith("loop"):
                 if stat[2] in fieldDicts.keys():
                     self._removeDiskMonitor(stat[2])
                 continue

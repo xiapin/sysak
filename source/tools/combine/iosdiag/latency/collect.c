@@ -89,7 +89,7 @@ static int exec_shell_cmd(char *cmd)
 static int over_threshold(struct iosdiag_req *iop)
 {
 	unsigned long threshold_ns = get_threshold_us() * 1000;
-	unsigned long delay_ns = iop->ts[IO_COMPLETE_TIME_POINT] -
+	unsigned long delay_ns = iop->ts[MAX_POINT-1] -
 				iop->ts[IO_START_POINT];
 
 	if (delay_ns >= threshold_ns)
@@ -147,8 +147,10 @@ void event_aggregator()
 				unsigned int max_total_dalay_idx = i;
 				char* max_total_delay_diskname = req_array[i].diskname;
     			unsigned long* sum_component_delay = (unsigned long*)malloc(5 * sizeof(unsigned long));
+				memset(sum_component_delay, 0, 5 * sizeof(unsigned long));
     			unsigned long* max_component_delay = (unsigned long*)malloc(5 * sizeof(unsigned long));
-        		int count = 1;
+        		memset(max_component_delay, 0, 5 * sizeof(unsigned long));
+				int count = 1;
 				// printf("sum_max_delay: %lu\n", sum_max_delay);
 				update_component_delay(&req_array[i], sum_component_delay, max_component_delay, 1);
 
@@ -693,7 +695,8 @@ int iosdiag_init(char *devname, unsigned int attach_interval)
 			bpf_map__fd(iosdiag_virtblk->maps.iosdiag_virtblk_maps);
 	if (target_devt)
 		bpf_map_update_elem(iosdiag_maps_targetdevt, &key, &target_devt, BPF_ANY);
-	return 0;
+     
+    return 0;
 }
 
 int iosdiag_run(int timeout, int mode, char *output_file)

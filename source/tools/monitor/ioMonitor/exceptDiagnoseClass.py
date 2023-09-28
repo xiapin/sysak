@@ -54,7 +54,7 @@ class runDiag(object):
     def startIolatencyDiagnose(self, *argv):
         devname = argv[0]
         thresh = argv[1]
-        ioburst = argv[2]
+        # ioburst = argv[2]
         now = time.time()
         if now - self.lastDiagTimeDicts['iolatency'] <= 60:
             return
@@ -67,15 +67,16 @@ class runDiag(object):
             except Exception:
                 return
         self.lastDiagTimeDicts['iolatency'] = now
-        if devname is not None:
-            os.system(self.sysakPath+' -g iosdiag latency -t '+str(thresh) +
-                      ' -T 45 -m -f '+logdir+' '+devname+' > '+outlog+' &')
+        if devname is not None:   
+            # str(thresh)
+            os.system(self.sysakPath+' -g iosdiag latency -t 2' +
+                    ' -T 25 -m -f '+logdir+' '+devname+' > '+outlog+' &')
         else:
-            os.system(self.sysakPath+' -g iosdiag latency -t '+str(thresh) +
-                      ' -T 45 -m -f '+logdir+' > '+outlog+' &')
-        if ioburst:
-            self.display.markIoburst(now)
-        self.display.start(60, 'iolatency', logdir, now, now+60)
+            os.system(self.sysakPath+' -g iosdiag latency -t 2' +
+                      ' -T 25 -m -f '+logdir+' > '+outlog+' &')
+        # if ioburst:
+        #     self.display.markIoburst(now)
+        # self.display.start(60, 'iolatency', logdir, now, now+60)
 
 
     def startIoutilDiagnose(self, *argv):
@@ -229,9 +230,15 @@ class diagnoseClass(runDiag):
                     diagDict[diagType]['trigger'] = False
 
         for diagType, value in diagInfo.items():
+            print("diagType :", diagType, value)
             diagStat[diagType]['run'] = True
             if len(value) > 1:
-                diagStat[diagType]['argv'][0] = None
+                diagStat[diagType]['argv'][0] = value[0]
+                max_threshold = diagnoseDicts[value[0]]['iolatency']['diagArgs'][0]
+                for dev in value:
+                    if max_threshold <= diagnoseDicts[dev]['iolatency']['diagArgs'][0]:
+                        diagStat[diagType]['argv'][0] = dev
+                        max_threshold = diagnoseDicts[dev]['iolatency']['diagArgs'][0]
             elif len(value) == 1:
                 diagStat[diagType]['argv'][0] = value[0]
             else:
@@ -246,6 +253,7 @@ class diagnoseClass(runDiag):
                 diagStat['ioutil']['argv'][idx] = val[-1]
 
         if diagStat['iolatency']['run'] == True:
+            print("diagStat['iolatency']:", diagStat['iolatency'])
             diagStat['iolatency']['argv'][1] = sorted(
                 [diagnoseDicts[dev]['iolatency']['diagArgs'][0] 
                 for dev in diagInfo['iolatency']],
