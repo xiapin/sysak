@@ -44,9 +44,8 @@ func newCnfPut(path string) error {
 func (c *CnfPut) puts(s string) error {
     if len(s) > MAX_BUFF {
         return PrintOnlyErrMsg(
-            "message len %d, is too long, should less than %d",
-            len(s),
-            MAX_BUFF)
+            "message len %d, is too long, should less than %d, data :\n%s",
+            len(s), MAX_BUFF, s)
     }
 
     if _, err := c.sock.Write([]byte(s)); err != nil {

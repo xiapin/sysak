@@ -22,6 +22,9 @@ func qByTable(table string, timeSecs int) ([]map[string]interface{}, error) {
     defer cancel()
 
     var m []map[string]interface{}
+    client := &http.Client{
+        Timeout: timeout,
+    }
     payload := strings.NewReader(fmt.Sprintf(
         "{\"mode\": \"last\", \"time\": \"%ds\", \"table\": [\"%s\"]}",
         timeSecs, table))
@@ -30,7 +33,7 @@ func qByTable(table string, timeSecs int) ([]map[string]interface{}, error) {
         return nil, err
     }
     req.Header.Add("content-type", "application/json")
-    res, err := http.DefaultClient.Do(req)
+    res, err := client.Do(req)
     if err != nil {
         return nil, err
     }

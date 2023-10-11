@@ -7,6 +7,7 @@ import (
     "sql-obs/events/analyzer"
     "strconv"
     "time"
+    "strings"
     //"math"
 )
 
@@ -79,8 +80,10 @@ var metricsName = []string{
         "nr_involuntary_switches", "delay", "write_bytes", "read_bytes", "IOwait",
         "majflt",
     }
+    
 func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
     info := make([][]string, 0)
+    set := make(map[string]struct{})
     labelName := []string{
         "cgroup", "pid",
     }
@@ -93,11 +96,19 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         if len(containerId) < 1 {
             containerId = "NULL"
         }
-        info = append(info, []string{
+        app := []string{
             metric["pid"].(string),
             common.GetAppInstanceMemberByPid(pid, "PodId").(string),
             containerId,
-        })
+        }
+        _, ok := set[strings.Join(app, ",")]
+        if !ok {
+            info = append(info, app)
+            set[strings.Join(app, ",")] = struct{}{}
+        } else {
+            /* repeated data for same app instance */
+            continue
+        }
         var m appOsMetrics
         m.CpuTotal, _ = metric["cpu_total"].(float64)
         m.CpuUser, _ = metric["cpu_user"].(float64)
@@ -214,7 +225,6 @@ func updateOsMetrics(m *globalOsMetrics) error {
     // m.NetSYNCnt = netinfo[2]
     // m.NetSYNCntThresh = netinfo[3]
 
-    // =================================================================
     iowait, err := GetMetricsFloat64("cpu_total", "iowait")
     if err == nil {
         analyzer.MarkEventsNotify(
@@ -227,7 +237,6 @@ func updateOsMetrics(m *globalOsMetrics) error {
         analyzer.MarkEventsNotify(
             MetricsType(analyzer.Notify_IO_Except_Type), ioData)
     }
-    // =================================================================
 
     analyzer.TriggerNotify()
     return nil
