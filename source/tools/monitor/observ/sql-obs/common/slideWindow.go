@@ -58,6 +58,8 @@ func calBaseThresh(dataAggregator map[string]*DataItem, key string, value float6
     data := dataAggregator[key]
     thresh := -1.0
     data.nrSample += 1
+    data.curWinMaxVal = math.Max(data.curWinMaxVal, value)
+    data.curWinMinVal = math.Min(data.curWinMinVal, value)
     // fmt.Println(key, data.nrSample, data.window)
     if data.nrSample >= data.window {
         if len(data.movWinData) < int(data.window) {
@@ -71,20 +73,14 @@ func calBaseThresh(dataAggregator map[string]*DataItem, key string, value float6
         threshAvg := (data.baseThresh*float64(nrThreshSample-1) + thresh) / float64(nrThreshSample)
         data.baseThresh = threshAvg
         data.moveAvg = moveAvg
-        data.curWinMaxVal = math.Max(data.curWinMaxVal, value)
-        data.curWinMinVal = math.Min(data.curWinMinVal, value)
-
-        data.usedWin += 1
-        if data.usedWin >= data.window {
-            data.curWinMaxVal = 0
-            data.curWinMinVal = math.MaxFloat64
-            data.usedWin = 0
-        }
     } else {
         data.movWinData = append(data.movWinData, value)
-        data.curWinMaxVal = math.Max(data.curWinMaxVal, value)
-        data.curWinMinVal = math.Min(data.curWinMinVal, value)
-        data.usedWin += 1
+    }
+    data.usedWin += 1
+    if data.usedWin >= data.window {
+        data.curWinMaxVal = 0
+        data.curWinMinVal = math.MaxFloat64
+        data.usedWin = 0
     }
     return thresh
 }
@@ -161,6 +157,18 @@ func GetNrDataSample(dataAggregator map[string]*DataItem, key string) uint32 {
 
 func GetDynThresh(dataAggregator map[string]*DataItem, key string) float64 {
     return dataAggregator[key].dynThresh
+}
+
+func GetBaseThresh(dataAggregator map[string]*DataItem, key string) float64 {
+    return dataAggregator[key].baseThresh
+}
+
+func GetMoveAvg(dataAggregator map[string]*DataItem, key string) float64 {
+    return dataAggregator[key].moveAvg
+}
+
+func GetComThresh(dataAggregator map[string]*DataItem, key string) float64 {
+    return dataAggregator[key].comThresh
 }
 
 func avg(list []float64, count uint32) float64 {
