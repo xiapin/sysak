@@ -117,6 +117,31 @@ func osChkIOExceptEvents(data []interface{}) {
     }
 }
 
+// func debugIOburstDyn(devname string, iops float64, bps float64) {
+//     data := ""
+//     LowW := map[string]uint32{"iops": config.Iops, "bps": config.Bps}
+//     for str, val := range map[string]float64{"iops": iops, "bps": bps} {
+//         HighW := math.Max(
+//             common.GetDynThresh(aggregator, devname+str), float64(LowW[str]))
+//         fieldCurr := "curr" + str
+//         currValue := uint64(val)
+//         fieldThresh := str + "Thresh"
+//         currThresh := uint64(HighW)
+//         Basethresh := uint64(common.GetBaseThresh(aggregator, devname+str))
+//         fieldBasethresh := str + "BaseThresh"
+//         MoveAvg := uint64(common.GetMoveAvg(aggregator, devname+str))
+//         fieldMoveAvg := str + "MoveAvg"
+//         ComThresh := uint64(common.GetComThresh(aggregator, devname+str))
+//         fieldComThresh := str + "ComThresh"
+//         data += fmt.Sprintf(`%s=%d,%s=%d,%s=%d,%s=%d,%s=%d,`,
+//             fieldCurr, currValue, fieldThresh, currThresh, fieldBasethresh,
+//             Basethresh, fieldMoveAvg, MoveAvg, fieldComThresh, ComThresh)
+//     }
+//     data = strings.TrimRight(data, ",")
+//     d := (`debugDynThreshTlb,disk=` + devname + ` ` + data)
+//     common.ExportData(d)
+// }
+
 // IO Burst & IO Hang
 // data should be [dev, util, iops, bps, qusize]
 func osChkIOUtilEvents(
@@ -132,6 +157,7 @@ func osChkIOUtilEvents(
             osChkIOHangEvents(devname, util, iops, qusize)
         }
     }
+    // debugIOburstDyn(devname, iops, bps)
     common.UpdateDynThresh(aggregator, devname+"util", util)
     common.UpdateDynThresh(aggregator, devname+"iops", iops)
     common.UpdateDynThresh(aggregator, devname+"bps", bps)
@@ -164,10 +190,10 @@ func osChkIOBurstEvents(devname string, bps float64, iops float64) bool {
     }
 
     if iopsOver || bpsOver {
-        field := "currIops"
+        fieldCurr := "currIops"
         currValue := iops
         if bpsOver {
-            field = "currBps"
+            fieldCurr = "currBps"
             currValue = bps
         }
         // ioburst, put data: dev
@@ -179,7 +205,7 @@ func osChkIOBurstEvents(devname string, bps float64, iops float64) bool {
             `,"%s":"%d"`+
             `,"tag_set":"os"}`,
             desc, time.Unix(time.Now().Unix(), 0).Format(common.TIME_FORMAT), devname,
-            field, uint32(currValue))
+            fieldCurr, uint64(currValue))
         common.ExportData(GetLogEventsDesc(
             Notify_IO_Burst_Type, "", "", desc, extra))
     }
