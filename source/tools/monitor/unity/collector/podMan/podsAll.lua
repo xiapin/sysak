@@ -32,8 +32,16 @@ function CpodsAll:setupPlugins()
         else    -- container environment, no pod info
             ls = {
                 {
+                    name = "pod",
+                    index = con.name,
+                },
+                {
                     name = "container",
                     index = con.name,
+                },
+                {
+                    name = "namespace",
+                    index = "",
                 }
             }
         end
