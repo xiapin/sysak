@@ -68,7 +68,7 @@ func calBaseThresh(dataAggregator map[string]*DataItem, key string, value float6
             data.movWinData[data.usedWin%data.window] = value
         }
         moveAvg := avg(data.movWinData, data.window)
-        nrThreshSample := data.nrSample + 1 - data.window
+        nrThreshSample := math.Min(float64(data.nrSample + 1 - data.window), float64(3 * data.window))
         thresh = math.Max(data.curWinMaxVal-moveAvg, moveAvg-data.curWinMinVal)
         threshAvg := (data.baseThresh*float64(nrThreshSample-1) + thresh) / float64(nrThreshSample)
         data.baseThresh = threshAvg

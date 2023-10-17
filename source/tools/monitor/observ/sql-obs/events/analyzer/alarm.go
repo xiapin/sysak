@@ -12,6 +12,7 @@ import (
     // "unsafe"
     "reflect"
     "strings"
+    "sync"
 )
 
 type eventsDesc struct {
@@ -19,6 +20,7 @@ type eventsDesc struct {
     desc  string
     extra string //some other desc...json format
     alarm bool
+    descLock sync.Mutex
 }
 
 type alarmManage struct {
@@ -148,6 +150,7 @@ func alarmEventAging(alarmType int, descIdx int) (bool, bool) {
     agingTime := alarm.agingTime
     hasAlarm := false
     now := time.Now().Unix()
+    desc.descLock.Lock()
     if desc.alarm {
         hasAlarm = true
         start := desc.ts
@@ -157,9 +160,11 @@ func alarmEventAging(alarmType int, descIdx int) (bool, bool) {
             desc.extra = ""
             addAlarmStat(alarmType, alarm.cacheDescExtra[descIdx], (-1))
             alarm.cacheDescExtra[descIdx] = map[string]string{}
+            desc.descLock.Unlock()
             return true, hasAlarm
         }
     }
+    desc.descLock.Unlock()
     return false, hasAlarm
 }
 
