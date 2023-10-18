@@ -10,12 +10,19 @@ import (
     "sql-obs/metrics"
     "sql-obs/tracing"
     "syscall"
+    "io/ioutil"
+    "strings"
 )
 
 type ErrorCode = common.ErrorCode
 
 func main() {
     if err := common.DetectSqlObs(); err != nil {
+        return
+    }
+    outlineFilePath, err:= getSysomOutline()
+    if err != nil {
+        common.PrintOnlyErrMsg("Not get path of unity outline")
         return
     }
     if err := common.InitAppInstancesInfo("mysqld"); err != nil {
@@ -30,7 +37,7 @@ func main() {
     sigCh := make(chan os.Signal, 1)
     signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
     fmt.Println("start mysql observability")
-    if err := common.InitDataExport("/var/sysom/outline"); err != nil {
+    if err := common.InitDataExport(outlineFilePath); err != nil {
         common.PrintDefinedErr(
             ErrorCode(common.Fail_Init_Data_Export),
             "Please confirm if the 'unity' is activated")
@@ -44,4 +51,31 @@ func main() {
     e := <-sigCh
     fmt.Printf("exit mysql observability, signal: %v\n", e)
     events.DestroyResource()
+}
+
+func getSysomOutline() (string, error) {
+    pipeFile := ""
+    yamlF := common.GetYamlFile()
+    yamlContent, err := ioutil.ReadFile(yamlF)
+    if err != nil {
+        return "", err
+    }
+    lines := strings.Split(string(yamlContent), "\n")
+    for i, line := range lines {
+        if strings.HasPrefix(line, "#") {
+            continue
+        }
+        if strings.Contains(line, "outline:") {
+            if len(lines) > i+1 {
+                outline := strings.Split(lines[i+1], " ")
+                pipeFile = strings.TrimRight(outline[len(outline)-1], "\n")
+                break
+            }
+        }
+    }
+    if pipeFile == "" {
+        return "", common.PrintOnlyErrMsg(
+            "Unable to get label \"outline\" in %s", yamlF)
+    }
+    return pipeFile, nil
 }
