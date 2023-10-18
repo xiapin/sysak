@@ -22,12 +22,15 @@ function CsoftnetStat:proc(elapsed, lines)
     for line in io.lines(self.pFile) do
         local cell = {}
         local cells = pystring:split(line)
+        local length = #cells
         cell.packet_process = tonumber(cells[1], 16)
         cell.packet_drop = tonumber(cells[2], 16)
         cell.time_squeeze = tonumber(cells[3], 16)
         cell.cpu_collision = tonumber(cells[9], 16)
         cell.received_rps = tonumber(cells[10], 16)
-        cell.flow_limit_count = tonumber(cells[11], 16)
+        if length > 10 then
+            cell.flow_limit_count = tonumber(cells[11], 16)
+        end
         c = c + 1
         softnets[c] = cell
     end
