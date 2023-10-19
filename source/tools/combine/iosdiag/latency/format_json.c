@@ -94,12 +94,22 @@ unsigned long get_total_delay(struct iosdiag_req *iop)
 
 unsigned long get_max_delay(struct iosdiag_req *iop)
 {
-	int i;
+	int i, n;
+	int skip = 0;
 	unsigned long delay;
 	unsigned long max_delay = 0;
 
-	for (i = IO_START_POINT + 1; i < MAX_POINT; i++) {
-		delay = iop->ts[i] / 1000 - iop->ts[i - 1] / 1000;
+	//for (i = IO_START_POINT + 1; i < MAX_POINT; i++) {
+	for (i = IO_START_POINT + 1, n = 0; i < MAX_POINT; i++) {
+		if (!skip)
+			n = i - 1;
+		if (iop->ts[i] > iop->ts[n]) {
+			delay = iop->ts[i] / 1000 - iop->ts[n] / 1000;
+			skip = 0;
+		} else {
+			skip = 1;
+			continue;
+		}
 		if (max_delay < delay)
 			max_delay = delay;
 	}
@@ -108,12 +118,21 @@ unsigned long get_max_delay(struct iosdiag_req *iop)
 
 char *get_max_delay_component(struct iosdiag_req *iop)
 {
-	int i, idx = 0;
+	int i, idx, n = 0;
+	int skip = 0;
 	unsigned long delay;
 	unsigned long max_delay = 0;
 
 	for (i = IO_START_POINT + 1; i < MAX_POINT; i++) {
-		delay = iop->ts[i] / 1000 - iop->ts[i - 1] / 1000;
+		if (!skip)
+			n = i - 1;
+		if (iop->ts[i] > iop->ts[n]) {
+			delay = iop->ts[i] / 1000 - iop->ts[n] / 1000;
+			skip = 0;
+		} else {
+			skip = 1;
+			continue;
+		}
 		if (max_delay < delay) {
 			max_delay = delay;
 			idx = i;

@@ -3,6 +3,10 @@
 #include <sys/un.h>
 #include "cnf_put.h"
 
+int upload_num = 0;
+int upload_capacity = 10; 
+char** upload_array;
+
 int cnfPut_init(struct cnfPut* self, const char* path) {
     self->_sock = socket(AF_UNIX, SOCK_DGRAM, 0);
         if (self->_sock == -1) {
@@ -39,3 +43,15 @@ void cnfPut_destroy(struct cnfPut *cnfput) {
     }
 }
 
+void reset_upload_statistics() 
+{
+	upload_num = 0;
+	upload_capacity = 10;
+	upload_array = malloc(upload_capacity * sizeof(char*));
+}
+
+void expand_upload_array() 
+{
+    upload_capacity *= 2; 
+    upload_array = realloc(upload_array, upload_capacity * sizeof(char*));
+}

@@ -38,34 +38,6 @@ static int g_stop;
 static int g_log_fd = -1;
 static char *g_json_buf;
 
-int metrics_num = 0;
-int metrics_capacity = 10; 
-char** metrics_array;
-pthread_mutex_t metrics_mutex;
-
-int req_array_length = 0;
-int req_capacity = 10;
-struct iosdiag_req* req_array;
-pthread_mutex_t req_mutex;
-
-int exit_flag = 0;
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-void signal_handler(int signum) 
-{
-    printf("Received signal %d\n", signum);
-
-    pthread_mutex_lock(&mutex);
-    exit_flag = 1;
-    pthread_mutex_unlock(&mutex);
-
-    pthread_cond_broadcast(&cond);
-
-    printf("Waiting for all threads to exit...\n");
-    printf("Exiting...\n");
-    exit(0);
-}
-
 extern int enable_debug_log(void);
 extern unsigned long get_threshold_us(void);
 static int exec_shell_cmd(char *cmd)
@@ -86,11 +58,51 @@ static int exec_shell_cmd(char *cmd)
 	return 0;
 }
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;	/*  */
+pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+int exit_flag = 0;
+/* Make sure all threads exit safely */
+void signal_handler(int signum) 
+{
+    printf("Received signal %d\n", signum);
+
+    pthread_mutex_lock(&mutex);
+    exit_flag = 1;
+    pthread_mutex_unlock(&mutex);
+
+    pthread_cond_broadcast(&cond);
+
+    printf("Waiting for all threads to exit...\n");
+    printf("Exiting...\n");
+    exit(0);
+}
+
+/* Ensure that the data of all IO path points are captured */
+static int check_catch_points(struct iosdiag_req *iop)
+{	
+	int i = 0;
+	for (i = 0; i < (MAX_POINT - 1); i++) {
+		if (iop->ts[i] == 0) {	
+			return 0;
+		}
+	}
+
+	if (!iop->ts[IO_DONE_POINT]){
+		iop->ts[IO_DONE_POINT] = iop->ts[IO_COMPLETE_TIME_POINT];
+	}
+
+	return 1;
+}
+
 static int over_threshold(struct iosdiag_req *iop)
 {
 	unsigned long threshold_ns = get_threshold_us() * 1000;
-	unsigned long delay_ns = iop->ts[MAX_POINT-1] -
-				iop->ts[IO_START_POINT];
+	unsigned long delay_ns = 0;
+
+	if (iop->ts[MAX_POINT-1] > iop->ts[IO_START_POINT]) {
+		delay_ns = iop->ts[MAX_POINT-1] -
+			iop->ts[IO_START_POINT];
+	} 
 
 	if (delay_ns >= threshold_ns)
 		return 1;
@@ -112,12 +124,16 @@ static void iosdiag_store_result(void *ctx, int cpu, void *data, __u32 size)
 	}
 }
 
+/* The aggregation thread aggregates multiple IO events generated 
+during the aggregation cycle. */
 void event_aggregator() 
-{
+{	
 	pthread_mutex_lock(&req_mutex);
 	req_array = (struct iosdiag_req*)malloc(req_capacity * sizeof(struct iosdiag_req));
 	pthread_mutex_unlock(&req_mutex);
+
   	while (1) {
+		/* Check the exit signal */
 		pthread_mutex_lock(&mutex);
         if (exit_flag) {
             pthread_mutex_unlock(&mutex);
@@ -125,199 +141,73 @@ void event_aggregator()
         }
         pthread_mutex_unlock(&mutex);
 
+		/* Start aggregating received IO events */
 		int lockResult = pthread_mutex_lock(&req_mutex);
-		//printf("req_array_length: %d\n", req_array_length);
         if (req_array_length > 1) {
       		int i, j;
       		for (i = 0; i < req_array_length; i++) {
-				if (strlen(req_array[i].diskname) == 0 || 
-				strlen(req_array[i].comm) == 0 || 
-				strlen(req_array[i].op) == 0) {
-					//printf("jump req_array.diskname: %d\n", i);
+				/* Filter to IO events that have participated in aggregation */
+				if (check_aggregated(&req_array[i])) {
                 	continue; 
             	}
-        		int m = 0;
-        		char *maxdelay_component = get_max_delay_component(&req_array[i]);
-				//printf("maxdelay_component: %s\n", maxdelay_component);
-				unsigned int sum_data_len = req_array[i].data_len;
-        		unsigned long sum_max_delay = get_max_delay(&req_array[i]);
-				unsigned long max_delay = sum_max_delay;
-        		unsigned long sum_total_delay = get_total_delay(&req_array[i]);
-				unsigned long max_total_delay = sum_total_delay;
-				unsigned int max_total_dalay_idx = i;
-				char* max_total_delay_diskname = req_array[i].diskname;
-    			unsigned long* sum_component_delay = (unsigned long*)malloc(5 * sizeof(unsigned long));
-				memset(sum_component_delay, 0, 5 * sizeof(unsigned long));
-    			unsigned long* max_component_delay = (unsigned long*)malloc(5 * sizeof(unsigned long));
-        		memset(max_component_delay, 0, 5 * sizeof(unsigned long));
-				int count = 1;
-				// printf("sum_max_delay: %lu\n", sum_max_delay);
-				update_component_delay(&req_array[i], sum_component_delay, max_component_delay, 1);
+				printf("max_total %d :%lu\n", i, get_max_delay(&req_array[i]));
 
-				//printf("block: %lu, driver: %lu, disk: %lu, complete: %lu, done: %lu\n", sum_block, sum_driver, sum_disk, sum_complete, sum_done);
+				struct aggregation_metrics agg_metrics = {0};
+				init_aggregation_metrics(&agg_metrics, &req_array[i], i);
+				printf("max_total0 %d :%lu\n", i, agg_metrics.sum_total_delay);
 
 				for (j = i + 1; j < req_array_length; j++) {
                 	if (check_aggregation_conditions(&req_array[i], &req_array[j])){
-						//printf("all the same req_array.diskname: %s\n", req_array[j].diskname);
-                    	count++;
-						unsigned long aggregated_total_delay = get_total_delay(&req_array[j]);
-						unsigned long aggregated_max_delay = get_max_delay(&req_array[j]);
-                    	sum_total_delay += aggregated_total_delay;
-						sum_max_delay += aggregated_max_delay;
-            			sum_data_len += req_array[j].data_len;
-						int flag = 0;
-						if (max_total_delay < aggregated_total_delay) {
-							flag = 1;
-						}
-						if (flag) {
-							max_delay = aggregated_max_delay;
-							max_total_delay = aggregated_total_delay;
-							strcpy(max_total_delay_diskname, req_array[j].diskname); 
-							// printf("find larger total_delay: %s\n", max_total_delay_diskname);
-							max_total_dalay_idx = j;
-							update_component_delay(&req_array[j], sum_component_delay, max_component_delay, 1);
-						}else {
-							update_component_delay(&req_array[j], sum_component_delay, max_component_delay, 0);
-						}
-						//printf("put %d into blank\n", j);
-						memset(req_array[j].diskname, '\0', sizeof(req_array[j].diskname));
+						aggregate_events(&agg_metrics, &req_array[j], j);
+						printf("max_total1 %d: %lu\n", j, agg_metrics.sum_total_delay);
             		}
           		}
-				printf("sum_block: %lu, sum_driver: %lu, sum_disk: %lu, sum_complete: %lu, sum_done: %lu\n", max_component_delay[0], max_component_delay[1], max_component_delay[2], max_component_delay[3], max_component_delay[4]);
-				printf("aggregator count: %d\n", count);
-        		sum_data_len /= count;
-      			sum_max_delay /= count;
-          		sum_total_delay /= count;
-				for (m = 0; m < MAX_POINT - 1; m++) {
-      				sum_component_delay[m] /= count;
-				}
+				post_aggregation_statistics(&agg_metrics);
 
 				set_check_time_date();
 				char *latency_summary = malloc(JSON_BUFFER_SIZE);
 				memset(latency_summary, 0x0, JSON_BUFFER_SIZE);
 
-				pthread_mutex_lock(&metrics_mutex);
-				if (metrics_num >= metrics_capacity) {
-        			metrics_capacity *= 2; 
-        			metrics_array = realloc(metrics_array, metrics_capacity * sizeof(char*));
+				pthread_mutex_lock(&upload_mutex);
+				if (upload_num >= upload_capacity) {
+					expand_upload_array();
     			}
 
-				metrics_array[metrics_num] = malloc(JSON_BUFFER_SIZE);
-				sprintf(latency_summary, 
-					"sysom_iolatency,diskname=%s,"
-					"comm=%s,"
-					"iotype=%s,"
-					"maxdelay_component=%s "
-					"max_delay=%lu,"
-					"total_delay=%lu,"
-					"pid=%d,"
-					"datalen=%d,"
-					"queue_id=%d,"
-					"initiated_cpu=%d,"
-					"issue_cpu=%d,"
-					"respond_cpu=%d,"
-					"soft_interrupt_cpu=%d,"
-					"block=%lu,"
-					"driver=%lu,"
-					"disk=%lu,"
-					"complete=%lu,"
-					"done=%lu",
-					req_array[i].diskname, 
-					req_array[i].comm, 
-					req_array[i].op, 
-					maxdelay_component, 
-					sum_max_delay, 
-					sum_total_delay, 
-					req_array[i].pid, 
-					sum_data_len,
-					req_array[i].queue_id,
-					req_array[i].cpu[0],
-					req_array[i].cpu[1],
-					req_array[i].cpu[2],
-					req_array[i].cpu[3],
-					sum_component_delay[0],
-					sum_component_delay[1],
-					sum_component_delay[2],
-					sum_component_delay[3],
-					sum_component_delay[4]
-				);
-				sprintf(latency_summary + strlen(latency_summary), "%s", "\n");
-				free(max_component_delay);
-				free(sum_component_delay);
-				//printf("collected step1: %s\n", latency_summary);
-				//printf("max_total_delay_diskname: %s\n", max_total_delay_diskname);
+				upload_array[upload_num] = malloc(JSON_BUFFER_SIZE);
 
-				sprintf(latency_summary + strlen(latency_summary), 
-					"sysom_iolatency_max,diskname=%s,"
-					"comm=%s,"
-					"iotype=%s,"
-					"maxdelay_component=%s "
-					"max_delay=%lu,"
-					"total_delay=%lu,"
-					"pid=%d,"
-					"datalen=%d,"
-					"queue_id=%d,"
-					"initiated_cpu=%d,"
-					"issue_cpu=%d,"
-					"respond_cpu=%d,"
-					"soft_interrupt_cpu=%d,"
-					"block=%lu,"
-					"driver=%lu,"
-					"disk=%lu,"
-					"complete=%lu,"
-					"done=%lu",
-					max_total_delay_diskname, 
-					req_array[max_total_dalay_idx].comm, 
-					req_array[max_total_dalay_idx].op, 
-					maxdelay_component, 
-					max_delay, 
-					max_total_delay, 
-					req_array[max_total_dalay_idx].pid, 
-					req_array[max_total_dalay_idx].data_len,
-					req_array[max_total_dalay_idx].queue_id,
-					req_array[max_total_dalay_idx].cpu[0],
-					req_array[max_total_dalay_idx].cpu[1],
-					req_array[max_total_dalay_idx].cpu[2],
-					req_array[max_total_dalay_idx].cpu[3],
-					max_component_delay[0],
-					max_component_delay[1],
-					max_component_delay[2],
-					max_component_delay[3],
-					max_component_delay[4]
-				);
+				aggregation_summary_convert_to_unity(latency_summary, &req_array[i], 
+				&req_array[agg_metrics.max_total_dalay_idx], &agg_metrics);
+
+				free(agg_metrics.max_component_delay);
+				free(agg_metrics.sum_component_delay);
 
 				// printf("collected aggregator latency: %s\n", latency_summary);
-				strcpy(metrics_array[metrics_num], latency_summary);
-				metrics_num++;
-				pthread_mutex_unlock(&metrics_mutex);
+				strcpy(upload_array[upload_num], latency_summary);
+				upload_num++;
+				pthread_mutex_unlock(&upload_mutex);
 				free(latency_summary);
         	} 
-			req_array_length = 0;
-			req_capacity = 10;
-			req_array = (struct iosdiag_req*)realloc(req_array, req_capacity * sizeof(struct iosdiag_req));
+			reset_req_statistics();
 			pthread_mutex_unlock(&req_mutex);
         } else if (req_array_length == 1){
 			set_check_time_date();
 			char *latency_summary = malloc(JSON_BUFFER_SIZE);
 			memset(latency_summary, 0x0, JSON_BUFFER_SIZE);
 			summary_convert_to_unity(latency_summary, &req_array[0]);
-			req_array_length = 0;
-			req_capacity = 10;
-			req_array = (struct iosdiag_req*)realloc(req_array, req_capacity * sizeof(struct iosdiag_req));
+			reset_req_statistics();
 			pthread_mutex_unlock(&req_mutex);
 
-			pthread_mutex_lock(&metrics_mutex);
-			if (metrics_num >= metrics_capacity) {
-        		metrics_capacity *= 2; 
-        		metrics_array = realloc(metrics_array, metrics_capacity * sizeof(char*));
+			pthread_mutex_lock(&upload_mutex);
+			if (upload_num >= upload_capacity) {
+        		expand_upload_array();
     		}
 		
-			metrics_array[metrics_num] = malloc(JSON_BUFFER_SIZE);
-			strcpy(metrics_array[metrics_num], latency_summary);
-			metrics_num++;
-			printf("collected 1: %s\n", latency_summary);
+			upload_array[upload_num] = malloc(JSON_BUFFER_SIZE);
+			strcpy(upload_array[upload_num], latency_summary);
+			upload_num++;
+			//printf("collected one: %s\n", latency_summary);
 
-			pthread_mutex_unlock(&metrics_mutex);
+			pthread_mutex_unlock(&upload_mutex);
 			free(latency_summary);
 		}
 		if (lockResult == 0) {
@@ -329,9 +219,9 @@ void event_aggregator()
 
 void event_upload_thread() 
 {
-	pthread_mutex_lock(&metrics_mutex);
-	metrics_array = malloc(metrics_capacity * sizeof(char*));
-	pthread_mutex_unlock(&metrics_mutex);
+	pthread_mutex_lock(&upload_mutex);
+	upload_array = malloc(upload_capacity * sizeof(char*));
+	pthread_mutex_unlock(&upload_mutex);
 	
 	struct cnfPut cnfput;
     if (cnfPut_init(&cnfput, PIPE_PATH)){
@@ -343,21 +233,22 @@ void event_upload_thread()
 		time_t startTime = time(NULL);
 		char *latency_summaries = malloc(JSON_BUFFER_SIZE);
 	    memset(latency_summaries, 0x0, JSON_BUFFER_SIZE);
-		pthread_mutex_lock(&metrics_mutex);
-		printf("Count: %d\n", metrics_num);
-		if (metrics_num > 0) {
-			for (i = 0; i < metrics_num; i++) {
+		pthread_mutex_lock(&upload_mutex);
+		printf("Count: %d\n", upload_num);
+		if (upload_num > 0) {
+			for (i = 0; i < upload_num; i++) {
 				//printf("combine: %s\n", metrics_array[i]);
-				if (strlen(latency_summaries) + strlen(metrics_array[i]) >= JSON_BUFFER_SIZE){
+				if (strlen(latency_summaries) + strlen(upload_array[i]) >= JSON_BUFFER_SIZE){
 					if (cnfPut_puts(&cnfput, latency_summaries)){
 						fprintf(stderr, "CnfPut put fail: %s\n", PIPE_PATH);
 						cnfPut_destroy(&cnfput);
 					}
-					printf("latency_summaries: %s\n", latency_summaries);
+					// printf("latency_summaries: %s\n", latency_summaries);
 					memset(latency_summaries, 0x0, JSON_BUFFER_SIZE);
 				}
-				sprintf(latency_summaries + strlen(latency_summaries), "%s", metrics_array[i]);
-				if (i < metrics_num - 1 && (strlen(latency_summaries) + strlen(metrics_array[i+1]) < JSON_BUFFER_SIZE)) {
+				sprintf(latency_summaries + strlen(latency_summaries), "%s", upload_array[i]);
+				if (i < upload_num - 1 && (strlen(latency_summaries) + strlen(upload_array[i+1]) 
+					< JSON_BUFFER_SIZE)) {
 					sprintf(latency_summaries + strlen(latency_summaries), "%s", "\n");
 				}
         	}
@@ -367,19 +258,17 @@ void event_upload_thread()
 				cnfPut_destroy(&cnfput);
 			}
 
-			for (i = 0; i < metrics_num; i++) {
-        		free(metrics_array[i]);
+			for (i = 0; i < upload_num; i++) {
+        		free(upload_array[i]);
     		}
-    		free(metrics_array);
-			metrics_num = 0;
-			metrics_capacity = 10;
-			metrics_array = malloc(metrics_capacity * sizeof(char*));
+    		free(upload_array);
+			reset_upload_statistics();
 		}
-		pthread_mutex_unlock(&metrics_mutex);
+		pthread_mutex_unlock(&upload_mutex);
 		free(latency_summaries);
 
         time_t endTime = time(NULL);
-        time_t sleepTime = 6 - (endTime - startTime);
+        time_t sleepTime = 3 - (endTime - startTime);
         if (sleepTime > 0) {
             sleep(sleepTime);
         }
@@ -390,21 +279,29 @@ static void iosdiag_upload_result(void *ctx, int cpu, void *data, __u32 size)
 {
 	struct iosdiag_req *iop = (struct iosdiag_req *)data;
 
-	if (over_threshold(iop)) {
-		// set_check_time_date();
-		// char *latency_summary = malloc(JSON_BUFFER_SIZE);
-		// memset(latency_summary, 0x0, JSON_BUFFER_SIZE);
-		pthread_mutex_lock(&req_mutex);
+	if (check_catch_points(iop) ) 
+	{	
+		// if (iop->ts[0] <= iop->ts[1] && iop->ts[1] <= iop->ts[2] && iop->ts[2] <= iop->ts[3] && iop->ts[3] <= iop->ts[4] && iop->ts[4] <= iop->ts[5]) {
+		// }else{
+		// 	printf("over threshold io: %s, %llu, %llu, %llu, %llu, %llu ,%llu \n", iop->diskname, iop->ts[0], iop->ts[1], iop->ts[2], iop->ts[3], iop->ts[4], iop->ts[5]);
+		// }
+		if (over_threshold(iop)) {
+			// set_check_time_date();
+			// char *latency_summary = malloc(JSON_BUFFER_SIZE);
+			// memset(latency_summary, 0x0, JSON_BUFFER_SIZE);
+			pthread_mutex_lock(&req_mutex);
 
-		if (req_array_length >= req_capacity) {
-        	req_capacity *= 2;
-			req_array = (struct iosdiag_req*)realloc(req_array, req_capacity * sizeof(struct iosdiag_req));
-    	}
+			if (req_array_length >= req_capacity) {
+        		expand_req_array();
+    		}
 
-		req_array[req_array_length] = *iop;
-		req_array_length++;
+			//printf("over threshold io: %s, %llu, %llu, %llu, %llu, %llu ,%llu \n", iop->diskname, iop->ts[0], iop->ts[1], iop->ts[2], iop->ts[3], iop->ts[4], iop->ts[5]);
 
-		pthread_mutex_unlock(&req_mutex);
+			req_array[req_array_length] = *iop;
+			req_array_length++;
+
+			pthread_mutex_unlock(&req_mutex);
+		}
 	}
 }
 
@@ -749,4 +646,5 @@ void iosdiag_exit(char *module_name)
 	if (iosdiag_scsi_mq_bpf_load)
 		iosdiag_scsi_mq_bpf__destroy(iosdiag_scsi_mq);
 }
+
 

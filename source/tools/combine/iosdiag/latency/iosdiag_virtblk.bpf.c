@@ -14,6 +14,7 @@ int kprobe_virtio_queue_rq(struct pt_regs *ctx)
 		(struct blk_mq_hw_ctx *)PT_REGS_PARM1(ctx);
 	struct blk_mq_queue_data *bd =
 		(struct blk_mq_queue_data *)PT_REGS_PARM2(ctx);
+
 	bool kick;
 	unsigned long req_addr;
 	unsigned int queue_id;
@@ -23,7 +24,12 @@ int kprobe_virtio_queue_rq(struct pt_regs *ctx)
 	struct iosdiag_req new_ioreq = {0};
 	struct iosdiag_key key = {0};
 	sector_t sector;
-
+	// unsigned long q = 0;
+	// unsigned long dev = 0;
+	dev_t devt = 0;
+	int major;
+	int first_minor;
+	
 	pid_t pid = bpf_get_current_pid_tgid();
 
 	bpf_probe_read(&kick, sizeof(bool), &bd->last);
@@ -32,7 +38,6 @@ int kprobe_virtio_queue_rq(struct pt_regs *ctx)
 
 	bpf_probe_read(&req_addr, sizeof(struct request *), &bd->rq);
 	if (!req_addr) {
-		//bpf_printk("kprobe_virtio_queue_rq: con't get request");
 		return 0;
 	}
 
@@ -41,9 +46,15 @@ int kprobe_virtio_queue_rq(struct pt_regs *ctx)
 	if (!req) {
 		return 0;
 	}
+
+	struct gendisk *gd = get_rq_disk(req);
+	bpf_probe_read(&major, sizeof(int), &gd->major);
+	bpf_probe_read(&first_minor, sizeof(int), &gd->first_minor);
+	devt = ((major) << 20) | (first_minor);
+
 	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
 
-	init_iosdiag_key(sector, &key);
+	init_iosdiag_key(sector, devt, &key);
 	ioreq = (struct iosdiag_req *)bpf_map_lookup_elem(&iosdiag_maps, &key);
 	if (ioreq) {
 		ioreq->queue_id = queue_id;
@@ -85,4 +96,5 @@ int kprobe_blk_mq_complete_request(struct pt_regs *ctx)
 	return trace_io_driver_route(ctx, req, IO_RESPONCE_DRIVER_POINT);
 }
 char _license[] SEC("license") = "GPL";
+
 

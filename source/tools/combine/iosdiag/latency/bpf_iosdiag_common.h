@@ -45,12 +45,6 @@ inline int get_target_devt(void)
 	return 0;
 }
 
-inline void
-init_iosdiag_key(unsigned long sector, struct iosdiag_key *key)
-{
-	key->sector = sector;
-}
-
 struct request___below_516 {
 	struct gendisk *rq_disk;
 };
@@ -74,7 +68,14 @@ inline struct gendisk *get_rq_disk(struct request *req)
 	return rq_disk;
 }
 
-inline int
+__always_inline void
+init_iosdiag_key(unsigned long sector, unsigned int dev, struct iosdiag_key *key)
+{
+	key->sector = sector;
+	key->dev = dev;
+}
+
+__always_inline int
 trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_type type)
 {
 	struct iosdiag_req *ioreq;
@@ -82,12 +83,23 @@ trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_typ
 	struct iosdiag_req data = {0};
 	struct iosdiag_key key = {0};
 	unsigned long long now = bpf_ktime_get_ns();
-	sector_t sector;
 	struct gendisk *rq_disk;
 	int complete = 0;
 
+	sector_t sector;
+	dev_t devt = 0;
+	int major = 0;
+	int first_minor = 0;
+
+	struct gendisk *gd = get_rq_disk(req);
+	bpf_probe_read(&major, sizeof(int), &gd->major);
+	bpf_probe_read(&first_minor, sizeof(int), &gd->first_minor);
+	devt = ((major) << 20) | (first_minor);
+
 	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
-	init_iosdiag_key(sector, &key);
+
+	init_iosdiag_key(sector, devt, &key);
+
 	ioreq = (struct iosdiag_req *)bpf_map_lookup_elem(&iosdiag_maps, &key);
 	if (ioreq) {
 		if (!ioreq->ts[type])
@@ -96,15 +108,19 @@ trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_typ
 			rq_disk = get_rq_disk(req);
 			bpf_probe_read(ioreq->diskname, sizeof(ioreq->diskname), &rq_disk->disk_name);
 		}
-		if (type == IO_RESPONCE_DRIVER_POINT)
+		if (type == IO_RESPONCE_DRIVER_POINT) {
 			ioreq->cpu[2] = bpf_get_smp_processor_id();
+			//bpf_printk("IO_RESPONCE_DRIVER_POINT?");
+		}
 		if (type == IO_DONE_POINT){
+			//bpf_printk("kprobe_blk_account_io_done?");
 			if (ioreq->ts[IO_ISSUE_DEVICE_POINT] &&
 		    	ioreq->ts[IO_RESPONCE_DRIVER_POINT])
 				complete = 1;
-			    //bpf_printk("kprobe_blk_account_io_done!");
+			    //bpf_printk("kprobe_blk_account_io_done!!!");
 		}
 		if (complete) {
+			//bpf_printk("kprobe_complete!!!!!!!!!!!!!!!!!!!!!");
 			memcpy(&data, ioreq, sizeof(data));
 			bpf_perf_event_output(ctx, &iosdiag_maps_notify, 0xffffffffULL, &data, sizeof(data));
 		}
@@ -133,15 +149,19 @@ int tracepoint_block_getrq(struct block_getrq_args *args)
 	u32 target_devt = get_target_devt();
 
 	if (target_devt && args->dev != target_devt)
+		//bpf_printk("block_getrq: %d, %d\n", args->dev, target_devt);
 		return 0;
 
 	new_ioreq.cpu[0] = -1;
 	new_ioreq.cpu[1] = -1;
 	new_ioreq.cpu[2] = -1;
 	new_ioreq.cpu[3] = -1;
-	init_iosdiag_key(args->sector, &key);
+
+	//bpf_printk("block_getrq: %d\n", args->dev);
+	init_iosdiag_key(args->sector, args->dev, &key);
 	if (pid)
 		memcpy(new_ioreq.comm, args->comm, sizeof(args->comm));
+	// IO_START_POINT
 	new_ioreq.ts[IO_START_POINT] = now;
 	new_ioreq.pid = pid;
 	memcpy(new_ioreq.op, args->rwbs, sizeof(args->rwbs));
@@ -174,9 +194,11 @@ int tracepoint_block_rq_issue(struct block_rq_issue_args *args)
 	u32 target_devt = get_target_devt();
 
 	if (target_devt && args->dev != target_devt)
+		//bpf_printk("block_rq_issue: %d, %d\n", args->dev, target_devt);
 		return 0;
 
-	init_iosdiag_key(args->sector, &key);
+	// bpf_printk("block_rq_issue: %d\n", args->dev);
+	init_iosdiag_key(args->sector, args->dev, &key);
 	ioreq = (struct iosdiag_req *)bpf_map_lookup_elem(&iosdiag_maps, &key);
 	if (ioreq) {
 		if (ioreq->ts[type])
@@ -215,9 +237,10 @@ int tracepoint_block_rq_complete(struct block_rq_complete_args *args)
 	int complete = 0;
 
 	if (target_devt && args->dev != target_devt)
+		//bpf_printk("block_rq_complete: %d, %d\n", args->dev, target_devt);
 		return 0;
-
-	init_iosdiag_key(args->sector, &key);
+	
+	init_iosdiag_key(args->sector, args->dev, &key);
 	ioreq = (struct iosdiag_req *)bpf_map_lookup_elem(&iosdiag_maps, &key);
 	if (ioreq) {
 		if (!ioreq->ts[IO_COMPLETE_TIME_POINT])
@@ -235,10 +258,23 @@ int kprobe_blk_account_io_done(struct pt_regs *ctx)
 {
 	struct request *req = (struct request *)PT_REGS_PARM1(ctx);
 	struct iosdiag_key key = {0};
+
 	sector_t sector;
+	// struct request_queue *q = {0};
+	// struct device *dev = {0};
+	dev_t devt = 0;
+
+	int major = 0;
+	int first_minor = 0;
+
+	struct gendisk *gd = get_rq_disk(req);
+	bpf_probe_read(&major, sizeof(int), &gd->major);
+	bpf_probe_read(&first_minor, sizeof(int), &gd->first_minor);
+	devt = ((major) << 20) | (first_minor);
 
 	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
-	init_iosdiag_key(sector, &key);
+
+	init_iosdiag_key(sector, devt, &key);
 
 	if (!req) {
 		//bpf_printk("kprobe_blk_account_io_done: con't get request");
@@ -251,3 +287,4 @@ int kprobe_blk_account_io_done(struct pt_regs *ctx)
 }
 
 #endif
+

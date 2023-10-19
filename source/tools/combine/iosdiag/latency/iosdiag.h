@@ -9,7 +9,7 @@
 #define REQ_OP_MASK		((1 << REQ_OP_BITS) - 1)
 #define MAX_STACK_DEPTH		12
 
-enum ioroute_type {
+enum ioroute_type{
 	IO_START_POINT,
 	IO_ISSUE_DRIVER_POINT,
 	IO_ISSUE_DEVICE_POINT,
@@ -19,7 +19,7 @@ enum ioroute_type {
 	MAX_POINT,
 };
 
-enum operating_mode {
+enum operating_mode{
 	DIAGNOSTIC_MODE,
 	MONITOR_MODE,
 };
@@ -36,6 +36,20 @@ struct iosdiag_req {
 	char op[8];
 	unsigned int data_len;
 	unsigned long sector;
+};
+
+struct aggregation_metrics {
+	unsigned int sum_data_len;
+	unsigned long sum_max_delay;
+	unsigned long max_delay;
+	unsigned long sum_total_delay;
+	unsigned long max_total_delay;
+	unsigned int max_total_dalay_idx;
+	char* maxdelay_component;
+	char* max_total_delay_diskname;
+	unsigned long* sum_component_delay;
+	unsigned long* max_component_delay;
+	int count;
 };
 
 struct iosdiag_key {
