@@ -11,35 +11,17 @@ sql-obs依赖sysak unity监控组件，在机器上部署之后，可直接通�
 
 # 使用说明
 
-在unity的yaml配置文件中，路径：source/tools/monitor/unity/etc/base.yaml中，forkRun标签中添加sql-obs的启动配置，由于默认配置文件中已经配置好，因此启动sysak服务情况下，mysql观测agent会默认启动，但默认配置不包含mysql数据库监控账户信息，因此不修改配置情况下，拿不到mysql应用侧指标；配置方法如下：
-
-- u参数表示指定用户名明文（或存在s参数情况下，为加密后的用户名）
-- p参数表示指定密码明文（或存在s参数情况下，为加密后的密码）
-- s参数表示账户密码信息是否加密，目前支持的是base64
-
-如：
+在unity的yaml配置文件中，路径：source/tools/monitor/unity/etc/base.yaml中，forkRun标签中添加sql-obs的启动配置，此外由于mysql应用侧指标需要事先配置mysql数据库监控账户信息，因此默认情况下不会采集mysql应用侧指标
+配置启动sql-obs如下：
 
 ```
 forkRun:
 ...
   - cmd: "../../../sql-obs"
     args:
-      ["-u", "用户名密文", "-p", "密码密文", "-s", "BASE"]
+      ["-y", "/etc/sysak/base.yaml"]
 ...
 ```
-
-或
-
-```
-forkRun:
-...
-  - cmd: "../../../sql-obs"
-    args:
-      ["-u", "用户名明文", "-p", "密码明文"]
-...
-```
-
-推荐第一种，以上配置前提是，需要在你的数据库中配置合理权限的监控账户，一般需要配置上PROCESS权限
 
 # 功能详情
 
