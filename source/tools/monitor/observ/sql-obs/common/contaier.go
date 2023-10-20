@@ -6,6 +6,8 @@ import (
     "regexp"
     "strings"
     "os"
+    "strconv"
+    "sort"
 )
 
 const (
@@ -49,6 +51,20 @@ func getContainerType(path string) string {
         return containerTypeRegexStr[Container_Type_K8s_Other]
     }
     return containerTypeRegexStr[Container_Type_Unknown]
+}
+
+func getContainerTypeByPid(pid int) string {
+    cgPath, err := GetCgroupPath(pid, "cpu,cpuacct")
+    if err != nil {
+        return containerTypeStr[Container_Type_Unknown]
+    }
+    i := Container_Type_Docker;
+    for ; i < Container_Type_Unknown; i++ {
+        if strings.Contains(cgPath, containerTypeStr[i]) {
+            break
+        }
+    }
+    return containerTypeStr[i]
 }
 
 func regexSearch(buffer string, reg *regexp.Regexp) []string {
@@ -265,6 +281,116 @@ func getMntFromPidMountInfo(containerFile string, pid int) ([]string) {
         return nil
     }
     return []string{fsRoot, mountPoint, device}
+}
+
+func filterPort(ns string, pid int) (int, error) {
+    cmdStr := fmt.Sprintf("ip netns exec %s netstat -tanp", ns)
+    lines, err := ExecShell(cmdStr)
+    if err != nil {
+        return 0, err
+    }
+    for _, line := range lines {
+        parts := strings.Fields(line)
+        if strings.Split(parts[len(parts)-1], "/")[0] == fmt.Sprintf("%d", pid) {
+            arr := strings.Split(parts[3], ":")
+            port, err := strconv.Atoi(arr[len(arr)-1])
+            if err != nil {
+                return 0, err
+            }
+            return port, nil
+        }
+    }
+    return 0, PrintOnlyErrMsg("failed to find port for pid %d\n", pid)
+}
+
+func filterIP(ns string, pid int) (string, error) {
+    cmdStr := fmt.Sprintf("ip netns exec %s ip addr show", ns)
+    lines, err := ExecShell(cmdStr)
+    if err != nil {
+        return "", err
+    }
+    for _, line := range lines {
+        if strings.Contains(line, "scope global") {
+            parts := strings.Fields(line)
+            return strings.Split(parts[1], "/")[0], nil
+        }
+    }
+    return "", PrintOnlyErrMsg("failed to find ip for pid %d\n", pid)
+}
+
+func getPodIpAndPort(pid int) (string, int, error) {
+    cmdStr := fmt.Sprintf("ip netns identify %d", pid)
+    lines, err := ExecShell(cmdStr, "origin")
+    if err != nil {
+        return "", 0, err
+    }
+    ns := lines[0]
+    port, err := filterPort(ns[:len(ns)-1], pid)
+    if err != nil {
+        PrintSysError(err)
+        return "", 0, err
+    }
+    ip, err := filterIP(ns[:len(ns)-1], pid)
+    if err != nil {
+        PrintSysError(err)
+        return "", 0, err
+    }
+    return ip, port, nil
+}
+
+func FindPodIpAndPort(pid int, containerId string) (string, int, error) {
+    ip, port, retErr := getPodIpAndPort(pid)
+    if retErr != nil {
+        if getContainerTypeByPid(pid) == containerTypeStr[Container_Type_Docker] {
+            retErr = nil
+            cmdStr := fmt.Sprintf("docker port %s", containerId)
+            lines, err := ExecShell(cmdStr, "origin")
+            if err != nil {
+                PrintSysError(err)
+                return "", 0, err
+            }
+            var ports []int
+            for _, line := range lines {
+                if len(line) > 0 {
+                    p, err := strconv.Atoi(strings.Split(line, "/")[0])
+                    if err != nil {
+                        continue
+                    }
+                    ports = append(ports, p)
+                }
+            }
+            if len(ports) > 0 {
+                sort.Ints(ports)
+                port = ports[0]
+            }
+            if port == 0 {
+                return "", 0, PrintOnlyErrMsg("failed to find port for pid %d\n", pid)
+            }
+            cmdStr = fmt.Sprintf("docker inspect %s | grep IPAddress", containerId)
+            lines, err = ExecShell(cmdStr, "origin")
+            if err != nil {
+                PrintSysError(err)
+                return "", 0, err
+            }
+            for _, line := range lines {
+                if len(line) > 0 {
+                    if strings.Contains(line, `"IPAddress":`) {
+                        reg := regexp.MustCompile(
+                            `"IPAddress":\s*"(\d+\.\d+\.\d+\.\d+)"`)
+                        match := reg.FindStringSubmatch(line)
+                        if len(match) >= 2 {
+                            ip = match[1]
+                            break
+                        }
+                    }
+                }
+            }
+            if ip == "" {
+                return "", 0, PrintOnlyErrMsg("failed to find ip for pid %d\n", pid)
+            }
+        }
+    }
+    return ip, port, retErr
 }
 
 func GetDeviceByFile(pid int, containerFile string) string {

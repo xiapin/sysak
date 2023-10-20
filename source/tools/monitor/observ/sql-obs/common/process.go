@@ -57,61 +57,6 @@ func findPort(pid int) (int, error) {
     return 0, PrintOnlyErrMsg("failed to find port for pid %d\n", pid)
 }
 
-func findPodIpAndPort(pid int) (string, int, error) {
-    cmdStr := fmt.Sprintf("ip netns identify %d", pid)
-    lines, err := ExecShell(cmdStr, "origin")
-    if err != nil {
-        return "", 0, err
-    }
-    ns := lines[0]
-    port, err := filterPort(ns[:len(ns)-1], pid)
-    if err != nil {
-        PrintSysError(err)
-        return "", 0, err
-    }
-    ip, err := filterIP(ns[:len(ns)-1], pid)
-    if err != nil {
-        PrintSysError(err)
-        return "", 0, err
-    }
-    return ip, port, nil
-}
-
-func filterPort(ns string, pid int) (int, error) {
-    cmdStr := fmt.Sprintf("ip netns exec %s netstat -tanp", ns)
-    lines, err := ExecShell(cmdStr)
-    if err != nil {
-        return 0, err
-    }
-    for _, line := range lines {
-        parts := strings.Fields(line)
-        if strings.Split(parts[len(parts)-1], "/")[0] == fmt.Sprintf("%d", pid) {
-            arr := strings.Split(parts[3], ":")
-            port, err := strconv.Atoi(arr[len(arr)-1])
-            if err != nil {
-                return 0, err
-            }
-            return port, nil
-        }
-    }
-    return 0, PrintOnlyErrMsg("failed to find port for pid %d\n", pid)
-}
-
-func filterIP(ns string, pid int) (string, error) {
-    cmdStr := fmt.Sprintf("ip netns exec %s ip addr show", ns)
-    lines, err := ExecShell(cmdStr)
-    if err != nil {
-        return "", err
-    }
-    for _, line := range lines {
-        if strings.Contains(line, "scope global") {
-            parts := strings.Fields(line)
-            return strings.Split(parts[1], "/")[0], nil
-        }
-    }
-    return "", PrintOnlyErrMsg("failed to find ip for pid %d\n", pid)
-}
-
 func findLogFile(pid int, logType string) (string, error) {
     basePath := fmt.Sprintf("/proc/%d/", pid)
     logPath := ""
@@ -212,8 +157,12 @@ func getProcessInfo(psEntry string) (processInfo, error) {
 
     id := GetContainerIdByPid(pid)
     if id != nil {
-        containerId = id[0]
-        podId = id[1]
+        if len(id[0]) > 0 {
+            containerId = id[0]
+        }
+        if len(id[1]) > 0 {
+            podId = id[1]
+        }
     }
     //fmt.Printf("conrainer id: %s, pod id: %s\n", containerId, podId)
     p := getKeyValueFromString(psEntry, "--port")
@@ -231,7 +180,7 @@ func getProcessInfo(psEntry string) (processInfo, error) {
                 return processInfo{}, err
             }
         } else {
-            ip, port, err = findPodIpAndPort(pid)
+            ip, port, err = FindPodIpAndPort(pid, containerId)
             if err != nil {
                 return processInfo{}, err
             }
@@ -248,7 +197,6 @@ func getProcessInfo(psEntry string) (processInfo, error) {
     if len(errLogPath) == 0 {
         errLogPath, _ = findLogFile(pid, "err")
     }
-
     if id != nil {
         if len(slowLogPath) > 0 {
             slowLogPath, _ = GetHostFilePathByContainerPath(containerId,
