@@ -35,7 +35,7 @@ func findPort(pid int) (int, error) {
     }
     re := regexp.MustCompile(fmt.Sprintf(".*LISTEN\\s+%d/mysqld", pid))
     matches := re.FindAllString(out[0], -1)
-    if len(matches) > 1 {
+    if len(matches) > 0 {
         var ports []int
         for _, match := range matches {
             s := strings.Fields(match)
