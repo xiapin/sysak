@@ -170,12 +170,14 @@ func GetAppLatency(table string, labels []string) map[string]map[string]string {
         if line["labels"].(map[string]interface{})["APP"].(string) != "MYSQL" {
             continue
         }
-        containerID := line["labels"].(
-        map[string]interface{})["ContainerID"].(string)
-        if len(containerID) > 0 {
-            containerID = containerID[:12]
-        } else {
-            containerID = "NULL"
+        containerID := "NULL"
+        if val, ok := line["labels"].(map[string]interface{})["ContainerID"]; ok && (val != nil) {
+            containerID = val.(string)
+            if len(containerID) >= 12 {
+                containerID = containerID[:12]
+            } else if len(containerID) == 0 {
+                containerID = "NULL"
+            }
         }
         if _, ok := result[containerID]; !ok {
             result[containerID] = map[string]string{}

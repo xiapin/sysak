@@ -92,9 +92,12 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         "observe", "mysqld", labelName, metricsName) {
         metric := line.(map[string]interface{})
         pid, _ := strconv.Atoi(metric["pid"].(string))
-        containerId := metric["cgroup"].(string)
-        if len(containerId) < 1 {
-            containerId = "NULL"
+        containerId := "NULL"
+        if val, ok := metric["cgroup"]; ok && (val != nil) {
+            containerId = metric["cgroup"].(string)
+            if len(containerId) < 1 {
+                containerId = "NULL"
+            }
         }
         app := []string{
             metric["pid"].(string),
