@@ -221,6 +221,7 @@ func getMountPathByMatch(match ...string) ([]string, error) {
     }
     s, err := ExecShell(fmt.Sprintf("mount %s", filter))
     if err != nil {
+        PrintOnlyErrMsg("get match mount info fail")
         return nil, err
     }
     for _, entry := range s {
@@ -433,9 +434,12 @@ func GetHostFilePathByContainerPath(containerId string,
         fsRoot := mntinfo[0]
         mountPoint := mntinfo[1]
         device := mntinfo[2]
-        mntPath, err := getMountPathByMatch(match, device)
+        mntPath, err := getMountPathByMatch(device, match)
         if err != nil {
-            return "", err
+            mntPath, err = getMountPathByMatch(device)
+            if err != nil {
+                return "", err
+            }
         }
         for _, mnt := range mntPath {
             path := mnt + fsRoot + containerFile
@@ -443,8 +447,7 @@ func GetHostFilePathByContainerPath(containerId string,
                 path = mnt + fsRoot + strings.Replace(
                     containerFile, mountPoint, "", -1)
             }
-            _, err := os.Stat(path)
-            if !os.IsNotExist(err) {
+            if _, err := os.Stat(path); !os.IsNotExist(err) {
                 return path, nil
             }
         }
