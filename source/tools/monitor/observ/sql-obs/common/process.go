@@ -9,6 +9,7 @@ import (
     "sort"
     "strconv"
     "strings"
+    "io/ioutil"
     //"unsafe"
     "github.com/fsnotify/fsnotify"
 )
@@ -39,15 +40,12 @@ func findPort(pid int) (int, error) {
         var ports []int
         for _, match := range matches {
             s := strings.Fields(match)
-            re := regexp.MustCompile(`(\d+)`)
-            m := re.FindStringSubmatch(s[3])
-            if len(m) > 1 {
-                port, err := strconv.Atoi(m[1])
-                if err != nil {
-                    continue
-                }
-                ports = append(ports, port)
+            arr := strings.Split(s[3], ":")
+            port, err := strconv.Atoi(arr[len(arr)-1])
+            if err != nil {
+                continue
             }
+            ports = append(ports, port)
         }
         if len(ports) > 0 {
             sort.Ints(ports)
@@ -57,7 +55,7 @@ func findPort(pid int) (int, error) {
     return 0, PrintOnlyErrMsg("failed to find port for pid %d\n", pid)
 }
 
-func findLogFile(pid int, logType string) (string, error) {
+func findLogFile(pid int, logType string, moreMatch ...string) (string, error) {
     basePath := fmt.Sprintf("/proc/%d/", pid)
     logPath := ""
 
@@ -69,13 +67,19 @@ func findLogFile(pid int, logType string) (string, error) {
             return "", err
         }
         logPath = realpath
-        if !strings.Contains(realpath, ".log") {
-            logPath = ""
+        for _, m := range moreMatch {
+            if !strings.Contains(logPath, m) {
+                logPath = ""
+            }
         }
     } else {
         logPath = filepath.Join(basePath, "fd")
         cmdStr := fmt.Sprintf("ls -l %s | grep %q", logPath,
             strings.ReplaceAll(logType, ".", `\.`))
+        for _, m := range moreMatch {
+            cmdStr += fmt.Sprintf(
+                "| grep %q", strings.ReplaceAll(m, ".", `\.`))
+        }
         matches, err := ExecShell(cmdStr)
         if err != nil {
             return "", PrintOnlyErrMsg("not found the path of %s log", logType)
@@ -84,9 +88,11 @@ func findLogFile(pid int, logType string) (string, error) {
             s := strings.Fields(match)
             if len(s) > 0 {
                 logPath = s[len(s)-1]
-                if !strings.Contains(logPath, logType) {
-                    logPath = ""
-                    continue
+                for _, m := range moreMatch {
+                    if !strings.Contains(logPath, m) {
+                        logPath = ""
+                        continue
+                    }
                 }
                 break
             }
@@ -98,11 +104,11 @@ func findLogFile(pid int, logType string) (string, error) {
     return logPath, nil
 }
 
-func getKeyValueFromString(str string, match string) string {
-    re := regexp.MustCompile(fmt.Sprintf(".*%s=\\S+", match))
-    m := re.FindAllString(str, -1)
-    if len(m) > 1 {
-        return m[1]
+func getKeyValueFromString(str string, key string) string {
+    re := regexp.MustCompile(key + `=([^ \t\n\r\f\v]+)`)
+    match := re.FindStringSubmatch(str)
+    if len(match) >= 2 {
+        return match[1]
     }
     return ""
 }
@@ -192,10 +198,10 @@ func getProcessInfo(psEntry string) (processInfo, error) {
     cnfPath = getKeyValueFromString(psEntry, "--defaults-file")
 
     if len(slowLogPath) == 0 {
-        slowLogPath, _ = findLogFile(pid, "slow.log")
+        slowLogPath, _ = findLogFile(pid, "slow", ".log")
     }
     if len(errLogPath) == 0 {
-        errLogPath, _ = findLogFile(pid, "err")
+        errLogPath, _ = findLogFile(pid, "err", ".log")
     }
     if id != nil {
         if len(slowLogPath) > 0 {
@@ -209,7 +215,7 @@ func getProcessInfo(psEntry string) (processInfo, error) {
     }
 
     if len(cnfPath) == 0 {
-        cnfPath, err = findLogFile(pid, ".cnf")
+        cnfPath, err = findLogFile(pid, "cnf", ".cnf")
     }
     if containerId != "NULL" {
         containerId = containerId[:12]
@@ -227,6 +233,15 @@ func initAppInfoList(comm string) error {
     }
     for _, match := range matches {
         if len(match) > 0 {
+            commBytes, err := ioutil.ReadFile(
+                "/proc/" + strings.Fields(match)[1] + "/comm")
+            if err != nil {
+                continue
+            }
+            commStr := strings.TrimSpace(string(commBytes))
+            if commStr != comm {
+                continue
+            }
             pInfo, err := getProcessInfo(match)
             if err != nil {
                 //PrintSysError(err)

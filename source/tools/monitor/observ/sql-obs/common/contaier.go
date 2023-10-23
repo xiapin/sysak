@@ -273,7 +273,7 @@ func getMntFromPidMountInfo(containerFile string, pid int) ([]string) {
                 if len(f[4]) > len(fsRoot) {
                     fsRoot = f[3]
                     mountPoint = f[4]
-                    device = f[8]
+                    device = f[len(f) - 2]
                 }
             }
         }
