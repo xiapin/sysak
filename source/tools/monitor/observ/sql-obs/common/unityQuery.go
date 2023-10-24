@@ -171,7 +171,8 @@ func GetAppLatency(table string, labels []string) map[string]map[string]string {
             continue
         }
         containerID := "NULL"
-        if val, ok := line["labels"].(map[string]interface{})["ContainerID"]; ok && (val != nil) {
+        if val, ok := line["labels"].(
+            map[string]interface{})["ContainerID"]; ok && (val != nil) {
             containerID = val.(string)
             if len(containerID) >= 12 {
                 containerID = containerID[:12]
@@ -179,11 +180,13 @@ func GetAppLatency(table string, labels []string) map[string]map[string]string {
                 containerID = "NULL"
             }
         }
-        if _, ok := result[containerID]; !ok {
-            result[containerID] = map[string]string{}
+        pid := line["labels"].(map[string]interface{})["Pid"].(string)
+        key := containerID + ":" + pid
+        if _, ok := result[key]; !ok {
+            result[key] = map[string]string{}
         }
         for _, label := range labels {
-            result[containerID][label] = 
+            result[key][label] = 
                 line["labels"].(map[string]interface{})[label].(string)
         }
     }

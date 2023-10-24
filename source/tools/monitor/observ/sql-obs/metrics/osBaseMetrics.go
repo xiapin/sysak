@@ -88,7 +88,7 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         "cgroup", "pid",
     }
     rtMap := common.GetAppLatency("sysom_metrics_ntopo_node", labelsRT)
-    for index, line := range common.GetAppMetrics(
+    for _, line := range common.GetAppMetrics(
         "observe", "mysqld", labelName, metricsName) {
         metric := line.(map[string]interface{})
         pid, _ := strconv.Atoi(metric["pid"].(string))
@@ -142,51 +142,52 @@ func updateAppMetrics(mList *[]*appOsMetrics) ([][]string, error) {
         // m.PkgDrops, _ := metric["drops"]         // null
         // retrans, _ = metric["retran"]           // null
         if rtMap != nil {
-            if _, ok := rtMap[containerId]; ok {
-                num, _ := strconv.ParseFloat(rtMap[containerId]["Requests"], 64)
+            key := containerId + ":" + app[0]
+            if _, ok := rtMap[key]; ok {
+                num, _ := strconv.ParseFloat(rtMap[key]["Requests"], 64)
                 m.RequestCount = num / 30.0
-                num, _ = strconv.ParseFloat(rtMap[containerId]["InBytes"], 64)
+                num, _ = strconv.ParseFloat(rtMap[key]["InBytes"], 64)
                 m.NetRecTraffic = num / 30.0
-                num, _ = strconv.ParseFloat(rtMap[containerId]["OutBytes"], 64)
+                num, _ = strconv.ParseFloat(rtMap[key]["OutBytes"], 64)
                 m.NetSendTraffic = num / 30.0
                 m.ResponseTimeAvg, _ = 
-                    strconv.ParseUint(rtMap[containerId]["AvgRT"], 10, 64)
+                    strconv.ParseUint(rtMap[key]["AvgRT"], 10, 64)
                 m.ResponseTimeMax, _ = 
-                    strconv.ParseUint(rtMap[containerId]["MaxRT"], 10, 64)
+                    strconv.ParseUint(rtMap[key]["MaxRT"], 10, 64)
             }
         }
         if m.CpuTotal > 0 {
             analyzer.MarkEventsNotify(
                 MetricsType(analyzer.Notify_Process_CPU_HIGH_Type),
-                info[index][2], "mysqld", info[index][0],
+                app[2], "mysqld", app[0],
                 m.CpuTotal, m.CpuUser, m.CpuSys)
         }
         if m.SchedDelay > 0 {
             analyzer.MarkEventsNotify(
                 MetricsType(analyzer.Notify_Process_Sched_Delay_Type),
-                info[index][2], "mysqld", info[index][0], m.SchedDelay/1000.0)
+                app[2], "mysqld", app[0], m.SchedDelay/1000.0)
         }
         if m.ResponseTimeAvg > 0 {
             analyzer.MarkEventsNotify(
                 MetricsType(analyzer.Notify_Process_RT_Type),
-                info[index][2], "mysqld", info[index][0],
+                app[2], "mysqld", app[0],
                 float64(m.ResponseTimeAvg))
         }
         if m.UNStatusTime > 0 {
             analyzer.MarkEventsNotify(MetricsType(analyzer.Notify_Long_Time_D_Type),
-                info[index][2], "mysqld", info[index][0], m.UNStatusTime)
+                app[2], "mysqld", app[0], m.UNStatusTime)
         }
         pgmajfault, _ := metric["majflt"].(float64)
         if m.MemReclaimLatency > 0 {
             analyzer.MarkEventsNotify(
                 MetricsType(analyzer.Notify_Direct_Reclaim_Type),
-                info[index][2], "mysqld", info[index][0],
+                app[2], "mysqld", app[0],
                 pgmajfault, m.MemReclaimLatency, m.MemReclaimLatency)
         }
         if m.PkgDrops > 0 {
             analyzer.MarkEventsNotify(
                 MetricsType(analyzer.Notify_Process_Net_Drops_Type),
-                info[index][2], "mysqld", info[index][0], m.PkgDrops)
+                app[2], "mysqld", app[0], m.PkgDrops)
         }
         analyzer.TriggerNotify()
         *mList = append(*mList, &m)
@@ -251,9 +252,12 @@ func exportAppMetrics(appMetrics []*appOsMetrics, info [][]string) {
         if len(data) > 0 {
             data += "\n"
         }
+        pid, _ := strconv.Atoi(info[index][0])
+        portStr := strconv.Itoa(
+            common.GetAppInstanceMemberByPid(pid, "Port").(int))
         data += (osMysqldMetricsTlbName + `,pid=` + info[index][0] +
             `,podID=` + info[index][1] + `,containerID=` + info[index][2] +
-            `,comm=mysqld ` + common.Struct2String(m))
+            `,port=` + portStr + `,comm=mysqld ` + common.Struct2String(m))
     }
     if len(data) > 0 {
         common.ExportData(data)

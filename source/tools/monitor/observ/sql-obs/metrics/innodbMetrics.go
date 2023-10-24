@@ -197,7 +197,8 @@ func startEngineMonitor(dbConn *DBConnect) {
         getCheckPointAge(dbConn, &innodbMetrics)
         addDataToExport(mysqldInlineMetricsTlbName + `,podID=` +
             dbConn.GetPodID() + `,containerID=` + dbConn.GetContainerID() +
-            `,comm=mysqld ` + common.Struct2String(innodbMetrics),
+            `,port=` + strconv.Itoa(dbConn.GetPort()) + `,comm=mysqld ` + 
+            common.Struct2String(innodbMetrics),
             common.GetAppInstanceCnt())
         time.Sleep(60 * time.Second)
     }

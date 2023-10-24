@@ -337,6 +337,8 @@ func analyzAndReportEvent(ssA *ssAnalyzer,
                 reason.(string), ", " + osChkStrFlag, "")
         }
     }
+    portStr := strconv.Itoa(
+        common.GetAppInstanceMemberByPid(pid, "Port").(int))
     desc := "slow SQL occurs"
     extra := fmt.Sprintf(`{"level":"warning"`+
         `,"value":"%s"`+
@@ -344,12 +346,13 @@ func analyzAndReportEvent(ssA *ssAnalyzer,
         `,"app_log":%s`+
         `,"reason":"%s"`+
         `,"os_log":%s`+
-        `,"pid":%d`+
+        `,"pid":"%s"`+
+        `,"port":"%s"`+
         `,"podId":"%s"`+
         `,"containerId":"%s"`+
         `,"tag_set":"mysqld"}`,
         desc, time.Unix(time.Now().Unix(), 0).Format(common.TIME_FORMAT), jApp, reason,
-        jOSEve, pid, podId, containerId)
+        jOSEve, strconv.Itoa(pid), portStr, podId, containerId)
     common.ExportData(GetLogEventsDesc(
         Notify_Process_Mysql_Slow_Sql_Type, "", "", desc, extra))
     return nil
