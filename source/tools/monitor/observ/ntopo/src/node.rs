@@ -97,8 +97,8 @@ impl Node {
                 format!("Node({})", self.ip)
             },
             self.icon,
-            self.poduuid,
-            self.container_id,
+            if self.poduuid.is_empty() { "NULL".to_owned() } else { self.poduuid.clone() },
+            if self.container_id.is_empty() { "NULL".to_owned() } else { self.container_id.clone()  },
             self.namespace,
             self.app,
             self.in_bytes,
@@ -114,6 +114,7 @@ impl Node {
         if let Some(pi) = pids.pids.get(&self.pid) {
             self.container_id = pi.container_id.clone();
             self.comm = pi.comm.clone();
+            self.poduuid = pi.podid.clone();
         }
     }
 
