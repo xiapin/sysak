@@ -308,6 +308,9 @@ func osChkNetProcessRTEvents(data []interface{}) {
                 common.PrintSysError(err)
             }
         }
+        pidInt, _ := strconv.Atoi(argvs[2].(string))
+        portStr := strconv.Itoa(
+            common.GetAppInstanceMemberByPid(pidInt, "Port").(int))
         extra := fmt.Sprintf(`{"metrics":"%s"`+
             `,"value":"%s"`+
             `,"ts":"%s"`+
@@ -317,10 +320,11 @@ func osChkNetProcessRTEvents(data []interface{}) {
             `,"tag_set":"%s"`+
             `,"pid":"%s"`+
             `,"podId":"%s"`+
+            `,"port":"%s"`+
             `,"containerId":"%s"}`,
             argvs[5].(string), argvs[6].(string), nowFormat, appLog, reason,
             jOSEve, argvs[1].(string), argvs[2].(string), argvs[3].(string),
-            argvs[4].(string))
+            portStr, argvs[4].(string))
         common.ExportData(GetMetricsEventsDesc(argvs[0].(int), "",
             "", "", "", "", argvs[6].(string), extra))
     }
@@ -401,6 +405,9 @@ func osChkMemProcessOOMEvents(data []interface{}) {
                 pid = result[1]
                 process = result[2]
             }
+            pidInt, _ := strconv.Atoi(pid)
+            portStr := strconv.Itoa(
+                common.GetAppInstanceMemberByPid(pidInt, "Port").(int))
             extra := fmt.Sprintf(`{"level":"fatal"`+
             `,"value":"mysqld exited by OOM killer"`+
             `,"details":"%s"`+
@@ -408,9 +415,10 @@ func osChkMemProcessOOMEvents(data []interface{}) {
             `,"tag_set":"%s"`+
             `,"pid":"%s"`+
             `,"podId":"%s"`+
+            `,"port":"%s"`+
             `,"containerId":"%s"}`,
-            data[1].(string), nowFormat, process, pid, extraPodId,
-            extraContainerId)
+            data[1].(string), nowFormat, process, pid,
+            extraPodId, portStr, extraContainerId)
             common.ExportData(GetLogEventsDesc(Notify_Process_OOM_Type,
                 "", "", "mysqld exited by OOM killer", extra))
         }

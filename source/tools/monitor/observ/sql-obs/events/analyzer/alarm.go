@@ -127,7 +127,7 @@ func addAlarmStat(alarmType int, extraVal map[string]string, add int) {
         key := "os"
         if _, ok := extraVal["containerId"]; ok {
             key = extraVal["podId"] + ":" + extraVal["containerId"] + ":" +
-                extraVal["tag_set"]
+                extraVal["tag_set"] + ":" + extraVal["port"]
         }
         if _, ok := alarmStatMap[key]; !ok {
             alarmStatMap[key] = make([]*alarmStatics, Notify_Type_Max)
@@ -305,15 +305,19 @@ func GetMetricsEventsDesc(alarmType int, comm string, pid string,
     }
     descExtra := extraVal
     if !json.Valid([]byte(descExtra)) {
+        pidInt, _ := strconv.Atoi(pid)
+        portStr := strconv.Itoa(
+            common.GetAppInstanceMemberByPid(pidInt, "Port").(int))
         descExtra = fmt.Sprintf(`{"metrics":"%s"`+
             `,"value":"%s"`+
             `,"ts":"%s"`+
             `,"tag_set":"%s"`+
             `,"pid":"%s"`+
+            `,"port":"%s"`+
             `,"podId":"%s"`+
             `,"containerId":"%s"}`,
             metricsName, extraVal, nowFormat,
-            comm, pid, extraPodId, extraContainerId)
+            comm, pid, portStr, extraPodId, extraContainerId)
     }
     alarmEvent(alarmType, ts, desc, descExtra)
     return fmt.Sprintf(`node_event event_type="metric_exception",`+
@@ -333,7 +337,7 @@ func ExportAlarmStatics() {
             podIp := common.GetAppInstanceInfo(map[string]interface{}{
                 "Comm": s[2], "PodId": s[0], "ContainerId": s[1]}, "Ip").(string)
             prefix += ",podId=" + s[0] + ",containerId=" + s[1] +
-                ",comm=" + s[2] + ",podIp=" + podIp
+                ",comm=" + s[2] + ",podIp=" + podIp + ",port=" + s[3]
         }
         fields := ""
         for t, stat := range value {
@@ -369,9 +373,11 @@ func initAppAlarm(values []interface{}) {
     podId := values[0].(string)
     containerId := values[1].(string)
     comm := values[2].(string)
+    port := strconv.Itoa(values[3].(int))
     for i := 0; i < Notify_Type_Max; i++ {
         addAlarmStat(i, map[string]string{
-            "podId" : podId, "containerId": containerId, "tag_set" : comm}, 0)
+            "podId" : podId, "containerId": containerId,
+            "tag_set": comm, "port": port}, 0)
     }
 }
 
@@ -415,7 +421,7 @@ func InitAlarmManage() {
     }
 
     common.ForeachAppInstances("mysqld", []string{
-        "PodId", "ContainerId", "Comm"}, initAppAlarm)
+        "PodId", "ContainerId", "Comm", "Port"}, initAppAlarm)
     go agingAlarmTimer()
     SetAlarmAgingTime(Notify_IO_Wait_Type, 0)
     SetAlarmAgingTime(Notify_Direct_Reclaim_Type, 0)
