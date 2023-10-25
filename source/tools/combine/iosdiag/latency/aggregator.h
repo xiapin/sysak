@@ -1,3 +1,8 @@
+#ifndef _AGGREGATOR_H
+#define _AGGREGATOR_H
+
+#define AGGREGATOR_INTERVAL 1
+
 extern int req_array_length;
 extern int req_capacity;
 extern struct iosdiag_req* req_array;
@@ -13,6 +18,6 @@ void aggregate_events(struct aggregation_metrics* ams, struct iosdiag_req *iop, 
 void aggregation_summary_convert_to_unity(char* dest, struct iosdiag_req *iop, struct iosdiag_req *iop_max, struct aggregation_metrics* ams);
 void post_aggregation_statistics(struct aggregation_metrics* ams);
 
-
+#endif
 
 

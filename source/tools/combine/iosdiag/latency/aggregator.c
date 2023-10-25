@@ -9,7 +9,6 @@ int req_array_length = 0;
 int req_capacity = 10;
 struct iosdiag_req* req_array;
 
-/* Make sure all threads exit safely */
 void reset_req_statistics() 
 {
 	req_array_length = 0;
@@ -39,7 +38,6 @@ void update_component_delay(struct iosdiag_req *iop, unsigned long *sum_delay, u
     }
 }
 
-/* Update various statistical variables */
 void init_aggregation_metrics(struct aggregation_metrics* ams, struct iosdiag_req *iop, int max_index)
 {
 	/* Initialize some statistical variables */
@@ -68,10 +66,10 @@ int check_aggregation_conditions(struct iosdiag_req *iop1, struct iosdiag_req *i
 	strcmp(iop1->comm, iop2->comm) == 0 && 
 	strcmp(iop1->op, iop2->op) == 0 && 
 	strcmp(get_max_delay_component(iop1), get_max_delay_component(iop2)) == 0 && 
-	iop1->cpu[0] == iop2->cpu[0] && 
-	iop1->cpu[1] == iop2->cpu[1] && 
-	iop1->cpu[2] == iop2->cpu[2] && 
-	iop1->cpu[3] == iop2->cpu[3]  && 
+	// iop1->cpu[0] == iop2->cpu[0] && 
+	// iop1->cpu[1] == iop2->cpu[1] && 
+	// iop1->cpu[2] == iop2->cpu[2] && 
+	// iop1->cpu[3] == iop2->cpu[3]  && 
 	iop1->queue_id == iop2->queue_id) {
         res = 1;
     }
@@ -95,7 +93,7 @@ void aggregate_events(struct aggregation_metrics* ams, struct iosdiag_req *iop, 
     ams->sum_total_delay += aggregated_total_delay;
 	ams->sum_max_delay += aggregated_max_delay;
     ams->sum_data_len += iop->data_len;
-	printf("max_total2 %d: %lu\n", new_index, aggregated_total_delay);
+	// printf("max_total2 %d: %lu\n", new_index, aggregated_total_delay);
 
 	if (ams->max_total_delay < aggregated_total_delay) {
 		ams->max_delay = aggregated_max_delay;
@@ -118,7 +116,7 @@ void post_aggregation_statistics(struct aggregation_metrics* ams)
     ams->sum_total_delay /= ams->count;
 	for (; m < MAX_POINT - 1; m++) {
     	ams->sum_component_delay[m] /= ams->count;
-		printf("sum_component_delay: %d, %lu\n", ams->count, ams->sum_component_delay[m]);
+		// printf("sum_component_delay: %d, %lu\n", ams->count, ams->sum_component_delay[m]);
 	}
 }
 

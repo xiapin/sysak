@@ -58,7 +58,7 @@ static int exec_shell_cmd(char *cmd)
 	return 0;
 }
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;	/*  */
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 int exit_flag = 0;
 /* Make sure all threads exit safely */
@@ -132,7 +132,12 @@ void event_aggregator()
 	req_array = (struct iosdiag_req*)malloc(req_capacity * sizeof(struct iosdiag_req));
 	pthread_mutex_unlock(&req_mutex);
 
+	int pre_count = 0;
+	int post_count = 0;
+	unsigned long byte_count = 0;
+
   	while (1) {
+		time_t startTime = time(NULL);
 		/* Check the exit signal */
 		pthread_mutex_lock(&mutex);
         if (exit_flag) {
@@ -143,23 +148,29 @@ void event_aggregator()
 
 		/* Start aggregating received IO events */
 		int lockResult = pthread_mutex_lock(&req_mutex);
+		size_t size = 0;
+		int before_aggregate_num = 0;
         if (req_array_length > 1) {
       		int i, j;
+			int after_aggregate_num = 0;
+			before_aggregate_num = req_array_length;
+			pre_count += req_array_length;
       		for (i = 0; i < req_array_length; i++) {
 				/* Filter to IO events that have participated in aggregation */
 				if (check_aggregated(&req_array[i])) {
                 	continue; 
             	}
-				printf("max_total %d :%lu\n", i, get_max_delay(&req_array[i]));
+				after_aggregate_num++;
+				// printf("max_total %d :%lu\n", i, get_max_delay(&req_array[i]));
 
 				struct aggregation_metrics agg_metrics = {0};
 				init_aggregation_metrics(&agg_metrics, &req_array[i], i);
-				printf("max_total0 %d :%lu\n", i, agg_metrics.sum_total_delay);
+				// printf("max_total0 %d :%lu\n", i, agg_metrics.sum_total_delay);
 
 				for (j = i + 1; j < req_array_length; j++) {
                 	if (check_aggregation_conditions(&req_array[i], &req_array[j])){
 						aggregate_events(&agg_metrics, &req_array[j], j);
-						printf("max_total1 %d: %lu\n", j, agg_metrics.sum_total_delay);
+						// printf("max_total1 %d: %lu\n", j, agg_metrics.sum_total_delay);
             		}
           		}
 				post_aggregation_statistics(&agg_metrics);
@@ -177,6 +188,7 @@ void event_aggregator()
 
 				aggregation_summary_convert_to_unity(latency_summary, &req_array[i], 
 				&req_array[agg_metrics.max_total_dalay_idx], &agg_metrics);
+				size += strlen(latency_summary) * sizeof(char);
 
 				free(agg_metrics.max_component_delay);
 				free(agg_metrics.sum_component_delay);
@@ -184,9 +196,21 @@ void event_aggregator()
 				// printf("collected aggregator latency: %s\n", latency_summary);
 				strcpy(upload_array[upload_num], latency_summary);
 				upload_num++;
+				
 				pthread_mutex_unlock(&upload_mutex);
+				printf("before aggregator pid: %d, data_len: %ld, total_delay: %lu, block: %lu, driver: %lu, disk: %lu, complete: %lu, done: %lu\n", req_array[i].pid, req_array[i].data_len, (req_array[i].ts[5]-req_array[i].ts[0])/1000, (req_array[i].ts[1]-req_array[i].ts[0])/1000, (req_array[i].ts[2]-req_array[i].ts[1])/1000, 
+					(req_array[i].ts[3]-req_array[i].ts[2])/1000, (req_array[i].ts[4]-req_array[i].ts[3])/1000, (req_array[i].ts[5]-req_array[i].ts[4])/1000);
+				printf("aggregated summary: %s\n", latency_summary);
+				printf("aggregated by: %d\n", before_aggregate_num);
+
 				free(latency_summary);
         	} 
+			byte_count += size;
+			post_count += after_aggregate_num*2;
+			printf("before aggregator length: %d, after aggregator length: %d, bytes: %lu\n", req_array_length, after_aggregate_num*2, size);
+			printf("aggregation rate: %d/%d   size: %lu\n", post_count, pre_count, byte_count);
+
+			printf("\n");
 			reset_req_statistics();
 			pthread_mutex_unlock(&req_mutex);
         } else if (req_array_length == 1){
@@ -213,7 +237,11 @@ void event_aggregator()
 		if (lockResult == 0) {
 			pthread_mutex_unlock(&req_mutex);
 		}
-    	usleep(10000);
+		time_t endTime = time(NULL);
+        time_t sleepTime = AGGREGATOR_INTERVAL - (endTime - startTime);
+        if (sleepTime > 0) {
+            sleep(sleepTime);
+        }
     }
 }
 
@@ -234,7 +262,7 @@ void event_upload_thread()
 		char *latency_summaries = malloc(JSON_BUFFER_SIZE);
 	    memset(latency_summaries, 0x0, JSON_BUFFER_SIZE);
 		pthread_mutex_lock(&upload_mutex);
-		printf("Count: %d\n", upload_num);
+		// printf("Count: %d\n", upload_num);
 		if (upload_num > 0) {
 			for (i = 0; i < upload_num; i++) {
 				//printf("combine: %s\n", metrics_array[i]);
@@ -268,7 +296,7 @@ void event_upload_thread()
 		free(latency_summaries);
 
         time_t endTime = time(NULL);
-        time_t sleepTime = 3 - (endTime - startTime);
+        time_t sleepTime = UPLOAD_INTERVAL - (endTime - startTime);
         if (sleepTime > 0) {
             sleep(sleepTime);
         }
