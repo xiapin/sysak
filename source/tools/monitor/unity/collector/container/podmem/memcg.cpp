@@ -54,13 +54,13 @@ struct myComp2
 
 //set<pair<unsigned long, int> ,myComp2> cachedset;
 // cachedset[cgroup_inode] = set<pair<file_inode, cached_size>>
-map<unsigned long, set<pair<unsigned long, int>, myComp2> > cinode_cached;
+map<unsigned long, set<pair<unsigned long, int>, myComp2>* > cinode_cached;
 map<unsigned long , struct file_info *> files;
 struct myComp
 {
     bool operator()(const unsigned long &a,const unsigned long &b)
     {
-        return files[a]->cached >= files[b]->cached;
+        return files[a]->cached > files[b]->cached || (files[a]->cached == files[b]->cached && a != b);
     }
 };
 set<unsigned long,myComp> fileset;
@@ -139,8 +139,8 @@ int get_top_dentry(unsigned long pfn, int top, unsigned long cinode)
 {
     unsigned long page = PFN_TO_PAGE(pfn);
     map<unsigned long,struct file_info*>::iterator iter2;
-    map<unsigned long, set<pair<unsigned long, int>, myComp2> >::iterator it;
-    set<pair<unsigned long, int>, myComp2> cachedset;
+    map<unsigned long, set<pair<unsigned long, int>, myComp2>* >::iterator it;
+    set<pair<unsigned long, int>, myComp2> *cachedset;
     struct member_attribute *att;
     struct member_attribute *att2;
     unsigned long map = 0;
@@ -182,26 +182,26 @@ int get_top_dentry(unsigned long pfn, int top, unsigned long cinode)
     if (cached*4 < 1024)
         return 0;
     
-    if (history_inodes.find(inode) != history_inodes.end() or (cachedset.size() >= top and (cached*4 < (--cachedset.end())->second)))
+    if (history_inodes.find(inode) != history_inodes.end() or (cachedset->size() >= top and (cached*4 < (--cachedset->end())->second)))
         return 0;
     
     //printf("---after filter---: cached:%d, cinode:%ld, inode:%lu\n", cached*4, cinode, inode);
-    cachedset.insert(pair<unsigned long, int>(inode, cached*4));
+    cachedset->insert(pair<unsigned long, int>(inode, cached*4));
     history_inodes[inode] = cinode;
-    if (cachedset.size() > top) {
+    if (cachedset->size() > top) {
         set<pair<unsigned long , int>, myComp2>::iterator iter;
-        iter = --cachedset.end();
+        iter = --cachedset->end();
         //printf("erase inode size: %d\n", iter->second);
-        cachedset.erase(--cachedset.end());
+        cachedset->erase(--cachedset->end());
     }
     
     cinode_cached[cinode] = cachedset;
 }
 
-static int get_dentry_top()
+static int iterate_dentry_path()
 {
     set<pair<unsigned long , int>, myComp2>::iterator iter;
-    map<unsigned long, set<pair<unsigned long, int>, myComp2> >::iterator it;
+    map<unsigned long, set<pair<unsigned long, int>, myComp2>* >::iterator it;
     unsigned long map = 0;
     unsigned long inode = 0;
     unsigned long i_ino;
@@ -216,8 +216,8 @@ static int get_dentry_top()
     struct file_info *info;
     struct member_attribute *att;
     for (it = cinode_cached.begin(); it != cinode_cached.end(); ++it) {
-        set<pair<unsigned long , int>, myComp2> cachedset = it->second;
-        for (iter = cachedset.begin(); iter != cachedset.end(); iter++) {
+        set<pair<unsigned long , int>, myComp2> *cachedset = it->second;
+        for (iter = cachedset->begin(); iter != cachedset->end(); iter++) {
             char tmp[4096] = {0};
             char *end = tmp + 4095;
             int buflen = 4095;
@@ -521,7 +521,8 @@ bool cached_cmp(const pair<unsigned long, struct file_info*>& a, const pair<unsi
 }
 
 static int output_file_cached_string(unsigned int top, char *res)
-{
+{   
+    map<unsigned long, set<pair<unsigned long, int>, myComp2>* >::iterator it;
     set<unsigned long, myComp>::iterator  iter2;
     struct file_info *info;
     int size = 0;
@@ -533,7 +534,13 @@ static int output_file_cached_string(unsigned int top, char *res)
         }
         size += sprintf(res + size, "cinode=%lu cached=%lu size=%lu file=%s\n", info->cinode,info->cached, info->size,info->filename);
         free(info);
+        files[*iter2] = NULL;
     }
+
+    for (it = cinode_cached.begin(); it != cinode_cached.end(); ++it) {
+        delete it->second;
+    }
+
     files.clear();
     fileset.clear();
     cinode_cached.clear();
@@ -586,7 +593,7 @@ int scan_pageflags_nooutput(struct options *opt, char *res)
             get_top_dentry(pfn, opt->top, inode);
         } 
     }
-    get_dentry_top();
+    iterate_dentry_path();
     output_file_cached_string(opt->top, res);
     return 0;
 }
@@ -594,7 +601,7 @@ int scan_pageflags_nooutput(struct options *opt, char *res)
 int memcg_cgroup_path(const char *cgrouppath)
 {
     struct stat st;
-    set<pair<unsigned long, int>, myComp2> cachedset;
+    set<pair<unsigned long, int>, myComp2>* cachedset = new set<pair<unsigned long, int>, myComp2>;
     if (access(cgrouppath, F_OK)) {
         return 0;
     }
