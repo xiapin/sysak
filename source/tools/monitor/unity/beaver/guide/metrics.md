@@ -466,7 +466,7 @@ This table show the hist of the latency of direct memory compaction
 | l3LoadMisRate | - | llc load miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
 | l3StoreMisRate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
 | l3MisRate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| MPI | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| MPI | - | llc miss per kilo-instruction |  | collector/plugin/pmu_events/pmu\_events.c  | 
 
 
 ### imc_node_event 表

@@ -244,7 +244,8 @@ int fill_line(struct unity_line *line, double *summ, char *mode, char *index)
 		summ[CYCLES]==0?0:summ[INSTRUCTIONS]/summ[CYCLES]);
 	unity_set_value(line, i++, "MPI", 
 		summ[INSTRUCTIONS]==0?0:
-		(summ[LLC_LOAD_MISS]+summ[LLC_STORE_MISS])/summ[INSTRUCTIONS]);
+		((float)summ[LLC_LOAD_MISS]+(float)summ[LLC_STORE_MISS])*1000.00/
+		(float)summ[INSTRUCTIONS]);
 	unity_set_value(line, i++, "l3LoadMisRate",
 		summ[LLC_LOAD_REF]==0?0:summ[LLC_LOAD_MISS]/summ[LLC_LOAD_REF]);
 	unity_set_value(line, i++, "l3StoreMisRate",
