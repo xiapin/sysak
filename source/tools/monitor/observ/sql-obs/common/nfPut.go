@@ -81,3 +81,9 @@ func InitDataExport(path string) error {
     }
     return nil
 }
+
+func UninitDataExport() {
+    if gCnfPut.sock != nil {
+        gCnfPut.sock.Close()
+    }
+}
