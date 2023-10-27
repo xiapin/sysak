@@ -44,13 +44,14 @@ func main() {
         events.DestroyResource()
         return
     }
+    defer events.DestroyResource()
+    defer common.UninitDataExport()
     events.StartEventsCheck()
     logs.StartLogCollect()
     tracing.StartTracing()
     metrics.StartMonitor()
     e := <-sigCh
     fmt.Printf("exit mysql observability, signal: %v\n", e)
-    events.DestroyResource()
 }
 
 func getSysomOutline() (string, error) {
