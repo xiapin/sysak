@@ -71,7 +71,10 @@ function CguardSelfStat:proc(elapsed, lines)
         os.exit(1)
     end
 
-    local anon = pcall(rssRssAnon) or 0
+    local ret, anon = pcall(rssRssAnon)
+    if not ret then
+        anon = 0
+    end
     if self._memLimit and anon > self._memLimit then
         print("last mem usage overflow. rss bytes: " .. rss)
         os.exit(1)
