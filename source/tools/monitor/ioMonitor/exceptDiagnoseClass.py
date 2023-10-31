@@ -68,12 +68,11 @@ class runDiag(object):
                 return
         self.lastDiagTimeDicts['iolatency'] = now
         if devname is not None:   
-            # str(thresh)
-            os.system(self.sysakPath+' -g iosdiag latency -t 2' +
-                    ' -T 45 -m -f '+logdir+' '+devname+' > '+outlog+' &')
+            os.system(self.sysakPath+' -g iosdiag latency -t ' + str(thresh) +
+                    ' -T 30 -m -f '+logdir+' '+devname+' > '+outlog+' &')
         else:
-            os.system(self.sysakPath+' -g iosdiag latency -t 2' +
-                      ' -T 45 -m -f '+logdir+' > '+outlog+' &')
+            os.system(self.sysakPath+' -g iosdiag latency -t ' + str(thresh) +
+                      ' -T 30 -m -f '+logdir+' > '+outlog+' &')
         # if ioburst:
         #     self.display.markIoburst(now)
         # self.display.start(60, 'iolatency', logdir, now, now+60)

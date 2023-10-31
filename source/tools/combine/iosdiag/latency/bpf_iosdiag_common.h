@@ -95,7 +95,6 @@ trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_typ
 	bpf_probe_read(&major, sizeof(int), &gd->major);
 	bpf_probe_read(&first_minor, sizeof(int), &gd->first_minor);
 	devt = ((major) << 20) | (first_minor);
-
 	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
 
 	init_iosdiag_key(sector, devt, &key);
@@ -110,17 +109,13 @@ trace_io_driver_route(struct pt_regs *ctx, struct request *req, enum ioroute_typ
 		}
 		if (type == IO_RESPONCE_DRIVER_POINT) {
 			ioreq->cpu[2] = bpf_get_smp_processor_id();
-			//bpf_printk("IO_RESPONCE_DRIVER_POINT?");
 		}
 		if (type == IO_DONE_POINT){
-			//bpf_printk("kprobe_blk_account_io_done?");
 			if (ioreq->ts[IO_ISSUE_DEVICE_POINT] &&
 		    	ioreq->ts[IO_RESPONCE_DRIVER_POINT])
 				complete = 1;
-			    //bpf_printk("kprobe_blk_account_io_done!!!");
 		}
 		if (complete) {
-			//bpf_printk("kprobe_complete!!!!!!!!!!!!!!!!!!!!!");
 			memcpy(&data, ioreq, sizeof(data));
 			bpf_perf_event_output(ctx, &iosdiag_maps_notify, 0xffffffffULL, &data, sizeof(data));
 		}
@@ -149,7 +144,6 @@ int tracepoint_block_getrq(struct block_getrq_args *args)
 	u32 target_devt = get_target_devt();
 
 	if (target_devt && args->dev != target_devt)
-		//bpf_printk("block_getrq: %d, %d\n", args->dev, target_devt);
 		return 0;
 
 	new_ioreq.cpu[0] = -1;
@@ -194,10 +188,8 @@ int tracepoint_block_rq_issue(struct block_rq_issue_args *args)
 	u32 target_devt = get_target_devt();
 
 	if (target_devt && args->dev != target_devt)
-		//bpf_printk("block_rq_issue: %d, %d\n", args->dev, target_devt);
 		return 0;
 
-	// bpf_printk("block_rq_issue: %d\n", args->dev);
 	init_iosdiag_key(args->sector, args->dev, &key);
 	ioreq = (struct iosdiag_req *)bpf_map_lookup_elem(&iosdiag_maps, &key);
 	if (ioreq) {
@@ -260,8 +252,6 @@ int kprobe_blk_account_io_done(struct pt_regs *ctx)
 	struct iosdiag_key key = {0};
 
 	sector_t sector;
-	// struct request_queue *q = {0};
-	// struct device *dev = {0};
 	dev_t devt = 0;
 
 	int major = 0;
@@ -271,7 +261,6 @@ int kprobe_blk_account_io_done(struct pt_regs *ctx)
 	bpf_probe_read(&major, sizeof(int), &gd->major);
 	bpf_probe_read(&first_minor, sizeof(int), &gd->first_minor);
 	devt = ((major) << 20) | (first_minor);
-
 	bpf_probe_read(&sector, sizeof(sector_t), &req->__sector);
 
 	init_iosdiag_key(sector, devt, &key);
