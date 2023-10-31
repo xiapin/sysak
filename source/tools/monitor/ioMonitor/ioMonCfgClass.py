@@ -31,16 +31,15 @@ class ioMonCfgClass(object):
         hasArgs = any(list(cfg.values()))
         if not os.path.exists(self.cfgPath) or resetCfg:
             cfg['iowait'] = int(cfg['iowait']) if cfg['iowait'] else 5
-            # cfg['await'] = int(cfg['await']) if cfg['await'] else 2
-            cfg['await'] = 2
+            cfg['await'] = int(cfg['await']) if cfg['await'] else 2
             cfg['util'] = int(cfg['util']) if cfg['util'] else 20
             cfg['iops'] = int(cfg['iops']) if cfg['iops'] else 150
             cfg['bps'] = int(cfg['bps']) if cfg['bps'] else 31457280
             cfg['cycle'] = int(cfg['cycle']) if cfg['cycle'] else 1000
             cfg['diagIowait'] = cfg['diagIowait'] if cfg['diagIowait'] else 'off'
             cfg['diagIoburst'] = cfg['diagIoburst'] if cfg['diagIoburst'] else 'off'
-            # cfg['diagIolat'] = cfg['diagIolat'] if cfg['diagIolat'] else 'off'
-            cfg['diagIolat'] = 'on'
+            cfg['diagIolat'] = cfg['diagIolat'] if cfg['diagIolat'] else 'off'
+            # cfg['diagIolat'] = 'on'
             cfg['diagIohang'] = cfg['diagIohang'] if cfg['diagIohang'] else 'off'
             self._updateCfg(cfg)
             return
@@ -137,3 +136,4 @@ class ioMonCfgClass(object):
         if val.isdigit():
             val = int(val)
         return val
+
