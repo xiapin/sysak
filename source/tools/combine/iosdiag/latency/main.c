@@ -23,13 +23,15 @@ static void usage(void)
 		"latency -t ms disk_devname          Set IO latency threshold(default 1000ms)\n"
 		"latency -T sec disk_devname         How long to detect IO latency(default 10s)\n"
 		"latency -a sec disk_devname         The period of time in the detach state(default 0s)\n"
-		"latency -m disk_devname             Monitor mode, sending high-latency IO events to unity\n"
 		"latency -f log disk_devname         Specify the output file log\n"
+		"latency -m                          Monitor mode, sending high-latency IO events to unity\n"
 		"latency -v                          Display debug log during load bpf\n"
 		"\ne.g.\n"
 		"latency vda                         Detect IO latency in disk \"vda\"\n"
 		"latency -t 10 vda                   Set IO latency threshold 10ms and detect IO latency in disk \"vda\"\n"
-		"latency -t 10 -T 30 vda             Detect IO latency in disk \"vda\" 30 secs\n");
+		"latency -t 10 -T 30 vda             Detect IO latency in disk \"vda\" 30 secs\n"
+		"latency -t 10 -T 30 -m              Detect IO latency in all disks 30 secs and send high-latency IO events to unity\n");
+
 	exit(-1);
 }
 
