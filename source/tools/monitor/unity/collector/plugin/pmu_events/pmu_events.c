@@ -79,7 +79,7 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 #endif
 		hwi[i].fd = perf_event_open(&attr, pid, cpu, group_leader, flags);
 		if (hwi[i].fd <= 0) {
-			int ret = errno;
+			ret = errno;
 			if (ret == ENODEV) {
 				printf("cpu may OFF LINE\n");
 			} else {
