@@ -13,7 +13,10 @@ function CinotifyPod:_init_()
 	self.kube_pod_paths = {
 		"sys/fs/cgroup/cpu/kubepods.slice",
 		"sys/fs/cgroup/cpu/kubepods.slice/kubepods-besteffort.slice",
-		"sys/fs/cgroup/cpu/kubepods.slice/kubepods-burstable.slice"
+		"sys/fs/cgroup/cpu/kubepods.slice/kubepods-burstable.slice",
+		"sys/fs/cgroup/cpu/kubepods",
+		"sys/fs/cgroup/cpu/kubepods/besteffort",
+		"sys/fs/cgroup/cpu/kubepods/burstable"
 	}
 	self._pod_ws = {} -- record ["pod_path"] = pod_ws(return value of addwatch)
 	self._kpp_map = {} -- record [kube_pod_path_ws] = "kube_pod_paths"

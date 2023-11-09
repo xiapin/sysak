@@ -53,7 +53,7 @@ end
 
 function obHelper:getCgroupSystemd(pid)
     local path = "/proc/"..pid.."/cgroup"
-    local res
+    local res = "NULL"
     for line in io.lines(path) do
         local sublines = pystring:split(line, ":")
         if sublines[1] == "1" and sublines[2] == "name=systemd" then

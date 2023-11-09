@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include "pg_query.h"
 
-typedef unsigned long fox_time_t;
+typedef signed long fox_time_t;
 typedef size_t fox_off_t;
 
 #define FNAME_SIZE 16

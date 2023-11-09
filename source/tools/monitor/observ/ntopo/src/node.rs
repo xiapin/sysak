@@ -77,12 +77,15 @@ pub struct Node {
     server_max_rt: u32,
     server_avg_rt: u32,
     server_min_rt: u32,
+    sport: u16,
+    dport: u16,
+    requests: u32,
 }
 
 impl Node {
     pub fn to_line_protocol(&self) -> String {
         format!(
-            "sysom_metrics_ntopo_node,Ip={},Kind={},Pod={},Pid={},Comm={},Title={},Icon={},PodUUID={},ContainerID={},NameSpace={},APP={},InBytes={},OutBytes={},MaxRT={},Connection={},AvgRT={} Value=1",
+            "sysom_metrics_ntopo_node,Ip={},Kind={},Pod={},Pid={},Comm={},Title={},Icon={},PodUUID={},ContainerID={},NameSpace={},APP={},InBytes={},OutBytes={},MaxRT={},Connection={},AvgRT={},Requests={} Value=1",
             self.ip,
             self.kind,
             self.pod,
@@ -94,26 +97,24 @@ impl Node {
                 format!("Node({})", self.ip)
             },
             self.icon,
-            self.poduuid,
-            self.container_id,
+            if self.poduuid.is_empty() { "NULL".to_owned() } else { self.poduuid.clone() },
+            if self.container_id.is_empty() { "NULL".to_owned() } else { self.container_id.clone()  },
             self.namespace,
             self.app,
             self.in_bytes,
             self.out_bytes,
             std::cmp::max(self.client_max_rt, self.server_max_rt),
-            format!("{}->{}", self.client_ip, self.server_ip),
+            format!("{}:{}->{}:{}", self.client_ip, self.sport, self.server_ip, self.dport),
             std::cmp::max(self.client_avg_rt, self.server_avg_rt),
+            self.requests,
         )
     }
 
     pub fn set_pid_info(&mut self, pids: &Pids) {
         if let Some(pi) = pids.pids.get(&self.pid) {
-            if pi.container_id.len() > 12 {
-                self.container_id = pi.container_id[0..12].to_owned();
-            } else {
-                self.container_id = pi.container_id.clone();
-            }
+            self.container_id = pi.container_id.clone();
             self.comm = pi.comm.clone();
+            self.poduuid = pi.podid.clone();
         }
     }
 
@@ -147,8 +148,8 @@ impl Node {
             title: Default::default(),
             icon: IconKind::Mysql,
 
-            in_bytes: 0,
-            out_bytes: 0,
+            in_bytes: info.in_bytes as i64,
+            out_bytes: info.out_bytes as i64,
 
             server_ip: Ipv4Addr::from(u32::from_be(info.server_addr)).to_string(),
             client_max_rt: info.client_max_rt_us,
@@ -167,6 +168,9 @@ impl Node {
                 info.server_tot_rt_us / info.server_tot_rt_hz
             },
             server_min_rt: info.server_min_rt_us,
+            sport: info.sport,
+            dport: info.dport,
+            requests: info.requests,
         }
     }
 }

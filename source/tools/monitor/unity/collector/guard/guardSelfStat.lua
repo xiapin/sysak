@@ -46,7 +46,7 @@ end
 local function rssRssAnon()
     local anon = 0
 
-    local f = io.open("/proc/self/status")
+    local f = assert(io.open("/proc/self/status"))
     for line in f:lines() do
         if pystring:startswith(line, "RssAnon:") then
             local res = pystring:split(line)
@@ -71,7 +71,10 @@ function CguardSelfStat:proc(elapsed, lines)
         os.exit(1)
     end
 
-    local anon = rssRssAnon()
+    local ret, anon = pcall(rssRssAnon)
+    if not ret then
+        anon = 0
+    end
     if self._memLimit and anon > self._memLimit then
         print("last mem usage overflow. rss bytes: " .. rss)
         os.exit(1)

@@ -69,7 +69,7 @@ fn main() {
         .nodes()
         .set_max_entries(opts.nodes)
         .expect("failed to set node table size");
-    let mut skel = open_skel.load().unwrap();
+    let mut skel = open_skel.load().expect("failed to load ntopo");
 
     for pid in &opts.pids {
         update_pids_map(skel.maps_mut().pids(), *pid);

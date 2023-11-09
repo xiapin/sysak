@@ -1,0 +1,5 @@
+requests==2.27.1
+pyinstaller==3.5
+nsenter==0.2
+psutil==5.9.5
+PyYAML==6.0

@@ -43,12 +43,12 @@ struct
 
 static inline void debug_sock_role(struct sock_info *info)
 {
-        __bpf_printk("role: %d\n", info->role);
+        // __bpf_printk("role: %d\n", info->role);
 }
 
 static inline void debug_pid_info(struct pid_info *info)
 {
-        __bpf_printk("container id: %s\n", info->container_id);
+        // __bpf_printk("container id: %s\n", info->container_id);
 }
 
 static inline void set_addr_pair_by_sock(struct sock *sk, struct addrpair *ap)
@@ -127,7 +127,12 @@ static inline void update_nodes(struct sock_info *info, int role, int rt)
         if (!ninfo)
                 return;
 
+        ninfo->in_bytes += info->in_bytes;
+        ninfo->out_bytes += info->out_bytes;
+        info->in_bytes = 0;
+        info->out_bytes = 0;
         ninfo->pid = info->pid;
+        ninfo->requests++;
         if (role == ROLE_CLIENT)
         {
                 ninfo->client_tot_rt_hz += 1;
@@ -136,6 +141,8 @@ static inline void update_nodes(struct sock_info *info, int role, int rt)
                 {
                         ninfo->client_addr = info->ap.saddr;
                         ninfo->server_addr = info->ap.daddr;
+                        ninfo->sport = info->ap.sport;
+                        ninfo->dport = info->ap.dport;
                         ninfo->client_max_rt_us = rt;
                 }
         }
@@ -145,12 +152,14 @@ static inline void update_nodes(struct sock_info *info, int role, int rt)
                 ninfo->server_tot_rt_us += rt;
                 if (rt > ninfo->server_max_rt_us)
                 {
-                        ninfo->client_addr = info->ap.daddr;
                         ninfo->server_addr = info->ap.saddr;
                         ninfo->client_addr = info->ap.daddr;
+                        ninfo->sport = info->ap.dport;
+                        ninfo->dport = info->ap.sport;
                         ninfo->server_max_rt_us = rt;
                 }
         }
+
 }
 
 static inline bool try_add_sock(struct sock *sk)
@@ -169,6 +178,7 @@ static inline bool try_add_sock(struct sock *sk)
         set_addr_pair_by_sock(sk, &info.ap);
         if (info.ap.saddr == info.ap.daddr)
                 return false;
+
         info.role = get_sock_role(&info, sk);
         // if (info.role == ROLE_SERVER) {
         //         int tmp;
@@ -183,7 +193,7 @@ static inline bool try_add_sock(struct sock *sk)
         return true;
 }
 
-static inline void handle_client_send_request(struct sock_info *info, u64 ts)
+static inline void handle_client_send_request(struct sock_info *info)
 {
         if (info->egress_min != 0 && info->ingress_min != 0)
         {
@@ -195,12 +205,12 @@ static inline void handle_client_send_request(struct sock_info *info, u64 ts)
         }
 }
 
-static inline void handle_client_recv_response()
+static inline void handle_client_recv_response(struct sock_info *info)
 {
         // do nothing
 }
 
-static inline void handle_server_recv_request(struct sock_info *info, u64 ts)
+static inline void handle_server_recv_request(struct sock_info *info)
 {
         if (info->egress_min != 0 && info->ingress_min != 0)
         {
@@ -212,37 +222,40 @@ static inline void handle_server_recv_request(struct sock_info *info, u64 ts)
         }
 }
 
-static inline void handle_server_send_response(struct sock_info *info, u64 ts)
+static inline void handle_server_send_response(struct sock_info *info)
 {
 }
 
-static inline void handle_client_close(struct sock_info *info, u64 ts)
+static inline void handle_client_close(struct sock_info *info)
 {
-        handle_client_send_request(info, ts);
+        handle_client_send_request(info);
 }
 
-static inline void handle_server_close(struct sock_info *info, u64 ts)
+static inline void handle_server_close(struct sock_info *info)
 {
-        handle_server_recv_request(info, ts);
+        handle_server_recv_request(info);
 }
 
 // int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
-SEC("kprobe/tcp_sendmsg")
-int BPF_KPROBE(kprobe_tcp_sendmsg, struct sock *sk)
+SEC("kprobe/tcp_sendmsg_locked")
+int BPF_KPROBE(kprobe_tcp_sendmsg_locked, struct sock *sk, struct msghdr *msg, size_t size)
 {
+        if (size == 0)
+                return 0;
         struct sock_info *info = bpf_map_lookup_elem(&socks, &sk);
         if (!info)
                 if (try_add_sock(sk))
                         info = bpf_map_lookup_elem(&socks, &sk);
         if (!info)
                 return 0;
-        u64 ts = bpf_ktime_get_ns();
         enum role role = get_sock_role(info, sk);
         if (role == ROLE_CLIENT)
-                handle_client_send_request(info, ts);
+                handle_client_send_request(info);
         else
-                handle_server_send_response(info, ts);
+                handle_server_send_response(info);
 
+        u64 ts = bpf_ktime_get_ns();
+        info->out_bytes += size;
         if (info->egress_min == 0)
                 info->egress_min = ts;
         info->egress_max = ts;
@@ -266,18 +279,54 @@ int tracepoint_tcp_rcv_space_adjust(struct tcp_rcv_space_adjust_args *ctx)
         if (!info)
                 return 0;
 
-        u64 ts = bpf_ktime_get_ns();
+        struct tcp_sock *tp = sk;
+        u32 copied_seq, seq; 
+        bpf_probe_read(&copied_seq, sizeof(copied_seq), &tp->copied_seq);
+        bpf_probe_read(&seq, sizeof(copied_seq), &tp->rcvq_space.seq);
+
         enum role role = get_sock_role(info, sk);
         if (role == ROLE_CLIENT)
-                handle_client_recv_response(info, ts);
+                handle_client_recv_response(info);
         else
-                handle_server_recv_request(info, ts);
+                handle_server_recv_request(info);
 
+        u64 ts = bpf_ktime_get_ns();
+        info->in_bytes += (copied_seq - seq);
         if (info->ingress_min == 0)
                 info->ingress_min = ts;
         info->ingress_max = ts;
         return 0;
 }
+
+#if 0
+
+SEC("kprobe/tcp_cleanup_rbuf")
+int BPF_KPROBE(kprobe_tcp_cleanup_rbuf, struct sock *sk, int copied)
+{
+        if (copied == 0)
+                return 0;
+        struct sock_info *info = bpf_map_lookup_elem(&socks, &sk);
+        if (!info)
+                if (try_add_sock(sk))
+                        info = bpf_map_lookup_elem(&socks, &sk);
+        if (!info)
+                return 0;
+        
+        enum role role = get_sock_role(info, sk);
+        if (role == ROLE_CLIENT)
+                handle_client_recv_response(info);
+        else
+                handle_server_recv_request(info);
+
+        u64 ts = bpf_ktime_get_ns();
+        info->in_bytes += copied;
+        if (info->ingress_min == 0)
+                info->ingress_min = ts;
+        info->ingress_max = ts;
+        return 0;
+}
+
+#endif 
 
 // void tcp_close(struct sock *sk, long timeout);
 SEC("kprobe/tcp_close")
@@ -290,9 +339,9 @@ int BPF_KPROBE(kprobe_tcp_close, struct sock *sk)
         u64 ts = bpf_ktime_get_ns();
         enum role role = get_sock_role(info, sk);
         if (role == ROLE_CLIENT)
-                handle_client_close(info, ts);
+                handle_client_close(info);
         else
-                handle_server_close(info, ts);
+                handle_server_close(info);
 
         bpf_map_delete_elem(&socks, &sk);
         return 0;
