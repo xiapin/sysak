@@ -2,7 +2,7 @@ newdirs += .
 csrcs += $(filter-out $(wildcard *.bpf.c), $(wildcard *.c))
 bpfsrcs += $(wildcard *.bpf.c)
 
-CFLAGS += -static
+CFLAGS += -static -pthread
 
 target = latency
 
