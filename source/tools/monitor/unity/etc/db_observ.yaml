@@ -29,6 +29,9 @@ forkRun:
   - cmd: "../../../sql-obs"
     args:
       []
+  - cmd: "../../../ioMonitor"
+    args:
+      ["-y", "/etc/sysak/base.yaml", "-s", "iowait=5,iops=200,diagIowait=on", "--only_set_cfg"]
 
 pushTo:
   to: "Influx"
