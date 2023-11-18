@@ -83,26 +83,45 @@ function CtransPro:_init_(instance, fYaml, help, timestamps)
         self.pack_line = packLine
     end
     self._tDescr = ms.metrics
-
 end
 
 local function checkLine(blacklist, whitelist, labels)
     if blacklist then
         for k, v in pairs(blacklist) do
-            if labels[k] and labels[k]:match(v)~=nil then
-                return false
+            if labels[k] then
+                if type(v) == "table" then
+                    for _, vv in ipairs(v) do
+                        if labels[k]:match(vv) then
+                            return false
+                        end
+                    end
+                else
+                    if labels[k]:match(v) then
+                        return false
+                    end
+                end
             end
-
         end
+        return true
     elseif whitelist then
         for k, v in pairs(whitelist) do
-            if labels[k] and labels[k]:match(v)==nil then
-                return false
+            if labels[k] then
+                if type(v) == "table" then
+                    for _, vv in ipairs(v) do
+                        if labels[k]:match(vv) then
+                            return true
+                        end
+                    end
+                else
+                    if labels[k]:match(v) then
+                        return true
+                    end
+                end
             end
         end
+        return false
     end
     return true
-
 end
 
 function CtransPro:export(datas)
