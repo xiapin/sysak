@@ -22,11 +22,15 @@ g_lb = nil
 
 function init(que, fYaml)
     fYaml = fYaml or "../collector/plugin.yaml"
+    local Cidentity = require("beaver.identity")
+    local inst = Cidentity.new(fYaml)
+    local instance = inst:id()
+
     local web = Cframe.new()
     local res = system:parseYaml(fYaml)
 
     CbaseQuery.new(web, fYaml)
-    CurlApi.new(web, que, fYaml)
+    CurlApi.new(web, que, fYaml, instance)
 
     if res.config.url_safe ~= "close" then
         CurlIndex.new(web)
@@ -35,9 +39,7 @@ function init(que, fYaml)
     end
 
 
-    local Cidentity = require("beaver.identity")
-    local inst = Cidentity.new(fYaml)
-    local export = Cexport.new(inst:id(), fYaml)
+    local export = Cexport.new(instance, fYaml)
     CurlExportHtml.new(web, export)
     CurlExportRaw.new(web, export)
 

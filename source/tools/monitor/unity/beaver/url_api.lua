@@ -17,10 +17,12 @@ local CasyncHttps = require("httplib.asyncHttps")
 local CasyncOSS = require("httplib.asyncOSS")
 local CurlApi = class("urlApi", ChttpApp)
 
-function CurlApi:_init_(frame, que, fYaml)
+function CurlApi:_init_(frame, que, fYaml, instance)
     ChttpApp._init_(self)
     self._pushLine = CpushLine.new(que)
     local res = system:parseYaml(fYaml)
+
+    self._instance = instance
     if res.config.url_safe==nil or res.config.url_safe ~= "close" then
         self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
         self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
@@ -34,21 +36,21 @@ function CurlApi:_init_(frame, que, fYaml)
             self._diagHost = res.diagnose.host
             self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
         end
-
     end
 
     self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
-
     self._urlCb["/api/sql"] = function(tReq) return self:qsql(tReq) end
+    if res.cec then
+        self._cec = res.cec
+        self._urlCb["/api/cec"] = function(tReq) return self:cec(tReq)  end
+        self._urlCb["/api/alert"] = function(tReq) return self:alert(tReq)  end
+    end
 
     self:_ossIntall(fYaml)
-
     self:_install(frame)
     self:_setupQs(fYaml)
     self._proxyhttp = CasyncHttp.new()
     self._proxyhttps = CasyncHttps.new()
-
-
 end
 
 function CurlApi:_ossIntall(fYaml)
@@ -115,6 +117,78 @@ end
 
 local function proxyPost(proxy, host, uri, headers, body)
     return proxy:post(host, uri, headers, body)
+end
+
+function CurlApi:packCEC(topic, data)
+    local host = self._cec
+    local uri = "/api/v1/cec_proxy/proxy/dispatch"
+
+    data.alert_id = system:guid()
+    data.instance = self._instance
+    if not data.alert_time then
+        data.alert_time = os.time() * 1000
+    end
+
+    local req = {
+        topic = topic,
+        data = data,
+    }
+    local headers = {
+        accept = "application/json",
+        ["Content-Type"] = "application/json",
+    }
+
+    if host and uri then
+        local stat
+        local body
+        if string.sub(host,1,5) == "https" then
+            host = string.sub(host,9)
+            stat, body = pcall(proxyPost, self._proxyhttps, host, uri, headers, self:jencode(req))
+        else
+            host = string.sub(host,8)
+            stat, body = pcall(proxyPost, self._proxyhttp, host, uri, headers, self:jencode(req))
+        end
+
+        if stat then
+            body = self:jdecode(body)
+            if body.code == 0 then
+                return string.format("cec process %s.", data.alert_id), 200
+            else
+                return {code = body.code, message = body.message}
+            end
+        end
+    end
+end
+
+-- refer to cec design
+function CurlApi:cec(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local topic, data = tJson.topic, tJson.data
+        if type(topic) ~= "string" then
+            return "no data segment." .. tReq.data, 400
+        end
+        if type(data) ~= "table" then
+            return "no data segment." .. tReq.data, 400
+        end
+
+        return self:packCEC(topic, data)
+    else
+        return "bad data" .. tReq.data, 400
+    end
+end
+
+function CurlApi:alert(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        if type(tJson) ~= "table" then
+            return "no data segment." .. tReq.data, 400
+        end
+
+        return self:packCEC("SYSOM_SAD_ALERT", tJson)
+    else
+        return "bad data" .. tReq.data, 400
+    end
 end
 
 function CurlApi:diag(tReq)
