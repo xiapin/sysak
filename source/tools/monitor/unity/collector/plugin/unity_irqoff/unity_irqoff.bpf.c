@@ -44,7 +44,7 @@ struct {
 	__type(value, struct info);
 } info_map SEC(".maps");
 
-#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+#define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 
 static inline u64 get_thresh(void)
 {

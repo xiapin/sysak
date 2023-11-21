@@ -10,7 +10,7 @@ BPF_PERF_OUTPUT(perf, 1024);
 
 #define BIT_WORD(nr)	((nr) / BITS_PER_LONG)
 #define BITS_PER_LONG	64
-#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+#define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 
 struct bpf_map_def SEC("maps") args_map = {
 	.type = BPF_MAP_TYPE_HASH,
