@@ -31,7 +31,7 @@ forkRun:
       []
   - cmd: "../../../ioMonitor"
     args:
-      ["-y", "/etc/sysak/base.yaml", "-s", "iowait=5,iops=200,diagIowait=on", "--only_set_cfg"]
+      ["-y", "/etc/sysak/base.yaml", "-s", "await=5,iops=200,diagIolat=on"]
 
 pushTo:
   to: "Influx"
@@ -64,6 +64,16 @@ metrics:
     from: disks
     head: counter
     help: "disk info from /proc/diskstats."
+    type: "gauge"
+  - title: sysom_iolatency
+    from: sysom_iolatency
+    head: value
+    help: "alarm on os exception of mysqld"
+    type: "gauge"
+  - title: sysom_iolatency_max
+    from: sysom_iolatency_max
+    head: value
+    help: "alarm on os exception of mysqld"
     type: "gauge"
   - title: sysom_ntopo_node
     from: sysom_metrics_ntopo_node

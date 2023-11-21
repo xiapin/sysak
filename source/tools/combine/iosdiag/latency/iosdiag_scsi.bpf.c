@@ -31,5 +31,3 @@ int kprobe_scsi_done(struct pt_regs *ctx)
 	}
 	return trace_io_driver_route(ctx, req, IO_RESPONCE_DRIVER_POINT);
 }
-char _license[] SEC("license") = "GPL";
-

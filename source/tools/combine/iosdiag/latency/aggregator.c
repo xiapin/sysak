@@ -1,9 +1,11 @@
 #include <sys/types.h>
 #include <unistd.h>
-#include "iosdiag.h"
-#include "aggregator.h"
-#include "format_json.h"
 #include <pthread.h>
+#include <stdio.h>
+#include <string.h>
+#include "iosdiag.h"
+#include "format_json.h"
+
 
 int req_array_length = 0;
 int req_capacity = 10;
@@ -111,7 +113,7 @@ void aggregate_events(struct aggregation_metrics* ams, struct iosdiag_req *iop, 
 void post_aggregation_statistics(struct aggregation_metrics* ams)
 {
 	int m = 0;
-    ams->sum_data_len /= ams->count;
+    // ams->sum_data_len /= ams->count;
     ams->sum_max_delay /= ams->count;
     ams->sum_total_delay /= ams->count;
 	for (; m < MAX_POINT - 1; m++) {
@@ -126,12 +128,14 @@ void aggregation_summary_convert_to_unity(char* dest, struct iosdiag_req *iop, s
 		"sysom_iolatency,diskname=%s,"
 		"comm=%s,"
 		"iotype=%s,"
+		"pid=%d,"
+		"ppid=%d,"
+		"queue_id=%d,"
 		"maxdelay_component=%s "
 		"max_delay=%lu,"
 		"total_delay=%lu,"
-		"pid=%d,"
+		"sum_datalen=%d,"
 		"datalen=%d,"
-		"queue_id=%d,"
 		"initiated_cpu=%d,"
 		"issue_cpu=%d,"
 		"respond_cpu=%d,"
@@ -140,16 +144,19 @@ void aggregation_summary_convert_to_unity(char* dest, struct iosdiag_req *iop, s
 		"driver=%lu,"
 		"disk=%lu,"
 		"complete=%lu,"
-		"done=%lu",
+		"done=%lu,"
+		"count=%d",
 		iop->diskname, 
 		iop->comm, 
 		iop->op, 
+		iop->tid, 
+		iop->pid, 
+		iop->queue_id,
 		ams->maxdelay_component, 
 		ams->sum_max_delay, 
 		ams->sum_total_delay, 
-		iop->pid, 
 		ams->sum_data_len,
-		iop->queue_id,
+		ams->sum_data_len/ams->count,
 		iop->cpu[0],
 		iop->cpu[1],
 		iop->cpu[2],
@@ -158,7 +165,8 @@ void aggregation_summary_convert_to_unity(char* dest, struct iosdiag_req *iop, s
 		ams->sum_component_delay[1],
 		ams->sum_component_delay[2],
 		ams->sum_component_delay[3],
-		ams->sum_component_delay[4]
+		ams->sum_component_delay[4],
+		ams->count
 	);
 	sprintf(dest + strlen(dest), "%s", "\n");
 
@@ -166,12 +174,14 @@ void aggregation_summary_convert_to_unity(char* dest, struct iosdiag_req *iop, s
 		"sysom_iolatency_max,diskname=%s,"
 		"comm=%s,"
 		"iotype=%s,"
+		"pid=%d,"
+		"ppid=%d,"
+		"queue_id=%d,"
 		"maxdelay_component=%s "
 		"max_delay=%lu,"
 		"total_delay=%lu,"
-		"pid=%d,"
+		"sum_datalen=%d,"
 		"datalen=%d,"
-		"queue_id=%d,"
 		"initiated_cpu=%d,"
 		"issue_cpu=%d,"
 		"respond_cpu=%d,"
@@ -180,16 +190,19 @@ void aggregation_summary_convert_to_unity(char* dest, struct iosdiag_req *iop, s
 		"driver=%lu,"
 		"disk=%lu,"
 		"complete=%lu,"
-		"done=%lu",
+		"done=%lu,"
+		"count=%d",
 		ams->max_total_delay_diskname, 
 		iop_max->comm, 
 		iop_max->op, 
+		iop_max->tid,
+		iop_max->pid,
+		iop_max->queue_id,
 		ams->maxdelay_component, 
 		ams->max_delay, 
 		ams->max_total_delay, 
-		iop_max->pid, 
+		ams->sum_data_len, 
 		iop_max->data_len,
-		iop_max->queue_id,
 		iop_max->cpu[0],
 		iop_max->cpu[1],
 		iop_max->cpu[2],
@@ -198,7 +211,8 @@ void aggregation_summary_convert_to_unity(char* dest, struct iosdiag_req *iop, s
 		ams->max_component_delay[1],
 		ams->max_component_delay[2],
 		ams->max_component_delay[3],
-		ams->max_component_delay[4]
+		ams->max_component_delay[4],
+		ams->count
 	);
 }
 
