@@ -12,16 +12,13 @@ local CtransPro = require("common.transPro")
 
 local CcoAutoMetrics = class("coAutoMetrics", CcoMetrics)
 
-function CcoAutoMetrics:_init_(fYaml)
-    CcoMetrics._init_(self,fYaml)
+function CcoAutoMetrics:_init_(fYaml, config, instance)
+    CcoMetrics._init_(self, config, fYaml)
 
-    --local ts = io.popen('curl 100.100.100.200/latest/meta-data/region-id')
-    --local regionid = ts:read("*all")
     local ChttpCli = require("httplib.httpCli")
     local cli = ChttpCli.new()
     local res = cli:get("100.100.100.200/latest/meta-data/region-id")
     local regionid =res.body
-    print("regionid  ".. regionid)
     self._project = "sysom-metrics-" .. regionid
     self._endpoint = regionid .. "-intranet.log.aliyuncs.com"
     self._metricstore = "auto"
@@ -33,9 +30,7 @@ function CcoAutoMetrics:_init_(fYaml)
         url = self._url,
         port = 80
     }
-    local Cidentity = require("beaver.identity")
-    local inst = Cidentity.new(fYaml)
-    local instance = inst:id()
+
     CcoHttpCliInst._init_(self, instance, pushMetrics)
     -- go ffi
     local ffi = require("common.protobuf.metricstore.ffi_lua")

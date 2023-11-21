@@ -16,23 +16,19 @@ local addition = require("common.addition")
 
 local CcoMetrics = class("coMetrics", CcoHttpCliInst)
 
-function CcoMetrics:_init_(fYaml)
+function CcoMetrics:_init_(fYaml, config, instance)
 
     local res = system:parseYaml(fYaml)
     local _metrics = res.metrics
     self._mhead = _metrics.head
     self._title = _metrics.title
 
-    local Cidentity = require("beaver.identity")
-    local inst = Cidentity.new(fYaml)
-    local instance = inst:id()
-
     local _addition = res.pushTo.addition
 
     self._key1, self._key2 = addition:decode(_addition)
-    self._project = res.pushTo.project
-    self._endpoint = res.pushTo.endpoint
-    self._metricstore = res.pushTo.metricstore
+    self._project = config.project
+    self._endpoint = config.endpoint
+    self._metricstore = config.metricstore
 
     if self._project and self._endpoint and self._metricstore then
         self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"

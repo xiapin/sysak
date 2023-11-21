@@ -138,9 +138,8 @@ local function read_stream(fd)
     end
 end
 
-function CcoCli:pushMsg(coOut, bytes)
+function CcoCli:pushMsg(coOut, lines)
     local ok, msg
-    local lines = self._proto:decode(bytes)
 
     ok, msg = coroutine.resume(coOut, lines)
     if not ok then
@@ -159,7 +158,7 @@ function CcoCli:_newOut(cli)
     return coOut
 end
 
-function CcoCli:_pollFd(bfd, cli, nes, coIn, coOut)
+function CcoCli:_pollFd(bfd, nes, coIn, coOuts)
     local ok, msg
     for i = 0, nes.num - 1 do
         local e = nes.evs[i];
@@ -168,48 +167,58 @@ function CcoCli:_pollFd(bfd, cli, nes, coIn, coOut)
             ok, msg = coroutine.resume(coIn, e)
             if ok then
                 if msg then
-                    ok = self:pushMsg(coOut, msg)
-                    if not ok then
-                        coOut = self:_newOut(cli)
-                        assert(coOut)
+                    local lines = self._proto:decode(msg)
+                    for cli, coOut in pairs(coOuts) do
+                        ok = self:pushMsg(coOut, lines)
+                        if not ok then
+                            coOuts[cli] = self:_newOut(cli)
+                            assert(coOuts[cli])
+                        end
                     end
                 end
             else
                 error(string.format("coIn run failed %s", msg))
             end
-        elseif fd == cli.fd then
-            ok, msg = coroutine.resume(cli.co, e)
-            if not ok then
-                error(string.format("cli.co run failed %s", msg))
-            end
-            if system:valueIsIn(socketWakeTbl, cli.status) then
-                ok, msg = coroutine.resume(coOut, nil)
-                if not ok then
-                    error(string.format("coOut run failed %s", msg))
+
+        else
+            local set = false
+            for cli, coOut in pairs(coOuts) do
+                if fd == cli.fd then
+                    set = true
+                    ok, msg = coroutine.resume(cli.co, e)
+                    if not ok then
+                        error(string.format("cli.co run failed %s", msg))
+                    end
+                    if system:valueIsIn(socketWakeTbl, cli.status) then
+                        ok, msg = coroutine.resume(coOut, nil)
+                        if not ok then
+                            error(string.format("coOut run failed %s", msg))
+                        end
+                    end
                 end
             end
-        else
-            print("bad fd " .. fd .. "use fd " .. cli.fd)
+
+            if not set then
+                print("bad fd " .. fd)
+            end
         end
     end
-    return coOut
 end
 
-function CcoCli:_poll(cli)
+function CcoCli:_poll(clis)
     local ok, msg
     local bfd = self._bfd
     local efd = self._efd
     local ffi, cffi = self.ffi, self.cffi
+    local coOuts = {}
 
-    --local coOut = coroutine.create(self.coQueFunc)
-    --ok, msg = coroutine.resume(coOut, self, cli, cffi, efd, coOut)
-    --if not ok then
-    --    error(string.format("coOut run failed %s", msg))
-    --end
+    -- setup for push to
+    for _, cli in ipairs(clis) do
+        coOuts[cli] = self:_newOut(cli)
+        assert(coOuts[cli])
+    end
 
-    local coOut = self:_newOut(cli)
-    assert(coOut)
-
+    -- setup for in
     local coIn = coroutine.create(read_stream)
     ok, msg = coroutine.resume(coIn, bfd)
     if not ok then
@@ -224,15 +233,15 @@ function CcoCli:_poll(cli)
             return "end poll."
         end
         if nes.num > 0 then
-            coOut = self:_pollFd(bfd, cli, nes, coIn, coOut)
+            self:_pollFd(bfd, nes, coIn, coOuts)
         else
-            self:checkOvertime(cli, coOut, ffi)
+            self:checkOvertime(coOuts, ffi)
         end
     end
 end
 
-function CcoCli:poll(cli)
-    local _, msg = pcall(self._poll, self, cli)
+function CcoCli:poll(clis)
+    local _, msg = pcall(self._poll, self, clis)
     print(msg)
     return 0
 end
