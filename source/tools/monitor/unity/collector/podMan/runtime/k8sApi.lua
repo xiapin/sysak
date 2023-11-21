@@ -125,7 +125,6 @@ function Ck8sApi:setupCons()
     local cli = ChttpCli.new()
     local cons = {}
     local c = 0
-    local blacklist = {["arms-prom"] = 1, ["kube-system"] = 1, ["kube-public"] = 1, ["kube-node-lease"] = 1}
     local content = cli:get("http://127.0.0.1:10255/pods")
     local obj = cli:jdecode(content.body)
     if not obj then
@@ -139,7 +138,7 @@ function Ck8sApi:setupCons()
 
     for _, pod in ipairs(obj.items) do
         local metadata = pod.metadata
-        if blacklist[metadata.namespace] then
+        if self._ns_blacklist[metadata.namespace] then
             goto continue
         end
 
@@ -238,6 +237,12 @@ function Ck8sApi:_init_(resYaml, mnt)
     self._ca_path = default_ca_path
     self._token = ""
     self._ino = {}
+    self._ns_blacklist = {}
+
+    local ns_blacklist = resYaml.container.nsBlacklist
+    for _, ns in ipairs(ns_blacklist) do
+        self._ns_blacklist[ns] = 1
+    end
 end
 
 return Ck8sApi

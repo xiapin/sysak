@@ -27,6 +27,7 @@ outline:
 container:
   mode: "pods"
   runtime: ["cri_containerd", "k8sApi", "docker"]
+  nsBlacklist: ["arms-prom", "kube-system", "kube-public", "kube-node-lease"]
   luaPlugin: ["cg_cpu_cfs_quota","cg_mem_drcm_glob_latency","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency",
               "cg_cpuacct_proc_stat","con_net_stat", "cg_blkio_stat", "podmem", "cg_memory_oom_cnt"]
   directCgPath:
