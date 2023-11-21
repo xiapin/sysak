@@ -107,7 +107,9 @@ function CpipeMon:poll()
             local stream, err = sock:receive()
             if stream then
                 local res, msg = pcall(self.procLines, self, stream)
-                assert(res, "bad line:\n" .. stream .. msg)
+                if not res then
+                    print("bad line:\n" .. stream .. msg)
+                end
             else
                 print("recv line return: " .. err)
                 return 0
