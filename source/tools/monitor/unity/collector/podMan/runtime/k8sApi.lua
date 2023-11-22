@@ -67,11 +67,11 @@ end
 
 local function get_bvt(bvt_path)
     -- local bvt_path = conpath.."cpu.bvt_warp_ns"
-    local value = 4
+    local value = 5
     if unistd.access(bvt_path) == 0 then
-	for line in io.lines(bvt_path) do
+        for line in io.lines(bvt_path) do
             value = tonumber(line) + 2
-	    break
+            break
         end
     end
     names = getQosStr()
