@@ -3,7 +3,6 @@ config:
   port: 8889  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
-  daemon: true
   url_safe: close
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     #    mode: curl
