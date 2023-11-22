@@ -7,14 +7,13 @@
 require("common.class")
 
 local sha1 = require("sha1")
-local lz4 = require("lz4")
 local md5 = require("md5")
 local base64 = require("base64")
 local system = require("common.system")
 local pystring = require("common.pystring")
+local log_encode = require("log_encode")
 
 local ChttpCli = require("httplib.httpCli")
-local CslsProto = require("protobuf.slsProto")
 local CslsCli = class("slsCli", ChttpCli)
 
 function CslsCli:_init_(endPoint, project, store, key, pswd, proxy)
@@ -24,7 +23,6 @@ function CslsCli:_init_(endPoint, project, store, key, pswd, proxy)
     self._store = store
     self._key = key
     self._pswd = pswd
-    self._proto = CslsProto.new()
 end
 
 local function packLog(vm, log)
@@ -85,11 +83,11 @@ function CslsCli:signature(heads, uri, msg)
     heads["Authorization"] = string.format("LOG %s:%s", self._key, sign)
 end
 
-function CslsCli:putLog(vm, log)
+function CslsCli:putLog(log)
     local uri = "/logstores/" .. self._store .. "/shards/lb"
-    local logList = packLog(vm, log)
-    print(self:jencode(logList))
-    local msg = self._proto:pack(logList)
+
+    local msg = log_encode:encode(log)
+    system:hexdump(msg)
     local heads = packHead(msg, self._project, self._endPoint)
     self:signature(heads, uri, msg)
     local url = string.format("http://%s%s", self._endPoint, uri)
