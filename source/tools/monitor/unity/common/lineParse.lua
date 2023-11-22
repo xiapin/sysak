@@ -110,6 +110,31 @@ function module.pack(title, ls, vs)
     return line
 end
 
+function module.packlog(line)
+    local cells
+    local title = line.line
+    local ls = {}
+    local vs = {}
+
+    if line.log then
+        cells = line.ls
+        if cells then
+            for _, cell in ipairs(cells) do
+                ls[cell.name] = cell.index
+            end
+        end
+
+        cells = line.log
+        if cells then
+            for _, cell in ipairs(cells) do
+                vs[cell.name] = cell.log
+            end
+        end
+
+        return module.pack(title, ls, vs)
+    end
+end
+
 function module.packs(line)
     local cells
     local title = line.line

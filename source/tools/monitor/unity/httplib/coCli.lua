@@ -40,7 +40,7 @@ local socketWakeTbl = {
     enumStat.closed,
 }
 
-function CcoCli:coQueFunc(cli, cffi, efd)
+local function coQueFunc(cli, cffi, efd)
     local body
     local ok, msg
     while true do
@@ -71,7 +71,7 @@ function CcoCli:coQueFunc(cli, cffi, efd)
     end
 end
 
-function CcoCli:checkOvertime(cli, co, ffi)
+local function checkOvertime(cli, co, ffi)
     local ok, msg
     if cli.status == enumStat.connecting and cli:checkTime() >= 2 then
         local e = ffi.new("native_event_t")
@@ -134,7 +134,7 @@ local function read_stream(fd)
     end
 end
 
-function CcoCli:pushMsg(coOut, lines)
+local function pushMsg(coOut, lines)
     local ok, msg
 
     ok, msg = coroutine.resume(coOut, lines)
@@ -145,8 +145,8 @@ function CcoCli:pushMsg(coOut, lines)
 end
 
 function CcoCli:_newOut(cli)
-    local coOut = coroutine.create(self.coQueFunc)
-    local ok, msg = coroutine.resume(coOut, self, cli, self.cffi, self._efd, coOut)
+    local coOut = coroutine.create(coQueFunc)
+    local ok, msg = coroutine.resume(coOut, cli, self.cffi, self._efd, coOut)
     if not ok then
         error(string.format("coOut run failed %s", msg))
         return nil
@@ -159,13 +159,13 @@ function CcoCli:_pollFd(bfd, nes, coIn, coOuts)
     for i = 0, nes.num - 1 do
         local e = nes.evs[i];
         local fd = e.fd
-        if fd == bfd then
-            ok, msg = coroutine.resume(coIn, e)
+        if fd == bfd then  -- get message from pipe
+            ok, msg = coroutine.resume(coIn, e)   -- coIn will call read_stream, yield full message
             if ok then
                 if msg then
                     local lines = self._proto:decode(msg)
                     for cli, coOut in pairs(coOuts) do
-                        ok = self:pushMsg(coOut, lines)
+                        ok = pushMsg(coOut, lines)   -- call coQueFunc
                         if not ok then
                             coOuts[cli] = self:_newOut(cli)
                             assert(coOuts[cli])
@@ -181,7 +181,7 @@ function CcoCli:_pollFd(bfd, nes, coIn, coOuts)
             for cli, coOut in pairs(coOuts) do
                 if fd == cli.fd then
                     set = true
-                    ok, msg = coroutine.resume(cli.co, e)
+                    ok, msg = coroutine.resume(cli.co, e) -- will call cli work function
                     if not ok then
                         error(string.format("cli.co run failed %s", msg))
                     end
@@ -231,7 +231,7 @@ function CcoCli:_poll(clis)
         if nes.num > 0 then
             self:_pollFd(bfd, nes, coIn, coOuts)
         else
-            self:checkOvertime(coOuts, ffi)
+            checkOvertime(coOuts, ffi)
         end
     end
 end

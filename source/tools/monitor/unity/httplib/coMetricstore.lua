@@ -27,8 +27,9 @@ function CcoMetricstore:_init_(fYaml, config, instance)
 
     local k1, k2 = addition:decode(config.addition)
     local s = base64.encode(k1 .. ":" .. k2)
-    headers["Authorization"] = "Basic " .. s
-    headers.Host = config.host
+    self._headers = system:deepcopy(headers)
+    self._headers["Authorization"] = "Basic " .. s
+    self._headers.Host = config.host
 
     self._transPro = CtransPro.new(instance, fYaml, false, false)
 
@@ -93,8 +94,8 @@ end
 
 function CcoMetricstore:pack(body)
     local line = self:packCliHead('POST', self._url)
-    headers["Content-Length"] = #body
-    local heads = self:packCliHeaders(headers)
+    self._headers["Content-Length"] = #body
+    local heads = self:packCliHeaders(self._headers)
     return pystring:join("\r\n", {line, heads, body})
 end
 
