@@ -83,6 +83,8 @@ plugins:
     description: "collect pmu events"
   - so: cpufreq
     description: "collect cpu frequence of perf cpu"
+  - so: numainfo
+    description: "numainfo"
 
 metrics:
   - title: sysom_java_app
@@ -416,6 +418,11 @@ metrics:
     from: cpufreq
     head: value
     help: "the frequence of percpu"
+    type: "gauge"
+  - title: sysom_numainfo
+    from: numainfo
+    head: value
+    help: "numainfo of system from /sys/devices/system/"
     type: "gauge"
 
 observe:
