@@ -11,6 +11,7 @@ local coCli = require("httplib.coCli")
 local coInflux = require("httplib.coInflux")
 local coMetrics = require("httplib.coMetrics")
 local coAutoMetrics =require("httplib.coAutoMetrics")
+local coMetricstore =require("httplib.coMetricstore")
 
 function work(fd, fYaml)
     local conf = system:parseYaml(fYaml)
@@ -24,7 +25,8 @@ function work(fd, fYaml)
     local _funcs = {
         Influx = function(fYaml, config, instance) return coInflux.new(fYaml, config, instance) end,
         Metrics = function(fYaml, config, instance) return coMetrics.new(fYaml, config, instance) end,
-        AutoMetrics = function(fYaml, config, instance) return coAutoMetrics.new(fYaml, config, instance) end
+        AutoMetrics = function(fYaml, config, instance) return coAutoMetrics.new(fYaml, config, instance) end,
+        Metricstore = function(fYaml, config, instance) return coMetricstore.new(fYaml, config, instance) end,
     }
 
     local clis = {}

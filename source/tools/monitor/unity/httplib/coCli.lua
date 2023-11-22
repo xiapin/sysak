@@ -40,10 +40,6 @@ local socketWakeTbl = {
     enumStat.closed,
 }
 
-function CcoCli:filterLines(cli, lines, body)
-    return cli:trans(lines, body, nil)
-end
-
 function CcoCli:coQueFunc(cli, cffi, efd)
     local body
     local ok, msg
@@ -51,7 +47,7 @@ function CcoCli:coQueFunc(cli, cffi, efd)
         local lines = coroutine.yield()
         local stat = cli.status
         if lines and #lines.lines > 0 then
-            body = self:filterLines(cli, lines, body)
+            body = cli:trans(lines, body, nil)
         end
         if body then   --> has data to send.
             if cli.co == nil and stat == enumStat.closed then  -- not active

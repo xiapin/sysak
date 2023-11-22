@@ -23,7 +23,7 @@ function CcoMetrics:_init_(fYaml, config, instance)
     self._mhead = _metrics.head
     self._title = _metrics.title
 
-    local _addition = res.pushTo.addition
+    local _addition = config.addition
 
     self._key1, self._key2 = addition:decode(_addition)
     self._project = config.project
