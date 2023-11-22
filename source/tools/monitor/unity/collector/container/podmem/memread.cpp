@@ -28,6 +28,7 @@ extern int memcg_cgroup_file(const char *cgroupfile);
 extern int memcg_cgroup_path(const char *cgrouppath);
 extern int offset_init(void);
 extern int sym_uninit(void);
+extern int get_structsize(char *type_name);
 
 extern "C" {
 char* scanall();
@@ -55,7 +56,7 @@ static struct proc_kcore_data *pkd = &proc_kcore_data;
 
 static int kcore_fd = 0;
 static int kpageflags_fd = 0;
-static int kpagecgroup_fd = 0;
+int kpagecgroup_fd = 0;
 uint64_t g_max_phy_addr;
 
 
@@ -73,6 +74,10 @@ unsigned long vmemmap_base = 0xffffea0000000000UL;
 unsigned long page_offset_base = 0xffff880000000000UL;
 unsigned long memstart_addr = 0x0;
 unsigned long page_shift = 0;
+
+// for linux 3.10 which has no kpagecgroup and mem_cgroup in page struct
+unsigned long mem_section_base = 0x0;
+int mem_section_size = 0x0;
 
 /*
  * Routines of kpageflags, i.e., /proc/kpageflags
@@ -324,10 +329,34 @@ static uint64_t get_max_phy_addr(const char *proc)
 	return max_phy_addr;
 }
 
+static int setup_mem_section(const char *proc)
+{
+	mem_section_base = lookup_kernel_symbol("mem_section", proc);
+	if (mem_section_base == (unsigned long)-1) {
+		LOG_ERROR("failed to lookup symbol: mem_section\n");
+		return -1;
+	}
+	
+	mem_section_size = get_structsize("mem_section");
+	if (mem_section_size == 0) {
+		LOG_ERROR("failed to get struct size: mem_section\n");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int setup(const char* proc)
 {
-        std::string filename(proc);
-        std::string tmp;
+    std::string filename(proc);
+    std::string tmp;
+
+	// init btf first
+	if (offset_init() < 0) {
+		LOG_ERROR("failed to init btf\n");
+		return -1;
+	}
+
 	g_max_phy_addr = get_max_phy_addr(proc);
 	if (g_max_phy_addr == 0ULL) {
 		g_max_phy_addr = 64 * 1024 * 1024 * 1024;
@@ -335,23 +364,30 @@ static int setup(const char* proc)
 	}
 	LOG_DEBUG("max physical address = %#lx\n", g_max_phy_addr);
 
-        tmp = filename+"/proc/kpageflags";
+    tmp = filename+"/proc/kpageflags";
 	kpageflags_fd = open(tmp.c_str(), O_RDONLY);
 	if (kpageflags_fd < 0) {
 		perror("open: /proc/kpageflags");
 		return -1;
 	}
-        tmp = filename+"/proc/kpagecgroup";
+    
+	tmp = filename+"/proc/kpagecgroup";
     kpagecgroup_fd = open(tmp.c_str(), O_RDONLY);
 	if (kpagecgroup_fd < 0) {
-		perror("open: /proc/kpagecgroup");
+		LOG_WARN("no /proc/kpagecgroup, use pfn_to_cgroup instead,"
+		"(only support kernel 3.10)\n");
+		if (setup_mem_section(proc) < 0) {
+			LOG_ERROR("failed to setup mem_section\n");
+			return -1;
+		}
 	}
+
 	if (kcore_init(proc) < 0) {
 		LOG_ERROR("failed to init kcore\n");
 		return -1;
 	}
 
-    return offset_init();
+    return 0;
 }
 
 static void cleanup(void)

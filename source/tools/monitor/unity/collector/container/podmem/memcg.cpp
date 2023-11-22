@@ -31,6 +31,7 @@ using namespace std;
 
 static bool full_scan;
 static unsigned int scan_rate = 4;
+
 struct file_info {
     char filename[256];
     unsigned long  inode;
@@ -66,7 +67,12 @@ struct myComp
 set<unsigned long,myComp> fileset;
 //map<unsigned long , int> inodes;
 map<unsigned long , int> history_inodes;
+// memcg -> inode cache
+map<unsigned long , unsigned long> memcg_inodes;
+
+extern int kpagecgroup_fd;
 extern struct member_attribute *get_offset(string struct_name,  string member_name);
+extern int get_structsize(char *type_name);
  
 static int prepend(char **buffer, int *buflen, const char *str, int namelen, int off)
 {
@@ -495,15 +501,155 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
     return 0;
 }
 
+/*
+ * struct mem_section *mem_section[NR_SECTION_ROOTS]
+ */
+static unsigned long __nr_to_section(unsigned long nr)
+{   
+    unsigned long offset = nr & SECTION_ROOT_MASK;
+    unsigned long mem_sections;
+
+    // mem_sections = mem_section[i]
+    kcore_readmem(mem_section_base + SECTION_NR_TO_ROOT(nr) * sizeof(unsigned long), 
+        &mem_sections, sizeof(mem_sections));
+    
+    // mem_section = mem_sections[i]
+    return mem_sections + offset * mem_section_size;
+}
+
+static unsigned long __pfn_to_section(unsigned long pfn)
+{
+	return __nr_to_section(pfn_to_section_nr(pfn));
+}
+
+// pfn to page_cgroup
+unsigned long lookup_page_cgroup(unsigned long pfn)
+{
+    unsigned long mem_section_addr = __pfn_to_section(pfn);
+    //LOG_WARN("mem_section_addr: %lx\n", mem_section_addr);  
+    unsigned long mem_section;
+    unsigned long page_cgroup;
+    int page_cgroup_size;
+    struct member_attribute *mem_sec_att;
+
+    mem_sec_att = get_offset("mem_section", "page_cgroup");
+    if (!mem_sec_att) {
+        return 0;
+    }
+
+    kcore_readmem(mem_section_addr + mem_sec_att->offset, &page_cgroup, sizeof(page_cgroup));
+    page_cgroup_size = get_structsize("page_cgroup");
+
+    return page_cgroup + pfn * page_cgroup_size;
+}
+
+// page_cgroup to mem_cgroup
+unsigned long mem_cgroup_from_page_group(unsigned long page_cgroup)
+{
+    unsigned long mem_cgroup;
+    struct member_attribute *memcg_att;
+
+    memcg_att = get_offset("page_cgroup", "mem_cgroup");
+    if (!memcg_att) {
+        return 0;
+    }
+
+    kcore_readmem(page_cgroup + memcg_att->offset, 
+        &mem_cgroup, sizeof(mem_cgroup));
+
+    return mem_cgroup;
+}
+
+unsigned long page_cgroup_ino(unsigned long pfn)
+{   
+    unsigned long page_group, mem_cgroup;
+    unsigned long css, cgroup, dentry, inode, i_ino;
+    struct member_attribute *memcg_css_att, *css_cg_att;
+    struct member_attribute *cg_dentry_att, *dentry_inode_att;
+    struct member_attribute *inode_i_ino_att;
+    map<unsigned long, unsigned long>::iterator iter;
+
+    page_group = lookup_page_cgroup(pfn);
+    if (!page_group) {
+        return 0;
+    }
+
+    mem_cgroup = mem_cgroup_from_page_group(page_group);
+    if (!mem_cgroup) {
+        return 0;
+    }
+
+    // check memcg -> inode cache
+    iter = memcg_inodes.find(mem_cgroup);
+    if (iter != memcg_inodes.end()) {
+        return iter->second;
+    }
+
+    /* memcg->css.cgroup->dentry->d_inode->i_ino;*/
+    memcg_css_att = get_offset("mem_cgroup", "css");
+    if (!memcg_css_att) {
+        return 0;
+    }
+
+    css_cg_att = get_offset("cgroup_subsys_state", "cgroup");
+    if (!css_cg_att) {
+        return 0;
+    }
+
+    // css = mem_cgroup(addr) + css_offset
+    css = mem_cgroup + memcg_css_att->offset;
+
+    // cgroup = readmem(css + cgroup_offset)
+    kcore_readmem(css + css_cg_att->offset, 
+        &cgroup, sizeof(cgroup));
+
+    cg_dentry_att = get_offset("cgroup", "dentry");
+    if (!cg_dentry_att) {
+        return 0;
+    }
+
+    // dentry = readmem(cgroup + dentry_offset)
+    kcore_readmem(cgroup + cg_dentry_att->offset, 
+        &dentry, sizeof(dentry));
+    
+    dentry_inode_att = get_offset("dentry", "d_inode");
+    if (!dentry_inode_att) {
+        return 0;
+    }
+
+    // inode = readmem(dentry + inode_offset)
+    kcore_readmem(dentry + dentry_inode_att->offset, 
+        &inode, sizeof(inode));
+    
+    inode_i_ino_att = get_offset("inode", "i_ino");
+    if (!inode_i_ino_att) {
+        return 0;
+    }
+
+    //  i_ino = readmem(inode + i_ino_offset)
+    kcore_readmem(inode + inode_i_ino_att->offset, 
+        &i_ino, sizeof(i_ino));
+
+    memcg_inodes[mem_cgroup] = i_ino;
+    
+    return i_ino;
+}
+
 unsigned long get_cgroup_inode(unsigned long pfn)
 {
     unsigned long ino;
     int ret = 0;
 
-    ret = kpagecgroup_read(&ino, sizeof(ino), pfn*sizeof(ino));
-    if (ret != sizeof(ino)) {
-        return 0;
+    if (kpagecgroup_fd > 0) {
+        ret = kpagecgroup_read(&ino, sizeof(ino), pfn*sizeof(ino));
+        if (ret != sizeof(ino)) {
+            return 0;
+        }
     }
+    else {
+        ino = page_cgroup_ino(pfn);
+    }
+
     return ino;
 }
 

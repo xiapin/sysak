@@ -42,7 +42,19 @@ function CPodMem:setup(cons)
     -- reset the data struct first
     self.allcons = {}
     self.inodes = {}
-    -- setup self.allcons and self.inodes
+
+    -- setup root cgroup
+    local root_name = "/"
+    local root_path = self.root_fs .. "sys/fs/cgroup/memory"
+    local root_inode = self:get_inode(root_path)
+    if root_inode == -1 then
+        print("Get root cgroup path inode failed: ", root_path)
+        return
+    end
+    self.allcons[root_name] = {["path"]=root_path, ["pod"]=root_name, ["ns"]="", ["inode"]=root_inode, ["cname"]=root_name}
+    self.inodes[root_inode] = root_name
+
+     -- setup self.allcons and self.inodes
     for _, v in pairs(cons) do
         local path =  self.root_fs .. "sys/fs/cgroup/memory" .. v['path']
         local inode = self:get_inode(path)
@@ -55,7 +67,7 @@ function CPodMem:setup(cons)
             self.allcons[v['name']..v['pod']['name']] = {["pod"]=v['pod']['name'], ["ns"]=v['pod']['namespace'], ["path"]=path,  ["inode"] = inode, ["cname"]=v['name']}
             self.inodes[inode] = v['name']..v['pod']['name']
         else -- is container
-            self.allcons[v['name']] = {["path"]=path,  ["inode"] = inode, ["cname"]=v['name']}
+            self.allcons[v['name']] = {["path"]=path, ["inode"]=inode, ["cname"]=v['name']}
             self.inodes[inode] = v['name']
         end
         ::continue::

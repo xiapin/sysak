@@ -1,9 +1,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <stdlib.h>
+#include <sys/utsname.h>
+
+#include "cache.h"
+
 extern "C" {
 #include "btfparse.h"
 }
@@ -37,6 +41,13 @@ int sym_uninit(void)
         }   
     }   
     return 0; 
+}
+
+int get_structsize(char *type_name)
+{
+    string structname("struct ");
+    structname += type_name;
+    return btf_type_size(handle, (char*)structname.c_str());
 }
 
 struct member_attribute *get_offset(string struct_name,  string member_name)
