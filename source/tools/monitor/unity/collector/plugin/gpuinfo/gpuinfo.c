@@ -19,6 +19,7 @@ int call(int t, struct unity_lines* lines) {
     char buffer[256];       /* Temporary buffer for parsing */
     float mm_total, mm_used, mm_free, temp, powerdraw, gpu_util, mem_util;
     struct unity_line* line;
+    int num_gpus = 0, num_gpus_index = 0;
 
 
     // make sure nvidia-smi installed
@@ -31,33 +32,52 @@ int call(int t, struct unity_lines* lines) {
 	fp = popen("nvidia-smi --query-gpu=\"memory.total,memory.used,memory.free,temperature.gpu,power.draw,utilization.gpu,utilization.memory\" --format=nounits,csv,noheader", "r");
 	memset(buffer, 0, sizeof(buffer));
 
-    // // for test
-    // char command[128];
-    // if (sprintf(command, "cat %s%s", get_unity_proc(), "/proc/gpuinfo") < 0)
-    //     printf("sprintf error\n");
-    // fp = popen(command, "r");
-
-
     if (fp != NULL)
     {
         while (fgets(buffer, sizeof(buffer), fp))
         {
+            if (strstr(buffer, "Failed") != NULL) {
+                // printf("Found the word 'Failed' in the buffer: %s", buffer);
+                break;
+            }
+            num_gpus++;
             sscanf(buffer, "%f, %f, %f, %f, %f, %f, %f",  &mm_total, &mm_used, &mm_free, &temp, &powerdraw, &gpu_util, &mem_util);
         }
         pclose(fp);
     }
 
-    unity_alloc_lines(lines, 1);    // 预分配好
-    line = unity_get_line(lines, 0);
-    unity_set_table(line, "gpuinfo");
-    unity_set_index(line, 0, "gpu_num", "gpu0");
-    unity_set_value(line, 0, "mm_total", mm_total);
-    unity_set_value(line, 1, "mm_used", mm_used);
-    unity_set_value(line, 2, "mm_free", mm_free);
-    unity_set_value(line, 3, "temp", temp);
-    unity_set_value(line, 4, "powerdraw", powerdraw);
-    unity_set_value(line, 5, "gpu_util", gpu_util);
-    unity_set_value(line, 6, "mem_util", mem_util);
+    unity_alloc_lines(lines, num_gpus);
+
+    fp = popen("nvidia-smi --query-gpu=\"memory.total,memory.used,memory.free,temperature.gpu,power.draw,utilization.gpu,utilization.memory\" --format=nounits,csv,noheader", "r");
+	memset(buffer, 0, sizeof(buffer));
+
+    if (fp != NULL)
+    {
+        while (fgets(buffer, sizeof(buffer), fp))
+        {
+            if (strstr(buffer, "Failed") != NULL) {
+                // printf("Found the word 'Failed' in the buffer: %s", buffer);
+                break;
+            }
+            
+            sscanf(buffer, "%f, %f, %f, %f, %f, %f, %f",  &mm_total, &mm_used, &mm_free, &temp, &powerdraw, &gpu_util, &mem_util);
+            line = unity_get_line(lines, num_gpus_index);
+            unity_set_table(line, "gpuinfo");
+            char gpu_name[10];
+            snprintf(gpu_name, 10, "%s%d", "gpu", num_gpus_index);
+            unity_set_index(line, 0, "gpu_num", gpu_name);
+            unity_set_value(line, 0, "mm_total", mm_total);
+            unity_set_value(line, 1, "mm_used", mm_used);
+            unity_set_value(line, 2, "mm_free", mm_free);
+            unity_set_value(line, 3, "temp", temp);
+            unity_set_value(line, 4, "powerdraw", powerdraw);
+            unity_set_value(line, 5, "gpu_util", gpu_util);
+            unity_set_value(line, 6, "mem_util", mem_util);
+
+            num_gpus_index++;
+        }
+        pclose(fp);
+    }
 
     return 0;
 }
