@@ -13,6 +13,8 @@ local coMetrics = require("httplib.coMetrics")
 local coAutoMetrics = require("httplib.coAutoMetrics")
 local coMetricstore = require("httplib.coMetricstore")
 local coSls = require("httplib.coSls")
+local coSlsLog = require("httplib.coSlsLog")
+local coSlsMetric = require("httplib.coSlsMetric")
 
 function work(fd, fYaml)
     local conf = system:parseYaml(fYaml)
@@ -29,6 +31,8 @@ function work(fd, fYaml)
         AutoMetrics = function(fYaml, config, instance) return coAutoMetrics.new(fYaml, config, instance) end,
         Metricstore = function(fYaml, config, instance) return coMetricstore.new(fYaml, config, instance) end,
         Sls = function(fYaml, config, instance) return coSls.new(fYaml, config, instance) end,
+        SlsLog = function(fYaml, config, instance) return coSlsLog.new(fYaml, config, instance) end,
+        SlsMetric = function(fYaml, config, instance) return coSlsMetric.new(fYaml, config, instance)  end
     }
 
     local clis = {}

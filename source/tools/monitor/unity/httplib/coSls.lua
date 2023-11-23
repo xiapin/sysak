@@ -50,25 +50,36 @@ function CcoSls:addInstance(line)   -- add instance id for line index.
     end
 end
 
+function CcoSls:transLine(line)
+    return lineParse.packs(line)
+end
+
 function CcoSls:trans(msgs, body, filter)
     local res
     local c = 0
     local lines
+    local ts = string.format(" %d000", os.time())   -- nano second
     local bodies = {}
 
     lines = msgs.lines
     for _, line in ipairs(lines) do
         self:addInstance(line)
-        local log = lineParse.packlog(line)
+        local log = self:transLine(line)
         if log then
             c = c + 1
-            bodies[c] = log
+            bodies[c] = log .. ts
         end
     end
 
-    res = pystring:join("\n", bodies)
+    if #bodies then
+        res = pystring:join("\n", bodies)
+    end
     if body and #body > 0 then
-        return pystring:join("\n", {body, res})
+        if res then
+            return pystring:join("\n", {body, res})
+        else
+            return body
+        end
     else
         return res
     end
