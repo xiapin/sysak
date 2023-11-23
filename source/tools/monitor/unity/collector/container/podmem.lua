@@ -43,17 +43,6 @@ function CPodMem:setup(cons)
     self.allcons = {}
     self.inodes = {}
 
-    -- setup root cgroup
-    local root_name = "/"
-    local root_path = self.root_fs .. "sys/fs/cgroup/memory"
-    local root_inode = self:get_inode(root_path)
-    if root_inode == -1 then
-        print("Get root cgroup path inode failed: ", root_path)
-        return
-    end
-    self.allcons[root_name] = {["path"]=root_path, ["pod"]=root_name, ["ns"]="", ["inode"]=root_inode, ["cname"]=root_name}
-    self.inodes[root_inode] = root_name
-
      -- setup self.allcons and self.inodes
     for _, v in pairs(cons) do
         local path =  self.root_fs .. "sys/fs/cgroup/memory" .. v['path']
