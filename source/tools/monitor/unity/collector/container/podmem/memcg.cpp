@@ -529,7 +529,6 @@ unsigned long lookup_page_cgroup(unsigned long pfn)
     //LOG_WARN("mem_section_addr: %lx\n", mem_section_addr);  
     unsigned long mem_section;
     unsigned long page_cgroup;
-    int page_cgroup_size;
     struct member_attribute *mem_sec_att;
 
     mem_sec_att = get_offset("mem_section", "page_cgroup");
