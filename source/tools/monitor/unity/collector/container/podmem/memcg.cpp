@@ -71,8 +71,8 @@ map<unsigned long , int> history_inodes;
 map<unsigned long , unsigned long> memcg_inodes;
 
 extern int kpagecgroup_fd;
+extern int page_cgroup_size;
 extern struct member_attribute *get_offset(string struct_name,  string member_name);
-extern int get_structsize(char *type_name);
  
 static int prepend(char **buffer, int *buflen, const char *str, int namelen, int off)
 {
@@ -538,7 +538,6 @@ unsigned long lookup_page_cgroup(unsigned long pfn)
     }
 
     kcore_readmem(mem_section_addr + mem_sec_att->offset, &page_cgroup, sizeof(page_cgroup));
-    page_cgroup_size = get_structsize("page_cgroup");
 
     return page_cgroup + pfn * page_cgroup_size;
 }
@@ -691,6 +690,7 @@ static int output_file_cached_string(unsigned int top, char *res)
     fileset.clear();
     cinode_cached.clear();
     history_inodes.clear();
+    memcg_inodes.clear();
 
     return 0;
 }

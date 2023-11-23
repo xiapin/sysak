@@ -78,6 +78,7 @@ unsigned long page_shift = 0;
 // for linux 3.10 which has no kpagecgroup and mem_cgroup in page struct
 unsigned long mem_section_base = 0x0;
 int mem_section_size = 0x0;
+int page_cgroup_size = 0;
 
 /*
  * Routines of kpageflags, i.e., /proc/kpageflags
@@ -340,6 +341,12 @@ static int setup_mem_section(const char *proc)
 	mem_section_size = get_structsize("mem_section");
 	if (mem_section_size == 0) {
 		LOG_ERROR("failed to get struct size: mem_section\n");
+		return -1;
+	}
+
+	page_cgroup_size = get_structsize("page_cgroup");
+	if (page_cgroup_size == 0) {
+		LOG_ERROR("failed to get struct size: page_cgroup\n");
 		return -1;
 	}
 
