@@ -61,6 +61,23 @@ local function joinContainerPath(pod_path, cell, runtime)
     return pystring:join("", paths)
 end
 
+local function getQosStr()
+        return {"BE", "NOR", "LS", "LS", "OT"}
+end
+
+local function get_bvt(bvt_path)
+    -- local bvt_path = conpath.."cpu.bvt_warp_ns"
+    local value = 5
+    if unistd.access(bvt_path) == 0 then
+        for line in io.lines(bvt_path) do
+            value = tonumber(line) + 2
+            break
+        end
+    end
+    names = getQosStr()
+    return names[value]
+end
+
 function Ck8sApi:queryPodsInfo()
     if self._token == "" then
         local f = io.open(self._token_path, "r")
@@ -145,6 +162,7 @@ function Ck8sApi:setupCons()
             }
             cell.path = joinContainerPath(pod_path, cell, runtime)
             if unistd.access(mnt .. "sys/fs/cgroup/cpu/" .. cell.path) == 0 then
+		cell.bvt = get_bvt(mnt .. "sys/fs/cgroup/cpu/" .. cell.path .. "/cpu.bvt_warp_ns")
                 c = c + 1
                 cons[c] = cell
             end

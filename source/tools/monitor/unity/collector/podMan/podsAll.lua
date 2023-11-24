@@ -21,6 +21,10 @@ function CpodsAll:setupPlugins()
                     index = con.pod.name,
                 },
                 {
+                    name = "bvt",
+                    index = con.bvt,
+                },
+                {
                     name = "container",
                     index = con.name.."-"..string.sub(con.id,0,4),
                 },
