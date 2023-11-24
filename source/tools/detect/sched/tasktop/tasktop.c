@@ -1,50 +1,58 @@
+
+#include "tasktop.h"
+
 #include <argp.h>
-#include <time.h>
-#include <limits.h>
-#include <unistd.h>
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
 #include <dirent.h>
 #include <errno.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/time.h>
-#include <sys/resource.h>
+#include <limits.h>
+#include <linux/types.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <signal.h>
-#include <linux/types.h>
-#include <stdbool.h>
-#include <bpf/libbpf.h>
-#include <bpf/bpf.h>
-#include "bpf/tasktop.skel.h"
-#include "procstate.h"
-#include "tasktop.h"
-#include "common.h"
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
-// #define DEBUG
-// #define LOG_DEBUG
-// #define ONLY_THREAD
-// #define STRESS_TEST
+#include "bpf/tasktop.skel.h"
+#include "common.h"
+#include "procstate.h"
+
+#define NSEC_PER_SECOND (1000 * 1000 * 1000)
+#define NSEC_PER_MILLSECOND (1000 * 1000)
 
 char log_dir[FILE_PATH_LEN] = "/var/log/sysak/tasktop";
 char default_log_path[FILE_PATH_LEN] = "/var/log/sysak/tasktop/tasktop.log";
 time_t btime = 0;
-u_int64_t pidmax = 0;
+u64 pidmax = 0;
 char* log_path = 0;
 int nr_cpu;
-u_int64_t* prev_delay;
 static volatile sig_atomic_t exiting;
 
+enum Mode { LOAD, BLOCKED };
+
 struct env {
-    bool thread_mode;
     time_t delay;
     pid_t tid;
-    int64_t nr_iter;
+    s64 nr_iter;
+    s64 stack_limit;
+    s64 cgroup_limit;
+    s64 limit;
+    int run;
     enum sort_type rec_sort;
-    int64_t limit;
+    enum Mode mode;
+    u64 blocked_ms;
+    FILE* dest;
+    bool thread_mode;
     bool human;
-    int64_t stack_limit;
-    int64_t cgroup_limit;
+    bool verbose;
+    bool kthread;
 } env = {.thread_mode = false,
          .delay = 3,
          .tid = -1,
@@ -53,18 +61,29 @@ struct env {
          .nr_iter = LONG_MAX - 1,
          .limit = INT_MAX,
          .stack_limit = 20,
-         .cgroup_limit = 20};
+         .cgroup_limit = 20,
+         .mode = LOAD,
+         .blocked_ms = 3000,
+         .verbose = false,
+         .dest = 0,
+         .kthread = false,
+         .run = -1};
 
 const char* argp_program_version = "tasktop 0.1";
 const char argp_program_doc[] =
-    "A light top, display the process/thread cpu utilization in peroid.\n"
+    "Load analyze & D stack catch.\n"
     "\n"
 
-    "USAGE: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] [-s SORT] "
+    "USAGE: \n"
+    "load analyze: tasktop [--help] [-t] [-p TID] [-d DELAY] [-i ITERATION] "
+    "[-s SORT] "
     "[-f LOGFILE] [-l LIMIT] [-H] [-e D-LIMIT]\n"
+    "catch D task stack: tasktop [--mode blocked] [--threshold TIME] [--run "
+    "TIME]\n"
     "\n"
 
     "EXAMPLES:\n"
+    "1. Load analyze examples:\n"
     "    tasktop            # run forever, display the cpu utilization.\n"
     "    tasktop -t         # display all thread.\n"
     "    tasktop -p 1100    # only display task with pid 1100.\n"
@@ -76,7 +95,12 @@ const char argp_program_doc[] =
     "20.\n"
     "    tasktop -H         # output time string, not timestamp.\n"
     "    tasktop -f a.log   # log to a.log.\n"
-    "    tasktop -e 10      # most record 10 d-task stack.\n";
+    "    tasktop -e 10      # most record 10 d-task stack.\n"
+    "\n"
+    "2. blocked analyze examples:\n"
+    "    tasktop --mode blocked --threshold 1000 --run 120 # tasktop run "
+    "(120s) catch the task that blocked in D more than (1000 ms)\n"
+    "\n";
 
 static const struct argp_option opts[] = {
     {"human", 'H', 0, 0, "Output human-readable time info."},
@@ -92,19 +116,19 @@ static const struct argp_option opts[] = {
     {"r-limit", 'l', "LIMIT", 0, "Specify the top R-LIMIT tasks to display"},
     {"d-limit", 'e', "D-LIMIT", 0,
      "Specify the D-LIMIT D tasks's stack to display"},
-
+    {"mode", 'm', "MODE", 0, "MODE is load or blocked, default is load"},
+    {"threshold", 'b', "TIME(ms)", 0,
+     "dtask blocked threshold, default is 3000 ms"},
+    {"verbose", 'v', 0, 0, "ebpf program output verbose message"},
+    {"run", 'r', "TIME(s)", 0, "run time in secnonds"},
+    {"kthread", 'k', 0, 0,
+     "blocked-analyze output kernel-thread D stack information"},
     {NULL, 'h', NULL, OPTION_HIDDEN, "Show the full help"},
     {},
 };
 
-/* PROCESS MODE
- /proc/pid/stat -- calculate process cpu util
- /proc/pid/task/tid/stat -- check task state, if d read the stack */
+u64 get_now_ns();
 
-/* THREAD MODE
-/proc/pid/task/tid/stat -- calcualte thread cpu util
-/proc/pid/task/tid/sat -- read task state, if d read stack
-*/
 static int prepare_directory(char* path) {
     int ret;
 
@@ -141,6 +165,9 @@ static error_t parse_arg(int key, char* arg, struct argp_state* state) {
     switch (key) {
         case 'h':
             argp_state_help(state, stderr, ARGP_HELP_STD_HELP);
+            break;
+        case 'v':
+            env.verbose = true;
             break;
         case 't':
             env.thread_mode = true;
@@ -204,6 +231,34 @@ static error_t parse_arg(int key, char* arg, struct argp_state* state) {
             break;
         case 'H':
             env.human = true;
+            break;
+        case 'm':
+            if (!strcmp(arg, "load")) {
+                env.mode = LOAD;
+            } else if (!strcmp(arg, "blocked")) {
+                env.mode = BLOCKED;
+            } else {
+                argp_usage(state);
+            }
+            break;
+        case 'b':
+            err = parse_long(arg, &val);
+            if (err || val <= 0) {
+                fprintf(stderr, "Failed parse blocked threshold.\n");
+                argp_usage(state);
+            }
+            env.blocked_ms = val;
+            break;
+        case 'r':
+            err = parse_long(arg, &val);
+            if (err || val <= 0) {
+                fprintf(stderr, "Failed parse run time.\n");
+                argp_usage(state);
+            }
+            env.run = val;
+            break;
+        case 'k':
+            env.kthread = true;
             break;
         case ARGP_KEY_ARG:
             break;
@@ -308,19 +363,11 @@ cleanup:
 
 static int read_d_task(struct id_pair_t* pids, int nr_thread, int* stack_num,
                        struct D_task_record_t* d_tasks) {
-#ifdef DEBUG
-    fprintf(stderr, "DEBUG: read_d_task\n");
-#endif
-    int i = 0;
-    int err = 0;
+    if (env.verbose) {
+        fprintf(stderr, "DEBUG: read_d_task\n");
+    }
 
-#ifdef DEBUG
-    struct timeval start, end;
-    err = gettimeofday(&start, 0);
-    if (err) fprintf(stderr, "read start time error.\n");
-#endif
-
-    int d_num = 0;
+    int i = 0, err = 0, d_num = 0;
     for (i = 0; i < nr_thread; i++) {
         if (d_num >= env.stack_limit) break;
         int pid = pids[i].pid;
@@ -332,18 +379,10 @@ static int read_d_task(struct id_pair_t* pids, int nr_thread, int* stack_num,
         }
     }
     *stack_num = d_num;
-
-#ifdef DEBUG
-    err = gettimeofday(&end, 0);
-    if (err) fprintf(stderr, "read end time error.\n");
-    fprintf(stderr, "read %d thread user %lds %ldus.\n", nr_thread,
-            end.tv_sec - start.tv_sec, end.tv_usec - start.tv_usec);
-#endif
-
     return err;
 }
 
-static int read_sched_delay(struct sys_record_t* sys_rec) {
+static int read_sched_delay(struct sys_record_t* sys_rec, u64* prev_delay) {
     FILE* fp = fopen(SCHEDSTAT_PATH, "r");
     int err = 0;
     if (!fp) {
@@ -561,7 +600,7 @@ cleanup:
     return err;
 };
 
-static u_int64_t read_pid_max() {
+static u64 read_pid_max() {
     int err = 0;
     FILE* fp = fopen(PIDMAX_PATH, "r");
     if (!fp) {
@@ -576,12 +615,12 @@ static u_int64_t read_pid_max() {
     return err;
 }
 
-static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
+static int read_all_pids(struct id_pair_t* pids, u64* num) {
     int err = 0;
 
     DIR* dir = NULL;
     DIR* task_dir = NULL;
-    u_int64_t nr_thread = 0;
+    u64 nr_thread = 0;
     struct dirent* proc_de = NULL;
     struct dirent* task_de = NULL;
     long val;
@@ -606,7 +645,10 @@ static int read_all_pids(struct id_pair_t* pids, u_int64_t* num) {
         snprintf(taskpath, FILE_PATH_LEN, "/proc/%d/task", pid);
         task_dir = opendir(taskpath);
         if (!task_dir) {
-            // fprintf(stderr, "Failed opendir %s\n", taskpath);
+            if (env.verbose) {
+                fprintf(stderr, "Failed opendir %s\n", taskpath);
+            }
+
             continue;
         }
 
@@ -689,7 +731,7 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
 
     fscanf(fp,
            " %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld "
-           "%ld %ld %ld %llu",
+           "%ld %ld %ld %lu",
            &proc_info.state, &proc_info.ppid, &proc_info.pgrp,
            &proc_info.session, &proc_info.tty_nr, &proc_info.tpgid,
            &proc_info.flags, &proc_info.minflt, &proc_info.cminflt,
@@ -703,6 +745,7 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
     data->ppid = proc_info.ppid;
     data->starttime = proc_info.starttime;
     data->pid = proc_info.pid;
+    data->ts_ns = get_now_ns();
 
     strcpy(data->comm, proc_info.comm);
 
@@ -712,7 +755,10 @@ static int read_proc(pid_t pid, pid_t tid, struct task_cputime_t** prev,
     if (prev[pid] && !strcmp(prev[pid]->comm, now[pid]->comm)) {
         long udelta = now[pid]->utime - prev[pid]->utime;
         long sdelta = now[pid]->stime - prev[pid]->stime;
-        long base = env.delay * sysconf(_SC_CLK_TCK);
+        /* if want more accurate, should calculate with clock */
+        // long base = env.delay * sysconf(_SC_CLK_TCK);
+        long base = (now[pid]->ts_ns - prev[pid]->ts_ns) / NSEC_PER_SECOND *
+                    sysconf(_SC_CLK_TCK);
 
         if (base != 0) {
             /* only process cpu utilization > 0 */
@@ -789,7 +835,6 @@ static void build_str(int day, int hour, int min, int sec, char* buf) {
         snprintf(tmp, 32, "%dd,", day);
         strcat(buf, tmp);
     }
-
     if (hour > 0) {
         snprintf(tmp, 32, "%dh,", hour);
         strcat(buf, tmp);
@@ -853,7 +898,7 @@ static void output_per_cpu(struct record_t* rec, FILE* dest) {
         char cpu_name[16];
         snprintf(cpu_name, 16, "cpu-%d", i - 1);
         fprintf(dest,
-                "%7s %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %10llu\n",
+                "%7s %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %6.1f %10lu\n",
                 cpu_name, sys->cpu[i].usr, sys->cpu[i].sys, sys->cpu[i].nice,
                 sys->cpu[i].idle, sys->cpu[i].iowait, sys->cpu[i].irq,
                 sys->cpu[i].softirq, sys->cpu[i].steal,
@@ -873,7 +918,7 @@ static void output_cgroup(struct record_t* rec, int cgroup_num, FILE* dest) {
                     "nr_periods", "nr_throttled", "throttled_time", "nr_burst",
                     "burst_time");
         }
-        fprintf(dest, "%20s %15d %15d %15llu %15d %15llu\n",
+        fprintf(dest, "%20s %15d %15d %15lu %15d %15lu\n",
                 cgroups[i].cgroup_name, cgroups[i].nr_periods,
                 cgroups[i].nr_throttled, cgroups[i].throttled_time,
                 cgroups[i].nr_burst, cgroups[i].burst_time);
@@ -922,6 +967,25 @@ static void output_tasktop(struct record_t* rec, int rec_num, FILE* dest) {
     }
 }
 
+static void output_stack_with_offset(int off, char* str, FILE* dest) {
+    const char delim[2] = "\n";
+    char* token;
+
+    token = strtok(str, delim);
+    fprintf(dest, "%s\n", token);
+
+    while (true) {
+        token = strtok(NULL, delim);
+        if (!token) break;
+        int cnt = 0;
+        while (cnt < off) {
+            fprintf(dest, " ");
+            cnt++;
+        }
+        fprintf(dest, "%s\n", token);
+    }
+}
+
 static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
     int i;
     struct D_task_record_t* d_tasks = rec->d_tasks;
@@ -937,17 +1001,7 @@ static void output_d_stack(struct record_t* rec, int d_num, FILE* dest) {
 
         strncpy(str, d_tasks[i].stack, STACK_CONTENT_LEN - 1);
 
-        const char delim[2] = "\n";
-        char* token;
-
-        token = strtok(str, delim);
-        fprintf(dest, "%s\n", token);
-
-        while (true) {
-            token = strtok(NULL, delim);
-            if (!token) break;
-            fprintf(dest, "%18s %6s %6s %s\n", "", "", "", token);
-        }
+        output_stack_with_offset(18 + 6 + 6 + 3, str, dest);
     }
 
     free(str);
@@ -967,11 +1021,6 @@ static bool inline is_high_D(struct record_t* rec) {
 #define THRESHOLD_D 8
     return rec->sys.nr_D >= THRESHOLD_D;
 }
-
-// static bool fork_detect(struct record_t* rec, FILE* dest) {
-// #define THRESHOLD_FORK_PS 2000
-//     return rec->sys.nr_fork >= THRESHOLD_FORK_PS;
-// }
 
 double inline calculate_sys(cpu_util_t* cpu) {
     double sys_util = cpu->iowait + cpu->sys + cpu->softirq + cpu->irq;
@@ -1156,7 +1205,7 @@ static int make_records(struct id_pair_t* pids, int nr_thread,
                         struct task_cputime_t** now_task, int* rec_num) {
     struct R_task_record_t** records = rec->r_tasks;
     int err = 0;
-    u_int64_t i;
+    u64 i;
     int nr_rec = 0;
 
     for (i = 0; i < nr_thread; i++) {
@@ -1214,6 +1263,7 @@ static FILE* open_logfile() {
 
 static int libbpf_print_fn(enum libbpf_print_level level, const char* format,
                            va_list args) {
+    if (level == LIBBPF_DEBUG && !env.verbose) return 0;
     return vfprintf(stderr, format, args);
 }
 
@@ -1229,8 +1279,8 @@ static int bump_memlock_rlimit(void) {
 static int check_fork(int fork_map_fd, struct sys_record_t* sys_rec) {
     int fd;
     int err;
-    u_int64_t total = 0;
-    u_int64_t lookup_key = -1, next_key;
+    u64 total = 0;
+    u64 lookup_key = -1, next_key;
     struct proc_fork_info_t info;
 
     fd = fork_map_fd;
@@ -1260,18 +1310,204 @@ static int check_fork(int fork_map_fd, struct sys_record_t* sys_rec) {
 
 static void sigint_handler(int signo) { exiting = 1; }
 
-// #define SEG_TRAP
+void handle_lost_events(void* ctx, int cpu, __u64 lost_cnt) {
+    fprintf(stderr, "Lost %llu events on CPU #%d!\n", lost_cnt, cpu);
+}
+
+void handle_event(void* ctx, int cpu, void* data, __u32 data_sz) {
+    const struct d_task_blocked_event_t* ev = data;
+    char stime_str[BUF_SIZE] = {0};
+    char* tstr = ts2str(time(0), stime_str, BUF_SIZE);
+
+    fprintf(env.dest, "%20s %10s %16s %10d %20lu %lu\n", tstr, "Stop-D",
+            ev->info.comm, ev->pid, ev->start_time_ns,
+            ev->duration_ns / NSEC_PER_MILLSECOND);
+}
+
+u64 get_now_ns() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * NSEC_PER_SECOND + ts.tv_nsec;
+}
+
+u64 check_d_task_timeout(int d_task_map_fd, u64 threshold_ns, FILE* dest) {
+    struct d_task_info_t info;
+    u64 now_ns = 0, min_start_time_ns = UINT64_MAX;
+    int err = 0;
+    struct d_task_key_t lookup_key = {.pid = 0, .start_time_ns = 0};
+    struct d_task_key_t next_key;
+    char stime_str[BUF_SIZE] = {0};
+    char* tstr = ts2str(time(0), stime_str, BUF_SIZE);
+
+    char* str = calloc(STACK_CONTENT_LEN, sizeof(char));
+
+    /* check all d task */
+    while (!bpf_map_get_next_key(d_task_map_fd, &lookup_key, &next_key)) {
+        err = bpf_map_lookup_elem(d_task_map_fd, &next_key, &info);
+        if (err < 0) {
+            // this d task maybe deleted by eBPF
+            goto check_next_key;
+        }
+
+        if (info.is_recorded == 0) {
+            /* must get now again, avoid time resolution problem*/
+            now_ns = get_now_ns();
+            if ((now_ns - next_key.start_time_ns) >= threshold_ns) {
+                D_task_record_t st;
+                err = read_stack(next_key.pid, next_key.pid, &st);
+                if (err || strlen(st.stack) == 0) {
+                    goto check_next_key;
+                }
+
+                /* if stack get caught the mark the task first */
+                info.is_recorded = 1;
+                err = bpf_map_update_elem(d_task_map_fd, &next_key, &info,
+                                          BPF_EXIST);
+                if (err) {
+                    goto check_next_key;
+                }
+
+                strncpy(str, st.stack, STACK_CONTENT_LEN - 1);
+                fprintf(dest, "%20s %10s %16s %10d %20lu ", tstr, "Timeout",
+                        info.comm, next_key.pid, next_key.start_time_ns);
+
+                output_stack_with_offset(20 + 10 + 16 + 10 + 20 + 5, str, dest);
+            } else {
+                min_start_time_ns = next_key.start_time_ns < min_start_time_ns
+                                        ? next_key.start_time_ns
+                                        : min_start_time_ns;
+            }
+        }
+    check_next_key:
+        lookup_key = next_key;
+    }
+    free(str);
+    return min_start_time_ns;
+}
+
+void wait_d_task_timeout(u64 threshold_ns, u64 min_start_time_ns) {
+    /* default sleep  threshold_ns, if there is a task will timeout, no need
+     * sleep threshold_ns*/
+    u64 now_ns = get_now_ns();
+
+    /* reset err to return 0 if exiting */
+    u64 sleep_ns = threshold_ns;
+    struct timespec ts, rem;
+    int err = 0;
+    /* sleep some time */
+    if (min_start_time_ns != UINT64_MAX) {
+        u64 wait_time_ns = min_start_time_ns + threshold_ns > now_ns
+                               ? min_start_time_ns + threshold_ns - now_ns
+                               : 0;
+        sleep_ns = wait_time_ns;
+    }
+
+    ts.tv_sec = sleep_ns / NSEC_PER_SECOND;
+    ts.tv_nsec = sleep_ns % NSEC_PER_SECOND;
+
+wait_sleep:
+    err = nanosleep(&ts, &rem);
+    /* if interupt by signal, but not SIGINT contine sleep */
+    if (err != 0 && !exiting) {
+        ts = rem;
+        goto wait_sleep;
+    }
+    return;
+}
+
+struct tasktop_state {
+    struct id_pair_t* pids;
+    struct task_cputime_t** prev_task;
+    struct task_cputime_t** now_task;
+    struct cgroup_cpu_stat_t** prev_cgroup;
+    struct sys_cputime_t** prev_sys;
+    struct sys_cputime_t** now_sys;
+    struct record_t* rec;
+    u64* prev_delay;
+} tasktop_state = {.pids = 0,
+                   .prev_task = 0,
+                   .now_task = 0,
+                   .prev_cgroup = 0,
+                   .prev_sys = 0,
+                   .now_sys = 0,
+                   .rec = 0,
+                   .prev_delay = 0};
+
+int init_state() {
+    int i = 0;
+    tasktop_state.rec = calloc(1, sizeof(struct record_t));
+    tasktop_state.rec->sys.cpu = calloc(nr_cpu + 1, sizeof(struct cpu_util_t));
+    tasktop_state.rec->sys.percpu_sched_delay = calloc(nr_cpu, sizeof(u64));
+    tasktop_state.rec->d_tasks =
+        calloc(env.stack_limit, sizeof(struct D_task_record_t));
+    tasktop_state.rec->cgroups =
+        calloc(env.cgroup_limit, sizeof(cgroup_cpu_stat_t));
+
+    if (!tasktop_state.rec || !tasktop_state.rec->sys.cpu ||
+        !tasktop_state.rec->sys.percpu_sched_delay ||
+        !tasktop_state.rec->d_tasks || !tasktop_state.rec->cgroups) {
+        fprintf(stderr, "Failed calloc memory\n");
+        return -1;
+    }
+
+    tasktop_state.prev_cgroup =
+        calloc(env.cgroup_limit, sizeof(struct cgroup_cpu_stat_t*));
+    tasktop_state.prev_delay = calloc(nr_cpu, sizeof(u64));
+    tasktop_state.pids = calloc(pidmax + 1, sizeof(struct id_pair_t));
+    tasktop_state.prev_task =
+        calloc(pidmax + 1, sizeof(struct task_cputime_t*));
+    tasktop_state.now_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
+    tasktop_state.prev_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
+    tasktop_state.now_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
+
+    for (i = 0; i <= nr_cpu; i++) {
+        tasktop_state.prev_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
+        tasktop_state.now_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
+    }
+    tasktop_state.prev_delay = calloc(nr_cpu, sizeof(u64));
+    if (!tasktop_state.prev_task || !tasktop_state.now_task ||
+        !tasktop_state.prev_delay || !tasktop_state.pids ||
+        !tasktop_state.prev_sys || !tasktop_state.now_sys ||
+        !tasktop_state.prev_cgroup) {
+        fprintf(stderr, "Failed calloc memory.\n");
+        return -1;
+    }
+    return 0;
+}
+
+void destory_state() {
+    int i = 0;
+
+    if (tasktop_state.rec) {
+        free(tasktop_state.rec->cgroups);
+        free(tasktop_state.rec->d_tasks);
+        free(tasktop_state.rec->sys.percpu_sched_delay);
+        free(tasktop_state.rec->sys.cpu);
+        free(tasktop_state.rec);
+    }
+
+    if (tasktop_state.now_sys && tasktop_state.prev_sys) {
+        for (i = 0; i <= nr_cpu; i++) {
+            free(tasktop_state.prev_sys[i]);
+            free(tasktop_state.now_sys[i]);
+        }
+
+        free(tasktop_state.now_sys);
+        free(tasktop_state.prev_sys);
+    }
+
+    if (tasktop_state.now_task) free(tasktop_state.now_task);
+    if (tasktop_state.prev_task) free(tasktop_state.prev_task);
+    if (tasktop_state.pids) free(tasktop_state.pids);
+    if (tasktop_state.prev_delay) free(tasktop_state.prev_delay);
+    if (tasktop_state.prev_cgroup) free(tasktop_state.prev_cgroup);
+}
+
 int main(int argc, char** argv) {
-    int err = 0, fork_map_fd = -1, i = 0;
+    int err = 0, fork_map_fd = -1, d_task_map_fd = -1,
+        d_task_notify_map_fd = -1, arg_map_fd = -1;
     FILE* stat_log = 0;
     struct tasktop_bpf* skel = 0;
-    struct id_pair_t* pids = 0;
-    struct task_cputime_t **prev_task = 0, **now_task = 0;
-    struct cgroup_cpu_stat_t** prev_cgroup = 0;
-    struct sys_cputime_t **prev_sys = 0, **now_sys = 0;
-    struct record_t* rec = 0;
-
-    nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
 
     if (signal(SIGINT, sigint_handler) == SIG_ERR) {
         fprintf(stderr, "Failed set signal handler.\n");
@@ -1294,55 +1530,11 @@ int main(int argc, char** argv) {
     libbpf_set_print(libbpf_print_fn);
     bump_memlock_rlimit();
 
-    /* init pid_max and btime */
-    err = read_pid_max();
-    if (err) {
-        fprintf(stderr, "Failed read pid max.\n");
-        goto cleanup;
-    }
-
-    err = read_btime();
-    if (err) {
-        fprintf(stderr, "Failed read btime.\n");
-        goto cleanup;
-    }
-
-    rec = calloc(1, sizeof(struct record_t));
-    rec->sys.cpu = calloc(nr_cpu + 1, sizeof(struct cpu_util_t));
-    rec->sys.percpu_sched_delay = calloc(nr_cpu, sizeof(int));
-    rec->d_tasks = calloc(env.stack_limit, sizeof(struct D_task_record_t));
-    rec->cgroups = calloc(env.cgroup_limit, sizeof(cgroup_cpu_stat_t));
-
-    if (!rec || !rec->sys.cpu || !rec->sys.percpu_sched_delay ||
-        !rec->d_tasks || !rec->cgroups) {
-        err = 1;
-        fprintf(stderr, "Failed calloc memory\n");
-        goto cleanup;
-    }
-
-    prev_cgroup = calloc(env.cgroup_limit, sizeof(struct cgroup_cpu_stat_t*));
-    prev_delay = calloc(nr_cpu, sizeof(unsigned long long));
-    pids = calloc(pidmax + 1, sizeof(struct id_pair_t));
-    prev_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
-    now_task = calloc(pidmax + 1, sizeof(struct task_cputime_t*));
-    prev_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
-    now_sys = calloc(1 + nr_cpu, sizeof(struct sys_cputime_t*));
-
-    for (i = 0; i <= nr_cpu; i++) {
-        prev_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
-        now_sys[i] = calloc(1, sizeof(struct sys_cputime_t));
-    }
-
-    if (!prev_task || !now_task || !prev_delay || !pids || !prev_sys ||
-        !now_sys) {
-        err = 1;
-        fprintf(stderr, "Failed calloc memory.\n");
-        goto cleanup;
-    }
-
+    /* prepare the logfile */
     prepare_directory(log_dir);
-    stat_log = open_logfile();
-    if (!stat_log) {
+    /* prepare ebpf */
+    env.dest = open_logfile();
+    if (!env.dest) {
         fprintf(stderr, "Failed open stat log file.\n");
         goto cleanup;
     }
@@ -1361,6 +1553,9 @@ int main(int argc, char** argv) {
     }
 
     fork_map_fd = bpf_map__fd(skel->maps.fork_map);
+    d_task_map_fd = bpf_map__fd(skel->maps.d_task_map);
+    d_task_notify_map_fd = bpf_map__fd(skel->maps.d_task_notify_map);
+    arg_map_fd = bpf_map__fd(skel->maps.arg_map);
 
     err = tasktop_bpf__attach(skel);
     if (err) {
@@ -1368,79 +1563,126 @@ int main(int argc, char** argv) {
         goto cleanup;
     }
 
-    bool first = true;
-    while (env.nr_iter-- && !exiting) {
-        u_int64_t nr_thread = 0;
-        int rec_num = 0;
-        int d_num = 0;
-        int cgroup_num = 0;
+    /* send argument to kernel space */
+    struct arg_to_bpf arg = {
+        .fork_enable = env.mode == LOAD ? 1 : 0,
+        .blocked_enable = env.mode == BLOCKED ? 1 : 0,
+        .verbose_enable = env.verbose ? 1 : 0,
+        .kthread_enable = env.kthread ? 1 : 0,
+        .threshold_ns = env.blocked_ms * NSEC_PER_MILLSECOND};
+    int key = 0;
+    bpf_map_update_elem(arg_map_fd, &key, &arg, BPF_ANY);
 
-#ifndef ONLY_THREAD
-        read_cgroup_throttle(rec->cgroups, &cgroup_num, prev_cgroup);
-        read_sched_delay(&rec->sys);
-        check_fork(fork_map_fd, &rec->sys);
-        runnable_proc(&rec->sys);
-        unint_proc(&rec->sys);
-        read_stat(prev_sys, now_sys, &rec->sys);
-#endif
-
-        /* get all process now */
-        read_all_pids(pids, &nr_thread);
-
-        read_d_task(pids, nr_thread, &d_num, rec->d_tasks);
-
-#ifndef ONLY_THREAD
-        rec->r_tasks = calloc(nr_thread, sizeof(struct R_task_record_t*));
-
-        /* if prev process info exist produce record*/
-        err = make_records(pids, nr_thread, rec, prev_task, now_task, &rec_num);
+    if (env.mode == LOAD) {
+        /* prepare load analyse */
+        nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
+        /* init pid_max and btime */
+        err = read_pid_max();
         if (err) {
-            fprintf(stderr, "Failed make records.\n");
+            fprintf(stderr, "Failed read pid max.\n");
             goto cleanup;
         }
 
-        /* sort record by sort type */
-        sort_records(rec, rec_num, env.rec_sort);
+        err = read_btime();
+        if (err) {
+            fprintf(stderr, "Failed read btime.\n");
+            goto cleanup;
+        }
 
-        /* output record */
-        if (!first)
-            output(rec, rec_num, stat_log, d_num, cgroup_num);
-        else
-            first = false;
+        err = init_state();
+        if (err) {
+            fprintf(stderr, "Failed init state.\n");
+            goto cleanup;
+        }
 
-        free_records(rec, nr_thread);
+        bool first = true;
+        while (env.nr_iter-- && !exiting) {
+            u64 nr_thread = 0;
+            int rec_num = 0;
+            int d_num = 0;
+            int cgroup_num = 0;
 
-        /* update old info and free nonexist process info */
-        now_to_prev(pids, nr_thread, pidmax, prev_task, now_task, prev_sys,
-                    now_sys);
-#ifdef STRESS_TEST
-        usleep(10000);
-#else
-        if (env.nr_iter) sleep(env.delay);
-#endif
-#endif
+            read_cgroup_throttle(tasktop_state.rec->cgroups, &cgroup_num,
+                                 tasktop_state.prev_cgroup);
+            read_sched_delay(&tasktop_state.rec->sys, tasktop_state.prev_delay);
+            check_fork(fork_map_fd, &tasktop_state.rec->sys);
+            runnable_proc(&tasktop_state.rec->sys);
+            unint_proc(&tasktop_state.rec->sys);
+            read_stat(tasktop_state.prev_sys, tasktop_state.now_sys,
+                      &tasktop_state.rec->sys);
+            /* get all process now */
+            read_all_pids(tasktop_state.pids, &nr_thread);
+            read_d_task(tasktop_state.pids, nr_thread, &d_num,
+                        tasktop_state.rec->d_tasks);
+            /* onlu alloc a array, the taskinfo allco in make records */
+            tasktop_state.rec->r_tasks =
+                calloc(nr_thread, sizeof(struct R_task_record_t*));
+            /* if prev process info exist produce record*/
+            err = make_records(tasktop_state.pids, nr_thread, tasktop_state.rec,
+                               tasktop_state.prev_task, tasktop_state.now_task,
+                               &rec_num);
+            if (err) {
+                fprintf(stderr, "Failed make records.\n");
+                goto cleanup;
+            }
+
+            /* sort record by sort type */
+            sort_records(tasktop_state.rec, rec_num, env.rec_sort);
+            /* output record */
+            if (!first)
+                output(tasktop_state.rec, rec_num, env.dest, d_num, cgroup_num);
+            else
+                first = false;
+            free_records(tasktop_state.rec, nr_thread);
+            /* update old info and free nonexist process info */
+            now_to_prev(tasktop_state.pids, nr_thread, pidmax,
+                        tasktop_state.prev_task, tasktop_state.now_task,
+                        tasktop_state.prev_sys, tasktop_state.now_sys);
+
+            if (env.nr_iter) {
+                sleep(env.delay);
+            }
+        }
+    } else if (env.mode == BLOCKED) {
+        int err = 0;
+        uint64_t min_start_time_ns = UINT64_MAX,
+                 threshold_ns = env.blocked_ms * NSEC_PER_MILLSECOND;
+        struct perf_buffer_opts pb_opts = {.sample_cb = handle_event,
+                                           .lost_cb = handle_lost_events};
+        struct perf_buffer* pb =
+            perf_buffer__new(d_task_notify_map_fd, 8, &pb_opts);
+        if (libbpf_get_error(pb)) {
+            fprintf(stderr, "Failed to create perf buffer.\n");
+            goto cleanup;
+        }
+
+        fprintf(env.dest, "%20s %10s %16s %10s %20s %s\n", "Time", "Event",
+                "Comm", "Pid", "Start(ns)", "Stack|Delya(ms)");
+        time_t run_start_s = time(0);
+
+        while (!exiting) {
+            if (env.run != -1 && time(0) - run_start_s > env.run) {
+                break;
+            }
+
+            min_start_time_ns =
+                check_d_task_timeout(d_task_map_fd, threshold_ns, env.dest);
+
+            /* process d task become running*/
+            err = perf_buffer__poll(pb, 0);
+            if (err < 0 && err != -EINTR) {
+                fprintf(stderr, "error polling perf buffer: %s\n",
+                        strerror(-err));
+                goto cleanup;
+            }
+
+            wait_d_task_timeout(threshold_ns, min_start_time_ns);
+            fflush(env.dest);
+        }
     }
-
 cleanup:
-
-    if (pids) free(pids);
-
-    if (prev_task) {
-        for (i = 0; i < pidmax; i++) {
-            if (prev_task[i]) free(prev_task[i]);
-        }
-        free(prev_task);
-    }
-
-    if (now_task) {
-        for (i = 0; i < pidmax; i++) {
-            if (now_task[i]) free(now_task[i]);
-        }
-        free(now_task);
-    }
-
+    destory_state();
     if (stat_log) fclose(stat_log);
-
     tasktop_bpf__destroy(skel);
     return err;
 }

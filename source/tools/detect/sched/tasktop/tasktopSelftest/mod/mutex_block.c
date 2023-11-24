@@ -53,8 +53,11 @@ static struct file_operations proc_fops = {.open = open_proc,
                                            .write = write_proc,
                                            .release = release_proc};
 
-// struct proc_dir_entry *proc_create(const char *name, umode_t mode, struct
-// proc_dir_entry *parent, const struct file_operations *proc_fops);
+// if no definition of file_operations, use below
+// static struct proc_ops proc_fops = {.proc_open = open_proc,
+//                                     .proc_write = write_proc,
+//                                     .proc_read = read_proc,
+//                                     .proc_release = release_proc};
 
 static struct proc_dir_entry *ent = 0;
 static int __init mod_init(void) {

@@ -23,80 +23,82 @@ struct id_pair_t {
 };
 
 struct proc_stat_t {
-    int pid;
+    s32 pid;
     char comm[MAX_COMM_LEN];
     char state;
-    int ppid;
-    int pgrp;
-    int session;
-    int tty_nr;
-    int tpgid;
-    unsigned int flags;
-    u_int64_t minflt;
-    u_int64_t cminflt;
-    u_int64_t majflt;
-    u_int64_t cmajflt;
-    u_int64_t utime;
-    u_int64_t stime;
-    int64_t cutime;
-    int64_t cstime;
-    int64_t priority;
-    int64_t nice;
-    int64_t num_threads;
-    int64_t itrealvalue;
-    unsigned long long starttime;
+    s32 ppid;
+    s32 pgrp;
+    s32 session;
+    s32 tty_nr;
+    s32 tpgid;
+    u32 flags;
+    u64 minflt;
+    u64 cminflt;
+    u64 majflt;
+    u64 cmajflt;
+    u64 utime;
+    u64 stime;
+    s64 cutime;
+    s64 cstime;
+    s64 priority;
+    s64 nice;
+    s64 num_threads;
+    s64 itrealvalue;
+    u64 starttime;
 };
 
 struct task_cputime_t {
-    int pid;
-    int ppid;
+    s32 pid;
+    s32 ppid;
     char comm[MAX_COMM_LEN];
-    u_int64_t stime;
-    u_int64_t utime;
-    u_int64_t starttime;
+    u64 stime;
+    u64 utime;
+    u64 starttime;
+    u64 ts_ns;
 };
 
 struct sys_cputime_t {
     char cpu[CPU_NAME_LEN];
-    long usr;
-    long nice;
-    long sys;
-    long idle;
-    long iowait;
-    long irq;
-    long softirq;
-    long steal;
-    long guest;
-    long guest_nice;
+    s64 usr;
+    s64 nice;
+    s64 sys;
+    s64 idle;
+    s64 iowait;
+    s64 irq;
+    s64 softirq;
+    s64 steal;
+    s64 guest;
+    s64 guest_nice;
 };
 
 typedef struct R_task_record_t {
-    int pid;
-    int ppid;
+    s32 pid;
+    s32 ppid;
     char comm[MAX_COMM_LEN];
     time_t runtime;
     time_t begin_ts;
     double system_cpu_rate;
     double user_cpu_rate;
     double all_cpu_rate;
+    u64 ts_ns;
 } R_task_record_t;
 
 typedef struct D_task_record_t {
-    int pid;
-    int tid;
+    s32 pid;
+    s32 tid;
     char comm[MAX_COMM_LEN];
     char stack[STACK_CONTENT_LEN];
 } D_task_record_t;
 
 typedef struct cgroup_cpu_stat_t {
     char cgroup_name[MAX_CGROUP_NAME_LEN];
-    int nr_periods;
-    int nr_throttled;
-    unsigned long long throttled_time;
-    unsigned long long wait_sum;
-    unsigned long long current_bw;
-    int nr_burst;
-    unsigned long long burst_time;
+    s32 nr_periods;
+    s32 nr_throttled;
+    u64 throttled_time;
+    u64 wait_sum;
+    u64 current_bw;
+    s32 nr_burst;
+    u64 burst_time;
     time_t last_update;
 } cgroup_cpu_stat_t;
 
@@ -119,12 +121,12 @@ typedef struct sys_record_t {
 
     /* load */
     float load1;
-    int nr_R;
-    int nr_D;
-    int nr_fork;
+    s32 nr_R;
+    s32 nr_D;
+    s32 nr_fork;
     struct proc_fork_info_t most_fork_info;
 
-    unsigned long long *percpu_sched_delay;
+    u64 *percpu_sched_delay;
 } sys_record_t;
 
 struct record_t {
