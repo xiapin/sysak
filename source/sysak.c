@@ -381,7 +381,7 @@ retry_ko_oss:
         }
         else
 retry_ko:
-            sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
+            sprintf(download_cmd, "wget -T 5 -t 2 -q %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
                     sysak_components_server, machine, kern_version, module_path, kern_version);
         //printf("%s ... \n", download_cmd);
 
@@ -410,7 +410,7 @@ retry_btf_oss:
         }
         else
 retry_btf:
-            sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
+            sprintf(download_cmd, "wget -T 5 -t 2 -q %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
                     sysak_components_server, machine, kern_version, tools_path);
         //printf("%s ... \n", download_cmd);
         ret = system(download_cmd);
