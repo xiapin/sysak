@@ -15,6 +15,7 @@
 #include <linux/version.h>
 #include "iosdiag.h"
 #include "format_json.h"
+#include "aggregator.h"
 
 
 #define min(x, y)		((x) > (y) ? (y) : (x))
@@ -272,29 +273,35 @@ void summary_convert_to_unity(void *dest, void *src)
 		"sysom_iolatency,diskname=%s,"
 		"comm=%s,"
 		"iotype=%s,"
+		"pid=%d,"
+		"ppid=%d,"
+		"queue_id=%d,"
 		"maxdelay_component=%s "
 		"max_delay=%lu,"
 		"total_delay=%lu,"
-		"pid=%d,"
+		"sum_datalen=%d,"
 		"datalen=%d,"
-		"queue_id=%d,"
 		"initiated_cpu=%d,"
 		"issue_cpu=%d,"
 		"respond_cpu=%d,"
-		"soft_interrupt_cpu=%d",
+		"soft_interrupt_cpu=%d,"
+		"count=%d",
 		iop->diskname, 
 		iop->comm, 
-		iop->op, 
+		iop->op,
+		iop->tid,
+		iop->pid,
+		iop->queue_id,
 		maxdelay_component, 
 		max_delay, 
-		total_delay, 
-		iop->pid, 
+		total_delay,
 		iop->data_len,
-		iop->queue_id,
+		iop->data_len,
 		iop->cpu[0],
 		iop->cpu[1],
 		iop->cpu[2],
-		iop->cpu[3]
+		iop->cpu[3],
+		1
 	);
 		
 	for (i = 0, n = 0; i < MAX_POINT; i++) {
@@ -322,29 +329,35 @@ void summary_convert_to_unity(void *dest, void *src)
 		"sysom_iolatency_max,diskname=%s,"
 		"comm=%s,"
 		"iotype=%s,"
+		"pid=%d,"
+		"ppid=%d,"
+		"queue_id=%d,"
 		"maxdelay_component=%s "
 		"max_delay=%lu,"
 		"total_delay=%lu,"
-		"pid=%d,"
+		"sum_datalen=%d,"
 		"datalen=%d,"
-		"queue_id=%d,"
 		"initiated_cpu=%d,"
 		"issue_cpu=%d,"
 		"respond_cpu=%d,"
-		"soft_interrupt_cpu=%d",
+		"soft_interrupt_cpu=%d,"
+		"count=%d",
 		iop->diskname, 
 		iop->comm, 
-		iop->op, 
+		iop->op,
+		iop->tid,
+		iop->pid,
+		iop->queue_id,
 		maxdelay_component, 
 		max_delay, 
-		total_delay, 
-		iop->pid, 
+		total_delay,
 		iop->data_len,
-		iop->queue_id,
+		iop->data_len,
 		iop->cpu[0],
 		iop->cpu[1],
 		iop->cpu[2],
-		iop->cpu[3]
+		iop->cpu[3],
+		1
 	);
 		
 	for (i = 0, n = 0; i < MAX_POINT; i++) {

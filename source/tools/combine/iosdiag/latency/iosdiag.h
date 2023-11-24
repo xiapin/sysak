@@ -26,6 +26,7 @@ enum operating_mode{
 
 struct iosdiag_req {
 	pid_t pid;
+	pid_t tid;
 	unsigned int queue_id;
 	char comm[16];
 	char diskname[32];

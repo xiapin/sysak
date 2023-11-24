@@ -36,14 +36,15 @@ class latencyAnalysis:
 		self.totalDiskCnt = 0
 		self.threshold = 0
 		self.componentDicts = OrderedDict([('os(block)',0),('os(driver)',1),\
-						   ('disk',2),('os(complete)',3)])
+						   ('disk',2),('os(complete)',3),('os(done)',4)])
 		self.delayStatJsonStr = \
 		'{	\
 			"diskname":"","delays":[	\
 			{"component":"os(block)","percent":"","max":0,"min":1000000000,"avg":0},\
 			{"component":"os(driver)","percent":"","max":0,"min":1000000000,"avg":0},\
 			{"component":"disk","percent":"","max":0,"min":1000000000,"avg":0},	\
-			{"component":"os(complete)","percent":"","max":0,"min":1000000000,"avg":0}]\
+			{"component":"os(complete)","percent":"","max":0,"min":1000000000,"avg":0},\
+			{"component":"os(done)","percent":"","max":0,"min":1000000000,"avg":0}]\
 		}'
 		newDelayStatDict = json.loads("["+self.delayStatJsonStr + "]", object_pairs_hook=OrderedDict)
 		self.delayStatDicts.setdefault('summary', newDelayStatDict)

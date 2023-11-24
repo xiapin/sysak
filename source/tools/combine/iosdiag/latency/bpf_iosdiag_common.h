@@ -6,6 +6,7 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_tracing.h>
+#include <coolbpf.h>
 #include "iosdiag.h"
 
 struct bpf_map_def SEC("maps") iosdiag_maps = {
@@ -140,7 +141,8 @@ int tracepoint_block_getrq(struct block_getrq_args *args)
 	struct iosdiag_req new_ioreq = {0};
 	struct iosdiag_key key = {0};
 	unsigned long long now = bpf_ktime_get_ns();
-	pid_t pid = bpf_get_current_pid_tgid();
+	pid_t pid = pid();
+	pid_t tid = tid();
 	u32 target_devt = get_target_devt();
 
 	if (target_devt && args->dev != target_devt)
@@ -158,6 +160,7 @@ int tracepoint_block_getrq(struct block_getrq_args *args)
 	// IO_START_POINT
 	new_ioreq.ts[IO_START_POINT] = now;
 	new_ioreq.pid = pid;
+	new_ioreq.tid = tid;
 	memcpy(new_ioreq.op, args->rwbs, sizeof(args->rwbs));
 	new_ioreq.sector = args->sector;
 	new_ioreq.data_len = args->nr_sector * 512;
@@ -183,7 +186,7 @@ int tracepoint_block_rq_issue(struct block_rq_issue_args *args)
 	struct iosdiag_req *ioreq;
 	struct iosdiag_key key = {0};
 	unsigned long long now = bpf_ktime_get_ns();
-	pid_t pid = bpf_get_current_pid_tgid();
+	// pid_t pid = bpf_get_current_pid_tgid();
 	int type = IO_ISSUE_DRIVER_POINT;
 	u32 target_devt = get_target_devt();
 
