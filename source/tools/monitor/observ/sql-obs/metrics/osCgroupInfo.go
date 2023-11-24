@@ -136,10 +136,11 @@ func getDRLatency(info *CgroupInfo) {
             count += (value - info.DRMemLayout[index])
             info.DRMemLayout[index] = value
         } else if strings.Contains(parts[0], "total") {
-            if count == 0 {
+            if count == 0 || info.DRMemLatencyPS < 0 {
                 info.DRMemLatencyPS = 0
             } else {
-                info.DRMemLatencyPS = float64(value-info.DRMemLatencyTotal) / float64(count)
+                info.DRMemLatencyPS = 
+                    float64(value-info.DRMemLatencyTotal) / float64(count)
             }
             info.DRMemLatencyTotal = value
             break
@@ -158,4 +159,5 @@ func getMemCgroupPath(pid int, containerID string) {
     }
     CgroupInfoMap[containerID] = new(CgroupInfo)
     CgroupInfoMap[containerID].path = "/sys/fs/cgroup/memory" + path
+    CgroupInfoMap[containerID].DRMemLatencyPS = -1
 }
