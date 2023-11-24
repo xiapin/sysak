@@ -85,7 +85,7 @@ function Ck8sApi:queryPodsInfo()
             print("service token not exist!")
             return nil
         end
-    
+
         self._token = f:read("*a")
         f:close()
     end
@@ -94,9 +94,14 @@ function Ck8sApi:queryPodsInfo()
         ["Authorization"] = "Bearer "..self._token
     }
 
+    local host_ip = os.getenv("HOST_IP")
+    if not host_ip then
+        host_ip = "127.0.0.1"
+    end
+
     local resp = {}
     local params = {
-        url = "https://127.0.0.1:10250/pods",
+        url = "https://" .. host_ip .. ":10250/pods",
         method = "GET",
         verify = "none",
         protocol = "any",
@@ -139,12 +144,14 @@ function Ck8sApi:setupCons()
         end
 
 		if not pod.status.qosClass then goto continue end
-        local lpod = {name = metadata.name,
-                      namespace = metadata.namespace,
-                      uid = pystring:replace(metadata.uid, "-", "_"),
-                      qos = pystring:lower(pod.status.qosClass),
+        local lpod = {
+            name = metadata.name,
+            namespace = metadata.namespace,
+            uid = pystring:replace(metadata.uid, "-", "_"),
+            qos = pystring:lower(pod.status.qosClass),
+            volume = pod.spec.volumes
         }
-		
+
 		-- watch pod dirs(containers' changes in pod)
         local pod_path = podPath(lpod)
 		local full_pod_path = mnt .. "sys/fs/cgroup/cpu" .. pod_path
@@ -153,21 +160,31 @@ function Ck8sApi:setupCons()
 		end
 
         local containerStatuses = pod.status.containerStatuses
+        local containers = pod.spec.containers
+        local containerResources = {}
+        -- record container resources for pod_storage_stat
+        for _, con in ipairs(containers) do
+            containerResources[con.name] = con.resources
+        end
+
         for _, con in ipairs(containerStatuses) do
-	        if not con.containerID then goto cs_continue end
+            if not con.containerID then goto cs_continue end
             local cell = {
                 pod = lpod,
                 name = con.name,
-                id = spiltConId(con.containerID)
+                id = spiltConId(con.containerID),
+                resources = containerResources[con.name]
             }
+
             cell.path = joinContainerPath(pod_path, cell, runtime)
             if unistd.access(mnt .. "sys/fs/cgroup/cpu/" .. cell.path) == 0 then
 		cell.bvt = get_bvt(mnt .. "sys/fs/cgroup/cpu/" .. cell.path .. "/cpu.bvt_warp_ns")
                 c = c + 1
                 cons[c] = cell
             end
-	        ::cs_continue::
+            ::cs_continue::
         end
+
         ::continue::
     end
 

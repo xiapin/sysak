@@ -26,7 +26,8 @@ function CpodsAll:setupPlugins()
                 },
                 {
                     name = "container",
-                    index = con.name.."-"..string.sub(con.id,0,4),
+                    --index = con.name.."-"..string.sub(con.id,0,4),
+                    index = con.name,
                 },
                 {
                     name = "namespace",
@@ -52,7 +53,7 @@ function CpodsAll:setupPlugins()
 
         for _, plugin in ipairs(self._resYaml.container.luaPlugin) do
             -- skip podmem. todo: 将podmem和其他插件如何统一起来。
-            if plugin == "podmem" then
+            if plugin == "podmem" or plugin == "pod_storage_stat" then
                 goto continue
             end
             local CProcs = require("collector.container." .. plugin)
@@ -66,13 +67,16 @@ function CpodsAll:setupPlugins()
 
     -- 对于podmem，只更新podmem维护的信息，不实例化新的对象
     self._podmem:setup(cons)
+    self._podStorageStat:setup(cons)
 
     return plugins
 end
 
 function CpodsAll:_init_(resYaml, proto, pffi, mnt)
     self._runtime = nil
+    self._runtime_name = nil
     self._podmem = nil
+    self._podStorageStat = nil
     self._resYaml = resYaml
     self._proto = proto
     self._pffi = pffi
@@ -90,6 +94,7 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
         local Cruntime = runtime_module.new(self._resYaml, self._mnt)
         if Cruntime:checkRuntime() == 1 then
             self._runtime = Cruntime
+            self._runtime_name = runtime
             break
         end
         print("Using "..runtime.." failed! Fall back to next runtime")
@@ -102,13 +107,22 @@ function CpodsAll:_init_(resYaml, proto, pffi, mnt)
 
     -- 初始化inotify（cgroup变化）
     self._runtime:initInotify()
-    -- podmem不需要每一轮实例化一个新的对象，先特殊处理
+    -- podmem & podStorageStat 不需要每一轮实例化一个新的对象，先特殊处理
     for _, plugin in ipairs(self._resYaml.container.luaPlugin) do
         if plugin == "podmem" then
             local CprocsPodMem = require("collector.container."..plugin)
             self._podmem = CprocsPodMem.new(self._proto, self._pffi, self._mnt)
         end
+        if plugin == "pod_storage_stat" then
+            if self._runtime_name ~= "k8sApi" then
+                print("pod_storage_stat will lose limit info not using k8sApi runtime!")
+            end
+
+            local CprocsPodStorageStat = require("collector.container."..plugin)
+            self._podStorageStat = CprocsPodStorageStat.new(self._proto, self._pffi, self._mnt)
+        end
     end
+
     self._plugins = self:setupPlugins()
     if not self._plugins then
         return
@@ -134,9 +148,20 @@ function CpodsAll:proc(elapsed, lines)
     end
 
     -- run podmem
-    local stat, res = pcall(self._podmem.proc, self._podmem, elapsed, lines)
-    if not stat then
-        print("Podmem Error: ", res)
+    if self._podmem then
+        local stat, res = pcall(self._podmem.proc, self._podmem, elapsed, lines)
+        if not stat then
+            print("Podmem Error: ", res)
+        end
+    end
+
+    -- run pod storage stat
+    if self._podStorageStat then
+        stat, res = pcall(self._podStorageStat.proc, self._podStorageStat,
+                        elapsed, lines)
+        if not stat then
+            print("Pod Storage Stat Error: ", res)
+        end
     end
 
     -- run other container plugins
