@@ -83,6 +83,15 @@ function CtransPro:_init_(instance, fYaml, help, timestamps)
         self.pack_line = packLine
     end
     self._tDescr = ms.metrics
+
+    if ms.container.cluster_id == true then
+        local cluster_id = os.getenv("CLUSTER_ID")
+        if not cluster_id then
+            cluster_id = ""
+        end
+        self._cluster_id = cluster_id
+    end
+
 end
 
 local function checkLine(blacklist, whitelist, labels)
@@ -159,6 +168,9 @@ function CtransPro:export(datas)
                         labels = {}
                     end
                     labels.instance = self._instance
+                    if self._cluster_id then
+                        labels.cluster = self._cluster_id
+                    end
                     for k, v in pairs(tFrom.values) do
                         labels[line.head] = k
                         if checkLine(blacklist, whitelist, labels)==true then
