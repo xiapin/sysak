@@ -178,4 +178,49 @@ function CtransPro:export(datas)
     return lines
 end
 
+function CtransPro:toMetric(datas)
+    local res = {}
+    local c = 0
+    local instance = self._instance
+    for _, line in ipairs(self._tDescr) do
+        local from = line.from -- cpu_total
+        local tFroms
+        if line.discrete then
+            tFroms = qFormDataDis(from, datas)
+        else
+            tFroms = qFormData(from, datas)
+        end
+        if #tFroms ~= 0 then
+            local title = line.title --sysak_proc_cpu_total
+
+            local blacklist = line.blacklist
+            local whitelist = line.whitelist
+            if blacklist and whitelist then
+                print("cannot set both blacklist and whitelist! ")
+                goto continue
+            end
+            for _, tFrom in ipairs(tFroms) do
+                if tFrom.values then
+                    local labels = system:deepcopy(tFrom.labels)
+                    if not labels then
+                        labels = {}
+                    end
+                    labels.instance = instance
+                    for k, v in pairs(tFrom.values) do
+                        local labels_u = system:deepcopy(labels)
+                        labels_u[line.head] = k
+                        if checkLine(blacklist, whitelist, labels_u) then
+                            c = c + 1
+                            res[c] = {title, labels_u, v}
+                        end
+                    end
+
+                end
+            end
+            ::continue::
+        end
+    end
+    return res
+end
+
 return CtransPro

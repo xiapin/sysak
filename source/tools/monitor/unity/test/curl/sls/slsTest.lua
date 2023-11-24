@@ -4,13 +4,18 @@
 --- DateTime: 2023/1/30 3:56 PM
 ---
 
-package.path = package.path .. ";../../../common/?.lua;"
-package.path = package.path .. ";../../../httplib/?.lua;"
+package.path = package.path .. ";../../../?.lua;"
+package.path = package.path .. ";../../../?.lua;"
 
-package.path = package.path .. ";../../../protobuf/?.lua;"
+package.path = package.path .. ";../../../?.lua;"
 
-local CslsCli = require("slsCli")
+local CslsCli = require("httplib.slsCli")
 
-local cli = CslsCli.new("xxx")
+local lines = {}
+for line in io.lines("config") do
+    table.insert(lines, line)
+end
 
-cli:putLog("abc", "hello.")
+local cli = CslsCli.new(lines[1], lines[2], lines[3], lines[4], lines[5])
+
+cli:putLog({vm = "abc", log = "hello."})
