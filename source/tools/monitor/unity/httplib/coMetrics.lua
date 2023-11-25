@@ -12,7 +12,7 @@ local pystring = require("common.pystring")
 local lineParse = require("common.lineParse")
 local CtransPro = require("common.transPro")
 local base64 = require("base64")
-local addition = require("common.addition")
+local sls_api = require("sls_api")
 
 local CcoMetrics = class("coMetrics", CcoHttpCliInst)
 
@@ -25,7 +25,7 @@ function CcoMetrics:_init_(fYaml, config, instance)
 
     local _addition = config.addition
 
-    self._key1, self._key2 = addition:decode(_addition)
+    self._key1, self._key2 = sls_api.decode(_addition)
     self._project = config.project
     self._endpoint = config.endpoint
     self._metricstore = config.metricstore
