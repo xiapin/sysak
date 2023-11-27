@@ -150,9 +150,78 @@ int inject_taskloop(void *args)
         return 0;
 }
 
+static int get_system_process_limit(void)
+{
+	int pid_max = -1;
+	int threads_max;
+	FILE *fp;
+	char buf[256];
+
+	fp = fopen("/proc/sys/kernel/pid_max", "r");
+	if (!fp) {
+		printf("open pid_max failed\n");
+		return -1;
+	}
+
+	memset(buf, 0, 256);
+	if (fgets(buf, 256, fp)) {
+		pid_max = atoi(buf);
+	}
+
+	fclose(fp);
+	if (pid_max < 0)
+		return -1;
+
+	fp = fopen("/proc/sys/kernel/threads-max", "r");
+	if (!fp) {
+		printf("open threads-max failed\n");
+		return -1;
+	}
+
+	memset(buf, 0, 256);
+	if (fgets(buf, 256, fp)) {
+		threads_max = atoi(buf);
+	}
+
+	fclose(fp);
+	if (threads_max < 0)
+		return -1;
+
+	return pid_max < threads_max ? pid_max: threads_max;
+}
+
+static int get_threads_nr(void)
+{
+	FILE *fp;
+	char buf[256];
+	int threads, dummy, ret;
+	float fdummy;
+
+	fp = fopen("/proc/loadavg", "r");
+	if (!fp)
+		return -1;
+
+	fgets(buf, 256, fp);
+	ret = sscanf(buf, "%f %f %f %d/%d %d", &fdummy, &fdummy, &fdummy, &dummy, &threads, &dummy);
+
+	if (ret < 1)
+		return -1;
+
+	return threads;
+}
+
+
 int inject_tasklimit(void *args)
 {
-        return 0;
+	char buff[32];
+	int task_nr = get_system_process_limit() - get_threads_nr();
+
+	if (task_nr > 0) {
+		snprintf(buff, 32, "%d", task_nr);
+		args = buff;
+	} else
+		args = NULL;
+        return exec_extern_tool("process_limit", args);
 }
 
 int inject_fdlimit(void *args)
@@ -277,7 +346,20 @@ int check_taskloop(void *args)
 
 int check_tasklimit(void *args)
 {
-        return 0;
+	int i, limit;
+
+	limit = get_system_process_limit();
+	if (limit < 0)
+		return -1;
+
+	limit -= 100;
+	for (i = 0; i < 20; i++) {
+		if (get_threads_nr() > limit)
+			return 0;
+		sleep(1);
+	}
+
+	return -1;
 }
 
 int check_fdlimit(void *args)
