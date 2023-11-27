@@ -41,8 +41,15 @@ function CprocDiskstats:_getNewValue(data)
     local now = {}
     local index = self:_diskIndex()
     for i = 1, self._diskVNum do
-        local head = index[i]
-        now[head] = tonumber(self._ffi.string(data.s[i + 2]))
+        if data.no >= 18 then
+            local head = index[i]
+            now[head] = tonumber(self._ffi.string(data.s[i + 2]))
+        elseif i <= 11 then
+            local head = index[i]
+            now[head] = tonumber(self._ffi.string(data.s[i + 2]))
+        else
+            now[index[i]] = 0
+        end
     end
 
     now["rkb"] = now["rkb"] / 2  -- sectors = 512 bytes
