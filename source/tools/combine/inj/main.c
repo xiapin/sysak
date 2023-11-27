@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -59,8 +60,58 @@ struct inj_op inj_ops[] = {
 
 #define NUM_INJ_OPS (sizeof(inj_ops)/sizeof(struct inj_op))
 
+static char *work_path;
+
+static void usage(void)
+{
+	int i;
+
+	printf("list for problem injection:\n");
+	for (i = 0; i < NUM_INJ_OPS; i++) {
+		printf("  %s\n", inj_ops[i].inj_name);
+	}
+}
+
+static void get_work_path(void)
+{
+	work_path = getenv("SYSAK_WORK_PATH");
+}
+
+static int exec_extern_tool(const char *name, const char *arg)
+{
+	char filepath[256];
+	if (!work_path)
+		return -1;
+
+	snprintf(filepath, 255, "%s/tools/%s", work_path, name);
+	filepath[255] = 0;
+	if (access((filepath), X_OK)) {
+		printf("file %s not exist\n",filepath);
+		return -1;
+	}
+
+	if (arg)
+		snprintf(filepath, 255, "bash -c \"%s/tools/%s %s\" &", work_path, name, arg);
+	else
+		snprintf(filepath, 255, "bash -c %s/tools/%s &", work_path, name);
+
+	filepath[255] = 0;
+	return system(filepath);
+}
+
 int inject_oops(void *args)
 {
+	int pid = fork();
+
+	if (pid < 0) {
+		return -1;
+	} else if (pid == 0) {
+		/*wait for parent return*/
+		sleep(2);
+		system("echo c > /proc/sysrq-trigger");
+		return 0;
+	}
+
 	return 0;
 }
 
@@ -81,7 +132,7 @@ int inject_high_load(void *args)
 
 int inject_high_sys(void *args)
 {
-        return 0;
+        return exec_extern_tool("high_sys", NULL);
 }
 
 int inject_softlockup(void *args)
@@ -139,9 +190,74 @@ int check_high_load(void *args)
         return 0;
 }
 
+struct proc_stat {
+	unsigned long user;
+	unsigned long nice;
+	unsigned long sys;
+	unsigned long idle;
+	unsigned long iowait;
+	unsigned long irq;
+	unsigned long softirq;
+};
+
+static int read_proc_stat(struct proc_stat *stat)
+{
+	FILE *fp;
+	char buf[256];
+	int ret;
+
+	fp = fopen("/proc/stat", "r");
+	if (!fp)
+		return -1;
+
+	fgets(buf, 256, fp);
+	ret = sscanf(buf, "cpu  %lu %lu %lu %lu %lu %lu %lu",
+		&stat->user, &stat->nice, &stat->sys, &stat->idle,
+		&stat->iowait, &stat->irq, &stat->softirq);
+
+	if (ret < 7)
+		return -1;
+
+	return 0;
+}
+
+static int calculate_sys_util(void)
+{
+	struct proc_stat stat1, stat2;
+	unsigned long total = 0, sys;
+	float sys_util;
+
+	if (read_proc_stat(&stat1))
+		return -1;
+	sleep(1);
+	if (read_proc_stat(&stat2))
+		return -1;
+
+	sys = stat2.sys - stat1.sys;
+
+	total += stat2.user - stat1.user;
+	total += stat2.nice - stat1.nice;
+	total += sys;
+	total += stat2.idle - stat1.idle;
+	total += stat2.iowait - stat1.iowait;
+	total += stat2.irq - stat1.irq;
+	total += stat2.softirq - stat1.softirq;
+
+	sys_util = (float)sys / total;
+	return (int)(sys_util*100);
+}
+
 int check_high_sys(void *args)
 {
-        return 0;
+	int i;
+
+	for (i = 0; i < 5; i++) {
+		if (calculate_sys_util() > 5)
+			return 0;
+		sleep(1);
+	}
+
+	return -1;
 }
 
 int check_softlockup(void *args)
@@ -197,10 +313,17 @@ int check_netlat(void *args)
 int main(int argc, char *argv[])
 {
 	int ret = -EINVAL, i;
-	const char *args = NULL;
+	char *args = NULL;
 
 	if (argc < 2)
 		return ret;
+
+	if (argc == 2 && !strcmp(argv[1], "-h")) {
+		usage();
+		return 0;
+	}
+
+	get_work_path();
 
 	if (argc == 3)
 		args = argv[2];
@@ -217,10 +340,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (ret)
+	if (ret) {
+		if (i >= NUM_INJ_OPS)
+			printf("Invalid inputs\n");
+
 		printf("Failed\n");
-	else
+	} else {
 		printf("Done\n");
+	}
 
 	return 0;
 }
