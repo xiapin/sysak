@@ -242,11 +242,14 @@ function PodStorageStat:proc(elapsed, lines)
 
         appendMetric(self, pod["ephemeral-storage"], "",
             podname, podns, "pod_ephemeral_storage")
+
+        --[[ dont't collect pod volume info for now
         for _, vol in ipairs(pod.volume) do
             appendMetric(self, vol, "",
                 podname, podns, "pod_volume")
             self:packVolumeLimit(vol.name, podname, podns)
         end
+        --]]
         ::continue::
     end
 
