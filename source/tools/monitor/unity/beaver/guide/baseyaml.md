@@ -89,5 +89,10 @@ resctrl:
     - name: ""                  #resctrl根目录下的资源组名 "" --> /sys/fs/resctrl/
     - name: "LS"                #resctrl根目录下的资源组名 "" --> /sys/fs/resctrl/LS
       monitor: ["mon1", "mon2"] # 资源组mon_groups目录下手动创建的监控组 "mon1" --> /sys/fs/resctrl/LS/mon_groups/mon1
+
+# cgroup-v2指标采集
+cgroupv2: 
+  directPaths: ["kubepods/besteffort", "kubepods.slice/kubepods-besteffort.slices"] # 配置cgroup的相对路径
+  luaPlugin: ["cg_sched_cfs_stat_v2","cg_cpu_stat_v2"] # 采集插件
 ````
 
