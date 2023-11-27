@@ -28,7 +28,7 @@ container:
   mode: "pods"
   runtime: ["cri_containerd", "k8sApi", "docker"]
   luaPlugin: ["cg_cpu_cfs_quota","cg_mem_drcm_glob_latency","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency",
-              "con_net_stat", "cg_blkio_stat", "podmem"]
+              "cg_cpuacct_proc_stat","con_net_stat", "cg_blkio_stat", "podmem", "cg_memory_oom_cnt"]
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -275,6 +275,11 @@ metrics:
     head: type
     help: "container memory alloc fail cnt"
     type: "gauge"
+  - title: sysom_container_memory_oomcnt
+    from: cg_memoom_cnt
+    head: "type"
+    help: "container oom event count"
+    type: "counter"
   - title: sysom_container_memory_stat
     from: cg_memory_util
     head: type
@@ -304,6 +309,11 @@ metrics:
     from: cg_cpuacct_stat
     head: type
     help: "container cpuacct/cpuacct.stat"
+    type: "gauge"
+  - title: sysom_container_proc_stat
+    from: cg_proc_stat
+    head: type
+    help: "container cpuacct proc stat"
     type: "gauge"
   - title: sysom_container_cpu_cfsquota
     from: cgCpuQuota
