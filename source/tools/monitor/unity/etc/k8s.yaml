@@ -27,6 +27,7 @@ outline:
 
 container:
   mode: "pods"
+  cluster: true # if true && CLUSTER_ID env is set, use CLUSTER_ID env (from ack configmap) as cluster id.
   runtime: ["k8sApi", "cri_containerd", "docker"]
   nsBlacklist: ["kube-system", "arms-prom", "kube-public", "kube-node-lease"]
   luaPlugin: ["cg_cpu_cfs_quota","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency", "podmem","con_net_stat"]

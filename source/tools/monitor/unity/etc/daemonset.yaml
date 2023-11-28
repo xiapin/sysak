@@ -16,6 +16,7 @@ rules:
       - nodes
       - nodes/status
       - nodes/pods
+      - nodes/stats
       - events
     verbs:
       - get
@@ -62,10 +63,20 @@ spec:
         - command:
             - /bin/sh
             - '-c'
-            - cd /root/dist/app/beeQ && sh ./run.sh
+            - cd /root/dist/app/beeQ && sh ./run.sh ../etc/k8s.yaml
           image: 'ackpod-registry.cn-shanghai.cr.aliyuncs.com/mem/sysom:v2.2'
           imagePullPolicy: IfNotPresent
           name: sysom
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CLUSTER_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: ack-cluster-profile
+                  key: clusterid 
           ports:
             - containerPort: 8889
               hostPort: 8889
@@ -102,3 +113,4 @@ spec:
       maxSurge: 0
       maxUnavailable: 1
     type: RollingUpdate
+

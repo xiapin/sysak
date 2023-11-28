@@ -75,6 +75,7 @@ end
 function CtransPro:_init_(instance, fYaml, help, timestamps)
     self._instance = instance
     self._help = help or false
+    self._cluster_id = nil
     local ms = system:parseYaml(fYaml)
     self._timestamps = timestamps or false
     if self._timestamps == true then
@@ -83,6 +84,14 @@ function CtransPro:_init_(instance, fYaml, help, timestamps)
         self.pack_line = packLine
     end
     self._tDescr = ms.metrics
+
+    if ms.container.cluster_id == true then
+        local cluster_id = os.getenv("CLUSTER_ID")
+        if cluster_id then
+            self._cluster_id = cluster_id
+        end
+    end
+
 end
 
 local function checkLine(blacklist, whitelist, labels)
@@ -159,6 +168,9 @@ function CtransPro:export(datas)
                         labels = {}
                     end
                     labels.instance = self._instance
+                    if self._cluster_id then
+                        labels.cluster = self._cluster_id
+                    end
                     for k, v in pairs(tFrom.values) do
                         labels[line.head] = k
                         if checkLine(blacklist, whitelist, labels)==true then
