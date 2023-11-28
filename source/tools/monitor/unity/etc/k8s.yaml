@@ -27,10 +27,12 @@ outline:
 
 container:
   mode: "pods"
-  cluster: true # if true && CLUSTER_ID env is set, use CLUSTER_ID env (from ack configmap) as cluster id.
+  cluster_id: true # if true && CLUSTER_ID env is set, use CLUSTER_ID env (from ack configmap) as cluster id.
   runtime: ["k8sApi", "cri_containerd", "docker"]
   nsBlacklist: ["kube-system", "arms-prom", "kube-public", "kube-node-lease"]
-  luaPlugin: ["cg_cpu_cfs_quota","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency", "podmem","con_net_stat"]
+  luaPlugin: ["cg_cpu_cfs_quota","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat",
+              "cg_cpuacct_proc_stat", "cg_memory_drcm_latency", "cg_memory_fail_cnt", 
+              "cg_memory_dcmp_latency", "cg_memory_oom_cnt", "con_net_stat", "podmem", "pod_storage_stat"]
 
   directCgPath:
     - "/"
@@ -56,7 +58,7 @@ container:
 
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
              "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
-             "proc_uptime", "proc_arp", "proc_cgroups"]
+             "proc_uptime", "proc_arp", "proc_cgroups", "proc_fd"]
 
 plugins:
   #- so: kmsg
@@ -233,6 +235,11 @@ metrics:
     head: type
     help: "cgroup number."
     type: "gauge"
+  - title: sysom_file_descriptor
+    from: procfd
+    head: type
+    help: "used file descriptor number."
+    type: "gauge"
   - title: sysom_per_sirqs
     from: per_sirqs
     head: type
@@ -350,4 +357,14 @@ metrics:
     from: cg_blkio_stat
     head: type
     help: "io stat from blkio cgroup"
+    type: "gauge"
+  - title: sysom_pod_ephemeral_storage_usage
+    from: pod_ephemeral_storage
+    head: type
+    help: "pod ephemeral storage usage"
+    type: "gauge"
+  - title: sysom_container_ephemeral_storage_usage
+    from: container_ephemeral_storage
+    head: type
+    help: "Containers ephemeral storage usage"
     type: "gauge"
