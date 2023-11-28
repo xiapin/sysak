@@ -18,6 +18,12 @@ function CcriContainerd:_init_(resYaml, mnt)
     self._ffi = ffi.ffi
     self._awsome = ffi.awesome
     self._valid_endpoint = ""
+    self._ns_blacklist = {}
+
+    local ns_blacklist = resYaml.container.nsBlacklist
+    for _, ns in ipairs(ns_blacklist) do
+        self._ns_blacklist[ns] = 1
+    end
 end
 
 function CcriContainerd:checkRuntime()
@@ -72,7 +78,6 @@ function CcriContainerd:setupCons()
     local mnt = self._mnt
     local cons = {}
     local c = 0
-    local blacklist = {["arms-prom"] = 1, ["kube-system"] = 1, ["kube-public"] = 1, ["kube-node-lease"] = 1}
 
     local consInfo = self:queryPodsInfo()
     if not consInfo then
@@ -82,7 +87,7 @@ function CcriContainerd:setupCons()
 
     for _, cs in ipairs(consInfo) do
         local namespace = cs.Namespace
-        if blacklist[namespace] then
+        if self._ns_blacklist[namespace] then
             goto continue
         end
 

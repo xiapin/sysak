@@ -141,7 +141,7 @@ func (c *Cri) InspectContainer(container Container, ctx context.Context) (Contai
 		 * cgroupfs driver, rawCgrouppath would be
 		 *  $(container id)
 		 */
-		containerCgroup = container.Id
+		containerCgroup = "/" + container.Id
 	}
 
 	return ContainerInfo{

@@ -3,6 +3,7 @@ config:
   port: 8889  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
+  url_safe: close
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     #    mode: curl
     #    url: "http://100.100.100.200/latest/meta-data/instance-id"
@@ -13,7 +14,7 @@ config:
   #  unix_socket: "/tmp/sysom_unity.sock"
   proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
   db:
-    rotate: 7  # tsdb file retention time, unit day
+    rotate: 3  # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
   limit:
     cpu: 90  # unit %
@@ -26,9 +27,10 @@ outline:
 
 container:
   mode: "pods"
-  runtime: ["cri_containerd", "k8sApi", "docker"]
-  luaPlugin: ["cg_cpu_cfs_quota","cg_mem_drcm_glob_latency","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency",
-              "cg_cpuacct_proc_stat","con_net_stat", "cg_blkio_stat", "podmem", "cg_memory_oom_cnt"]
+  runtime: ["k8sApi", "cri_containerd", "docker"]
+  nsBlacklist: ["kube-system", "arms-prom", "kube-public", "kube-node-lease"]
+  luaPlugin: ["cg_cpu_cfs_quota","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency", "podmem","con_net_stat"]
+
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -53,12 +55,11 @@ container:
 
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
              "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
-             "proc_uptime", "proc_arp", "proc_cgroups", "proc_softirqs", "proc_softnet_stat",
-]
+             "proc_uptime", "proc_arp", "proc_cgroups"]
 
 plugins:
-  - so: kmsg
-    description: "collect dmesg info."
+  #- so: kmsg
+  #  description: "collect dmesg info."
   -
     so: proc_schedstat
     description: "collect schedule stat info of percpu"
@@ -90,6 +91,8 @@ metrics:
     head: mode
     help: "cpu usage info for per-cpu."
     type: "gauge"
+    whitelist:
+        mode: ["^softirq", "^user","^idle","^sys","^iowait"]
   - title: sysom_proc_sirq
     from: sirq
     head: type
@@ -105,11 +108,20 @@ metrics:
     head: type
     help: "meminfo from /proc/meminfo."
     type: "gauge"
+    whitelist:
+        type: ["^MemFree","user","kernel_used","^MemTotal","MemAvailable","^total",
+                "^MemFree","^Cached","^Buffers","^AnonHugePages","^VmallocUsed","^SReclaimable",
+                "^SUnreclaim","^PageTables","^alloc_page","^KernelStack","^kernel_reserved"]
   - title: sysom_proc_vmstat
     from: vmstat
     head: type
     help: "vmstat info from /proc/vmstat."
     type: "gauge"
+    whitelist:
+        type: ["^thp_fault_alloc","^thp_fault_fallback","^thp_collapse_alloc","^thp_collapse_alloc_failed",
+                "^pgpgin","^pgpgout","^pswpin","^pswpout","^pgfault","^pgmajfault","^pgfault","^compact_stall",
+                "^compact_success","^compact_fail","^pgscan_kswapd","^pgscan_direct","^oom_kill","^pgsteal_kswapd",
+                "^pgsteal_direct","^pgscan_direct_throttle"]
   - title: sysom_proc_self_statm
     from: self_statm
     head: type
@@ -285,6 +297,8 @@ metrics:
     head: type
     help: "container memory util"
     type: "gauge"
+    blacklist:
+        type: ["^pgfault","^dirty","^pgpgout","^pgpgin"]
   - title: sysom_container_memory_gdrcm_latency
     from: cgGlbDrcmLatency
     head: type
@@ -293,13 +307,17 @@ metrics:
   - title: sysom_container_memory_cdrcm_latency
     from: cg_memdrcm_latency
     head: type
-    help: "container cgroup memory latency"
+    help: "container cgroup memory reclaim latency"
     type: "gauge"
+    whitelist:
+        type: ["^memDrcm_lat_10to100ms","^memDrcm_lat_100to500ms","^memDrcm_lat_500to1000ms","^memDrcm_lat_1000ms"]
   - title: sysom_container_memory_cpt_latency
     from: cg_memmcmp_latency
     head: type
     help: "container memory compact latency"
     type: "gauge"
+    whitelist:
+        type: ["^memDcmp_lat_10to100ms","^memDcmp_lat_100to500ms", "^memDcmp_lat_500to1000ms", "^memDcmp_lat_1000ms"]
   - title: sysom_container_cpu_stat
     from: cg_cpu_stat
     head: type
@@ -325,6 +343,8 @@ metrics:
     head: type
     help: "network stat of containers"
     type: "gauge"
+    blacklist:
+        type: ["^net_tx_packets","^net_rx_packets"]
   - title: sysom_container_blkio_stat
     from: cg_blkio_stat
     head: type

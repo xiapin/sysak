@@ -34,12 +34,12 @@ end
 
 function CprocMeminfo:readVmalloc()
     local pages = 0
-    for line in io.lines("/proc/vmallocinfo") do
-        if string.find(line,"vmalloc") and string.find(line,"pages=") then
-            local cells = pystring:split(pystring:split(pystring:strip(line),"pages=",1)[2]," ",1)
-            pages = pages + tonumber(cells[1])
-        end
-    end
+    --for line in io.lines("/proc/vmallocinfo") do
+     --   if string.find(line,"vmalloc") and string.find(line,"pages=") then
+      --      local cells = pystring:split(pystring:split(pystring:strip(line),"pages=",1)[2]," ",1)
+       --     pages = pages + tonumber(cells[1])
+        --end
+    --end
     self._protoTable_dict["vs"]["VmallocUsed"]=pages * 4
 end
 
