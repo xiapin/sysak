@@ -75,6 +75,7 @@ end
 function CtransPro:_init_(instance, fYaml, help, timestamps)
     self._instance = instance
     self._help = help or false
+    self._cluster_id = nil
     local ms = system:parseYaml(fYaml)
     self._timestamps = timestamps or false
     if self._timestamps == true then
@@ -86,10 +87,9 @@ function CtransPro:_init_(instance, fYaml, help, timestamps)
 
     if ms.container.cluster_id == true then
         local cluster_id = os.getenv("CLUSTER_ID")
-        if not cluster_id then
-            cluster_id = ""
+        if cluster_id then
+            self._cluster_id = cluster_id
         end
-        self._cluster_id = cluster_id
     end
 
 end
