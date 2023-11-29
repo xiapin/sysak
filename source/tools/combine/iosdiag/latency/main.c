@@ -13,6 +13,7 @@
 #include <sys/sysinfo.h>
 #include <time.h>
 #include <fcntl.h>
+
 #include "iosdiag.h"
 
 static void usage(void)
@@ -47,6 +48,35 @@ unsigned long get_threshold_us(void)
 	return g_threshold_us;
 }
 
+int check_bpf_config() {
+    char command[200];
+    char config[200];
+    char line[200];
+    FILE *fp;
+
+    strcpy(command, "grep \"CONFIG_BPF=y\" /boot/config-");
+    strcpy(config, command); 
+    strcat(command, "`uname -r`");
+
+    fp = popen(command, "r");
+    if (fp == NULL) {
+        printf("check bpf config command error\n");
+        return -1; 
+    }
+
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        if (strlen(line) > 0) {
+            printf("found CONFIG_BPF=y\n");
+            pclose(fp);
+            return 1; 
+        }
+    }
+
+    printf("CONFIG_BPF=y not found\n");
+    pclose(fp);
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	int ch;
@@ -54,6 +84,7 @@ int main(int argc, char *argv[])
 	unsigned int attach_s = 0;
 	int operating_mode = DIAGNOSTIC_MODE;
 	char *result_dir = "/var/log/sysak/iosdiag/latency";
+	char *tool_path = "/usr/local/sysak/.sysak_components/tools";
 	char *devname;
 	char resultfile_path[256];
 
@@ -86,15 +117,52 @@ int main(int argc, char *argv[])
 				usage();
 		}
 	}
+
 	devname = argv[argc - 1];
 	g_threshold_us = threshold_ms * 1000;
-	if (iosdiag_init(devname, attach_s)) {
-		fprintf(stderr, "iosdiag_init fail\n");
-		return -1;
-	}
 	sprintf(resultfile_path, "%s/result.log.seq", result_dir);
-	iosdiag_run(timeout_s, operating_mode, resultfile_path);
-	iosdiag_exit(devname);
-	return 0;
+	
+	if (!check_bpf_config()) {
+    	char command[100];
+		char execute_path[100];
+		sprintf(execute_path, "%s/tracing_latency", tool_path);
+		strcpy(command, execute_path);
+
+		char arg1[10];
+		sprintf(arg1, "%d", threshold_ms); 
+		strcat(command, " -t ");
+		strcat(command, arg1);
+
+		char arg2[10];
+		sprintf(arg2, "%d", timeout_s); 
+		strcat(command, " -T ");
+		strcat(command, arg2);
+
+		if (devname != NULL) {
+			strcat(command, " -d ");
+			strcat(command, devname);
+		}
+
+		strcat(command, " -f ");
+		strcat(command, resultfile_path);
+
+    	int status = 0;
+    	status = system(command); 
+
+    	if (status == -1) {
+    	    printf("Error executing script\n");
+    	    return 1;
+    	} else {
+    	    return 0;
+    	}
+	} else{
+		if (iosdiag_init(devname, attach_s)) {
+			fprintf(stderr, "iosdiag_init fail\n");
+			return -1;
+		}
+		iosdiag_run(timeout_s, operating_mode, resultfile_path);
+		iosdiag_exit(devname);
+		return 0;
+	}
 }
 

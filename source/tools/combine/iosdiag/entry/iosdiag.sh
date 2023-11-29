@@ -16,8 +16,8 @@ TOOLS_PATH=$WORK_PATH/tools/`uname -r`
 LIB_PATH=$WORK_PATH/lib/`uname -r`
 latency_bin=$WORK_PATH/tools/latency
 hangdetect_bin=$WORK_PATH/tools/hangdetect
+iodiagnosis_bin=$WORK_PATH/tools/iodiagnosis
 data_analysis=$WORK_PATH/tools/iosdiag_data_analysis
-logfile="/var/log/sysak/iosdiag/$1/result.log.seq"
 threshold_arg="-t 1000"
 
 function usage() {
@@ -25,11 +25,13 @@ function usage() {
 	echo "       subcmd:"
 	echo "              latency, io latency diagnosis"
 	echo "              hangdetect, io hang diagnosis"
+	echo "              iodiagnosis, io diagnosis"	
 	echo "       cmdargs:"
 	echo "              -h, help info"
 	echo "       options:"
 	echo "              -u url, transfer datafile to remote url"
 	echo "              -s latency|[hangdetect], stop diagnosis"
+	echo "              -o offline mode, only log recording, no data analysis"
 }
 
 upload_data() {
@@ -57,7 +59,13 @@ datafile_analysis() {
 		elif [ -e "/usr/bin/python3.5" ]; then
 			run_python="/usr/bin/python3.5"
 		fi
-		$run_python $data_analysis --$1 -s -f $logfile $threshold_arg
+		if [ -n "$offline" ]; then
+			echo "offline mode, no data analysis"
+			echo $threshold >> $logfile
+		else
+			echo "iosdiag datafile analysis starting..."
+			$run_python $data_analysis --$1 -s -f $logfile $threshold_arg
+		fi
 	fi
 }
 
@@ -162,6 +170,55 @@ disable_latency() {
 	exit 0
 }
 
+enable_iodiagnosis() {
+	if [ ! -e "$iodiagnosis_bin" ]; then
+		echo "$iodiagnosis_bin not found"
+		echo "iosdiag iodiagnosis not support '$(uname -r)', please report to the developer"
+		exit -1
+	fi
+	{
+		flock -n 3
+		[ $? -eq 1 ] && { echo "another iodiagnosis is running."; exit -1; }
+		trap disable_iodiagnosis SIGINT SIGTERM SIGQUIT
+		#mkdir -p `dirname $datafile`
+		chmod +x $iodiagnosis_bin
+		rm -f $(dirname $logfile)/result.log*
+		#$SYSAK_WORK_PATH/../sysak btf
+		$iodiagnosis_bin $* &
+		iodiagnosis_pid=$!
+		wait $iodiagnosis_pid
+		disable_iodiagnosis
+	} 3<> /tmp/iodiagnosis.lock
+}
+
+disable_iodiagnosis() {
+	pid=$iodiagnosis_pid
+	if [ $diag_stop ]; then
+		pid=`ps -ef | grep "\$iodiagnosis_bin" | grep -v "grep" | awk '{print $2}'`
+	fi
+
+	comm=`cat /proc/$pid/comm 2>/dev/null`
+	if [ "$comm" = "iodiagnosis" ]
+	then
+		kill -9 $pid 2>/dev/null
+	fi
+
+	if [ ! $diag_stop ]; then
+        if [ -e "/var/log/sysak/iosdiag/latency/result.log.seq" ]; then
+            datafile_analysis latency
+            if [ -n "$url" ]; then
+                upload_data latency
+            fi
+        elif [ -e "/var/log/sysak/iosdiag/hangdetect/result.log.stat" ]; then
+            datafile_analysis hangdetect
+			if [ -n "$url" ]; then
+                upload_data hangdetect
+            fi
+        fi
+	fi
+	exit 0
+}
+
 
 #execute command,every command need such args:
 # -h/--help: command usage
@@ -178,7 +235,7 @@ function execute() {
 }
 
 diag_stop=
-while getopts 'hs:u:' OPT; do
+while getopts 'hos:u:' OPT; do
 	case $OPT in
 		"u")
 			url=$OPTARG
@@ -186,6 +243,9 @@ while getopts 'hs:u:' OPT; do
 		"s")
 			diag_stop=true
 			subcmd=$OPTARG
+			;;
+		"o")
+			offline="offline"
 			;;
 		*)
 			usage
@@ -202,6 +262,8 @@ fi
 
 subcmd=${@:$OPTIND:1}
 subargs=${*:$OPTIND+1};
-[ "$subcmd" != "latency" -a "$subcmd" != "hangdetect" ] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
+# [ "$subcmd" != "latency" -a "$subcmd" != "hangdetect" -a "$subcmd" != "iodiagnosis"] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
+[[ "$subcmd" != "latency" && "$subcmd" != "hangdetect" && "$subcmd" != "iodiagnosis" ]] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
+logfile="/var/log/sysak/iosdiag/$subcmd/result.log.seq"
 execute $subcmd $subargs
 
