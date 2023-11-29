@@ -24,7 +24,6 @@ function usage() {
 	echo "       subcmd:"
 	echo "              latency, io latency diagnosis"
 	echo "              hangdetect, io hang diagnosis"
-	echo "              iodiagnosis, io diagnosis"	
 	echo "       cmdargs:"
 	echo "              -h, help info"
 	echo "       options:"
