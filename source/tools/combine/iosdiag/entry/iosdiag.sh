@@ -16,7 +16,6 @@ TOOLS_PATH=$WORK_PATH/tools/`uname -r`
 LIB_PATH=$WORK_PATH/lib/`uname -r`
 latency_bin=$WORK_PATH/tools/latency
 hangdetect_bin=$WORK_PATH/tools/hangdetect
-iodiagnosis_bin=$WORK_PATH/tools/iodiagnosis
 data_analysis=$WORK_PATH/tools/iosdiag_data_analysis
 threshold_arg="-t 1000"
 
@@ -31,7 +30,6 @@ function usage() {
 	echo "       options:"
 	echo "              -u url, transfer datafile to remote url"
 	echo "              -s latency|[hangdetect], stop diagnosis"
-	echo "              -o offline mode, only log recording, no data analysis"
 }
 
 upload_data() {
@@ -170,56 +168,6 @@ disable_latency() {
 	exit 0
 }
 
-enable_iodiagnosis() {
-	if [ ! -e "$iodiagnosis_bin" ]; then
-		echo "$iodiagnosis_bin not found"
-		echo "iosdiag iodiagnosis not support '$(uname -r)', please report to the developer"
-		exit -1
-	fi
-	{
-		flock -n 3
-		[ $? -eq 1 ] && { echo "another iodiagnosis is running."; exit -1; }
-		trap disable_iodiagnosis SIGINT SIGTERM SIGQUIT
-		#mkdir -p `dirname $datafile`
-		chmod +x $iodiagnosis_bin
-		rm -f $(dirname $logfile)/result.log*
-		#$SYSAK_WORK_PATH/../sysak btf
-		$iodiagnosis_bin $* &
-		iodiagnosis_pid=$!
-		wait $iodiagnosis_pid
-		disable_iodiagnosis
-	} 3<> /tmp/iodiagnosis.lock
-}
-
-disable_iodiagnosis() {
-	pid=$iodiagnosis_pid
-	if [ $diag_stop ]; then
-		pid=`ps -ef | grep "\$iodiagnosis_bin" | grep -v "grep" | awk '{print $2}'`
-	fi
-
-	comm=`cat /proc/$pid/comm 2>/dev/null`
-	if [ "$comm" = "iodiagnosis" ]
-	then
-		kill -9 $pid 2>/dev/null
-	fi
-
-	if [ ! $diag_stop ]; then
-        if [ -e "/var/log/sysak/iosdiag/latency/result.log.seq" ]; then
-            datafile_analysis latency
-            if [ -n "$url" ]; then
-                upload_data latency
-            fi
-        elif [ -e "/var/log/sysak/iosdiag/hangdetect/result.log.stat" ]; then
-            datafile_analysis hangdetect
-			if [ -n "$url" ]; then
-                upload_data hangdetect
-            fi
-        fi
-	fi
-	exit 0
-}
-
-
 #execute command,every command need such args:
 # -h/--help: command usage
 # -f/--file: output files, default stdout
@@ -262,8 +210,7 @@ fi
 
 subcmd=${@:$OPTIND:1}
 subargs=${*:$OPTIND+1};
-# [ "$subcmd" != "latency" -a "$subcmd" != "hangdetect" -a "$subcmd" != "iodiagnosis"] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
-[[ "$subcmd" != "latency" && "$subcmd" != "hangdetect" && "$subcmd" != "iodiagnosis" ]] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
+[[ "$subcmd" != "latency" && "$subcmd" != "hangdetect" ]] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
 logfile="/var/log/sysak/iosdiag/$subcmd/result.log.seq"
 execute $subcmd $subargs
 
