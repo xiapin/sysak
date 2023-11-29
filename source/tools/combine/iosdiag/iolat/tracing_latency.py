@@ -18,7 +18,7 @@ def main():
         print ("This program must be run as root. Aborting.")
         sys.exit(0)
     examples = """e.g.
-  ./iolatency.py -t 10 -t 10 -d vda
+  ./tracing_latency.py -t 10 -T 10 -d vda
             Report io delay over 10ms for vda 10s
     """
     parser = argparse.ArgumentParser(
