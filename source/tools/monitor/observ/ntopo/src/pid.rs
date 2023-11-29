@@ -135,7 +135,6 @@ fn get_container_id_by_pid(pid: i32) -> Option<Vec<String>> {
         Ok(path) => path,
         Err(_) => return None,
     };
-    println!("path:{path}");
     let matcher = get_cgroup_matcher(&format!("{}/cgroup.procs", path));
     if matcher.is_none() {
         return None;
