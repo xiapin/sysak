@@ -37,6 +37,10 @@ container:
   luaPlugin: ["cg_cpu_cfs_quota","cg_mem_drcm_glob_latency","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat","cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency", "cg_cpuacct_wait_latency",
               "con_net_stat", "cg_blkio_stat", "podmem"]
 
+# cgroupv2:
+#   directPaths: ["kubepods/besteffort", "kubepods.slice/kubepods-besteffort.slices"]
+#   luaPlugin: ["cg_sched_cfs_stat_v2","cg_cpu_stat_v2"]
+
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
              "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
              "proc_uptime", "proc_arp", "proc_cgroups", "proc_softirqs", "proc_softnet_stat",
@@ -424,6 +428,17 @@ metrics:
     head: value
     help: "numainfo of system from /sys/devices/system/"
     type: "gauge"
+  - title: sysom_cg_sched_cfs_stat_v2
+    from: cg_sched_cfs_stat_v2
+    head: value
+    help: "cgroupv2 cg_sched_cfs_stat_v2 info"
+    type: "gauge"
+  - title: sysom_cg_cpu_stat_v2
+    from: cg_cpu_stat_v2
+    head: value
+    help: "cgroupv2 cg_cpu_stat_v2 info"
+    type: "gauge"
+
 
 observe:
   comms:

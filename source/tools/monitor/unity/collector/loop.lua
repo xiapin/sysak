@@ -19,6 +19,7 @@ local CpostPlugin = require("collector.postPlugin.postPlugin")
 local CforkRun = require("collector.execEngine.forkRun")
 local CpodFilter = require("collector.podMan.podFilter")
 local CrdtManager = require("collector.rdt.rdtManager")
+local Ccgroupv2 = require("collector.cgroupv2.cgroupv2")
 ---local CpodFilter = require("collector.podMan.podFilter")
 
 local CpodsAll = require("collector.podMan.podsAll")
@@ -113,7 +114,17 @@ function Cloop:loadLuaPlugin(res, proc_path, procffi)
         else
             print("add rdtManager failed. " .. msg)
         end
+    end
 
+    if res.cgroupv2 then
+        local status, msg = pcall(newPlugin, Ccgroupv2, res, self._proto, procffi, proc_path)
+        if status then
+            self._procs[c] = msg
+            self._names[c] = "cgroupv2"
+            c = c + 1
+        else
+            print("add cgroupv2 failed. " .. msg)
+        end
     end
 
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")

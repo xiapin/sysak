@@ -66,6 +66,8 @@ mkdir ${APP}/collector/rdt
 mkdir ${APP}/collector/rdt/plugin
 mkdir ${APP}/collector/observe
 mkdir ${APP}/collector/perfRun
+mkdir ${APP}/collector/cgroupv2
+mkdir ${APP}/collector/container/cgroupv2
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
@@ -85,6 +87,8 @@ cp collector/rdt/plugin/*.lua ${APP}/collector/rdt/plugin
 cp collector/observe/*.lua ${APP}/collector/observe
 cp collector/plugin.yaml ${APP}/collector/
 cp collector/perfRun/perfRun.sh ${APP}/collector/perfRun/perfRun.sh
+cp collector/cgroupv2/*.lua ${APP}/collector/cgroupv2
+cp collector/container/cgroupv2/*.lua ${APP}/collector/container/cgroupv2
 
 
 mkdir ${APP}/common

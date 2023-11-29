@@ -528,3 +528,38 @@ This table show the hist of the latency of direct memory compaction
 | MB     |      | 内存带宽分配比例 | MB（Memory Bandwidth） | collector/rdt/plugin/rdt_size.lua |
 | L3     | byte | llc分配size      |                        | collector/rdt/plugin/rdt_size.lua |
 
+
+### cg_sched_cfs_stat_v2
+
+- 对应 export 指标： sysom_cg_sched_cfs_stat_v2
+- 属性标签：value
+  
+| 指标名        | 单位 | 标签说明                         | 备注 | 源码路径                                              |
+| :------------ | ---- | :------------------------------- | :--- | :---------------------------------------------------- |
+| serve         | ns   | 从开始运行到睡眠的时间           |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| oncpu         | ns   | oncpu时间                        |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| queue_other   | ns   | 被非兄弟层级打断的时长           |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| queue_sibling | ns   | 被兄弟层级打断的时长             |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| queue_max     | ns   | 在调度队列上的最大等待时间       |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| force_idle    | ns   | 被core sched造成force idle的时间 |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+
+
+### cg_cpu_stat_v2
+
+- 对应 export 指标： sysom_cg_cpu_stat_v2
+- 属性标签：value
+  
+| 指标名                     | 单位 | 标签说明              | 备注 | 源码路径                                        |
+| :------------------------- | ---- | :-------------------- | :--- | :---------------------------------------------- |
+| usage_usec                 | usec | 运行时长              |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| user_usec                  | usec | 用户态时间            |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| system_usec                | usec | 内核态时间            |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| core_sched.force_idle_usec | usec | 对端HT force idle时间 |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| sibidle_usec               | usec | 对端HT idle时间       |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| nr_periods                 | 次   | 带宽周期数            |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| nr_throttled               | 次   | 限流次数              |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| throttled_usec             | usec | 限流时长              |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| current_bw                 |      |                       |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| nr_bursts                  | 次   | burst次数             |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| burst_usec                 | usec | busrt时长             |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+
