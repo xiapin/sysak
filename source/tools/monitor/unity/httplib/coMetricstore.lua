@@ -12,7 +12,7 @@ local pystring = require("common.pystring")
 local snappy = require("snappy")
 local base64 = require("base64")
 local pro_encode = require("pro_encode")
-local addition = require("common.addition")
+local sls_api = require("sls_api")
 local CtransPro = require("common.transPro")
 
 local CcoMetricstore = class("coMetricstore", CcoHttpCliInst)
@@ -25,7 +25,7 @@ local headers = {
 
 function CcoMetricstore:_init_(fYaml, config, instance)
 
-    local k1, k2 = addition:decode(config.addition)
+    local k1, k2 = sls_api.decode(config.addition)
     local s = base64.encode(k1 .. ":" .. k2)
     self._headers = system:deepcopy(headers)
     self._headers["Authorization"] = "Basic " .. s
