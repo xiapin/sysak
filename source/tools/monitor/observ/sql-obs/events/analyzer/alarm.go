@@ -268,11 +268,33 @@ func addFieldToExtra(extra string, field string) string {
     return str
 }
 
+func makeAlarmBody(alarmType int, desc string, descExtra string) string {
+    ts := time.Now().Unix()
+
+    alarmEvent(alarmType, ts, desc, descExtra)
+    // return fmt.Sprintf(`node_event event_type="log_exception",`+
+    //     `description="%s",extra=%s,ts="%s"`,
+    //     desc, strconv.Quote(addFieldToExtra(descExtra,
+    //         "\"root_analyz_flag\":\"" + getDiagnoseApiName(alarmType,
+    //         descExtra) + "\"")), now)
+    alarmItem := strings.ReplaceAll(mTypeStrTlb[alarmType], "Type", "Alarm")
+    alarmItem = strings.ReplaceAll(alarmItem, "Notify", "Sqlobs")
+    return fmt.Sprintf(
+        `{"alert_item":"%s",`+
+        `"alert_category":"APPLICATION",`+
+        `"status":"FIRING",`+
+        `"alert_source_type":"sysak",`+
+        `"labels":%s}`,
+        alarmItem,
+        strconv.Quote(addFieldToExtra(descExtra,
+            "\"root_analyz_flag\":\"" + getDiagnoseApiName(alarmType,
+            descExtra) + "\"")))
+}
+
 func GetLogEventsDesc(alarmType int, level string, tag_set string,
     desc string, extra ...string) string {
     extraVal := desc
     ts := time.Now().Unix()
-    now := fmt.Sprintf("%d", ts)
     nowFormat := time.Unix(ts, 0).Format(common.TIME_FORMAT)
     if len(extra) > 0 {
         extraVal = extra[0]
@@ -285,12 +307,7 @@ func GetLogEventsDesc(alarmType int, level string, tag_set string,
             `,"tag_set":"%s"}`,
             level, extraVal, nowFormat, tag_set)
     }
-    alarmEvent(alarmType, ts, desc, descExtra)
-    return fmt.Sprintf(`node_event event_type="log_exception",`+
-        `description="%s",extra=%s,ts="%s"`,
-        desc, strconv.Quote(addFieldToExtra(descExtra,
-            "\"root_analyz_flag\":\"" + getDiagnoseApiName(alarmType,
-            descExtra) + "\"")), now)
+    return makeAlarmBody(alarmType, desc, descExtra)
 }
 
 func GetMetricsEventsDesc(alarmType int, comm string, pid string,
@@ -298,7 +315,6 @@ func GetMetricsEventsDesc(alarmType int, comm string, pid string,
     desc string, extra ...string) string {
     extraVal := desc
     ts := time.Now().Unix()
-    now := fmt.Sprintf("%d", ts)
     nowFormat := time.Unix(ts, 0).Format(common.TIME_FORMAT)
     if len(extra) > 0 {
         extraVal = extra[0]
@@ -319,12 +335,19 @@ func GetMetricsEventsDesc(alarmType int, comm string, pid string,
             metricsName, extraVal, nowFormat,
             comm, pid, portStr, extraPodId, extraContainerId)
     }
-    alarmEvent(alarmType, ts, desc, descExtra)
-    return fmt.Sprintf(`node_event event_type="metric_exception",`+
-        `description="%s",extra=%s,ts="%s"`,
-        desc, strconv.Quote(addFieldToExtra(descExtra,
-            "\"root_analyz_flag\":\"" + getDiagnoseApiName(alarmType,
-            descExtra) + "\"")), now)
+    return makeAlarmBody(alarmType, desc, descExtra)
+}
+
+func SubmitAlarm(data string) error {
+    //fmt.Println(data)
+    _, err := common.PostReqToUnity("/api/alert", data)
+    if err != nil {
+        //fmt.Println(bodyBytes)
+        common.PrintSysError(err)
+        return err
+    }
+    //fmt.Println(string(bodyBytes))
+    return nil
 }
 
 func ExportAlarmStatics() {

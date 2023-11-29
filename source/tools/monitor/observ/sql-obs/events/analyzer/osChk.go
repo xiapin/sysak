@@ -61,7 +61,7 @@ func chkProcessMetricsGeneral(alarmType int, metricsName string,
                     metricsName, desc)
             }
         } else {
-            common.ExportData(GetMetricsEventsDesc(alarmType, comm,
+            SubmitAlarm(GetMetricsEventsDesc(alarmType, comm,
                 pid, extraPodId, extraContainerId, metricsName,
                 desc))
         }
@@ -81,7 +81,7 @@ func osChkIOWaitEvents(data []interface{}) {
         iowaitThresh := math.Max(
             common.GetDynThresh(aggregator, "iowait"), minThresh)
         if iowait > iowaitThresh {
-            common.ExportData(GetLogEventsDesc(Notify_IO_Wait_Type,
+            SubmitAlarm(GetLogEventsDesc(Notify_IO_Wait_Type,
                 "warning", "os", "IO wait high"))
         }
         common.UpdateDynThresh(aggregator, "iowait", iowait)
@@ -206,7 +206,7 @@ func osChkIOBurstEvents(devname string, bps float64, iops float64) bool {
             `,"tag_set":"os"}`,
             desc, time.Unix(time.Now().Unix(), 0).Format(common.TIME_FORMAT), devname,
             fieldCurr, uint64(currValue))
-        common.ExportData(GetLogEventsDesc(
+        SubmitAlarm(GetLogEventsDesc(
             Notify_IO_Burst_Type, "", "", desc, extra))
     }
     return ioburst
@@ -222,7 +222,7 @@ func osChkIOHangEvents(devname string, util float64, iops float64, qusize float6
             `,"disk":"%s"`+
             `,"tag_set":"os"}`,
             desc, time.Unix(time.Now().Unix(), 0).Format(common.TIME_FORMAT), devname)
-        common.ExportData(GetLogEventsDesc(
+        SubmitAlarm(GetLogEventsDesc(
             Notify_IO_Hang_Type, "", "", desc, extra))
     }
 }
@@ -243,7 +243,7 @@ func osChkIODelayEvents(devname string, await float64) {
             `,"tag_set":"os"}`,
             desc, time.Unix(time.Now().Unix(), 0).Format(common.TIME_FORMAT), devname,
                 int32(await), int32(awaitThresh))
-        common.ExportData(GetLogEventsDesc(
+        SubmitAlarm(GetLogEventsDesc(
             Notify_IO_Delay_Type, "", "", desc, extra))
     }
     common.UpdateDynThresh(aggregator, devname+"await", await)
@@ -251,7 +251,7 @@ func osChkIODelayEvents(devname string, await float64) {
 
 func chkKmsgErrorLogGenaral(alarmType int, data []interface{}) {
     if len(data) > 1 {
-        common.ExportData(GetLogEventsDesc(alarmType,
+        SubmitAlarm(GetLogEventsDesc(alarmType,
             "warning", "os", data[0].(string), data[1].(string)))
     }
 }
@@ -281,7 +281,7 @@ func osChkNetLinkDownEvents(data []interface{}) {
         re := regexp.MustCompile("ethd")
         ethx := re.FindString(data[1].(string))
         if strings.Contains(ethx, "eth") {
-            common.ExportData(GetLogEventsDesc(Notify_Net_Link_Down_Type,
+            SubmitAlarm(GetLogEventsDesc(Notify_Net_Link_Down_Type,
                 "warning", "os", data[0].(string), ethx+` link down`))
         }
     }
@@ -325,7 +325,7 @@ func osChkNetProcessRTEvents(data []interface{}) {
             argvs[5].(string), argvs[6].(string), nowFormat, appLog, reason,
             jOSEve, argvs[1].(string), argvs[2].(string), argvs[3].(string),
             portStr, argvs[4].(string))
-        common.ExportData(GetMetricsEventsDesc(argvs[0].(int), "",
+        SubmitAlarm(GetMetricsEventsDesc(argvs[0].(int), "",
             "", "", "", "", argvs[6].(string), extra))
     }
     data[3] = (data[3].(float64) / 1000.0)
@@ -371,7 +371,7 @@ func osChkMemDirectReclaimEvents(data []interface{}) {
             }
 
             if len(events) > 0 {
-                common.ExportData(GetLogEventsDesc(Notify_Direct_Reclaim_Type,
+                SubmitAlarm(GetLogEventsDesc(Notify_Direct_Reclaim_Type,
                     "warning", "os", events))
             }
         }
@@ -419,7 +419,7 @@ func osChkMemProcessOOMEvents(data []interface{}) {
             `,"containerId":"%s"}`,
             data[1].(string), nowFormat, process, pid,
             extraPodId, portStr, extraContainerId)
-            common.ExportData(GetLogEventsDesc(Notify_Process_OOM_Type,
+            SubmitAlarm(GetLogEventsDesc(Notify_Process_OOM_Type,
                 "", "", "mysqld exited by OOM killer", extra))
         }
     }

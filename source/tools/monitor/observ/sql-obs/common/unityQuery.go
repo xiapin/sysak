@@ -16,19 +16,17 @@ import (
 var queryUrl string = "http://127.0.0.1:8400/api/query"
 var queryPeriod = 30
 
-func qByTable(table string, timeSecs int) ([]map[string]interface{}, error) {
+func PostReqToUnity(url string, data string) ([]byte, error) {
     timeout := 3 * time.Second
     ctx, cancel := context.WithTimeout(context.Background(), timeout)
     defer cancel()
 
-    var m []map[string]interface{}
     client := &http.Client{
         Timeout: timeout,
     }
-    payload := strings.NewReader(fmt.Sprintf(
-        "{\"mode\": \"last\", \"time\": \"%ds\", \"table\": [\"%s\"]}",
-        timeSecs, table))
-    req, err := http.NewRequestWithContext(ctx, "POST", queryUrl, payload)
+    payload := strings.NewReader(data)
+    req, err := http.NewRequestWithContext(
+        ctx, "POST", "http://127.0.0.1:8400" + url, payload)
     if err != nil {
         return nil, err
     }
@@ -42,7 +40,41 @@ func qByTable(table string, timeSecs int) ([]map[string]interface{}, error) {
     if err != nil {
         return nil, err
     }
-    err = json.Unmarshal([]byte(string(bodyBytes)), &m)
+    return bodyBytes, nil
+}
+
+func qByTable(table string, timeSecs int) ([]map[string]interface{}, error) {
+    // timeout := 3 * time.Second
+    // ctx, cancel := context.WithTimeout(context.Background(), timeout)
+    // defer cancel()
+
+    // var m []map[string]interface{}
+    // client := &http.Client{
+    //     Timeout: timeout,
+    // }
+    // payload := strings.NewReader(fmt.Sprintf(
+    //     "{\"mode\": \"last\", \"time\": \"%ds\", \"table\": [\"%s\"]}",
+    //     timeSecs, table))
+    // req, err := http.NewRequestWithContext(ctx, "POST", queryUrl, payload)
+    // if err != nil {
+    //     return nil, err
+    // }
+    // req.Header.Add("content-type", "application/json")
+    // res, err := client.Do(req)
+    // if err != nil {
+    //     return nil, err
+    // }
+    // defer res.Body.Close()
+    // bodyBytes, err := ioutil.ReadAll(res.Body)
+    var m []map[string]interface{}
+    data := fmt.Sprintf(
+        "{\"mode\": \"last\", \"time\": \"%ds\", \"table\": [\"%s\"]}",
+        timeSecs, table)
+    bodyBytes, err := PostReqToUnity("/api/query", data)
+    if err != nil {
+        return nil, err
+    }
+    err = json.Unmarshal(bodyBytes, &m)
     if err != nil {
         return nil, err
     }
