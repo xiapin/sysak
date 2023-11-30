@@ -13,6 +13,7 @@
 #include <sys/sysinfo.h>
 #include <time.h>
 #include <fcntl.h>
+
 #include "iosdiag.h"
 
 static void usage(void)
@@ -54,6 +55,7 @@ int main(int argc, char *argv[])
 	unsigned int attach_s = 0;
 	int operating_mode = DIAGNOSTIC_MODE;
 	char *result_dir = "/var/log/sysak/iosdiag/latency";
+	char *tool_path = "/usr/local/sysak/.sysak_components/tools";
 	char *devname;
 	char resultfile_path[256];
 
@@ -86,13 +88,15 @@ int main(int argc, char *argv[])
 				usage();
 		}
 	}
+
 	devname = argv[argc - 1];
 	g_threshold_us = threshold_ms * 1000;
+	sprintf(resultfile_path, "%s/result.log.seq", result_dir);
+	
 	if (iosdiag_init(devname, attach_s)) {
 		fprintf(stderr, "iosdiag_init fail\n");
 		return -1;
 	}
-	sprintf(resultfile_path, "%s/result.log.seq", result_dir);
 	iosdiag_run(timeout_s, operating_mode, resultfile_path);
 	iosdiag_exit(devname);
 	return 0;
