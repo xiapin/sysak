@@ -270,6 +270,7 @@ func addFieldToExtra(extra string, field string) string {
 
 func makeAlarmBody(alarmType int, desc string, descExtra string) string {
     ts := time.Now().Unix()
+    time := time.Unix(ts, 0).Format(common.TIME_FORMAT)
 
     alarmEvent(alarmType, ts, desc, descExtra)
     // return fmt.Sprintf(`node_event event_type="log_exception",`+
@@ -279,16 +280,20 @@ func makeAlarmBody(alarmType int, desc string, descExtra string) string {
     //         descExtra) + "\"")), now)
     alarmItem := strings.ReplaceAll(mTypeStrTlb[alarmType], "Type", "Alarm")
     alarmItem = strings.ReplaceAll(alarmItem, "Notify", "Sqlobs")
+    diag_url := getDiagnoseApiName(alarmType, descExtra)
+    labels := fmt.Sprintf(
+        `{"desc":"%s","diag_url":"%s","ts":"%s"}`,
+        desc, diag_url, time)
     return fmt.Sprintf(
         `{"alert_item":"%s",`+
         `"alert_category":"APPLICATION",`+
         `"status":"FIRING",`+
         `"alert_source_type":"sysak",`+
-        `"labels":%s}`,
+        `"labels":%s,`+
+        `"annotations":%s}`,
         alarmItem,
-        strconv.Quote(addFieldToExtra(descExtra,
-            "\"root_analyz_flag\":\"" + getDiagnoseApiName(alarmType,
-            descExtra) + "\"")))
+        labels,
+        addFieldToExtra(descExtra, "\"root_analyz_flag\":\"diag_url\""))
 }
 
 func GetLogEventsDesc(alarmType int, level string, tag_set string,
