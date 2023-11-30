@@ -31,13 +31,9 @@ forkRun:
       []
   - cmd: "../../../ioMonitor"
     args:
-      ["-y", "/etc/sysak/base.yaml", "-s", "await=5,iops=200,diagIolat=on"]
+      ["-y", "/etc/sysak/base.yaml", "-s", "await=5,iops=1000,diagIolat=on"]
 
-pushTo:
-  to: "Influx"
-  host: "sysom.alibaba-inc.com"
-  port: 80
-  url: "/api/v1/cec_proxy/proxy/line_protocol"
+cec: "http://localhost"
 
 outline:
   - /var/sysom/outline
@@ -64,16 +60,6 @@ metrics:
     from: disks
     head: counter
     help: "disk info from /proc/diskstats."
-    type: "gauge"
-  - title: sysom_iolatency
-    from: sysom_iolatency
-    head: value
-    help: "alarm on os exception of mysqld"
-    type: "gauge"
-  - title: sysom_iolatency_max
-    from: sysom_iolatency_max
-    head: value
-    help: "alarm on os exception of mysqld"
     type: "gauge"
   - title: sysom_ntopo_node
     from: sysom_metrics_ntopo_node
@@ -115,6 +101,31 @@ metrics:
     from: sysom_obser_os_alarm
     head: value
     help: "alarm on os exception of mysqld"
+    type: "gauge"
+  - title: sysom_IOMonIndForDisksIO
+    from: IOMonIndForDisksIO
+    head: value
+    help: "Disk IO indicators and abnormal events"
+    type: "gauge"
+  - title: sysom_IOMonIndForSystemIO
+    from: IOMonIndForSystemIO
+    head: value
+    help: "System indicators and abnormal events about IO"
+    type: "gauge"
+  # - title: sysom_IOMonDiagLog
+  #   from: IOMonDiagLog
+  #   head: value
+  #   help: "Diagnose log for IO exception"
+  #   type: "gauge"
+  - title: sysom_iolatency
+    from: sysom_iolatency
+    head: value
+    help: "IO average processing latency information"
+    type: "gauge"
+  - title: sysom_iolatency_max
+    from: sysom_iolatency_max
+    head: value
+    help: "IO Max processing latency information"
     type: "gauge"
 
 observe:
