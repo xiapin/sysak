@@ -85,10 +85,12 @@ function CtransPro:_init_(instance, fYaml, help, timestamps)
     end
     self._tDescr = ms.metrics
 
-    if ms.container.cluster_id == true then
-        local cluster_id = os.getenv("CLUSTER_ID")
-        if cluster_id then
-            self._cluster_id = cluster_id
+    if ms.container then
+        if ms.container.cluster_id == true then
+            local cluster_id = os.getenv("CLUSTER_ID")
+            if cluster_id then
+                self._cluster_id = cluster_id
+            end
         end
     end
 
