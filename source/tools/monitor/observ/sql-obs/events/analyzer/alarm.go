@@ -293,7 +293,8 @@ func makeAlarmBody(alarmType int, desc string, descExtra string) string {
         `"annotations":%s}`,
         alarmItem,
         labels,
-        addFieldToExtra(descExtra, "\"root_analyz_flag\":\"diag_url\""))
+        addFieldToExtra(
+            descExtra, "\"root_analyz_flag\":\"" + diag_url + "\""))
 }
 
 func GetLogEventsDesc(alarmType int, level string, tag_set string,
