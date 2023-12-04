@@ -996,9 +996,9 @@ int copy_file(char *dest_file, char *src_file)
 int has_string(char *dest_file, char *substring)
 {
 	FILE *fp;
-	char find_str[DEFAULT_LEN];
 	int	line=0;
 	char file_str[DEFAULT_LEN];
+
 	fp=fopen(dest_file,"r");
 	if(fp==NULL)
 	{
@@ -1009,7 +1009,7 @@ int has_string(char *dest_file, char *substring)
 	while(fgets(file_str,sizeof(file_str),fp))
 	{
 		line++;
-		if(strstr(file_str,find_str))
+		if(strstr(file_str,substring))
 		{
 			return 1;
 		}
@@ -1024,10 +1024,11 @@ void btf_support_check(void){
     char tool_btf[DEFAULT_LEN];
     char *config_name = "CONFIG_BPF=y";
 
-    if (access(local_btf,0) != 0){
+    if (access(local_btf,0) == 0){
         snprintf(tool_btf, sizeof(tool_btf), "%s/vmlinux-%s", tools_path, kern_version);
         if (copy_file(tool_btf, local_btf) > 0){
             oss_get_components = auto_get_components =false;
+            btf_depend = false;
             return;
         }
     }
