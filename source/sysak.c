@@ -12,6 +12,7 @@
 #define KVERSION 64
 #define MAX_SUBCMD_ARGS 512
 #define MAX_DEPEND_LEN 128
+#define DEFAULT_LEN 128
 #define MAX_NAME_LEN 64
 #define MAX_WORK_PATH_LEN 512
 #define ERR_NOSUBTOOL 2
@@ -965,6 +966,78 @@ static bool tool_lookup(char *tool)
     return true;
 }
 
+int copy_file(char *dest_file, char *src_file)
+{
+    int cnt = 0;
+    FILE *fp1 = fopen(dest_file,"w");
+    FILE *fp2 = fopen(src_file,"r");
+
+    if(fp1 == NULL) {
+        printf("%s:fopen failed!", dest_file);
+        return -1;
+    }
+    if(fp2 == NULL) {
+        printf("%s: fopen failed!", src_file);
+        return -1;
+    }
+
+    char buffer = fgetc(fp2);
+
+    while(!feof(fp2)) {
+        cnt++;
+        fputc(buffer,fp1);
+        buffer = fgetc(fp2);
+    }
+    fclose(fp1);
+    fclose(fp2);
+    return cnt;
+}
+
+int has_string(char *dest_file, char *substring)
+{
+	FILE *fp;
+	int	line=0;
+	char file_str[DEFAULT_LEN];
+
+	fp=fopen(dest_file,"r");
+	if(fp==NULL)
+	{
+		printf("open error\n");
+		return -1;
+	}
+
+	while(fgets(file_str,sizeof(file_str),fp))
+	{
+		line++;
+		if(strstr(file_str,substring))
+		{
+			return 1;
+		}
+	}
+	fclose(fp);
+	return 0;
+}
+
+void btf_support_check(void){
+    char config[DEFAULT_LEN];
+    char local_btf[DEFAULT_LEN] = "/sys/kernel/btf/vmlinux";
+    char tool_btf[DEFAULT_LEN];
+    char *config_name = "CONFIG_BPF=y";
+
+    if (access(local_btf,0) == 0){
+        snprintf(tool_btf, sizeof(tool_btf), "%s/vmlinux-%s", tools_path, kern_version);
+        if (copy_file(tool_btf, local_btf) > 0){
+            oss_get_components = auto_get_components =false;
+            btf_depend = false;
+            return;
+        }
+    }
+
+    snprintf(config, sizeof(config), "/boot/config-%s", kern_version);
+    if (!has_string(config, config_name))
+        btf_depend = false;
+}
+
 static int subcmd_parse(int argc, char *argv[])
 {
     int i;
@@ -977,8 +1050,8 @@ static int subcmd_parse(int argc, char *argv[])
     if (!strcmp(argv[0], "-d")) {
         only_download = true;
         pre_module = true;
-	btf_depend = true;
-	goto exec;
+	    btf_depend = true;
+	    goto exec;
     }
 
     if (strstr(prev_dep, "btf") != NULL) {
@@ -1004,6 +1077,7 @@ static int subcmd_parse(int argc, char *argv[])
         }
     }
 exec:
+    btf_support_check();
     return exectue(argc, argv);
 }
 
