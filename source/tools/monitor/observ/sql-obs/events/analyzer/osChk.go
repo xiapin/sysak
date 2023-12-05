@@ -309,8 +309,11 @@ func osChkNetProcessRTEvents(data []interface{}) {
             }
         }
         pidInt, _ := strconv.Atoi(argvs[2].(string))
-        portStr := strconv.Itoa(
-            common.GetAppInstanceMemberByPid(pidInt, "Port").(int))
+        port := common.GetAppInstanceMemberByPid(pidInt, "Port")
+        if port == "" {
+            return
+        }
+        portStr := strconv.Itoa(port.(int))
         extra := fmt.Sprintf(`{"metrics":"%s"`+
             `,"value":"%s"`+
             `,"ts":"%s"`+
@@ -406,8 +409,11 @@ func osChkMemProcessOOMEvents(data []interface{}) {
                 process = result[2]
             }
             pidInt, _ := strconv.Atoi(pid)
-            portStr := strconv.Itoa(
-                common.GetAppInstanceMemberByPid(pidInt, "Port").(int))
+            port := common.GetAppInstanceMemberByPid(pidInt, "Port")
+            if port == "" {
+                return
+            }
+            portStr := strconv.Itoa(port.(int))
             extra := fmt.Sprintf(`{"level":"fatal"`+
             `,"value":"mysqld exited by OOM killer"`+
             `,"details":"%s"`+
