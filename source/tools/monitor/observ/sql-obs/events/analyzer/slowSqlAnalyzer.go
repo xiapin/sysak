@@ -337,8 +337,7 @@ func analyzAndReportEvent(ssA *ssAnalyzer,
                 reason.(string), ", " + osChkStrFlag, "")
         }
     }
-    portStr := strconv.Itoa(
-        common.GetAppInstanceMemberByPid(pid, "Port").(int))
+    portStr := strconv.Itoa(ssA.dbConn.GetPort())
     desc := "slow SQL occurs"
     extra := fmt.Sprintf(`{"level":"warning"`+
         `,"value":"%s"`+
@@ -353,8 +352,8 @@ func analyzAndReportEvent(ssA *ssAnalyzer,
         `,"tag_set":"mysqld"}`,
         desc, time.Unix(time.Now().Unix(), 0).Format(common.TIME_FORMAT), jApp, reason,
         jOSEve, strconv.Itoa(pid), portStr, podId, containerId)
-    common.ExportData(GetLogEventsDesc(
-        Notify_Process_Mysql_Slow_Sql_Type, "", "", desc, extra))
+        SubmitAlarm(GetLogEventsDesc(
+            Notify_Process_Mysql_Slow_Sql_Type, "", "", desc, extra))
     return nil
 }
 

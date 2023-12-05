@@ -253,8 +253,11 @@ func exportAppMetrics(appMetrics []*appOsMetrics, info [][]string) {
             data += "\n"
         }
         pid, _ := strconv.Atoi(info[index][0])
-        portStr := strconv.Itoa(
-            common.GetAppInstanceMemberByPid(pid, "Port").(int))
+        port := common.GetAppInstanceMemberByPid(pid, "Port")
+        if port == "" {
+            continue
+        }
+        portStr := strconv.Itoa(port.(int))
         data += (osMysqldMetricsTlbName + `,pid=` + info[index][0] +
             `,podID=` + info[index][1] + `,containerID=` + info[index][2] +
             `,port=` + portStr + `,comm=mysqld ` + common.Struct2String(m))

@@ -71,7 +71,7 @@ import (
                                 `,"containerId":"%s"}`,
                                 level, data, nowFormat, "mysqld", pid,
                                 dbConn.GetPodID(), dbConn.GetContainerID())
-                            common.ExportData(analyzer.GetLogEventsDesc(
+                            analyzer.SubmitAlarm(analyzer.GetLogEventsDesc(
                                 analyzer.Notify_Process_Mysql_Error_Type,
                                 level, "", "Error occurred in mysqld", extra))
                         }

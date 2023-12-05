@@ -328,8 +328,10 @@ func GetMetricsEventsDesc(alarmType int, comm string, pid string,
     descExtra := extraVal
     if !json.Valid([]byte(descExtra)) {
         pidInt, _ := strconv.Atoi(pid)
-        portStr := strconv.Itoa(
-            common.GetAppInstanceMemberByPid(pidInt, "Port").(int))
+        portStr := common.GetAppInstanceMemberByPid(pidInt, "Port")
+        if portStr != "" {
+            portStr = strconv.Itoa(portStr.(int))
+        }
         descExtra = fmt.Sprintf(`{"metrics":"%s"`+
             `,"value":"%s"`+
             `,"ts":"%s"`+
