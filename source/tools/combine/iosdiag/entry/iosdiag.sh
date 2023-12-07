@@ -69,16 +69,9 @@ datafile_analysis() {
 		elif [ -e "/usr/bin/python3.5" ]; then
 			run_python="/usr/bin/python3.5"
 		fi
-		# if [ -n "$offline" ]; then
-		# 	# echo "offline mode, no data analysis"
-		# 	echo $threshold >> $logfile
-		# else
-		# 	# echo "iosdiag datafile analysis starting..."
 		if [ -e "$data_analysis" ]
 		then
 			$run_python $data_analysis --$1 -s -f $logfile $threshold_arg
-		else
-			echo $threshold >> $logfile
 		fi
 	fi
 }
@@ -225,9 +218,6 @@ while getopts 'hos:u:' OPT; do
 			diag_stop=true
 			subcmd=$OPTARG
 			;;
-		# "o")
-		# 	offline="offline"
-		# 	;;
 		*)
 			usage
 			exit 0
