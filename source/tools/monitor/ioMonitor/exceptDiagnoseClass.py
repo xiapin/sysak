@@ -11,7 +11,7 @@ from displayClass import displayClass
 
 
 class runDiag(object):
-    def __init__(self, logRootPath, sender):
+    def __init__(self, logRootPath, sender, mode, resultPath):
         self.funcDicts = {
             'iohang': self.startIohangDiagnose,
             'ioutil': self.startIoutilDiagnose,
@@ -19,7 +19,7 @@ class runDiag(object):
             'iowait': self.startIowaitDiagnose}
         self.lastDiagTimeDicts = \
             {'iohang': 0, 'ioutil': 0, 'iolatency': 0, 'iowait': 0}
-        self.display = displayClass(sender)
+        self.display = displayClass(sender, mode, resultPath)
         self.sysakPath = 'sysak'
         self.logRootPath = logRootPath
 
@@ -54,7 +54,8 @@ class runDiag(object):
     def startIolatencyDiagnose(self, *argv):
         devname = argv[0]
         thresh = argv[1]
-        # ioburst = argv[2]
+        ioburst = argv[2]
+        mode = argv[3]
         now = time.time()
         if now - self.lastDiagTimeDicts['iolatency'] <= 60:
             return
@@ -67,15 +68,24 @@ class runDiag(object):
             except Exception:
                 return
         self.lastDiagTimeDicts['iolatency'] = now
-        if devname is not None:   
-            os.system(self.sysakPath+' -g iosdiag latency -t ' + str(thresh) +
-                    ' -T 20 -m -f '+logdir+' '+devname+' > '+outlog+' &')
-        else:
-            os.system(self.sysakPath+' -g iosdiag latency -t ' + str(thresh) +
+        if mode == "monitor":
+            # str(thresh)
+            if devname is not None:   
+                os.system(self.sysakPath+' -g iosdiag latency -t ' + str(thresh) +
+                        ' -T 20 -m -f '+logdir+' '+devname+' > '+outlog+' &')
+            else:
+                os.system(self.sysakPath+' -g iosdiag latency -t ' + str(thresh) +
                       ' -T 20 -m -f '+logdir+' > '+outlog+' &')
-        # if ioburst:
-        #     self.display.markIoburst(now)
-        # self.display.start(60, 'iolatency', logdir, now, now+60)
+        else:
+            if devname is not None:
+                os.system(self.sysakPath+' -g iosdiag latency -t 0'+
+                        ' -T 20 -f '+logdir+' '+devname+' > '+outlog+' &')
+            else:
+                os.system(self.sysakPath+' -g iosdiag latency -t 0'+
+                      ' -T 20 -f '+logdir+' > '+outlog+' &')
+            if ioburst:
+                self.display.markIoburst(now)
+            self.display.start(60, 'iolatency', logdir, now, now+60)
 
 
     def startIoutilDiagnose(self, *argv):
@@ -94,7 +104,7 @@ class runDiag(object):
             except Exception:
                 return
         self.lastDiagTimeDicts['ioutil'] = now
-        #self.display.setIoburstThresh(iopsThresh, bwThresh)
+        self.display.setIoburstThresh(iopsThresh, bwThresh)
         argvs = ['-j',outlog,'-n','-m','-c','1','-t','5','-T','40',
             '-i',str(iopsThresh),'-b',str(bwThresh)]
         threading.Thread(target=iofsstatStart, args=(argvs,)).start()
@@ -125,8 +135,9 @@ class runDiag(object):
 
 
 class diagnoseClass(runDiag):
-    def __init__(self, window, logRootPath, sender):
-        super(diagnoseClass, self).__init__(logRootPath, sender)
+    def __init__(self, window, logRootPath, sender, mode, resultPath):
+        super(diagnoseClass, self).__init__(logRootPath, sender, mode, resultPath)
+        self.mode = mode
         self.window = window
         self.diagnoseDicts = OrderedDict()
         self._diagStat = OrderedDict(
@@ -252,12 +263,12 @@ class diagnoseClass(runDiag):
                 diagStat['ioutil']['argv'][idx] = val[-1]
 
         if diagStat['iolatency']['run'] == True:
-            # print("diagStat['iolatency']:", diagStat['iolatency'])
             diagStat['iolatency']['argv'][1] = sorted(
                 [diagnoseDicts[dev]['iolatency']['diagArgs'][0] 
                 for dev in diagInfo['iolatency']],
                 reverse=True)[-1]
             diagStat['iolatency']['argv'][2] = ioburst
+            diagStat['iolatency']['argv'][3] = self.mode
 
         for diagType, stat in diagStat.items():
             if stat['run'] == True:
