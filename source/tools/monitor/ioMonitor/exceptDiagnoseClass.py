@@ -78,10 +78,10 @@ class runDiag(object):
                       ' -T 20 -m -f '+logdir+' > '+outlog+' &')
         else:
             if devname is not None:
-                os.system(self.sysakPath+' -g iosdiag latency -t 0'+
+                os.system(self.sysakPath+' -g iosdiag latency -t '+ str(thresh) +
                         ' -T 20 -f '+logdir+' '+devname+' > '+outlog+' &')
             else:
-                os.system(self.sysakPath+' -g iosdiag latency -t 0'+
+                os.system(self.sysakPath+' -g iosdiag latency -t '+ str(thresh) +
                       ' -T 20 -f '+logdir+' > '+outlog+' &')
             if ioburst:
                 self.display.markIoburst(now)
