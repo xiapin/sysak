@@ -12,7 +12,7 @@ local pystring = require("common.pystring")
 local CPodMem = class("podmem", CkvProc)
 --local podman = require("collector.podMan.podsAll")
 
-function CPodMem:_init_(proto, pffi, mnt)
+function CPodMem:_init_(resYaml, proto, pffi, mnt)
     CkvProc._init_(self, proto, pffi, mnt, nil, "podmem")
     self._ffi = require("collector.native.plugincffi")
     self.cffi = self._ffi.load("podmem")
