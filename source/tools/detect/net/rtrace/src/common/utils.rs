@@ -12,7 +12,11 @@ use std::net::IpAddr;
 use std::net::Ipv4Addr;
 use std::net::SocketAddr;
 use std::net::TcpListener;
+use std::os::unix::prelude::PermissionsExt;
+use std::process::Command;
+use std::process::Stdio;
 use sysctl::Sysctl;
+use tempfile::tempdir;
 use tempfile::NamedTempFile;
 
 pub static SYSAK_BTF_PATH: Lazy<Option<CString>> = Lazy::new(|| {
@@ -132,6 +136,28 @@ pub fn get_send_receive_queue() -> Result<(usize, usize)> {
     }
 
     bail!("not found send_queue and receive_queue in rtrace.db")
+}
+
+pub fn run_old_rtrace(args: Vec<String>) {
+    if let Some(file_data) = Asset::get("rtrace") {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("rtrace");
+        {
+            let mut temp_file = File::create(&file_path).unwrap();
+            temp_file.write_all(&file_data.data).unwrap();
+            let metadata = temp_file.metadata().unwrap();
+            let mut permissions = metadata.permissions();
+            permissions.set_mode(0o777);
+            temp_file.set_permissions(permissions).unwrap();
+        }
+        let mut child = Command::new(file_path)
+            .args(args)
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap();
+        let _ = child.wait().unwrap();
+    }
 }
 
 /// Monotonically increasing timestamp, incremented by 1 when the clock interrupt

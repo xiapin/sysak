@@ -5,7 +5,7 @@ TARGET_PATH := $(OBJ_TOOLS_ROOT)
 rtrace: bin target_rule
 
 bin: 
-	cargo build --release
+	cargo build --release --features embed-rtrace
 	cp target/release/rtrace $(TARGET_PATH)/
 
 target := rtrace

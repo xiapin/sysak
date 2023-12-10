@@ -25,14 +25,6 @@ struct
 
 struct
 {
-    __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 1);
-    __type(key, u32);
-    __type(value, struct filter);
-} filter SEC(".maps");
-
-struct
-{
     __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
     __uint(key_size, sizeof(u32));
     __uint(value_size, sizeof(u32));
@@ -93,8 +85,8 @@ int tp_tcp_rcv_space_adjust(struct tcp_rcv_space_adjust_arg *arg)
 
     int key = 0;
 
-    u64 *threshold = bpf_map_lookup_elem(&filter, &key);
-    if (threshold && delta > *threshold)
+    struct filter *filter = get_filter();
+    if (filter && delta > filter->threshold)
     {
         struct slow_event event = {0};
 
@@ -108,6 +100,11 @@ int tp_tcp_rcv_space_adjust(struct tcp_rcv_space_adjust_arg *arg)
         struct sched_event *sched = bpf_map_lookup_elem(&scheds, &cpu);
         if (sched)
             event.sched = *sched;
+
+        int tid = bpf_get_current_pid_tgid();
+        struct thread_event *thread = bpf_map_lookup_elem(&threads, &tid);
+        if (thread)
+            event.thread = *thread;
 
         bpf_perf_event_output(arg, &perf_events, BPF_F_CURRENT_CPU, &event, sizeof(event));
     }
@@ -136,13 +133,35 @@ int tp_sched_switch(struct tp_sched_switch_arg *arg)
     if (!event)
         return 0;
 
-    event->ts = bpf_ktime_get_ns();
+    u64 ts = bpf_ktime_get_ns();
+    event->ts = ts;
     event->next_pid = arg->next_pid;
     event->prev_pid = arg->prev_pid;
+
+    add_sched_in(arg->next_pid, ts, cpu);
+    add_sched_out(arg->prev_pid, ts, cpu);
 
     __builtin_memcpy(event->next_comm, arg->next_comm, 16);
     __builtin_memcpy(event->prev_comm, arg->prev_comm, 16);
 
+    return 0;
+}
+
+struct tp_sched_wakeup_arg
+{
+    u64 pad;
+    char comm[16];
+    pid_t pid;
+    int prio;
+};
+
+SEC("tracepoint/sched/sched_wakeup")
+int tp_sched_wakeup(struct tp_sched_wakeup_arg *arg)
+{
+    u32 tid = arg->pid;
+    u64 ts = bpf_ktime_get_ns();
+    int cpu = bpf_get_smp_processor_id();
+    add_sched_wakeup(tid, ts, cpu);
     return 0;
 }
 
