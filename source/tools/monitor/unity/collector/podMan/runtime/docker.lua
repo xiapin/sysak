@@ -24,7 +24,12 @@ function Cdocker:getCgroupDriver()
         print("Get docker cgroup driver failed!", err)
         return "cgroupfs" -- default is "cgroupfs"
     end
-    return qresp["CgroupDriver"]
+
+    if not qresp["body"] then
+        return "cgroupfs"
+    end
+
+    return qresp["body"]["CgroupDriver"]
 end
 
 function Cdocker:initInotify()
@@ -32,7 +37,9 @@ function Cdocker:initInotify()
     -- in docker, default watch /sys/fs/cgroup/cpu/docker (cgroupfs driver)
     local cg_path = self._cgTopDir .. docker
     if cgroupDriver == "systemd" then
-        cg_path = self._cgTopDir .. "system.slice"
+        -- systemd cgroup driver, watch /sys/fs/cgroup/system.slice/docker
+        cg_path = self._cgTopDir .. "/system.slice"
+        self._cgroupDriver = "systemd"
     end
     self._ino = Cinotifies.new()
     self._ino:add(cg_path)
@@ -68,25 +75,40 @@ function Cdocker:setupCons()
     if not obj then
         return nil
     end
-    obj = obj["body"]
 
-    for _, container in ipairs(obj) do
+    local obj_body = obj["body"]
+    if not obj_body then
+        return nil
+    end
+
+    for _, container in ipairs(obj_body) do
+        local path = ""
+        local cg_path = ""
         local id = container.Id
         -- 返回的容器名会多一个"/"前缀（i.e /con_name)
         local name = string.sub(container.Names[1], 2)
+
         -- i.e /sys/fs/cgroup/cpu/docker/container_id/, path="docker/con_id"
-        local path = docker .. id
+        if self._cgroupDriver == "systemd" then
+            path = "/system.slice" .. "/docker-" .. id .. ".scope"
+            cg_path = self._cgTopDir .. path
+        else
+            path = docker .. id
+            cg_path = self._cgTopDir .. path
+        end
+
         local cell = {
             pod = nil,
             name = name,
             id = id,
             path =path
         }
-        if unistd.access(self._cgTopDir .. cell.path) == 0 then
+        if unistd.access(cg_path) == 0 then
             c = c + 1
             cons[c] = cell
         end
     end
+
     return cons
 end
 
