@@ -2,7 +2,6 @@ require("common.class")
 local json = require("cjson")
 local https = require("ssl.https")
 local ltn12 = require("ltn12")
-local ChttpCli = require("httplib.httpCli")
 local CkvProc = require("collector.kvProc")
 local CvProc = require("collector.vproc")
 
@@ -11,16 +10,19 @@ local PodStorageStat = class("con_storage_stat", CkvProc)
 local default_token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 local default_ca_path = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 local summary_api = "/stats/summary"
-local blacklist = {
-    ["arms-prom"] = 1, ["kube-system"] = 1,
-    ["kube-public"] = 1, ["kube-node-lease"] = 1
-}
 
-function PodStorageStat:_init_(proto, pffi, mnt)
+function PodStorageStat:_init_(resYaml, proto, pffi, mnt)
     CkvProc._init_(self, proto, pffi, mnt, nil, "PodStorageStat")
     self._token = ""
     self.pods = {}
     self.cons = {}
+    self._ns_blacklist = {}
+    self._con_capacity_bytes = math.maxinteger
+
+    local ns_blacklist = resYaml.container.nsBlacklist
+    for _, ns in ipairs(ns_blacklist) do
+        self._ns_blacklist[ns] = 1
+    end
 end
 
 -- get container's resoure info and pod's volume info
@@ -28,10 +30,12 @@ function PodStorageStat:setup(cons)
     -- reset the data struct first
     self.pods= {}
     self.cons = {}
+    self._con_capacity_bytes = math.maxinteger
 
     for _, con in ipairs(cons) do
         local pod_key = con.pod.name .. "-" .. con.pod.namespace
-        self.cons[con.name] = con
+        local con_key = pod_key .. "-" .. con.name
+        self.cons[con_key] = con
         self.pods[pod_key] = con.pod
     end
 end
@@ -108,6 +112,15 @@ local function appendMetric(self, table, con, pod, podns, protoType)
             goto continue
         end
 
+        -- all container's rootfs and log's capacityBytes are the 
+        -- same (equal with nodes's rootfs capacity)
+        if type == "capacityBytes" and
+                protoType == "container_ephemeral_storage" then
+            if self._con_capacity_bytes == math.maxinteger then
+                self._con_capacity_bytes = tonumber(value)
+            end
+        end
+
         local cell = {
             {name=type, value=value},
         }
@@ -116,7 +129,7 @@ local function appendMetric(self, table, con, pod, podns, protoType)
     end
 end
 
-local function convertToBytes(limit)
+local function convertToBytes(limit, capacityBytes)
     local suffixes = {
         ["E"] = 10^18,
         ["P"] = 10^15,
@@ -140,7 +153,7 @@ local function convertToBytes(limit)
     elseif suffixes[suffix:upper()] then
         return value * suffixes[suffix:upper()]
     else
-        return nil
+        return capacityBytes
     end
 end
 
@@ -164,22 +177,23 @@ local function searchKey(table, key)
 end
 
 function PodStorageStat:packContainerLimit(con_name, pod_name, pod_ns)
-    local con = self.cons[con_name]
-    if not con or not con.resources or
-        not con.resources.limits then return end
-
-    local limits = con.resources.limits
-    local es_limit = limits["ephemeral-storage"]
-    if not es_limit then return end
-
+    local limit_bytes = self._con_capacity_bytes
     local labels = {
         {name="pod", index=pod_name},
         {name="nanmespace", index=pod_ns},
         {name="container", index=con_name},
         {name="storage", index=""}
     }
+    local con_key = pod_name.."-"..pod_ns.."-"..con_name
+    local con = self.cons[con_key]
+    if con and con.resources and con.resources.limits then
+        local limits = con.resources.limits
+        local es_limit = limits["ephemeral-storage"]
+        if es_limit then
+            limit_bytes = convertToBytes(es_limit)
+        end
+    end
 
-    local limit_bytes = convertToBytes(es_limit)
     local cell = {
         {name="limit", value=limit_bytes}
     }
@@ -228,7 +242,7 @@ function PodStorageStat:proc(elapsed, lines)
         local podname = pod.podRef.name
         local podns = pod.podRef.namespace
         -- skip blacklist namespace
-        if blacklist[podns] then
+        if self._ns_blacklist[podns] then
             goto continue
         end
 

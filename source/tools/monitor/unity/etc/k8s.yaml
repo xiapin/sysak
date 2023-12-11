@@ -363,8 +363,12 @@ metrics:
     head: type
     help: "pod ephemeral storage usage"
     type: "gauge"
+    whitelist:
+        type: ["^usedBytes", "^inodesUsed"]
   - title: sysom_container_ephemeral_storage_usage
     from: container_ephemeral_storage
     head: type
     help: "Containers ephemeral storage usage"
     type: "gauge"
+    whitelist:
+        type: ["^usedBytes", "^inodesUsed", "^limit"]
