@@ -272,8 +272,8 @@ static int get_dentry(unsigned long pfn, unsigned long cinode, int active, int s
 
     info->cinode = cinode;
     info->size = i_size>>10;
-    strncpy(info->filename, end, sizeof(info->filename) - 2);
-    info->filename[sizeof(info->filename) -1] = '0';
+    strncpy(info->filename, end, sizeof(info->filename) - 1);
+    info->filename[sizeof(info->filename) -1] = 0;
     files[i_ino] = info;
     return 0;
 }
