@@ -58,4 +58,6 @@ fn main() {
 
     generate_skeleton(&mut out, "tcpping");
     generate_header(&mut out, "tcpping");
+
+    generate_header(&mut out, "filter");
 }

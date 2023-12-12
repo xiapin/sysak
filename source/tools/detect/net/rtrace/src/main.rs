@@ -8,6 +8,7 @@ use rtrace::common::config::Config;
 use rtrace::common::file_logger::setup_file_logger;
 use rtrace::common::protocol::Protocol;
 use rtrace::common::utils::parse_ip_str;
+use rtrace::common::utils::run_old_rtrace;
 use rtrace::event::initial_stop_event_thread;
 use structopt::StructOpt;
 
@@ -77,8 +78,32 @@ pub struct Command {
     verbose: bool,
 }
 
+fn compatible_args() -> Vec<String> {
+    let mut args: Vec<String> = std::env::args().collect();
+    let mut old_rtrace = false;
+    for arg in &mut args {
+        if arg.as_str() == "retran" {
+            *arg = "--retran".to_owned();
+        } else if arg.as_str() == "drop" {
+            *arg = "--drop".to_owned();
+        } else if arg.as_str() == "latency" {
+            old_rtrace = true;
+        }
+    }
+    if old_rtrace {
+        args.remove(0);
+        run_old_rtrace(args);
+        return vec![];
+    }
+    args
+}
+
 fn main() {
-    let opts = Command::from_args();
+    let args = compatible_args();
+    if args.is_empty() {
+        return;
+    }
+    let opts = Command::from_iter(args.iter());
     setup_file_logger(opts.verbose).expect("failed to setup file logger");
 
     let config = Config {

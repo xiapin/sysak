@@ -17,10 +17,18 @@ impl JitterApplication {
             match rx.recv() {
                 Ok(event) => match event {
                     Event::QueueSlow(q) => {
-                        println!("{}", serde_json::to_string(&q).unwrap());
+                        if config.output_json {
+                            println!("{}", serde_json::to_string(&q).unwrap());
+                        } else {
+                            println!("{}", q);
+                        }
                     }
                     Event::UserSlow(u) => {
-                        println!("{}", serde_json::to_string(&u).unwrap());
+                        if config.output_json {
+                            println!("{}", serde_json::to_string(&u).unwrap());
+                        } else {
+                            println!("{}", u);
+                        }
                     }
                     Event::Stop => break,
                     _ => panic!("unexpected event type"),

@@ -1,10 +1,8 @@
 #ifndef __USER_SLOW_H
 #define __USER_SLOW_H
 
-struct filter
-{
-    unsigned long long threshold;
-};
+#include "filter.h"
+#include "thread.h"
 
 struct sched_event
 {
@@ -26,8 +24,7 @@ struct slow_event
     unsigned short dport;
 
     struct sched_event sched;
+    struct thread_event thread;
 };
-
-
 
 #endif
