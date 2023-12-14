@@ -11,8 +11,6 @@ extern "C" int gettid(void);
 
 using namespace std;
 
-#define MAX_THREAD_NUM 300
-
 static pthread_mutex_t foo_mutex;
 
 void* foo(void* arg)
@@ -42,15 +40,23 @@ void* foo(void* arg)
 
 int main(int argc,char** argv)
 {
+    int i, thread_nr, cpu_nr;
+    pthread_t *thread;
+
+    cpu_nr = sysconf(_SC_NPROCESSORS_CONF);
+    if (cpu_nr <= 0)
+        exit(1);
+
+    thread_nr = cpu_nr * 20;
     pthread_mutex_init(&foo_mutex, NULL);
 
-    pthread_t thread[MAX_THREAD_NUM];
-    for(int i=0;i<MAX_THREAD_NUM;i++){
+    thread = (pthread_t *)malloc(thread_nr * sizeof(pthread_t));
+    for(i = 0; i < thread_nr; i++){
         if(pthread_create(&thread[i],NULL,foo,(void *)i))
             exit(1);
    }
 
-   for(int i=0;i<MAX_THREAD_NUM;i++) {
+   for(i = 0; i < thread_nr; i++) {
       pthread_join(thread[i],NULL);
    }
 
