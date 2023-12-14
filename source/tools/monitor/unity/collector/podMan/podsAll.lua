@@ -51,7 +51,7 @@ function CpodsAll:setupPlugins()
                 },
                 {
                     name = "namespace",
-                    index = "",
+                    index = "None",
                 }
             }
         end
