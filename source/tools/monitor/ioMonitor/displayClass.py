@@ -37,6 +37,8 @@ def iolatencyResultReport(*argvs):
     nf = argvs[1]
     nfPutPrefix = str(argvs[2])
     statusReportDicts = argvs[3]
+    mode = argvs[4]
+    analysisFile = argvs[5]
     ioburst = False
     nfPrefix = []
     iolatStartT = statusReportDicts['iolatency']['startT']
@@ -154,10 +156,21 @@ def iolatencyResultReport(*argvs):
         result.append(diagret+','+reason+','+suggest)
 
     for e, p in zip(result, nfPrefix):
-        # print(e+'\n')
-        #nf.put(nfPutPrefix, p+' '+e)
-        nf.puts(nfPutPrefix+p+' '+e)
-        statusReportDicts['iolatency']['valid'] = True
+        if mode == "diagnose":
+            dic = dict(item.split('=') for item in p[1:].split(','))
+            matches = re.findall(r'(\w+)="(.*?)"', e)
+            info_dict = {key: value for key, value in matches}
+            dic.update(info_dict)
+            json_str = json.dumps(dic)
+            directory = os.path.dirname(analysisFile)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            with open(analysisFile, 'a+') as f:
+                f.write(json_str+"\n")
+            statusReportDicts['iolatency']['valid'] = True
+        else:
+            nf.puts(nfPutPrefix+p+' '+e)
+            statusReportDicts['iolatency']['valid'] = True
 
 
 def iohangResultReport(*argvs):
@@ -168,6 +181,8 @@ def iohangResultReport(*argvs):
     nfPutPrefix=str(argvs[2])
     statusReportDicts = argvs[3]
     nfPrefix=[]
+    mode = argvs[4]
+    analysisFile = argvs[5]
 
     os.system('ls -rtd '+argvs[0]+'/../* | head -n -5 |'\
         ' xargs --no-run-if-empty rm {} -rf')
@@ -246,9 +261,21 @@ def iohangResultReport(*argvs):
             result.append(diagret+','+reason+','+suggest)
 
     for e, p in zip(result, nfPrefix):
-        nf.puts(nfPutPrefix+p+' '+e)
-        #nf.put(nfPutPrefix, p+' '+e)
-        statusReportDicts['iohang']['valid'] = True
+        if mode == "diagnose":
+            dic = dict(item.split('=') for item in p[1:].split(','))
+            matches = re.findall(r'(\w+)="(.*?)"', e)
+            info_dict = {key: value for key, value in matches}
+            dic.update(info_dict)
+            json_str = json.dumps(dic)
+            directory = os.path.dirname(analysisFile)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            with open(analysisFile, 'a+') as f:
+                f.write(json_str+"\n")
+            statusReportDicts['iohang']['valid'] = True
+        else:
+            nf.puts(nfPutPrefix+p+' '+e)
+            statusReportDicts['iohang']['valid'] = True
 
 
 def ioutilDataParse(data, resultInfo):
@@ -279,7 +306,7 @@ def ioutilDataParse(data, resultInfo):
     return totalIops,totalBw,tUnit
 
 
-def ioutilReport(nf, nfPutPrefix, resultInfo, tUnit, diagret):
+def ioutilReport(nf, nfPutPrefix, resultInfo, tUnit, diagret, mode, analysisFile):
     top = 1
     suggestPS = reason = ''
     resultInfo = \
@@ -318,8 +345,17 @@ def ioutilReport(nf, nfPutPrefix, resultInfo, tUnit, diagret):
         diagret, reason, suggest)
     #nf.put(nfPutPrefix,
     if reason != '':
-        nf.puts(nfPutPrefix+putIdx+putField)
-    # print(prefix+reason+suggest+'\n')
+        if mode == "diagnose":
+            dic = dict({'diag_type': 'IO-Burst', 'devname': "——", 
+                        'diagret': diagret,'reason': reason,'solution': suggest})
+            json_str = json.dumps(dic)
+            directory = os.path.dirname(analysisFile)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            with open(analysisFile, 'a+') as f:
+                f.write(json_str+"\n")
+        else:
+            nf.puts(nfPutPrefix+putIdx+putField)
 
 
 def ioutilResultReport(*argvs):
@@ -331,6 +367,8 @@ def ioutilResultReport(*argvs):
     maxIops = maxBw = 0
     minIops = minBw = sys.maxsize
     tUnit = None
+    mode = argvs[4]
+    analysisFile = argvs[5]
 
     os.system('ls -rtd '+os.path.dirname(argvs[0])+'/../* | head -n -5 |'\
         ' xargs --no-run-if-empty rm {} -rf')
@@ -358,7 +396,7 @@ def ioutilResultReport(*argvs):
             ', Bps:'+humConvert(minBw).replace('s', tUnit)+\
             '~'+humConvert(maxBw).replace('s', tUnit)
         diagret = 'IO-Burst('+content+') detected'
-        ioutilReport(nf, nfPutPrefix, resultInfo, tUnit, diagret)
+        ioutilReport(nf, nfPutPrefix, resultInfo, tUnit, diagret, mode, analysisFile)
         statusReportDicts['ioutil']['valid'] = True
 
 
@@ -380,7 +418,7 @@ def iowaitDataParse(data, resultInfo):
     return data['global iowait'],unkownDisable
 
 
-def iowaitReport(nf, nfPutPrefix, unkownDisable, resultInfo, diagret):
+def iowaitReport(nf, nfPutPrefix, unkownDisable, resultInfo, diagret, mode, analysisFile):
     top = 0
     reason = ''
     resDicts = {
@@ -427,11 +465,20 @@ def iowaitReport(nf, nfPutPrefix, unkownDisable, resultInfo, diagret):
     else:
         suggest = 'Report stacktrace to OS kernel specialist'
 
-    putIdx = ',diag_type=IOwait-high '
-    putField = 'diagret=\"%s\",reason=\"%s\",solution=\"%s\"' %(
-        diagret, reason, suggest)
-    #nf.put(nfPutPrefix,
-    nf.puts(nfPutPrefix+putIdx+putField)
+    if mode == "diagnose":
+        dic = dict({'diag_type': 'IOwait-high', 'devname': "——", 
+                    'diagret': diagret,'reason': reason,'solution': suggest})
+        json_str = json.dumps(dic)
+        directory = os.path.dirname(analysisFile)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(analysisFile, 'a+') as f:
+            f.write(json_str+"\n")
+    else:
+        putIdx = ',diag_type=IOwait-high '
+        putField = 'diagret=\"%s\",reason=\"%s\",solution=\"%s\"' %(
+            diagret, reason, suggest)
+        nf.puts(nfPutPrefix+putIdx+putField)
 
 
 def iowaitResultReport(*argvs):
@@ -442,6 +489,8 @@ def iowaitResultReport(*argvs):
     maxGiowait = 0
     minGiowait = sys.maxsize
     unkownDisable = None
+    mode = argvs[4]
+    analysisFile = argvs[5]
 
     os.system('ls -rtd '+os.path.dirname(argvs[0])+'/../* | head -n -5 |'\
         ' xargs --no-run-if-empty rm {} -rf')
@@ -465,13 +514,12 @@ def iowaitResultReport(*argvs):
     if resultInfo:
         content = str(minGiowait)+'%~'+str(maxGiowait)+'%'
         diagret = 'IOwait high('+content+') detected'
-        iowaitReport(nf, nfPutPrefix, unkownDisable, resultInfo, diagret)
+        iowaitReport(nf, nfPutPrefix, unkownDisable, resultInfo, diagret, mode, analysisFile)
         statusReportDicts['iowait']['valid'] = True
-        # print(diagret+reason+solution+'\n')
 
 
 class displayClass(object):
-    def __init__(self, sender):
+    def __init__(self, sender, mode, resultPath):
         self.funcResultReportDicts = {
             'iohang': iohangResultReport,
             'ioutil': ioutilResultReport,
@@ -487,6 +535,8 @@ class displayClass(object):
         }
         self._sender = sender
         self._nfPutPrefix = 'IOMonDiagLog'
+        self._mode = mode
+        self._resultpath = resultPath
 
     def markIoburst(self, now):
         self.statusReportDicts['iolatency']['lastIOburstT'] = now
@@ -503,7 +553,7 @@ class displayClass(object):
         self.statusReportDicts[diagType]['endT'] = endTime
         self.statusReportDicts[diagType]['valid'] = False
         argvs = [
-            filepath, self._sender, self._nfPutPrefix, self.statusReportDicts]
+            filepath, self._sender, self._nfPutPrefix, self.statusReportDicts, self._mode, self._resultpath]
         timer = threading.Timer(timeout,
                                 self.funcResultReportDicts[diagType],
                                 argvs)
