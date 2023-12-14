@@ -118,7 +118,7 @@ function CPodMem:proc(elapsed, lines)
             if self.inodes[tonumber(cinode)] ~= nil then
                 local cname = self.inodes[tonumber(cinode)]
                 local cell = {{name = "size", value = tonumber(size)}}
-                local label = {{name="pod",index=cname}, {name="namespace",index = "",},
+                local label = {{name="pod",index=cname}, {name="namespace",index = "None",},
                         {name = "container", index = cname}, {name = "file", index = filen}}
                 self:appendLine(self:_packProto("podmem", label, cell))
                 cell = {{name = "cached", value = tonumber(cache)}}
