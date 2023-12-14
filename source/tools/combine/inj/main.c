@@ -231,7 +231,7 @@ int inject_fdlimit(void *args)
 
 int inject_oom(void *args)
 {
-        return 0;
+	return exec_extern_tool("goom", NULL);
 }
 
 int inject_packdrop(void *args)
