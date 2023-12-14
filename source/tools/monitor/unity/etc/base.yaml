@@ -89,6 +89,8 @@ plugins:
     description: "collect pmu events"
   - so: cpufreq
     description: "collect cpu frequence of perf cpu"
+  - so: cpudist
+    description: "sched delay"
   - so: numainfo
     description: "numainfo"
 
@@ -342,7 +344,7 @@ metrics:
     type: "gauge"
   - title: sysom_container_memory_oomcnt
     from: cg_memoom_cnt
-    head: "type"
+    head: value
     help: "container oom event count"
     type: "counter"
   - title: sysom_container_memUtil
@@ -374,6 +376,11 @@ metrics:
     from: cg_cpuacct_stat
     head: value
     help: "cpuacct/cpuacct.stat"
+    type: "gauge"
+  - title: sysom_container_proc_stat
+    from: cg_proc_stat
+    head: value
+    help: "container cpuacct proc stat"
     type: "gauge"
   - title: sysom_container_cfs_quota
     from: cgCpuQuota
