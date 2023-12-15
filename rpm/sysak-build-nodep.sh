@@ -51,6 +51,7 @@ mkdir -p \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 /bin/cp $SOURCE_DIR/rpm/sysak.service \$RPM_BUILD_ROOT/usr/lib/systemd/system/
 /bin/cp $SOURCE_DIR/rpm/sysak_server.conf \$RPM_BUILD_ROOT/usr/local/sysak/
 /bin/cp $SOURCE_DIR/rpm/.sysak.diag.config \$RPM_BUILD_ROOT/etc/sysak/
+/usr/bin/rm -rf \$RPM_BUILD_ROOT/usr/local/sysak/.sysak_components/tools/$LINUX_VERSION
 
 %preun
 systemctl stop sysak
