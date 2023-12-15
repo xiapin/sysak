@@ -1002,7 +1002,6 @@ int has_string(char *dest_file, char *substring)
 	fp=fopen(dest_file,"r");
 	if(fp==NULL)
 	{
-		printf("open error\n");
 		return -1;
 	}
 
