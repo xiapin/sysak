@@ -1026,7 +1026,6 @@ void btf_support_check(void){
     if (access(local_btf,0) == 0){
         snprintf(tool_btf, sizeof(tool_btf), "%s/vmlinux-%s", tools_path, kern_version);
         if (copy_file(tool_btf, local_btf) > 0){
-            oss_get_components = auto_get_components =false;
             btf_depend = false;
             return;
         }
