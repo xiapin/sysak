@@ -3,9 +3,16 @@
 
 #include "btfparse.h"
 
+enum KERNEL_VERSION {
+    LINUX_3_10,
+    LINUX_4_19,
+    LINUX_5_10
+};
+
 #define PATH_MAX        (2048)
 #define LEN             (255)
 #define CSS_DYING       (1 << 4)     /* css is dying */
+#define CSS_ONLINE      (1 << 1) 
 
 /* iterator function of "for_each_mem_cgroup" */
 unsigned long _mem_cgroup_iter(unsigned long root, unsigned long prev,

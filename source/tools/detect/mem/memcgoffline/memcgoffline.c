@@ -6,12 +6,14 @@
 #include <errno.h>
 #include <getopt.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 
 #include "kcore_utils.h"
 #include "memcg_iter.h"
 
 static struct btf *btf_handle = NULL;
 int total_memcg_num = 0;
+enum KERNEL_VERSION kernel_version = LINUX_4_19;
 
 struct environment {
 	int print_cg_num;                 /* unused */
@@ -19,15 +21,48 @@ struct environment {
 	.print_cg_num = 10000,
 };
 
+static int get_kernel_version()
+{
+    struct utsname kernel_info;
+    char *release;
+    long ver[16];
+    int i = 0;
+
+    if (uname(&kernel_info) < 0) {
+        LOG_ERROR("uname error: %s\n", strerror(errno));
+        return -1;
+    }
+
+    release = kernel_info.release;
+    while (*release) {
+        if (isdigit(*release)) {
+            ver[i] = strtol(release, &release, 10);
+            i++;
+        } else {
+            release++;
+        }
+    }
+
+    if (ver[0] == 3) {
+        kernel_version = LINUX_3_10;
+    } else if (ver[0] == 4) {
+        kernel_version = LINUX_4_19;
+    } else {
+        kernel_version = LINUX_5_10;
+    }
+
+    return 0;
+}
+
 static int caculate_offline(unsigned long start_memcg)
 {   
     int offline_num = 0;
     unsigned long css, css_flags, cnt, iter = 0;
     long refcnt_value;
-    unsigned int flags_value;
+    unsigned int flags_value, offline_flag;
     char fileName[PATH_MAX];
     struct member_attribute *css_attr, *css_flag_attr, *refcnt_attr;
-    struct member_attribute *cnt_attr;
+    struct member_attribute *cnt_attr, *ref_data_attr, *data_cnt_attr;
 
     css_attr = get_offset_no_cache("mem_cgroup", "css", btf_handle);
     if (!css_attr) {
@@ -49,24 +84,57 @@ static int caculate_offline(unsigned long start_memcg)
         return -1;
     }
 
-    cnt_attr = get_offset_no_cache("percpu_ref", "count", btf_handle);
-    if (!cnt_attr) {
-        LOG_ERROR("get cnt offset of percpu_ref failed!\n");
-        return -1;
+    if (kernel_version == LINUX_5_10) {
+        ref_data_attr = get_offset_no_cache("percpu_ref", "data", btf_handle);
+        if (!ref_data_attr) {
+            LOG_ERROR("get data offset of percpu_ref failed!\n");
+            return -1;
+        }
+        data_cnt_attr = get_offset_no_cache("percpu_ref_data", "count", btf_handle);
+        if (!data_cnt_attr) {
+            LOG_ERROR("get cnt offset of percpu_ref_data failed!\n");
+            return -1;
+        }
+    } else {
+        cnt_attr = get_offset_no_cache("percpu_ref", "count", btf_handle);
+        if (!cnt_attr) {
+            LOG_ERROR("get cnt offset of percpu_ref failed!\n");
+            return -1;
+        }
     }
-    
+
     for_each_mem_cgroup(iter, start_memcg, btf_handle) {
         css = iter + css_attr->offset;
         css_flags = css + css_flag_attr->offset;
 
         kcore_readmem(css_flags, &flags_value, sizeof(flags_value));
-
-        if (flags_value & CSS_DYING) {
-            cnt = css + refcnt_attr->offset + cnt_attr->offset;
-            
+        if (kernel_version == LINUX_3_10) {
+            offline_flag = !(flags_value & CSS_ONLINE);
+        } else {
+            offline_flag = flags_value & CSS_DYING;
+        }
+        
+        if (offline_flag) {
             offline_num++;
-            kcore_readmem(cnt, &refcnt_value, sizeof(refcnt_value));
-            
+
+            // in kernel 5.10, refcnt = css->refcnt->data->count
+            // in other, refcnt = css->refcnt->count
+            if (kernel_version == LINUX_5_10) {
+                unsigned long ref_data, ref_data_val;
+    
+                ref_data = css + refcnt_attr->offset + ref_data_attr->offset;
+                kcore_readmem(ref_data, &ref_data_val, sizeof(ref_data_val));
+
+                cnt = ref_data_val + data_cnt_attr->offset;
+                kcore_readmem(cnt, &refcnt_value, sizeof(refcnt_value));
+            } else if (kernel_version == LINUX_4_19) {
+                cnt = css + refcnt_attr->offset + cnt_attr->offset;
+                kcore_readmem(cnt, &refcnt_value, sizeof(refcnt_value));
+            } else {
+                cnt = css + refcnt_attr->offset;
+                kcore_readmem(cnt, &refcnt_value, sizeof(refcnt_value));
+            }
+
             if (env.print_cg_num > 0) {
                 memcg_get_name(iter, fileName, PATH_MAX, btf_handle);
                 printf("cgroup path:%s\trefcount=%ld\n", fileName, refcnt_value);
@@ -148,6 +216,12 @@ int main(int argc, char *argp[])
 	ret = parse_args(argc, argp, &env);
     if (ret) {
         LOG_ERROR("parse arg error!\n");
+        return -1;
+    }
+
+    ret = get_kernel_version();
+    if (ret) {
+        LOG_ERROR("get kernel version failed!");
         return -1;
     }
 
