@@ -145,7 +145,6 @@ struct ksym_cell* ksym_search(addr_t key) {
     int mid;
 
     if (sym_cnt <= 0) {
-        printf("sym_cnt: %d", sym_cnt);
         return NULL;
     }
 

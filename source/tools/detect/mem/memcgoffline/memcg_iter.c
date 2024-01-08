@@ -9,6 +9,7 @@
 #include "kcore_utils.h"
 
 static unsigned long root_mem_cgroup;
+extern enum KERNEL_VERSION kernel_version;
 
 struct member_attribute *get_offset_no_cache(char *struct_name, 
                             char *member_name, struct btf *handle)
@@ -32,6 +33,34 @@ int get_member_offset(char *struct_name, char *member_name, struct btf *handle)
     strcat(prefix, struct_name);
 
     return btf_get_member_offset(handle, prefix, member_name)/8;
+}
+
+static unsigned long _cg_next_child(unsigned long pos, unsigned long parent,
+                        struct btf *btf_handle)
+{
+    struct member_attribute *att, *att2;
+    unsigned long next;
+
+    att = get_offset_no_cache("cgroup", "sibling", btf_handle);
+    if (!att)
+        return 0;
+
+    att2 = get_offset_no_cache("cgroup", "children", btf_handle);
+    if (!att2)
+        return 0;
+
+    if(!pos) {
+        kcore_readmem(parent + att2->offset, &next, sizeof(next));
+        next = next - att->offset;
+    } else {
+        kcore_readmem(pos + att->offset, &next, sizeof(next));
+        next = next - att->offset;
+    }
+
+    if(next + att->offset != parent + att2->offset)
+        return next;
+
+    return 0;
 }
 
 static unsigned long _css_next_child(unsigned long pos, unsigned long parent,
@@ -62,6 +91,28 @@ static unsigned long _css_next_child(unsigned long pos, unsigned long parent,
     return 0;
 }
 
+static unsigned long cg_to_memcg(unsigned long cgroup, struct btf *btf_handle)
+{
+    struct member_attribute *cg_subsys_att, *memcg_css_att;
+    unsigned long css_offset, css;
+    // normally, mem_cgroup_subsys_id = 3 (without cgroup debug subsys)
+    const int mem_cgroup_subsys_id = 3;
+
+    cg_subsys_att = get_offset_no_cache("cgroup", "subsys", btf_handle);
+    if (!cg_subsys_att)
+        return 0;
+
+    css_offset = cgroup + cg_subsys_att->offset + (mem_cgroup_subsys_id * sizeof(unsigned long));
+    kcore_readmem(css_offset, &css, sizeof(css));
+
+    memcg_css_att = get_offset_no_cache("mem_cgroup", "css", btf_handle);
+    if (!memcg_css_att)
+        return 0;
+
+    // equal to mem_cgroup_from_css()
+    return css - memcg_css_att->offset;
+}
+
 unsigned long _mem_cgroup_iter(unsigned long root, unsigned long prev,
                 struct btf *btf_handle)
 {
@@ -77,40 +128,71 @@ unsigned long _mem_cgroup_iter(unsigned long root, unsigned long prev,
     if(!prev)
         return root;
     
-    //printf("root:%lx, prev:%lx\n", root, prev);
-
     att = get_offset_no_cache("mem_cgroup", "css", btf_handle);
     if (!att)
-        return 0;
-
-    att2 = get_offset_no_cache("cgroup_subsys_state", "parent", btf_handle);
-    if (!att2)
         return 0;
 
     pos = prev;
     //kcore_readmem(pos + att->offset, &css, sizeof(css));
     css = pos + att->offset;
-
     //kcore_readmem(root+att->offset, &root_css, sizeof(root_css));
     root_css = root + att->offset;
-    next = _css_next_child(0, css, btf_handle);
-    if(!next)
-    {
-        tmp1 = css;
-        while(tmp1 != root_css)
+
+    if (kernel_version == LINUX_3_10) {
+        struct member_attribute *css_cg_att, *cg_parent_att;
+        unsigned long cg, root_cg;
+        unsigned long cg_tmp1, cg_tmp2;
+
+        css_cg_att = get_offset_no_cache("cgroup_subsys_state", "cgroup", btf_handle);
+        if (!css_cg_att)
+            return 0;
+
+        cg_parent_att = get_offset_no_cache("cgroup", "parent", btf_handle);
+        if (!cg_parent_att)
+            return 0;
+
+        kcore_readmem(css + css_cg_att->offset, &cg, sizeof(cg));
+        kcore_readmem(root_css + css_cg_att->offset, &root_cg, sizeof(root_cg));
+
+        next = _cg_next_child(0, cg, btf_handle);
+        if (!next) {
+            cg_tmp1 = cg;
+            while (cg_tmp1 != root_cg) {
+                kcore_readmem(cg_tmp1 + cg_parent_att->offset, &cg_tmp2, sizeof(cg_tmp2));
+                next = _cg_next_child(cg_tmp1, cg_tmp2, btf_handle);
+                if (next)
+                    break;
+                cg_tmp1 = cg_tmp2;
+            }
+        }
+    } else {
+        att2 = get_offset_no_cache("cgroup_subsys_state", "parent", btf_handle);
+        if (!att2)
+            return 0;
+
+        next = _css_next_child(0, css, btf_handle);
+        if(!next)
         {
-            kcore_readmem(tmp1 + att2->offset, &tmp2, sizeof(tmp2));
-            next = _css_next_child(tmp1, tmp2, btf_handle);
-            if(next)
-                break;
-            tmp1 = tmp2;
+            tmp1 = css;
+            while(tmp1 != root_css)
+            {
+                kcore_readmem(tmp1 + att2->offset, &tmp2, sizeof(tmp2));
+                next = _css_next_child(tmp1, tmp2, btf_handle);
+                if(next)
+                    break;
+                tmp1 = tmp2;
+            }
         }
     }
 
     if(!next)
         return 0;
 
-    memcg = next - att->offset;
+    if (kernel_version == LINUX_3_10) {
+        memcg = cg_to_memcg(next, btf_handle);
+    } else {
+        memcg = next - att->offset;
+    }
 
     return memcg;
 }
@@ -234,58 +316,58 @@ void memcg_get_name(unsigned long memcg, char *name,
 
     kcore_readmem(cg + att->offset, &cg, sizeof(cg));
 
-#ifdef LINUX_310
-    if (!cg)
-        return;
-    cgroup_path(cg, name, PATH_MAX);
-    end = name+strlen("/sys/fs/cgroup/memory/");
-    memmove(end, name, strlen(name)+1);
-    prepend(&end, &len, "/sys/fs/cgroup/memory", strlen("/sys/fs/cgroup/memory"), 0);
-#else
-    unsigned long kn;
-    unsigned long pkn;
-    int kn_name_offset, kn_pa_offset;
+    if (kernel_version == LINUX_3_10) {
+        if (!cg)
+            return;
+        cgroup_path(cg, name, PATH_MAX, btf_handle);
+        end = name + strlen("sys/fs/cgroup/memory/");
+        memmove(end, name, strlen(name) + 1);
+        prepend(&end, &len, "sys/fs/cgroup/memory", strlen("sys/fs/cgroup/memory"), 0);
+    } else {
+        unsigned long kn;
+        unsigned long pkn;
+        int kn_name_offset, kn_pa_offset;
 
-    att = get_offset_no_cache("cgroup", "kn", btf_handle);
-    if (!att)
-        return;
+        att = get_offset_no_cache("cgroup", "kn", btf_handle);
+        if (!att)
+            return;
 
-    kcore_readmem(cg + att->offset, &kn, sizeof(kn));
+        kcore_readmem(cg + att->offset, &kn, sizeof(kn));
 
-    if (!cg || !kn)
-        return;
+        if (!cg || !kn)
+            return;
 
-    end = name + len - 1;
-    prepend(&end, &len, "\0", 1, 0);
-    pkn = kn;
-
-    kn_name_offset = get_member_offset("kernfs_node", "name", btf_handle);
-    if (kn_name_offset < 0)
-        return;
-       
-    kn_pa_offset = get_member_offset("kernfs_node", "parent", btf_handle);
-    if (kn_pa_offset < 0)
-        return;
-
-    while (pkn) {
-        kcore_readmem(pkn + kn_name_offset, &knname, sizeof(knname));
-        kcore_readmem(knname, subname, sizeof(subname));
-
-        pos = prepend(&end, &len, subname, strlen(subname), 0);
-        if (pos)
-            break;
-
-        kcore_readmem(pkn + kn_pa_offset, &kn, sizeof(kn));
-        if ((pkn == kn) || !kn)
-            break;
-        pos = prepend(&end, &len, "/", 1, 0);
-        if (pos)
-            break;
+        end = name + len - 1;
+        prepend(&end, &len, "\0", 1, 0);
         pkn = kn;
+
+        kn_name_offset = get_member_offset("kernfs_node", "name", btf_handle);
+        if (kn_name_offset < 0)
+            return;
+        
+        kn_pa_offset = get_member_offset("kernfs_node", "parent", btf_handle);
+        if (kn_pa_offset < 0)
+            return;
+
+        while (pkn) {
+            kcore_readmem(pkn + kn_name_offset, &knname, sizeof(knname));
+            kcore_readmem(knname, subname, sizeof(subname));
+
+            pos = prepend(&end, &len, subname, strlen(subname), 0);
+            if (pos)
+                break;
+
+            kcore_readmem(pkn + kn_pa_offset, &kn, sizeof(kn));
+            if ((pkn == kn) || !kn)
+                break;
+            pos = prepend(&end, &len, "/", 1, 0);
+            if (pos)
+                break;
+            pkn = kn;
+        }
+
+        prepend(&end, &len, "/sys/fs/cgroup/memory", strlen("/sys/fs/cgroup/memory"), 0);
+
+        memmove(name, end, strlen(end) + 1);
     }
-
-    prepend(&end, &len, "/sys/fs/cgroup/memory", strlen("/sys/fs/cgroup/memory"), 0);
-
-    memmove(name, end, strlen(end) + 1);
-#endif
 }

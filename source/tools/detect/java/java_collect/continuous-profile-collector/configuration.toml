@@ -1,0 +1,145 @@
+################################ Basic ################################
+# collection period
+# unit: second(s)
+# default: 60
+period = 60
+
+# delay of the first period starting
+# unit: second(s)
+# default: 0
+delay = 0
+
+# whether to start the first period at zero second, 'delay' will be ignored if true
+# default: false
+start_at_zero_second = false
+
+# compression mode of profile
+# support values: 'gzip', 'none'
+# default: 'none'
+compression_mode = 'none'
+
+# trigger mode
+# support values: 'periodic', 'api'
+# when 'api', 'period', 'delay', 'start_at_zero_second' will be ignored, and
+# agent will set this mode to 'api' when using collector script
+# default: 'periodic'
+trigger_mode = 'periodic'
+
+# Output file format:
+# 'jfr'
+# 'collapsed_with_samples': this format is only supported by Async Profiler, JFR will be disabled if is is specified
+# 'collapsed_with_total': this format is only supported by Async Profiler, JFR will be disabled if is is specified
+#
+# when specified as 'collapsed_with_samples' and 'collapsed_with_total', only one of 'execution'
+# and 'allocation' will be enabled, if both are specified as enabled, only 'execution' will be finally enabled
+#
+# it is recommended to use 'jfr', this configuration item will be removed in the future, and only used by a special scene now
+#
+# default: 'jfr'
+output_format = 'jfr'
+
+################################ Execution ################################
+[execution]
+# implementation strategy for data collection:
+#   'jfr': use JFR to collect profiling profile or disabled if unsupported
+#   'async_profiler': use Async Profiler to profile or disabled if unsuppored
+#   'auto': automatically decide which way to collect profile, or disabled if none of ways is supported
+#   'off': distable the profiling type
+#
+# default: 'auto'
+strategy = 'auto'
+
+# unit: ms
+# default: 10
+interval = -1
+
+################################ Wall Clock ################################
+[wall_clock]
+# default: 'auto'
+strategy = 'off'
+# unit: ms
+interval = 10
+thread_filter = ''
+threads_per_tick = 16
+
+################################ Allocation ################################
+[allocation]
+# same meaning as 'execution.strategy'
+strategy= 'off'
+
+# unit: kilobyte(s)
+# default: 256
+# Only work for Async Profiler
+interval = 256
+
+# unit: kilobyte(s)
+# default: 0
+# Only work for Async Profiler
+# =0 means disabled, >0 means sampling obj exceeding such threshold
+humongous_threshold = 0
+
+################################ JFR ################################
+[JFR]
+# how much data is kept in the disk repository
+# unit: megabyte(s)
+# default: 64
+max_size = 64
+
+# how far back data is kept in the disk repository
+# unit: minute(s)
+# default: 10
+max_age = 10
+
+# the path of custom JFR settings file, empty means use default settings
+# file format: property
+# default: null
+# custom_settings_path = ''
+
+# override custom or default settings
+# e.g.
+#   jdk.ExecutionSample#period=20 ms
+#   jdk.SafepointCleanup#enabled=true
+# default: null
+# override_settings = """
+# """
+
+# the settings of JFR may be modified due to environmental problem (such as JDK version),
+# if you want some settings not to be modified, please specify here
+#
+# default: null
+# mandatory_settings = """
+# """
+
+################################ Logging ################################
+[log]
+# DEBUG, INFO, WARN, ERROR, OFF, default ERROR
+# level = 'DEBUG'
+# default <user.dir>/cpc.log
+log_file = '/tmp/cpc_?.log'
+
+################################ Agent ################################
+[agent]
+# application name, agent will set a value automatically if empty:
+#   a. <ip>-<Main-Class-Name>
+#   b. UNNAMED-APP
+# default: null
+# app_name = ''
+
+# upload server of profile, 'oss' and 'destination' will be ignored if not empty
+# e.g. http://profile-visualizer-dev.alibaba.net
+# default: null
+# upload_server = ''
+
+# oss configuration
+# default: null
+# oss_endpoint = ''
+# oss_key = ''
+# oss_secret = ''
+# oss_bucket = ''
+
+# the path(directory or file) to save profile, only take effect when 'upload_server' and 'oss' is empty. Agent will set
+# to <user.dir> when effect but empty
+# when specified as a directory, the final saved file name is 'profile-MM-dd-HH-mm-ss.jfr'
+# overwrite if the target file already exists and is not a directory
+#
+# default: null

@@ -13,7 +13,7 @@ local CguardDaemon = class("guardDaemon")
 local function feedDaemon(fd)
     local ws, err, errno = unistd.write(fd, "feed.")
     if ws == nil then
-        system:posixError("feed daemo failed.", err, errno)
+        system:posixError("feed daemon failed.", err, errno)
     end
 end
 

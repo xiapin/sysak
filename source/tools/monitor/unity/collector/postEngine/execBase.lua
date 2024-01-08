@@ -22,8 +22,8 @@ local function checkChild(ppid, pid)
 
         for line in f:lines() do
             if pystring:startswith(line, "PPid:") then
-                local _, s = pystring:split(line, ":", 1)
-                if tonumber(pystring:strip(s)) == ppid then
+                local s = pystring:split(line, ":", 1)
+                if tonumber(pystring:strip(s[2])) == ppid then
                     ret = true
                 end
                 break
@@ -35,13 +35,17 @@ local function checkChild(ppid, pid)
     return ret
 end
 
-function CexecBase:_init_(cmd, args, seconds)
+function CexecBase:_init_(cmd, args, seconds) -- seconds超时时间
     self.cmd = cmd
     self._cnt = 0
     self._loop = seconds / interval
 
     self._ppid = unistd.getpid()
-    self._pid = exec.run(cmd, args)
+
+    self._fIn, self._fOut = unistd.pipe()
+    assert(self._fIn, "creat pipe failed.")
+
+    self._pid = exec.run(cmd, args, self._fIn, self._fOut)
 end
 
 function CexecBase:addEvents(e)

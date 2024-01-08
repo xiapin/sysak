@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import argparse
 import signal
+import os
 from ioMonCfgClass import ioMonCfgClass
 from ioMonitorClass import ioMonitorClass
 
@@ -57,6 +58,9 @@ def main():
                         help='Reset cfg to default')
     parser.add_argument('-o','--only_set_cfg', action='store_true',
                         help='Only set cfg')
+    parser.add_argument('-t','--timeout', type=int, default=0, help='Monitoring duration')
+    parser.add_argument('-a','--analysis_file', type=str, default=\
+        '/var/log/sysak/iosdiag/iodiagnose/iodiagnose.log', help='Store diagnosis result')
     args = parser.parse_args()
 
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
@@ -71,10 +75,19 @@ def main():
         ioMonCfg = ioMonCfgClass(args.set_cfg, args.reset_cfg, logRootPath)
         ioMonCfg.notifyIoMon()
         return
+    
+    mode = "monitor"
+    if args.timeout < 0:
+        args.timeout = 0
+    elif args.timeout > 0:
+        mode = "diagnose"
+    
+    if os.path.exists(args.analysis_file):
+        os.remove(args.analysis_file)
 
     ioMonCfg = ioMonCfgClass(args.set_cfg, args.reset_cfg, logRootPath)
-    ioMon = ioMonitorClass(logRootPath, ioMonCfg, pipeFile)
-    ioMon.monitor()
+    ioMon = ioMonitorClass(logRootPath, ioMonCfg, pipeFile, mode, args.analysis_file)
+    ioMon.monitor(args.timeout)
 
 if __name__ == "__main__":
     main()

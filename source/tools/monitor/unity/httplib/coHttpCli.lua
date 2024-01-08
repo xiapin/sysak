@@ -286,7 +286,6 @@ local function waitHttpRest(fread, tReq)
     if tReq.header["content-length"] then
         local lenData = #tReq.data
         local lenInfo = tonumber(tReq.header["content-length"])
-        print("len: " .. lenInfo)
 
         local rest = lenInfo - lenData
         if rest > 10 * 1024 * 1024 then  -- limit max data len
@@ -433,10 +432,11 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
                     sent, err, errno = socket.send(fd, stream)
                     if sent == nil then
                         if errno == 11 then  -- EAGAIN ?
+                            sent = 0
                             goto continue
                         end
                         checkInt(errno, fd)
-                        print(string.format("socket send failed, report:%d, %s", err, errno))
+                        print(string.format("socket send failed, report:%s, %d", err, errno))
                         return false
                     end
                 else  -- need to read ? may something error or closed.
@@ -454,7 +454,7 @@ function CcoHttpCli:coWrite(cffi, efd, fd, stream)
         return true
     else
         checkInt(errno, fd)
-        print(string.format("socket send failed, report:%d, %s", err, errno))
+        print(string.format("socket send failed, report:%s, %d", err, errno))
         return false
     end
 end

@@ -49,6 +49,7 @@ cp beeQ/rbtree/*.lua ${APP}/beeQ/rbtree/
 cp beeQ/unity-mon ${APP}/beeQ/
 cp beeQ/run.sh ${APP}/beeQ/
 
+# for collector
 mkdir ${APP}/collector
 mkdir ${APP}/collector/native
 mkdir ${APP}/collector/guard
@@ -58,7 +59,15 @@ mkdir ${APP}/collector/postEngine
 mkdir ${APP}/collector/execEngine
 mkdir ${APP}/collector/podMan
 mkdir ${APP}/collector/container
+mkdir ${APP}/collector/podMan/runtime
+mkdir ${APP}/collector/podMan/runtime/cri
 mkdir ${APP}/collector/io
+mkdir ${APP}/collector/rdt
+mkdir ${APP}/collector/rdt/plugin
+mkdir ${APP}/collector/observe
+mkdir ${APP}/collector/perfRun
+mkdir ${APP}/collector/cgroupv2
+mkdir ${APP}/collector/container/cgroupv2
 cp collector/native/*.so* ${APP}/collector/native/
 cp collector/native/*.lua ${APP}/collector/native/
 cp collector/*.lua ${APP}/collector/
@@ -70,8 +79,16 @@ cp collector/execEngine/*.lua ${APP}/collector/execEngine
 cp collector/container/*.lua ${APP}/collector/container/
 cp collector/postPlugin/*.lua ${APP}/collector/postPlugin
 cp collector/podMan/*.lua ${APP}/collector/podMan
+cp collector/podMan/runtime/*.lua ${APP}/collector/podMan/runtime
+cp collector/podMan/runtime/cri/*.lua ${APP}/collector/podMan/runtime/cri
 cp collector/io/*.lua ${APP}/collector/io
+cp collector/rdt/*.lua ${APP}/collector/rdt
+cp collector/rdt/plugin/*.lua ${APP}/collector/rdt/plugin
+cp collector/observe/*.lua ${APP}/collector/observe
 cp collector/plugin.yaml ${APP}/collector/
+cp collector/perfRun/perfRun.sh ${APP}/collector/perfRun/perfRun.sh
+cp collector/cgroupv2/*.lua ${APP}/collector/cgroupv2
+cp collector/container/cgroupv2/*.lua ${APP}/collector/container/cgroupv2
 
 
 mkdir ${APP}/common

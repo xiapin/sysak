@@ -3,6 +3,7 @@ config:
   port: 8889  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
+  url_safe: close
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     #    mode: curl
     #    url: "http://100.100.100.200/latest/meta-data/instance-id"
@@ -13,23 +14,26 @@ config:
   #  unix_socket: "/tmp/sysom_unity.sock"
   proc_path: /mnt/host/  # in container mode, like -v /:/mnt/host , should use /mnt/host/
   db:
-    rotate: 7  # tsdb file retention time, unit day
+    rotate: 3  # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
   limit:
     cpu: 90  # unit %
     mem: 200  # unit mb
     tasks: 10  # monitor 10 pid max.
+    cellLimit: -1 # set guard limit time. guard time is unlimit when cellLimit is -1,default is 50(ms)
 
 outline:
   - /var/sysom/outline
 
 container:
   mode: "pods"
-  #mode:"cgroup"
-  #"cg_cpuacct_stat" is a substitute of cg_cpuacct_proc_stat
-  luaPlugin: ["cg_memory_fail_cnt", "cg_memory_util", "cg_memory_dcmp_latency",
-             "cg_memory_drcm_latency", "cg_cpuacct_wait_latency", "cg_cpuacct_proc_stat",
-             "cg_cpu_stat", "cg_pmu_events", "cg_cpu_cfs_quota", "cg_mem_drcm_glob_latency"]
+  cluster_id: true # if true && CLUSTER_ID env is set, use CLUSTER_ID env (from ack configmap) as cluster id.
+  runtime: ["k8sApi", "cri_containerd", "docker"]
+  nsBlacklist: ["kube-system", "arms-prom", "kube-public", "kube-node-lease"]
+  luaPlugin: ["cg_cpu_cfs_quota","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat",
+              "cg_cpuacct_proc_stat", "cg_memory_drcm_latency", "cg_memory_fail_cnt", 
+              "cg_memory_dcmp_latency", "cg_memory_oom_cnt", "con_net_stat", "podmem", "pod_storage_stat"]
+
   directCgPath:
     - "/"
     - "/kubepods.slice"
@@ -52,14 +56,13 @@ container:
       child1: "/kubepods%-burstable%-pod"
 
 
-luaPlugins: ["podmem","proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
+luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
              "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
-             "proc_uptime", "proc_arp", "proc_cgroups", "proc_softirqs", "proc_softnet_stat",
-]
+             "proc_uptime", "proc_arp", "proc_cgroups", "proc_fd"]
 
 plugins:
-  - so: kmsg
-    description: "collect dmesg info."
+  #- so: kmsg
+  #  description: "collect dmesg info."
   -
     so: proc_schedstat
     description: "collect schedule stat info of percpu"
@@ -91,6 +94,8 @@ metrics:
     head: mode
     help: "cpu usage info for per-cpu."
     type: "gauge"
+    whitelist:
+        mode: ["^softirq", "^user","^idle","^sys","^iowait"]
   - title: sysom_proc_sirq
     from: sirq
     head: type
@@ -103,17 +108,26 @@ metrics:
     type: "gauge"
   - title: sysom_proc_meminfo
     from: meminfo
-    head: value
+    head: type
     help: "meminfo from /proc/meminfo."
     type: "gauge"
+    whitelist:
+        type: ["^MemFree","user","kernel_used","^MemTotal","MemAvailable","^total",
+                "^MemFree","^Cached","^Buffers","^AnonHugePages","^VmallocUsed","^SReclaimable",
+                "^SUnreclaim","^PageTables","^alloc_page","^KernelStack","^kernel_reserved"]
   - title: sysom_proc_vmstat
     from: vmstat
-    head: value
+    head: type
     help: "vmstat info from /proc/vmstat."
     type: "gauge"
+    whitelist:
+        type: ["^thp_fault_alloc","^thp_fault_fallback","^thp_collapse_alloc","^thp_collapse_alloc_failed",
+                "^pgpgin","^pgpgout","^pswpin","^pswpout","^pgfault","^pgmajfault","^pgfault","^compact_stall",
+                "^compact_success","^compact_fail","^pgscan_kswapd","^pgscan_direct","^oom_kill","^pgsteal_kswapd",
+                "^pgsteal_direct","^pgscan_direct_throttle"]
   - title: sysom_proc_self_statm
     from: self_statm
-    head: value
+    head: type
     help: "statm info from /proc/self/statm."
     type: "gauge"
   - title: sysom_proc_networks
@@ -138,196 +152,223 @@ metrics:
     type: "gauge"
   - title: sysom_sock_stat
     from: sock_stat
-    head: value
+    head: type
     help: "sock stat counters from /proc/net/sockstat"
     type: "gauge"
   - title: sysom_proc_schedstat
     from: proc_schedstat
-    head: value
+    head: type
     help: "schedule state of percpu."
     type: "gauge"
   - title: sysom_proc_loadavg
     from: proc_loadavg
-    head: value
+    head: type
     help: "loadavg of system from /proc/loadavg"
     type: "gauge"
   - title: sysom_proc_buddyinfo
     from: buddyinfo
-    head: value
+    head: type
     help: "buddyinfo of system from /proc/buddyinfo"
     type: "gauge"
   - title: sysom_IOMonIndForDisksIO
     from: IOMonIndForDisksIO
-    head: value
+    head: type
     help: "Disk IO indicators and abnormal events"
     type: "gauge"
   - title: sysom_IOMonIndForSystemIO
     from: IOMonIndForSystemIO
-    head: value
+    head: type
     help: "System indicators and abnormal events about IO"
     type: "gauge"
   - title: sysom_IOMonDiagLog
     from: IOMonDiagLog
-    head: value
+    head: type
     help: "Diagnose log for IO exception"
     type: "gauge"
   - title: sched_moni_jitter
     from: sched_moni_jitter
-    head: value
+    head: type
     help: "nosched/irqoff:sys and irqoff hold cpu and didn't scheduling"
     type: "gauge"
   - title: sysom_cpu_dist
     from: cpu_dist
-    head: value
+    head: type
     help: "task cpu sched dist."
     type: "gauge"
   - title: sysom_net_health_hist
     from: net_health_hist
-    head: value
+    head: type
     help: "net_health_hist"
     type: "gauge"
   - title: sysom_net_health_count
     from: net_health_count
-    head: value
+    head: type
     help: "net_health_count"
     type: "gauge"
   - title: sysom_net_retrans_count
     from: net_retrans_count
-    head: value
+    head: type
     help: "net_retrans_count"
     type: "gauge"
   - title: sysom_gpuinfo
     from: gpuinfo
-    head: value
+    head: type
     help: "gpuinfo of system from nvidia-smi"
     type: "gauge"
   - title: sysom_uname
     from: uname
-    head: value
+    head: type
     help: "uname info"
     type: "gauge"
   - title: sysom_uptime
     from: uptime
-    head: value
+    head: type
     help: "uptime from /proc/uptime"
     type: "gauge"
   - title: sysom_system_release
     from: system_release
-    head: value
+    head: type
     help: "system_release from /etc/os-release"
     type: "gauge"
   - title: sysom_cgroups
     from: cgroups
-    head: value
+    head: type
     help: "cgroup number."
+    type: "gauge"
+  - title: sysom_file_descriptor
+    from: procfd
+    head: type
+    help: "used file descriptor number."
     type: "gauge"
   - title: sysom_per_sirqs
     from: per_sirqs
-    head: value
+    head: type
     help: "per_sirqs."
     type: "gauge"
   - title: sysom_softnets
     from: softnets
-    head: value
+    head: type
     help: "cgroup number."
     type: "gauge"
   - title: sysom_interrupts
     from: interrupts
-    head: value
+    head: type
     help: "interrupts."
     type: "gauge"
   - title: sysom_net_ip_count
     from: net_ip_count
-    head: value
+    head: type
     help: "net snmp net_ip_count"
     type: "gauge"
   - title: sysom_net_icmp_count
     from: net_icmp_count
-    head: value
+    head: type
     help: "net snmp net_icmp_count"
     type: "gauge"
   - title: sysom_net_udp_count
     from: net_udp_count
-    head: value
+    head: type
     help: "net snmp net_udp_count"
     type: "gauge"
   - title: sysom_net_tcp_count
     from: net_tcp_count
-    head: value
+    head: type
     help: "net snmp net_tcp_count"
     type: "gauge"
   - title: sysom_net_tcp_ext_count
     from: net_tcp_ext_count
-    head: value
+    head: type
     help: "net stat net_tcp_ext_count"
     type: "gauge"
-  - title: sysom_podmem
+  - title: sysom_container_memory_filecache
     from: podmem
-    head: value
+    head: type
     help: "file cache for pod"
     type: "gauge"
-  - title: sysom_alloc_page
+  - title: sysom_container_memory_allocpage
     from: pod_alloc
-    head: value
+    head: type
     help: "pod tcp memory"
     type: "gauge"
-  - title: sysom_cg_memfail_cnt
+  - title: sysom_container_memory_failcnt
     from: cg_memfail_cnt
-    head: value
-    help: "sysom_cg_memFail_cnt"
+    head: type
+    help: "container memory alloc fail cnt"
     type: "gauge"
-  - title: sysom_cg_memUtil
+  - title: sysom_container_memory_oomcnt
+    from: cg_memoom_cnt
+    head: "type"
+    help: "container oom event count"
+    type: "counter"
+  - title: sysom_container_memory_stat
     from: cg_memory_util
-    head: value
-    help: "sysom_cg_memory_util"
+    head: type
+    help: "container memory util"
     type: "gauge"
-  - title: sysom_cg_mem_glob_drcm_latency
+    blacklist:
+        type: ["^pgfault","^dirty","^pgpgout","^pgpgin"]
+  - title: sysom_container_memory_gdrcm_latency
     from: cgGlbDrcmLatency
-    head: value
-    help: "sysom global memory latency"
+    head: type
+    help: "container global memory latency"
     type: "gauge"
-  - title: sysom_cg_mem_drcm_latency
+  - title: sysom_container_memory_cdrcm_latency
     from: cg_memdrcm_latency
-    head: value
-    help: "sysom_cg_memdrcm_latency"
+    head: type
+    help: "container cgroup memory reclaim latency"
     type: "gauge"
-  - title: sysom_cg_memmcmp_latency
+    whitelist:
+        type: ["^memDrcm_lat_10to100ms","^memDrcm_lat_100to500ms","^memDrcm_lat_500to1000ms","^memDrcm_lat_1000ms"]
+  - title: sysom_container_memory_cpt_latency
     from: cg_memmcmp_latency
-    head: value
-    help: "sysom_cg_memmcmp_latency"
+    head: type
+    help: "container memory compact latency"
     type: "gauge"
-  - title: sysom_cg_mem_dcmp_latency
-    from: cg_memdcmp_latency
-    head: value
-    help: "sysom_cg_mem_dcmp_latency"
-    type: "gauge"
-  - title: sysom_cg_cpuacct_wait_latency
-    from: cg_wait_latency
-    head: value
-    help: "sysom_cg_cpuacct_wait_latency"
-    type: "gauge"
-  - title: sysom_cg_cpuacct_proc_stat
-    from: cg_cpuacct_proc_stat
-    head: value
-    help: "sysom_cg_cpuacct_proc_stat"
-    type: "gauge"
-  - title: sysom_cg_cpu_quota
-    from: cgCpuQuota
-    head: value
-    help: "quota_us,peroid_us and quota/period"
-    type: "gauge"
-  - title: sysom_cg_cpu_stat
+    whitelist:
+        type: ["^memDcmp_lat_10to100ms","^memDcmp_lat_100to500ms", "^memDcmp_lat_500to1000ms", "^memDcmp_lat_1000ms"]
+  - title: sysom_container_cpu_stat
     from: cg_cpu_stat
-    head: value
-    help: "sysom_cg_cpu_stat"
+    head: type
+    help: " container cpu_stat"
     type: "gauge"
-  - title: sysom_cg_cpuacct_stat
+  - title: sysom_container_cpu_acctstat
     from: cg_cpuacct_stat
-    head: value
-    help: "cpuacct/cpuacct.stat"
+    head: type
+    help: "container cpuacct/cpuacct.stat"
     type: "gauge"
-  - title: sysom_cg_pmu_events
-    from: pmu_cg_events
-    head: value
-    help: "pmu events of cgroups"
+  - title: sysom_container_proc_stat
+    from: cg_proc_stat
+    head: type
+    help: "container cpuacct proc stat"
     type: "gauge"
+  - title: sysom_container_cpu_cfsquota
+    from: cgCpuQuota
+    head: type
+    help: "cfs quota"
+    type: "gauge"
+  - title: sysom_container_network_stat
+    from: con_net_stat
+    head: type
+    help: "network stat of containers"
+    type: "gauge"
+    blacklist:
+        type: ["^net_tx_packets","^net_rx_packets"]
+  - title: sysom_container_blkio_stat
+    from: cg_blkio_stat
+    head: type
+    help: "io stat from blkio cgroup"
+    type: "gauge"
+  - title: sysom_pod_ephemeral_storage_usage
+    from: pod_ephemeral_storage
+    head: type
+    help: "pod ephemeral storage usage"
+    type: "gauge"
+    whitelist:
+        type: ["^usedBytes", "^inodesUsed"]
+  - title: sysom_container_ephemeral_storage_usage
+    from: container_ephemeral_storage
+    head: type
+    help: "Containers ephemeral storage usage"
+    type: "gauge"
+    whitelist:
+        type: ["^usedBytes", "^inodesUsed", "^limit"]

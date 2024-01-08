@@ -1,3 +1,5 @@
+#include <sys/resource.h>
+#include <sys/time.h>
 #include "pmu_events.h"
 
 struct pmu_events {
@@ -11,14 +13,13 @@ struct pcpu_hw_info *gpcpu_hwi;
 struct pmu_events *glb_pme;
 char *events_str[] = {"cycles", "ins", "refCyc",
 			"llcLoadMis", "llcStoreMis",
-			"llcLoad", "llcStore"};
+			"llcLoad", "llcStore", "splitLock"};
 char *value_str[] = {"cycles", "instructions", "CPI",
 			"llc_load_ref", "llc_load_miss", "LLC_LMISS_RATE"
-			"llc_store_ref", "llc_store_miss", "LLC_SMIRSS_RATE"};
+			"llc_store_ref", "llc_store_miss", "LLC_SMIRSS_RATE", "splitLock"};
 /*char origpath[]="/mnt/host/sys/fs/cgroup/perf_event/system.slice/"; */
 char *origpath = NULL;	/* defalt to host events */
 
-static int init_fail;
 static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 			   int cpu, int group_fd, unsigned long flags)
 {
@@ -27,6 +28,19 @@ static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
 	ret = syscall(__NR_perf_event_open, hw_event, pid, cpu,
 			group_fd, flags);	
 	return ret;
+}
+
+static void bump_nofile_rlimit(void)
+{
+	struct rlimit rlim_new = {
+		/* NOFILE is limited by sysctl_nr_file, which is 1024*1024 by default  */
+		.rlim_cur	= 1024*1024,
+		.rlim_max	= 1024*1024,
+	};
+
+	if (setrlimit(RLIMIT_NOFILE, &rlim_new)) {
+		fprintf(stderr, "Failed to increase RLIMIT_NOFILE limit!\n");
+	}
 }
 
 int create_hw_events(struct pcpu_hw_info *pc_hwi)
@@ -65,7 +79,7 @@ int create_hw_events(struct pcpu_hw_info *pc_hwi)
 #endif
 		hwi[i].fd = perf_event_open(&attr, pid, cpu, group_leader, flags);
 		if (hwi[i].fd <= 0) {
-			int ret = errno;
+			ret = errno;
 			if (ret == ENODEV) {
 				printf("cpu may OFF LINE\n");
 			} else {
@@ -149,8 +163,7 @@ int init(void * arg)
 	if (nr_cpus <= 0) {
 		ret = errno;
 		printf("WARN: pmu_events install FAIL sysconf\n");
-		init_fail = ret;
-		return 0;
+		return -ret;
 	}
 
 	pmue = pme_new(nr_cpus);
@@ -158,8 +171,7 @@ int init(void * arg)
 		pcpu_hwi = pmue->pcpu_hwi;
 		glb_pme = pmue;
 	} else {
-		init_fail = -1;
-		return 0;
+		return -1;
 	}
 #if 0
 	pmue = (struct pmu_events *)arg;
@@ -169,26 +181,24 @@ int init(void * arg)
 		cgroup_fd = open(origpath, O_RDONLY);
 		if (cgroup_fd < 0) {
 			printf(" open %s fail\n", origpath);
-			init_fail = cgroup_fd;
-			return 0;
+			return cgroup_fd;
 		}
 		flags = PERF_FLAG_PID_CGROUP;
 	} else {
 		cgroup_fd = -1;
 		flags = 0;
 	}
+	bump_nofile_rlimit();
 	for (i = 0; i < nr_cpus; i++) {
 		pcpu_hwi[i].cpu = i;
 		pcpu_hwi[i].pid = cgroup_fd;
 		pcpu_hwi[i].flags = flags;
 		ret = create_hw_events(&pcpu_hwi[i]);
 		if (ret) {
-			init_fail = ret;
-			return 0;
+			return ret;
 		}
 	}
 	printf("pmu_events plugin install.\n");
-	init_fail = 0;
 	return 0;
 }
 
@@ -234,7 +244,8 @@ int fill_line(struct unity_line *line, double *summ, char *mode, char *index)
 		summ[CYCLES]==0?0:summ[INSTRUCTIONS]/summ[CYCLES]);
 	unity_set_value(line, i++, "MPI", 
 		summ[INSTRUCTIONS]==0?0:
-		(summ[LLC_LOAD_MISS]+summ[LLC_STORE_MISS])/summ[INSTRUCTIONS]);
+		((float)summ[LLC_LOAD_MISS]+(float)summ[LLC_STORE_MISS])*1000.00/
+		(float)summ[INSTRUCTIONS]);
 	unity_set_value(line, i++, "l3LoadMisRate",
 		summ[LLC_LOAD_REF]==0?0:summ[LLC_LOAD_MISS]/summ[LLC_LOAD_REF]);
 	unity_set_value(line, i++, "l3StoreMisRate",
@@ -253,9 +264,6 @@ int call(int t, struct unity_lines* lines)
 	double summ[NR_EVENTS];
 	struct pcpu_hw_info *pcp_hw;
 
-	if (init_fail) {
-		return init_fail;
-	}
 	pcp_hw = glb_pme->pcpu_hwi;
 	for (i = 0; i < nr_cpus; i++) {
 		collect(&pcp_hw[i], summ);

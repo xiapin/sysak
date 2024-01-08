@@ -10,12 +10,19 @@ local system = require("common.system")
 
 local CguardSched = class("guardSched")
 
-function CguardSched:_init_(tid, procs, names, jperiod)
+function CguardSched:_init_(tid, procs, names, jperiod, resYaml)
     self._stat = CcollectorStat.new(tid)
     self._jperiod = jperiod
     self._procs = procs
     self._names = names
-    self._limit = 1e5 * 5   -- 500 ms
+
+    self._limit = resYaml.config.limit.cellLimit
+    if self._limit == nil then
+        self._limit = 1e4 * 5 -- 50ms
+    elseif self._limit ~= -1 then
+        self._limit = self._limit * 1e3
+    end
+
 end
 
 function CguardSched:proc(t, lines)
@@ -24,24 +31,32 @@ function CguardSched:proc(t, lines)
     local start = lua_local_clock()  -- unit us
     local stop = 0
     local j1 = self._stat:jiffies()
-    local ret
-
     for i, obj in ipairs(self._procs) do
+        if i % 100 == 0 then -- need to update jiffies
+            j1 = self._stat:jiffies()
+        end
         local ret, overTime = obj:proc(t, lines)
+        stop = lua_local_clock()
         if ret == -1 then
+            print(self._names[i].. "-1")
             table.insert(toRemove, i)
         else
-            stop = lua_local_clock()
-            if ret ~= 1 then
+            if ret ~= 1 then   -- plugin must return 1, overTime will be available.
                 overTime = 0
             end
-            if stop - start - overTime >= self._limit then   --
-                print(stop - start)
-                local j2 = self._stat:jiffies()
-                if j2 - j1 >= self._limit / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used by plugin
-                    table.insert(toRemove, i)
+
+            local elapse = stop - start - overTime
+            if self._limit ~= -1 then
+                if stop - start - overTime >= self._limit then   --
+                    local j2 = self._stat:jiffies()
+                    if j2 - j1 >= elapse / 1e6 * self._jperiod * 3 / 4 then  -- 3/4 time used by plugin
+                        table.insert(toRemove, i)
+                    end
+                    j1 = j2
                 end
             end
+
+
         end
         start = stop
 

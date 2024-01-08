@@ -22,7 +22,7 @@ struct liphdr {
 #define MAX_ENTRY 128
 #define BPF_F_FAST_STACK_CMP	(1ULL << 9)
 #define KERN_STACKID_FLAGS	(0 | BPF_F_FAST_STACK_CMP)
-#define _(P) ({typeof(P) val = 0; bpf_probe_read(&val, sizeof(val), &P); val;})
+#define _(P) ({typeof(P) val = 0; bpf_probe_read_kernel(&val, sizeof(val), &P); val;})
 
 BPF_PERF_OUTPUT(perf, 1024);
 BPF_STACK_TRACE(stack, MAX_ENTRY);
@@ -90,7 +90,7 @@ static inline void get_list_task(struct list_head* phead, struct data_t* e) {
             struct task_struct* tsk = (struct task_struct*)BPF_CORE_READ(pwq, polling_task);
             if (tsk) {
                 e->pid = BPF_CORE_READ(tsk, pid);
-                bpf_probe_read(&e->comm[0], TASK_COMM_LEN, &tsk->comm[0]);
+                bpf_probe_read_kernel(&e->comm[0], TASK_COMM_LEN, &tsk->comm[0]);
             }
         }
     }

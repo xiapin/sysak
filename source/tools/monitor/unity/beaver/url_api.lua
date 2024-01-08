@@ -8,28 +8,49 @@ require("common.class")
 local system = require("common.system")
 local ChttpApp = require("httplib.httpApp")
 local CfoxTSDB = require("tsdb.foxTSDB")
+local CfoxSQL = require("tsdb.foxSQL")
 local postQue = require("beeQ.postQue.postQue")
 local CpushLine = require("beaver.pushLine")
 local CasyncDns = require("httplib.asyncDns")
 local CasyncHttp = require("httplib.asyncHttp")
+local CasyncHttps = require("httplib.asyncHttps")
 local CasyncOSS = require("httplib.asyncOSS")
 local CurlApi = class("urlApi", ChttpApp)
 
-function CurlApi:_init_(frame, que, fYaml)
+function CurlApi:_init_(frame, que, fYaml, instance)
     ChttpApp._init_(self)
     self._pushLine = CpushLine.new(que)
-    self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
-    self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
-    self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
-    self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
-    self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
-    self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
-    self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
-    self:_ossIntall(fYaml)
+    local res = system:parseYaml(fYaml)
 
+    self._instance = instance
+    if res.config.url_safe==nil or res.config.url_safe ~= "close" then
+        self._urlCb["/api/sum"] = function(tReq) return self:sum(tReq)  end
+        self._urlCb["/api/sub"] = function(tReq) return self:sub(tReq)  end
+        self._urlCb["/api/trig"] = function(tReq) return self:trig(tReq)  end
+        self._urlCb["/api/line"] = function(tReq) return self:line(tReq)  end
+        self._urlCb["/api/dns"] = function(tReq) return self:dns(tReq)  end
+        self._urlCb["/api/proxy"] = function(tReq) return self:proxy(tReq)  end
+        self._urlCb["/api/ssl"] = function(tReq) return self:ssl(tReq) end
+        if res.diagnose then
+            self._diagAuth = res.diagnose.token
+            self._diagHost = res.diagnose.host
+            self._urlCb["/api/diag"] = function(tReq) return self:diag(tReq) end
+        end
+    end
+
+    self._urlCb["/api/query"] = function(tReq) return self:query(tReq)  end
+    self._urlCb["/api/sql"] = function(tReq) return self:qsql(tReq) end
+    if res.cec then
+        self._cec = res.cec
+        self._urlCb["/api/cec"] = function(tReq) return self:cec(tReq)  end
+        self._urlCb["/api/alert"] = function(tReq) return self:alert(tReq)  end
+    end
+
+    self:_ossIntall(fYaml)
     self:_install(frame)
     self:_setupQs(fYaml)
-    self._proxy = CasyncHttp.new()
+    self._proxyhttp = CasyncHttp.new()
+    self._proxyhttps = CasyncHttps.new()
 end
 
 function CurlApi:_ossIntall(fYaml)
@@ -64,8 +85,169 @@ function CurlApi:oss(tReq)
     end
 end
 
+local function reqSSL(https, host, uri, port)
+    port = port or 443
+    return https:get(host, uri, port)
+end
+
+function CurlApi:ssl(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local host = tJson.host
+        local uri = tJson.uri
+        if host and uri then
+            local https = CasyncHttps.new()
+            local stat, body = pcall(reqSSL, https, host, uri)
+            if stat then
+                return {body = body}
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
+end
+
 local function reqProxy(proxy, host, uri)
     return proxy:get(host, uri)
+end
+
+local function proxyPost(proxy, host, uri, headers, body)
+    return proxy:post(host, uri, headers, body)
+end
+
+function CurlApi:packCEC(topic, data)
+    local host = self._cec
+    local uri = "/api/v1/cec_proxy/proxy/dispatch"
+
+    data.alert_id = system:guid()
+    data.instance = self._instance
+    if not data.alert_time then
+        data.alert_time = os.time() * 1000
+    end
+
+    local req = {
+        topic = topic,
+        data = data,
+    }
+    local headers = {
+        accept = "application/json",
+        ["Content-Type"] = "application/json",
+    }
+
+    if host and uri then
+        local stat
+        local body
+        if string.sub(host,1,5) == "https" then
+            host = string.sub(host,9)
+            stat, body = pcall(proxyPost, self._proxyhttps, host, uri, headers, self:jencode(req))
+        else
+            host = string.sub(host,8)
+            stat, body = pcall(proxyPost, self._proxyhttp, host, uri, headers, self:jencode(req))
+        end
+
+        if stat then
+            body = self:jdecode(body)
+            if body.code == 0 then
+                return string.format("cec process %s.", data.alert_id), 200
+            else
+                return {code = body.code, message = body.message}
+            end
+        end
+    end
+end
+
+-- refer to cec design
+function CurlApi:cec(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local topic, data = tJson.topic, tJson.data
+        if type(topic) ~= "string" then
+            return "no data segment." .. tReq.data, 400
+        end
+        if type(data) ~= "table" then
+            return "no data segment." .. tReq.data, 400
+        end
+
+        return self:packCEC(topic, data)
+    else
+        return "bad data" .. tReq.data, 400
+    end
+end
+
+function CurlApi:alert(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        if type(tJson) ~= "table" then
+            return "no data segment." .. tReq.data, 400
+        end
+
+        return self:packCEC("SYSOM_SAD_ALERT", tJson)
+    else
+        return "bad data" .. tReq.data, 400
+    end
+end
+
+function CurlApi:diag(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat and tJson then
+        local host = self._diagHost
+        local uri = "/api/v1/tasks/sbs_task_create/"
+        if not host then
+            host = tJson.host
+        end
+        --local headers = tJson.headers
+        local reqbody = tJson.body
+        
+        if system:keyIsIn(reqbody, "params") == false then
+            reqbody["params"] = {
+                instance = "127.0.0.1"
+            }
+        elseif system:keyIsIn(reqbody.params, "instance") == false then
+            reqbody.params["instance"] = "127.0.0.1"
+        end
+
+        local headers = {
+            accept = "application/json",
+            ["Content-Type"] = "application/json",
+            authorization = self._diagAuth
+        }
+        local service_name = reqbody.service_name
+
+        if host and uri then
+            local stat
+            local body
+            if string.sub(host,1,5) == "https" then
+                host = string.sub(host,9)
+                stat, body = pcall(proxyPost, self._proxyhttps, host, uri, headers, self:jencode(reqbody))
+            else
+                host = string.sub(host,8)
+                stat, body = pcall(proxyPost, self._proxyhttp, host, uri, headers, self:jencode(reqbody))
+            end
+            if stat then
+                body = self:jdecode(body)
+                if body.code == 200 then
+                    local data = body.data
+                    data["service_name"] = service_name
+                    local s = self:jencode(data)
+                    postQue.post(s)
+                else
+                    print(body.message)
+                    return {code = body.code, message = body.message}
+                end
+                return {task_id = body.data.task_id}
+            else
+                return "bad req dns " .. body, 400
+            end
+        else
+            return "need domain arg.", 400
+        end
+    else
+        return "bad dns " .. tReq.data, 400
+    end
 end
 
 function CurlApi:proxy(tReq)
@@ -204,12 +386,30 @@ function CurlApi:qtable(tJson)
     return self.fox:qTabelNow(secs)
 end
 
+function CurlApi:qsql(tReq)
+    local stat, tJson = pcall(self.getJson, self, tReq)
+    if stat then
+        local res = self.foxSQL:parse(tJson)
+        if res.error ~= nil or res.cursorpos ~= nil then
+            print("sql parse error")
+            return {}
+        end
+        return self.foxSQL:sql(res)
+    else
+        return {}
+    end
+
+
+end
+
 function CurlApi:_setupQs(fYaml)
     self.fox = CfoxTSDB.new(fYaml)
+    self.foxSQL = CfoxSQL.new(fYaml)
     self._q = {}
     self._q["last"] = function(tJson) return self:qlast(tJson) end
     self._q["table"] = function(tJson) return self:qtable(tJson) end
     self._q["date"] = function(tJson) return self:qdate(tJson) end
+    --self._q["sql"] = function(tJson) return self:qsql(tJson) end
 end
 
 function CurlApi:lquery(tJson)
@@ -227,6 +427,7 @@ function CurlApi:query(tReq)
         if cStat then
             return ms
         else
+            print("query return :", ms)
             return {}
         end
     else

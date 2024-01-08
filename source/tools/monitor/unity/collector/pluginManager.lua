@@ -20,7 +20,7 @@ function CpluginManager:_init_(procffi, proto_q, resYaml, tid, jperiod)
     self._plugins = {}
     self._names = {}
     self:setup(res, proto_q)
-    self._guardSched = CguardSched.new(tid, self._plugins, self._names, jperiod)
+    self._guardSched = CguardSched.new(tid, self._plugins, self._names, jperiod, res)
 
     self._resYaml = resYaml   -- for add function
     self._proto_q = proto_q
@@ -40,8 +40,13 @@ function CpluginManager:setup(resYaml, proto_q)
     for _, plugin in ipairs(plugins) do
         local so = plugin.so
         if so then
-            table.insert(self._plugins, Cplugin.new(resYaml, pluginFFI, proto_q, so))
-            table.insert(self._names, so)
+            local plugin = Cplugin.new(resYaml, pluginFFI, proto_q, so)
+            if plugin.alive >= 0 then
+                table.insert(self._plugins, plugin)
+                table.insert(self._names, so)
+            else
+                plugin = nil
+            end
         end
     end
 end

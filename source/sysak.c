@@ -12,6 +12,7 @@
 #define KVERSION 64
 #define MAX_SUBCMD_ARGS 512
 #define MAX_DEPEND_LEN 128
+#define DEFAULT_LEN 128
 #define MAX_NAME_LEN 64
 #define MAX_WORK_PATH_LEN 512
 #define ERR_NOSUBTOOL 2
@@ -30,7 +31,29 @@ enum TOOL_TYPE {
     MAX_TOOL_TYPE
 };
 
-struct tool_info {
+struct diagnose_info
+{
+    char default_cmd[MAX_SUBCMD_ARGS];
+    char cmd[MAX_SUBCMD_ARGS];
+    char name[MAX_NAME_LEN];
+    char helpinfo[MAX_SUBCMD_ARGS];
+};
+
+struct diagnose_tool
+{
+    struct diagnose_info tool;
+    struct diagnose_tool *next;
+};
+
+struct diagnose_menu_node
+{
+    struct diagnose_menu_node *next;
+    struct diagnose_tool *diagnose_tool_head;
+    char diagnose_menu_name[MAX_NAME_LEN];
+};
+
+struct tool_info
+{
     char module[MAX_NAME_LEN];
     char name[MAX_NAME_LEN];
     char helpinfo[MAX_SUBCMD_ARGS];
@@ -47,7 +70,7 @@ struct tool_list {
 };
 
 char *module = "/sysak.ko";
-char *log_path="/var/log/sysak";
+char *log_path = "/var/log/sysak";
 char *system_modules = "/proc/modules";
 char *sysak_root_path = "/usr/local/sysak";
 char *python_bin = "/usr/bin/python";
@@ -58,7 +81,7 @@ char kern_version[KVERSION];
 char machine[KVERSION];
 char prev_dep[MAX_DEPEND_LEN];
 char post_dep[MAX_DEPEND_LEN];
-char run_depend[MAX_DEPEND_LEN]= {0};
+char run_depend[MAX_DEPEND_LEN] = {0};
 char tools_path[MAX_WORK_PATH_LEN];
 char tools_exec[MAX_WORK_PATH_LEN] = {0};
 char sysak_rule[MAX_WORK_PATH_LEN];
@@ -70,6 +93,7 @@ char sysak_components_server[MAX_WORK_PATH_LEN];
 char sysak_oss_server[MAX_WORK_PATH_LEN];
 char download_cmd[MAX_WORK_PATH_LEN];
 char region[MAX_NAME_LEN] = {0};
+char sysak_diagnose_rule[MAX_WORK_PATH_LEN];
 
 bool pre_module = false;
 bool post_module = false;
@@ -86,17 +110,21 @@ static struct tool_list tool_lists[MAX_TOOL_TYPE]={
     {"sysak tools for bclinux", NULL}
 };
 
+static struct diagnose_menu_node *diag_list_head, *diag_menu_choose;
+static struct diagnose_tool *diag_tool_choose = NULL;
+
 static void usage(void)
 {
     fprintf(stdout,
-                "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
-                "       cmd:\n"
-                "              list [-a],   show subcmds\n"
-                "              -h/help,     help informati on for specify subcmd\n"
-                "              -g,          auto download btf and components from anolis mirrors\n"
-                "              -oss,        auto download btf and components from oss\n"
-                "              -d,          only download btf and components. example: sysak -oss -d\n"
-                "       subcmd: see the result of list\n");
+            "Usage: sysak [cmd] [subcmd [cmdargs]]\n"
+            "       cmd:\n"
+            "              list [-a],   show subcmds\n"
+            "              -h/help,     help informati on for specify subcmd\n"
+            "              -g,          auto download btf and components from anolis mirrors\n"
+            "              -oss,        auto download btf and components from oss\n"
+            "              -d,          only download btf and components. example: sysak -oss -d\n"
+            "              -c,          show diagnosis center\n"
+            "       subcmd: see the result of list\n");
 }
 
 static void strim(char *str)
@@ -106,17 +134,17 @@ static void strim(char *str)
 
     while (pstr && *pstr) {
        if (isspace(*pstr)) {
-           *pstr = 0;
-           has_space = true;
-       }
+            *pstr = 0;
+            has_space = true;
+        }
        else if (!start) {
-           start = pstr;
-       }
-       pstr++;
+            start = pstr;
+        }
+        pstr++;
     }
 
     if (start && start != str)
-       strcpy(str, start);
+        strcpy(str, start);
 }
 
 static void kern_release(void)
@@ -221,7 +249,7 @@ static bool get_module_tag(void)
             strcpy(module_tag, pstr);
             strim(module_tag);
             if (strlen(module_tag) == 0)
-               return false;
+                return false;
             return true;
         }
     }
@@ -259,7 +287,7 @@ static int down_install_ext_tools(const char *tool)
     char *pstr;
 
     sprintf(download_cmd, "wget %s/sysak/ext_tools/%s/%s/rule -P %s &>/dev/null",
-           sysak_components_server, machine, tool, tools_path);
+            sysak_components_server, machine, tool, tools_path);
     //printf("%s ... \n", download_cmd);
     ret = system(download_cmd);
     if (ret < 0)
@@ -328,7 +356,12 @@ static int down_install(const char *component_name)
     char ko_path[MAX_WORK_PATH_LEN];
     char ko_file[MAX_WORK_PATH_LEN];
     char btf_file[MAX_WORK_PATH_LEN];
+    int retry_cnt = 0;
     int ret = 0;
+
+    sprintf(ko_path, "%s/%s", module_path, kern_version);
+    sprintf(ko_file, "%s/%s/%s", module_path, kern_version, "sysak.ko");
+    sprintf(btf_file, "%s/vmlinux-%s", tools_path, kern_version);
 
     if (!get_server_addr())
         return -1;
@@ -337,40 +370,63 @@ static int down_install(const char *component_name)
         if (!get_module_tag())
             return -1;
 
-        sprintf(ko_path, "%s/%s", module_path, kern_version);
-        sprintf(ko_file, "%s/%s/%s", module_path, kern_version, "sysak.ko");
-        sprintf(btf_file, "%s/%s/vmlinux-%s", tools_path, kern_version, kern_version);
         if (access(ko_path,0) != 0)
             mkdir(ko_path, 0755 );
 
         //sprintf(download_cmd, "wget %s/sysak/sysak_modules/%s/%s/sysak.ko -P %s/%s 1&>/dev/null",
         //        sysak_components_server, machine, module_tag, module_path, kern_version);
         if (oss_get_components){
+retry_ko_oss:
             sprintf(download_cmd, "wget -T 5 -t 2 -q -O %s/%s/sysak.ko %s-%s.oss-%s-internal.aliyuncs.com/home/hive/sysak/modules/%s/sysak-%s.ko",
                     module_path, kern_version, sysak_oss_server, &region[0], &region[0], machine, kern_version);
         }
         else
-            sprintf(download_cmd, "wget %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
+retry_ko:
+            sprintf(download_cmd, "wget -T 5 -t 2 -q %s/sysak/modules/%s/sysak-%s.ko -O %s/%s/sysak.ko &>/dev/null",
                     sysak_components_server, machine, kern_version, module_path, kern_version);
         //printf("%s ... \n", download_cmd);
+
         ret = system(download_cmd);
         if (access(ko_file,0) == 0)
             ret = 0;
+        else if (retry_cnt == 0){
+            if (oss_get_components){
+                retry_cnt++;
+                goto retry_ko;
+            }
+            else {
+                retry_cnt++;
+                goto retry_ko_oss;
+            }
+        }
         return ret;
+
     } else if (strcmp(component_name, "btf") == 0) {
 	    //sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s/%s 1&>/dev/null",
         //       sysak_components_server, machine, kern_version, tools_path, kern_version);
         if (oss_get_components){
+retry_btf_oss:
             sprintf(download_cmd, "wget -T 5 -t 2 -q -P %s %s-%s.oss-%s-internal.aliyuncs.com/home/hive/btf/%s/vmlinux-%s",
                     tools_path, sysak_oss_server, &region[0], &region[0], machine, kern_version);
         }
         else
-	        sprintf(download_cmd, "wget %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
+retry_btf:
+            sprintf(download_cmd, "wget -T 5 -t 2 -q %s/coolbpf/btf/%s/vmlinux-%s -P %s &>/dev/null",
                     sysak_components_server, machine, kern_version, tools_path);
         //printf("%s ... \n", download_cmd);
         ret = system(download_cmd);
         if (access(btf_file,0) == 0)
             ret = 0;
+        else if (retry_cnt == 0){
+            if (oss_get_components){
+                retry_cnt++;
+                goto retry_btf;
+            }
+            else {
+                retry_cnt++;
+                goto retry_btf_oss;
+            }
+        }
         return ret;
     } else {
         return down_install_ext_tools(component_name);
@@ -413,7 +469,7 @@ static int pre_down_install(const char *module, const char *btf, const char *com
         if (ret < 0)
             ret = -EEXIST;
     } else {
-            ret = -EEXIST;
+        ret = -EEXIST;
     }
     return ret;
 }
@@ -579,7 +635,7 @@ static int exectue(int argc, char *argv[])
     snprintf(subcmd_exec_final, sizeof(subcmd_exec_final), "%s;%s", sysak_work_path, tools_exec);
     ret = my_system(subcmd_exec_final);
     if (ret < 0)
-       return ret;
+        return ret;
 
     if (post_module)
         mod_ctrl(false);
@@ -709,6 +765,139 @@ static void subcmd_list(bool show_all)
     print_each_tool(show_all);
 }
 
+static int build_diagnose_cmd_info_from_file(FILE *fp)
+{
+    struct diagnose_menu_node *menu_node;
+    struct diagnose_tool *node;
+    char buf[MAX_NAME_LEN + MAX_SUBCMD_ARGS], *default_str, *cmd_str;
+    char tools_name[MAX_NAME_LEN], menu_name[MAX_NAME_LEN];
+    char tools_class_module[MAX_NAME_LEN];
+    int ret = 0, flag = 0, menu_num = 0;
+
+    // diag_list_head
+
+    while (fgets(buf, sizeof(buf), fp))
+    {
+        sscanf(buf, "%[^/]/%[^:]", menu_name, tools_name);
+
+        if (!menu_name)
+            continue;
+
+        menu_node = diag_list_head;
+        flag = 0;
+        while (menu_node && flag == 0)
+        {
+            if (strcmp(menu_name, menu_node->diagnose_menu_name) == 0)
+            {
+                flag = 1;
+                break;
+            }
+            menu_node = menu_node->next;
+        }
+
+        if (!flag)
+        {
+            // create new menu
+            menu_node = malloc(sizeof(struct diagnose_menu_node));
+            memset(menu_node, 0, sizeof(struct diagnose_menu_node));
+            strcpy(menu_node->diagnose_menu_name, menu_name);
+            menu_node->next = diag_list_head;
+            diag_list_head = menu_node;
+        }
+
+        node = malloc(sizeof(struct diagnose_tool));
+        if (!node)
+        {
+            fclose(fp);
+            return -1;
+        }
+        memset(node, 0, sizeof(struct diagnose_tool));
+
+        strcpy(node->tool.name, tools_name);
+        default_str = strstr(buf, ":default{");
+        cmd_str = strstr(buf, ":cmd{");
+
+        if (default_str)
+            sscanf(default_str, ":default{%[^}]}", node->tool.default_cmd);
+        if (cmd_str)
+            sscanf(cmd_str, ":cmd{%[^}]}", node->tool.cmd);
+
+        if (menu_node->diagnose_tool_head == NULL)
+        {
+            menu_node->diagnose_tool_head = node;
+        }
+        else
+        {
+            node->next = menu_node->diagnose_tool_head;
+            menu_node->diagnose_tool_head = node;
+        }
+        ret++;
+    }
+
+    fclose(fp);
+    return ret;
+}
+
+static int build_diagnose_cmd_info()
+{
+    FILE *fp;
+    int ret = 0;
+
+    if (access(sysak_diagnose_rule, 0) != 0)
+    {
+        printf(".sysak.diag.config not found!\n");
+        return 0;
+    }
+
+    fp = fopen(sysak_diagnose_rule, "r");
+    if (fp)
+        ret += build_diagnose_cmd_info_from_file(fp);
+
+    return ret;
+}
+
+static void show_diagnose_menu()
+{
+    struct diagnose_menu_node *menu_node = diag_list_head;
+    int num = 0;
+    printf("\n");
+    while (menu_node)
+    {
+        num++;
+        printf("%d %s\n", num, menu_node->diagnose_menu_name);
+        menu_node = menu_node->next;
+    }
+}
+
+static void show_diagnose_tool_menu()
+{
+    struct diagnose_tool *node = diag_menu_choose->diagnose_tool_head;
+    int num = 0;
+    printf("\n");
+    while (node)
+    {
+        num++;
+        printf("  %d  %s\n", num, node->tool.name);
+        node = node->next;
+    }
+}
+
+static int choose_diagnose_menu()
+{
+    int num;
+    printf("\nchoose a menu number:");
+    scanf("%d", &num);
+    return num;
+}
+
+static int choose_diagnose_tool_menu()
+{
+    int num;
+    printf("\nchoose a tool number:");
+    scanf("%d", &num);
+    return num;
+}
+
 static bool tool_rule_parse(char *path, char *tool)
 {
     char *pstr = NULL;
@@ -733,7 +922,7 @@ static bool tool_rule_parse(char *path, char *tool)
         sscanf(buf,"%[^:]:%[^:]", class_name, tools_name);
     if (strstr(class_name,"combine"))
         if (strstr(class_name,"/"))
-            continue;
+                continue;
 
         if (strcmp(tools_name, tool)) {
             continue;
@@ -771,10 +960,80 @@ static bool tool_lookup(char *tool)
     }
 
     if (!tool_rule_parse(sysak_other_rule, tool) &&
-            !tool_rule_parse(sysak_rule, tool))
+        !tool_rule_parse(sysak_rule, tool))
         return false;
 
     return true;
+}
+
+int copy_file(char *dest_file, char *src_file)
+{
+    int cnt = 0;
+    FILE *fp1 = fopen(dest_file,"w");
+    FILE *fp2 = fopen(src_file,"r");
+
+    if(fp1 == NULL) {
+        printf("%s:fopen failed!", dest_file);
+        return -1;
+    }
+    if(fp2 == NULL) {
+        printf("%s: fopen failed!", src_file);
+        return -1;
+    }
+
+    char buffer = fgetc(fp2);
+
+    while(!feof(fp2)) {
+        cnt++;
+        fputc(buffer,fp1);
+        buffer = fgetc(fp2);
+    }
+    fclose(fp1);
+    fclose(fp2);
+    return cnt;
+}
+
+int has_string(char *dest_file, char *substring)
+{
+	FILE *fp;
+	int	line=0;
+	char file_str[DEFAULT_LEN];
+
+	fp=fopen(dest_file,"r");
+	if(fp==NULL)
+	{
+		return -1;
+	}
+
+	while(fgets(file_str,sizeof(file_str),fp))
+	{
+		line++;
+		if(strstr(file_str,substring))
+		{
+			return 1;
+		}
+	}
+	fclose(fp);
+	return 0;
+}
+
+void btf_support_check(void){
+    char config[DEFAULT_LEN];
+    char local_btf[DEFAULT_LEN] = "/sys/kernel/btf/vmlinux";
+    char tool_btf[DEFAULT_LEN];
+    char *config_name = "CONFIG_BPF=y";
+
+    if (access(local_btf,0) == 0){
+        snprintf(tool_btf, sizeof(tool_btf), "%s/vmlinux-%s", tools_path, kern_version);
+        if (copy_file(tool_btf, local_btf) > 0){
+            btf_depend = false;
+            return;
+        }
+    }
+
+    snprintf(config, sizeof(config), "/boot/config-%s", kern_version);
+    if (!has_string(config, config_name))
+        btf_depend = false;
 }
 
 static int subcmd_parse(int argc, char *argv[])
@@ -789,8 +1048,8 @@ static int subcmd_parse(int argc, char *argv[])
     if (!strcmp(argv[0], "-d")) {
         only_download = true;
         pre_module = true;
-        btf_depend = true;
-        goto exec;
+	    btf_depend = true;
+	    goto exec;
     }
 
     if (strstr(prev_dep, "btf") != NULL) {
@@ -816,7 +1075,74 @@ static int subcmd_parse(int argc, char *argv[])
         }
     }
 exec:
+    btf_support_check();
     return exectue(argc, argv);
+}
+
+static void get_menu_node(int menu_num)
+{
+    diag_menu_choose = diag_list_head;
+    int num = 1;
+    while (diag_menu_choose && num < menu_num)
+    {
+        num++;
+        diag_menu_choose = diag_menu_choose->next;
+    }
+    if (diag_menu_choose)
+        printf("\n%s:", diag_menu_choose->diagnose_menu_name);
+    else
+        printf("please choose a valid menu number!\n");
+}
+
+static void get_diagnose_tool_node(int tool_num)
+{
+    diag_tool_choose = diag_menu_choose->diagnose_tool_head;
+    int num = 1;
+    while (diag_tool_choose && num < tool_num)
+    {
+        num++;
+        diag_tool_choose = diag_tool_choose->next;
+    }
+    if (!diag_tool_choose)
+        printf("please choose a valid tool number!\n");
+}
+
+static void show_diagnose_usage()
+{
+    printf("\nusage of %s:\n", diag_tool_choose->tool.name);
+    // printf("strlen=%d",strlen(diag_tool_choose->tool.cmd));
+    if (strlen(diag_tool_choose->tool.cmd))
+    {
+        printf("\n%16s %s\n", " ", diag_tool_choose->tool.cmd);
+        printf("\ndefault cmd:\n%16s%s \n\n", " ", diag_tool_choose->tool.default_cmd);
+    }
+    else
+        printf("\n%16s %s\n\n", " ", diag_tool_choose->tool.default_cmd);
+}
+
+static int diagnose_page()
+{
+    if (build_diagnose_cmd_info() == 0)
+    {
+        printf("diagnose tool not found");
+        return 0;
+    }
+    show_diagnose_menu();
+    int menu_num, tool_num;
+    while (diag_menu_choose == NULL)
+    {
+        menu_num = choose_diagnose_menu();
+        get_menu_node(menu_num);
+    }
+    show_diagnose_tool_menu();
+    while (diag_tool_choose == NULL)
+    {
+        tool_num = choose_diagnose_tool_menu();
+        get_diagnose_tool_node(tool_num);
+    }
+    show_diagnose_usage();
+
+    return 0;
 }
 
 static int parse_arg(int argc, char *argv[])
@@ -836,7 +1162,14 @@ static int parse_arg(int argc, char *argv[])
         return 0;
     }
 
-    if (!strcmp(argv[1], "help") || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) {
+    if (!strcmp(argv[1], "-c"))
+    {
+        diagnose_page();
+        return 0;
+    }
+
+    if (!strcmp(argv[1], "help") || !strcmp(argv[1], "-h") || !strcmp(argv[1], "--help"))
+    {
         usage();
         return 0;
     }
@@ -904,7 +1237,7 @@ static void set_path(char *argv[])
 
     if (access(components_path,0) != 0)
         snprintf(components_path, sizeof(tools_path), "%s%s",
-            sysak_root_path, "/.sysak_components");
+                 sysak_root_path, "/.sysak_components");
 
     snprintf(tools_path, sizeof(tools_path), "%s%s",
              components_path, "/tools/");
@@ -913,7 +1246,8 @@ static void set_path(char *argv[])
     snprintf(sysak_rule, sizeof(sysak_rule), "%s%s",
              components_path, "/tools/.sysak.rules");
     snprintf(sysak_other_rule, sizeof(sysak_other_rule), "%s%s%s%s",
-             components_path, "/tools/",kern_version,"/.sysak.rules");
+             components_path, "/tools/", kern_version, "/.sysak.rules");
+    snprintf(sysak_diagnose_rule, sizeof(sysak_diagnose_rule), "%s", "/etc/sysak/.sysak.diag.config");
     snprintf(sysak_work_path, sizeof(sysak_work_path), "%s%s",
              "export SYSAK_WORK_PATH=", components_path);
 }

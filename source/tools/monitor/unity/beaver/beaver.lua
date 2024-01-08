@@ -16,22 +16,30 @@ local CurlExportHtml = require("beaver.url_export_html")
 local CurlExportRaw = require("beaver.url_export_raw")
 local CLocalBeaver = require("beaver.localBeaver")
 local CbaseQuery = require("beaver.query.baseQuery")
+local system = require("common.system")
 
 g_lb = nil
 
 function init(que, fYaml)
     fYaml = fYaml or "../collector/plugin.yaml"
-    local web = Cframe.new()
-
-    CurlIndex.new(web)
-    CurlApi.new(web, que, fYaml)
-    CurlRpc.new(web)
-    CurlGuide.new(web)
-    CbaseQuery.new(web, fYaml)
-
     local Cidentity = require("beaver.identity")
     local inst = Cidentity.new(fYaml)
-    local export = Cexport.new(inst:id(), fYaml)
+    local instance = inst:id()
+
+    local web = Cframe.new()
+    local res = system:parseYaml(fYaml)
+
+    CbaseQuery.new(web, fYaml)
+    CurlApi.new(web, que, fYaml, instance)
+
+    if res.config.url_safe ~= "close" then
+        CurlIndex.new(web)
+        CurlRpc.new(web)
+        CurlGuide.new(web)
+    end
+
+
+    local export = Cexport.new(instance, fYaml)
     CurlExportHtml.new(web, export)
     CurlExportRaw.new(web, export)
 

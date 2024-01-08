@@ -13,6 +13,8 @@ local system = require("common.system")
 local cjson = require("cjson.safe")
 local CexecBase = require("collector.postEngine.execBase")
 local CexecDiag = require("collector.postEngine.execDiag")
+local CexecJobs = require("collector.postEngine.execJobs")
+local ChttpReq = require("httplib.httpReq")
 local Cengine = class("engine", CvProto)
 
 local diagExec = {
@@ -22,6 +24,8 @@ local diagExec = {
                                   "/var/log/sysak/iosdiag/hangdetect/result.log.seq"}}},
     net_edge = {block = 5 * 60, time = 60, so = {virtiostat = 5 * 3}},
 }
+
+
 
 function Cengine:_init_(que, proto_q, fYaml, tid)
     CvProto._init_(self, CprotoData.new(que))
@@ -33,6 +37,14 @@ function Cengine:_init_(que, proto_q, fYaml, tid)
     local res = system:parseYaml(fYaml)
     self._resDiag = res.diagnose
     self._diags = {}
+
+    if self._resDiag then
+        self._fYamlJobs = res.diagnose.jobs
+        self._jobs = {}
+        self._auth = res.diagnose.token
+        self._host = res.diagnose.host
+    end
+
 end
 
 function Cengine:setMainloop(main)
@@ -41,6 +53,37 @@ end
 
 function Cengine:setTask(taskMons)
     self._task = taskMons
+end
+
+function Cengine:postReq(s, data)
+    local req = ChttpReq.new()
+    local url = self._host .. "/api/v1/tasks/sbs_task_result/"
+    local formData = {
+        task_id = data.task_id,
+        results = s
+    }
+    local headers = {
+        accept = "application/json",
+        ["Content-Type"] = "multipart/form-data",
+        authorization = self._auth
+    }
+    req:postFormData(url,headers,formData)
+end
+
+function Cengine:postReqFile(s, data)
+    local req = ChttpReq.new()
+    local url = self._host .. "/api/v1/tasks/sbs_task_result/"
+    local formData = {
+        task_id = data.task_id,
+        files = s,
+        results = ""
+    }
+    local headers = {
+        accept = "application/json",
+        ["Content-Type"] = "multipart/form-data",
+        authorization = self._auth
+    }
+    req:postFormData(url,headers,formData)
 end
 
 function Cengine:run(e, res, diag)
@@ -60,13 +103,74 @@ function Cengine:run(e, res, diag)
     self._diags[res.exec] = diag.block
 end
 
+function Cengine:runJobs(e, res, diag)
+    local cmd = res.jobs[1].cmd
+    local isFile = false
+    local filename
+    local filepath
+    if #res.jobs[1].fetch_file_list~=0  then
+        isFile = true
+        filename = res.jobs[1].fetch_file_list[1].name
+        filepath = res.jobs[1].fetch_file_list[1].remote_path
+    end
+
+    local time
+    if diag and diag.time then
+        time = diag.time
+    else
+        time = 30
+    end
+
+    if cmd then
+        local exec = CexecJobs.new("/bin/bash", {"-c",cmd}, time, res.service_name)
+        --local exec = CexecJobs.new("/bin/bash", {"-c","sysak memgraph"}, time, res.service_name)
+        exec:addEvents(e)
+        if isFile then
+            local file = io.open(filepath, "rb")
+            if file then
+                local content = file:read("*a")
+                file:close()
+                local s = {
+                    filename,
+                    content,
+                    "application/octet-stream"
+                }
+                self:postReqFile(s, res)
+            else
+                print("无法打开文件" .. filepath)
+            end
+
+        else
+            local s = exec:readIn()
+            self:postReq(s, res)
+        end
+
+    end
+    if diag and diag.block then
+        self._jobs[res.service_name] = diag.block
+    else
+        self._jobs[res.service_name] = 60
+    end
+
+end
+
 function Cengine:pushTask(e, msgs)
     local events = pystring:split(msgs, '\n')
     for _, msg in ipairs(events) do
-        print(msg)
         local res = cjson.decode(msg)
+
+        local service_name = res.service_name
+
         local cmd = res.cmd
-        if cmd == "mon_pid" then
+        if service_name ~= nil then
+            local diag = self._fYamlJobs[service_name]
+            if self._jobs[service_name] then
+                print(service_name .. " is blocking")
+            else
+                self:runJobs(e,res,diag)
+            end
+
+        elseif cmd == "mon_pid" then
             self._task:add(res.pid, res.loop)
         elseif cmd == "exec" then  -- exec a cmd
             local execCmd = res.exec
@@ -79,7 +183,7 @@ function Cengine:pushTask(e, msgs)
             local diag = self._resDiag[exec]
             if diag then
                 system:dumps(diag)
-                if self._diags[exec] then
+                if self._diags[exec] then --实现阻塞
                     print("cmd " .. exec .. " is blocking.")
                 else
                     self:run(e, res, diag)
@@ -101,7 +205,7 @@ function Cengine:proc(t, event, msgs)
     self:pushTask(event, msgs)
 end
 
-function Cengine:checkDiag()
+function Cengine:checkDiag() --
     local toDel = {}
     for k, v in pairs(self._diags) do
         if v > 0 then
@@ -115,12 +219,30 @@ function Cengine:checkDiag()
     end
 end
 
+function Cengine:checkJobs() --
+    local toDel = {}
+    for k, v in pairs(self._jobs) do
+        if v > 0 then
+            self._jobs[k] = v - 1
+        else
+            table.insert(toDel, k)
+        end
+    end
+    for _, k in ipairs(toDel) do
+        self._jobs[k] = nil
+    end
+end
+
 function Cengine:work(t, event)
     local msgs = postQue.pull()
     if msgs then
         self:proc(t, event, msgs)
     end
     self:checkDiag()
+    if self._resDiag then
+        self:checkJobs()
+    end
+
 end
 
 return Cengine

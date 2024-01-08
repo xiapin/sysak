@@ -263,6 +263,15 @@ def memgraph_free(meminfo):
         used = int(line.strip().split()[2])
     return used
 
+def format_unit(value):
+    value = int(value)
+    if value > 5 * 1024 * 1024:
+        return '%s KB (%s GB)' % (value, round(value/(1024*1024),2))
+    elif value > 10 * 1024:
+        return '%s KB (%s MB)' % (value, round(value/(1024),2))
+    else:
+        return '%s KB' % value
+
 def memgraph_graph(meminfo):
     res = {}
     res["total"] = meminfo["MemTotal"] + meminfo['res']
@@ -291,11 +300,35 @@ def memgraph_graph(meminfo):
     kernel["VmallocUsed"] = meminfo["VmallocUsed"]
     kernel["allocPage"] = meminfo["allocPage"]
     res["kernel"] = kernel
+
+    format_res = {}
+    for i in res:
+        if type(res[i]) == dict:
+            format_res[i] = {}
+            for j in res[i]:
+                format_res[i][j] = format_unit(res[i][j])
+        else:
+            format_res[i] = format_unit(res[i])
+
     meminfo["graph"] = res
     global jsonFormat
     if jsonFormat != None:
         return meminfo
+    memgraph_check_event(meminfo)
+    res_str = ("\nmemgraph result:\ntotal memory: %s\tused: %s\tfree: %s\tavailable: %s\n\nuser: total used: %s\n\tuser-anon: %s\n\tuser-filecache: %s\n\tuser-buffers: %s\n\tuser-mlock: %s\n\nkernel: total used: %s\n\tkernel-reserved: %s\n\tkernel-SReclaimable: %s\n\tkernel-SUnreclaim: %s\n\tkernel-PageTables: %s\n\tkernel-VmallocUsed: %s\n\tkernel-KernelStack: %s\n\tkernel-allocPage: %s\n") % (format_res['total'],format_res['used'],format_res['free'],format_res['available'],format_res['userUsed'],format_res['user']['anon'],format_res['user']['filecache'],format_res['user']['buffers'],format_res['user']['mlock'],format_res['kernelUsed'],format_res['kernel']['reserved'],format_res['kernel']['SReclaimable'],format_res['kernel']['SUnreclaim'],format_res['kernel']['PageTables'],format_res['kernel']['VmallocUsed'],format_res['kernel']['KernelStack'],format_res['kernel']['allocPage'])
+    for item in meminfo['event']:
+        if item == "util":
+            continue
+        if meminfo['event'][item] == True:
+            if item == 'memcg':
+                res_str = '%sNotice: memcg leak\n' % res_str
+            elif item == 'leak':
+                res_str = '%sNotice: memory leak\n' % res_str
+            elif item == 'memfrag':
+                res_str = '%sNotice: memory fragment\n' % res_str
     print(res)
+    print(res_str)
+    return res
 
 def kmemleak_check(meminfo, memType):
     kmem = meminfo[memType]/1024
@@ -665,15 +698,6 @@ def memgraph_check_event(meminfo):
 def memgraph_handler_cmd(meminfo, argv):
     global jsonFormat
     filepath = "memgraph.json"
-    meminfo["taskAnon"] = {}
-    meminfo["taskMem"] = {}
-    meminfo["filepid"] = {}
-    meminfo["filecache"] = {}
-    meminfo["graph"] = {}
-    meminfo["memleak"] = {}
-    meminfo["taskInfo"] = {}
-    meminfo["cgroupTop"] = {}
-    meminfo["cgroupInfo"] = {}
     try:
         opts, args = getopt.getopt(argv,"j:hgfaklc:")
     except getopt.GetoptError:
@@ -716,6 +740,15 @@ def memgraph_handler_cmd(meminfo, argv):
 
 if __name__ == "__main__":
     meminfo = {}
+    meminfo["taskAnon"] = {}
+    meminfo["taskMem"] = {}
+    meminfo["filepid"] = {}
+    meminfo["filecache"] = {}
+    meminfo["graph"] = {}
+    meminfo["memleak"] = {}
+    meminfo["taskInfo"] = {}
+    meminfo["cgroupTop"] = {}
+    meminfo["cgroupInfo"] = {}
     memgraph_get_meminfo(meminfo)
     if len(sys.argv) == 1:
         memgraph_graph(meminfo)

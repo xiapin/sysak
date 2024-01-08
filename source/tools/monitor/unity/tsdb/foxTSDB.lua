@@ -11,28 +11,66 @@ local snappy = require("snappy")
 local pystring = require("common.pystring")
 local CprotoData = require("common.protoData")
 local foxFFI = require("tsdb.native.foxffi")
+local dirent = require("posix.dirent")
+local unistd = require("posix.unistd")
+local cjson = require("cjson.safe")
+local inotify = require('inotify')
 
 local CfoxTSDB = class("CfoxTSDB")
 
+local function get_timezone_offset()
+    local ts = os.time()
+    local utcdate   = os.date("!*t", ts)
+    local localdate = os.date("*t", ts)
+    localdate.isdst = false -- this is the trick
+    return os.difftime(os.time(localdate), os.time(utcdate))
+end
+
+local json = cjson.new()
 function CfoxTSDB:_init_(fYaml)
     self.ffi = foxFFI.ffi
     self.cffi = foxFFI.cffi
     self._proto = CprotoData.new(nil)
+    self.tz_sec = get_timezone_offset()
     self:setupConf(fYaml)
 end
 
 function CfoxTSDB:_del_()
+
     if self._man then
         self.cffi.fox_del_man(self._man)
+        self._man = nil
     end
-    self._man = nil
+
+    if self._ino then
+        for _, w in ipairs(self._ino_ws) do
+            self._ino:rmwatch(w)
+        end
+        self._ino:close()
+        self._ino = nil
+    end
+end
+
+function CfoxTSDB:_initInotify()
+    self._ino = inotify.init()
+    system:fdNonBlocking(self._ino:getfd())
+    self._ino_ws = {}
 end
 
 function CfoxTSDB:setupConf(fYaml)
     local conf = system:parseYaml(fYaml)
-    local dbConf = conf.db or {budget = 200, rotate=7}
+    local dbConf =  conf.config.db or {budget = 200, rotate=7}
     self._qBudget = dbConf.budget or 200
     self._rotate = dbConf.rotate or 7
+end
+
+function CfoxTSDB:fileNames()
+    if self._man then
+        local iname = self.ffi.string(self._man.iname)
+        local fname = self.ffi.string(self._man.fname)
+        return {iname = iname,
+                fname = fname}
+    end
 end
 
 function CfoxTSDB:get_us()
@@ -56,7 +94,7 @@ function CfoxTSDB:getDate()
 end
 
 function CfoxTSDB:makeStamp(foxTime)
-    return self.cffi.make_stamp(foxTime)
+    return self.cffi.make_stamp(foxTime) + self.tz_sec * 1e6
 end
 
 function CfoxTSDB:date2str(date)
@@ -132,9 +170,6 @@ function CfoxTSDB:packLine(lines)
 end
 
 function CfoxTSDB:rotateDb()
-    local dirent = require("posix.dirent")
-    local unistd = require("posix.unistd")
-
     local usec = self._man.now
     local sec = self._rotate * 24 * 60 * 60
 
@@ -152,7 +187,7 @@ function CfoxTSDB:rotateDb()
             local num = tonumber(sf)
             if num < level then
                 print("delete " .. "./" .. f)
-                pcall(unistd.unlink, "./" .. f)
+                pcall(unistd.unlink, "./" .. f) --delete
             end
         end
     end
@@ -164,33 +199,92 @@ function CfoxTSDB:setupWrite()
     local date = self:getDate()
     local us = self:get_us()
     local ret = self.cffi.fox_setup_write(self._man, date, us)
+
+    if ret ~= 0 then
+        local usec = self:get_us()
+
+        local foxTime = self:getDateFrom_us(usec)
+        local v = foxTime.year * 10000 + foxTime.mon * 100 + foxTime.mday
+        local fname = string.format("%08d.fox", v)
+        pcall(unistd.unlink, "./" .. fname)
+        fname = string.format("%08d.foxi", v)
+        pcall(unistd.unlink, "./" .. fname)
+        ret = self.cffi.fox_setup_write(self._man, date, us)
+    end
     assert(ret == 0)
     return ret
 end
 
-function CfoxTSDB:write(buff)
+local function getTables(proto, buff)
+    local tables = {}
+
+    local lines = proto:decode(buff)
+    for _, line in ipairs(lines.lines) do
+        local title = line.line
+        if tables[title] then
+            tables[title] = tables[title] + 1
+        else
+            tables[title] = 1
+        end
+    end
+    return tables
+end
+
+function CfoxTSDB:_write(tables, buff)
     assert(self._man ~= nil, "this fox object show setup for read or write, you should call setupWrite after new")
     local now = self:get_us()
     local date = self:getDateFrom_us(now)
+    local tableStream = snappy.compress(json.encode(tables))
     local stream = snappy.compress(buff)
-    assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(stream, #stream), #stream) == 0)
+
+    local tableLen = #tableStream
+    local streamLen = #stream
+
+    assert(self.cffi.fox_write(self._man, date, now,
+                    tableStream, tableLen,
+                    stream, streamLen) > 0 )
+
     if self._man.new_day > 0 then
         self:rotateDb()
     end
-    --assert(self.cffi.fox_write(self._man, date, now, self.ffi.string(buff), #buff) == 0)
+end
+
+function CfoxTSDB:write(buff)
+    local tables = getTables(self._proto, buff)
+    if system:keyCount(tables) then
+        self:_write(tables, buff)
+    end
+end
+
+local function addWatch(ino, ws, fname)
+    local w = ino:addwatch(fname, inotify.IN_MODIFY)
+    table.insert(ws, w)
+end
+
+local function dbIsUpdate(ino)
+    local ret = false
+    for _ in ino:events() do
+        ret = true
+    end
+    return ret
 end
 
 function CfoxTSDB:_setupRead(us)
     assert(self._man == nil, "one fox object should have only one manager.")
     self._man = self.ffi.new("struct fox_manager")
-    us = us or (self:get_us() - 15e6)
+    us = us or (self:get_us() - 1)
     local date = self:getDateFrom_us(us)
     local res = self.cffi.fox_setup_read(self._man, date, us)
     assert(res >= 0, string.format("setup read return %d.", res))
     if res > 0 then
         self.cffi.fox_del_man(self._man)
         self._man = nil
+    else
+        self:_initInotify()
+        local names = self:fileNames()
+        addWatch(self._ino, self._ino_ws, names.iname)
     end
+
     return res
 end
 
@@ -198,46 +292,187 @@ function CfoxTSDB:curMove(us)
     assert(self._man)
     local ret = self.cffi.fox_cur_move(self._man, us)
     assert(ret >= 0, string.format("cur move bad ret: %d", ret))
-    return self._man.pos
+    return self._man.r_index
 end
 
-function CfoxTSDB:resize()
-    if self._man then
+function CfoxTSDB:_resize()
+    if dbIsUpdate(self._ino) then
         local ret = self.cffi.fox_read_resize(self._man)
         assert(ret >= 0, string.format("resize bad ret: %d", ret))
     end
 end
 
-function CfoxTSDB:loadData(stop_us)
+function CfoxTSDB:resize()
+    print("warn: resize function is no need any more.")
+end
+
+local function loadFoxTable(ffi, cffi, pman)
+    local tables = {}
+
+    local data = ffi.new("char* [1]")
+    local ret  = cffi.fox_read_table(pman, data)
+    assert(ret >= 0)
+    if ret > 0 then
+        local stream = ffi.string(data[0], ret)
+        --local ustr = snappy.decompress(stream)
+        --tables = json.decode(ustr)
+        --cffi.fox_free_buffer(data)
+        local stat, ustr = pcall(snappy.decompress, stream)
+        if stat and ustr ~= nil then
+            tables = json.decode(ustr)
+            cffi.fox_free_buffer(data)
+        else
+            print("foxTSDB loadFoxTable: snappy error")
+        end
+    end
+    return tables
+end
+
+local function loadFoxData(ffi, cffi, pman, proto)
+    local lines = {}
+
+    local data = ffi.new("char* [1]")
+    local us = ffi.new("fox_time_t [1]")
+    local ret  = cffi.fox_read_data(pman, data, us)
+    assert(ret >= 0)
+    if ret > 0 then
+        local stream = ffi.string(data[0], ret)
+        --local ustr = snappy.decompress(stream)
+        local stat, ustr = pcall(snappy.decompress, stream)
+        if stat and ustr ~= nil then
+            lines = proto:decode(ustr)
+            lines['time'] = tonumber(us[0])
+            cffi.fox_free_buffer(data)
+        else
+            print("foxTSDB loadfoxData: snappy error")
+        end
+
+    end
+
+    return lines
+end
+
+local function checkQTable(qtbl, ffi, cffi, pman)
+    if qtbl == nil then  -- nil means get all
+        return true
+    end
+
+    local tables = loadFoxTable(ffi, cffi, pman)
+    for _, tbl in ipairs(qtbl) do
+        if tables[tbl] then
+            return true
+        end
+    end
+    return false
+end
+
+local function transLine(line, time, addLog)
+    local cell = {time = time, title = line.line}
+
+    local labels = {}
+    if line.ls then
+        for _, vlabel in ipairs(line.ls) do
+            labels[vlabel.name] = vlabel.index
+        end
+    end
+    cell.labels = labels
+
+    local values = {}
+    if line.vs then
+        for _, vvalue in ipairs(line.vs) do
+            values[vvalue.name] = vvalue.value
+        end
+    end
+    cell.values = values
+
+    local logs = {}
+    if addLog then
+        if line.log then
+            for _, log in ipairs(line.log) do
+                logs[log.name] = log.log
+            end
+        end
+    end
+    cell.logs = logs
+
+    return cell
+end
+
+local function filterLines(qtbl, lines, cells, addLog)
+    local c = #cells + 1
+    if not lines.lines then
+        return
+    end
+    local time = lines.time
+
+    if qtbl == nil then  -- nil means get all
+        for _, line in ipairs(lines.lines) do
+            cells[c] = transLine(line, time, addLog)
+            c = c + 1
+        end
+        return
+    end
+
+    for _, tbl in ipairs(qtbl) do
+        for _, line in ipairs(lines.lines) do
+            if line.line == tbl then
+                cells[c] = transLine(line, time, addLog)
+                c = c + 1
+            end
+        end
+    end
+    return cells
+end
+
+-- stop_us: end time; qtbl: query tables, if nil, get all; addLog, if nil only get values,
+function CfoxTSDB:loadData(stop_us, qtbl, addLog)
     local stop = false
 
     local function fLoad()
+        local cells = {}
+
         if stop then
             return nil
         end
 
-        local data = self.ffi.new("char* [1]")
-        local us = self.ffi.new("fox_time_t [1]")
-        local ret = self.cffi.fox_read(self._man, stop_us, data, us)
-        assert(ret >= 0)
-        if ret > 0 then
-            local stream = self.ffi.string(data[0], ret)
-            local ustr = snappy.decompress(stream)
-            local line = self._proto:decode(ustr)
-            self.cffi.fox_free_buffer(data)
-
-            if self._man.fsize == self._man.pos then  -- this means cursor is at the end of file.
-                stop = true
-            end
-            line['time'] = tonumber(us[0])
-            return line
+        if checkQTable(qtbl, self.ffi, self.cffi, self._man) then
+            local datas = loadFoxData(self.ffi, self.cffi, self._man, self._proto)
+            filterLines(qtbl, datas, cells, addLog)
         end
-        return nil
+
+        local ret = self.cffi.fox_next(self._man, stop_us)
+        assert(ret >= 0, "for next failed.")
+        if ret > 0 then
+            stop = true
+        end
+        return cells
     end
     return fLoad
 end
 
-function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
+function CfoxTSDB:loadTable(stop_us)
+    local stop = false
+
+    local function fTable()
+        if stop then
+            return nil
+        end
+
+        local tables = loadFoxTable(self.ffi, self.cffi, self._man)
+
+        local ret = self.cffi.fox_next(self._man, stop_us)
+        assert(ret >= 0, "for next failed.")
+        if ret > 0 then
+            stop = true
+        end
+
+        return tables
+    end
+    return fTable
+end
+
+
+function CfoxTSDB:_loadMetric(start, stop, ms)  -- start stop should at the same mday
     assert(stop > start)
     local dStart = self:getDateFrom_us(start)
     local dStop = self:getDateFrom_us(stop)
@@ -247,54 +482,49 @@ function CfoxTSDB:query(start, stop, ms)  -- start stop should at the same mday
 
     self:curMove(start)    -- moveto position
 
-    local lenMs = #ms
-    for line in self:loadData(stop) do
-        local time = line.time
-        for _, v in ipairs(line.lines) do
-            local tCell = {time = time, title = v.line}
-
-            local labels = {}
-            if v.ls then
-                for _, vlabel in ipairs(v.ls) do
-                    labels[vlabel.name] = vlabel.index
-                end
-            end
-            tCell.labels = labels
-
-            local values = {}
-            if v.vs then
-                for _, vvalue in ipairs(v.vs) do
-                    values[vvalue.name] = vvalue.value
-                end
-            end
-            tCell.values = values
-
+    local lenMs = #ms + 1
+    for cells in self:loadData(stop, nil, false) do  -- only for metric, do not need log.
+        for _, cell in ipairs(cells) do
+            ms[lenMs] = cell
             lenMs = lenMs + 1
-            ms[lenMs] = tCell
         end
     end
     return ms
 end
 
-function CfoxTSDB:_qlast(date, beg, stop, ms)
+function CfoxTSDB:_preQuery(date, beg)
     if not self._man then    -- check _man is already installed.
         if self:_setupRead(beg) ~= 0 then    -- try to create new
-            return ms
+            return 1    -- beg is  nil
         end
+        return 0
     end
 
     if self.cffi.check_pman_date(self._man, date) == 1 then
-        return self:query(beg, stop, ms)
+        self:_resize()  -- check is need to resize.
+        return 0 -- at the same day
     else
-        self:_del_()
-        if self:_setupRead(beg) ~= 0 then    -- try to create new
-            return ms
+        self:_del_()  -- to destroy..
+        if self:_setupRead(beg) ~= 0 then    -- try to setup new
+            return 1
         end
-        return self:query(beg, stop, ms)
+        return 0
     end
 end
 
-function CfoxTSDB:qlast(last, ms)
+function CfoxTSDB:_qLastMetric(date, beg, stop, ms)
+    local res = self:_preQuery(date, beg)
+
+    if res > 0 then
+        return ms
+    elseif res == 0 then
+        return self:_loadMetric(beg, stop, ms)
+    else
+        error("bad preQuery state: " .. res)
+    end
+end
+
+function CfoxTSDB:qLastMetric(last, ms)
     assert(last < 24 * 60 * 60)
 
     local now = self:get_us()
@@ -304,7 +534,7 @@ function CfoxTSDB:qlast(last, ms)
     local dStop = self:getDateFrom_us(now)
 
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
-        self:_qlast(dStart, beg, now, ms)
+        self:_qLastMetric(dStart, beg, now, ms)
     else
         dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
@@ -312,60 +542,27 @@ function CfoxTSDB:qlast(last, ms)
         local now1 = beg2 - 1
         local now2 = now
 
-        self:_qlast(dStart, beg1, now1, ms)
-        self:_qlast(dStop,  beg2, now2, ms)
+        self:_qLastMetric(dStart, beg1, now1, ms)
+        self:_qLastMetric(dStop,  beg2, now2, ms)
     end
 end
 
-function CfoxTSDB:qDay(start, stop, ms, tbls, budget)
-    if self._man then
-        self:_del_()
-    end
-
-    if self:_setupRead(start) ~= 0 then
-        return {}
+function CfoxTSDB:qDay(date, start, stop, ms, tbls, budget)
+    local ret = self:_preQuery(date, start)
+    if ret ~= 0 then
+        return ms
     end
 
     budget = budget or self._qBudget
     self:curMove(start)
     local inc = false
-    local lenMs = #ms
-    for line in self:loadData(stop) do
+    local lenMs = #ms + 1
+    for cells in self:loadData(stop, tbls, true) do
         inc = false
-        local time = line.time
-        for _, v in ipairs(line.lines) do
-            local title = v.line
-            if not tbls or system:valueIsIn(tbls, title) then
-                local tCell = {time = string.format("%d", time), title = title}
-
-                local labels = {}
-                if v.ls then
-                    for _, vlabel in ipairs(v.ls) do
-                        labels[vlabel.name] = vlabel.index
-                    end
-                end
-                tCell.labels = labels
-
-                local values = {}
-                if v.vs then
-                    for _, vvalue in ipairs(v.vs) do
-                        values[vvalue.name] = vvalue.value
-                    end
-                end
-                tCell.values = values
-
-                local logs = {}
-                if v.log then
-                    for _, log in ipairs(v.log) do
-                        logs[log.name] = log.log
-                    end
-                end
-                tCell.logs = logs
-
-                lenMs = lenMs + 1
-                ms[lenMs] = tCell
-                inc = true
-            end
+        for _, cell in ipairs(cells) do
+            inc = true
+            ms[lenMs] = cell
+            lenMs = lenMs + 1
         end
 
         if inc then
@@ -378,23 +575,19 @@ function CfoxTSDB:qDay(start, stop, ms, tbls, budget)
     return ms
 end
 
-function CfoxTSDB:qDayTables(start, stop, tbls)
-    if self._man then
-        self:_del_()
-    end
-
-    if self:_setupRead(start) ~= 0 then
-        return {}
+function CfoxTSDB:qDayTables(date, start, stop, tbls)
+    local ret = self:_preQuery(date, start)
+    if ret ~= 0 then
+        return tbls
     end
 
     self:curMove(start)
-    local lenTbls = #tbls
-    for line in self:loadData(stop) do
-        for _, v in ipairs(line.lines) do
-            local title = v.line
-            if not system:valueIsIn(tbls, title) then
-                lenTbls = lenTbls + 1
-                tbls[lenTbls] = title
+    for cells in self:loadTable(stop) do
+        for k, v in pairs(cells) do
+            if tbls[k] then
+                tbls[k] = tbls[k] + v
+            else
+                tbls[k] = v
             end
         end
     end
@@ -411,7 +604,7 @@ function CfoxTSDB:qDate(dStart, dStop, tbls)
 
     local ms = {}
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
-        self:qDay(beg, now, ms, tbls)
+        self:qDay(dStart, beg, now, ms, tbls)
     else
         dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
@@ -419,10 +612,10 @@ function CfoxTSDB:qDate(dStart, dStop, tbls)
         local now1 = beg2 - 1
         local now2 = now
 
-        self:qDay(beg1, now1, ms, tbls)
+        self:qDay(dStart, beg1, now1, ms, tbls)
         local budget = self._qBudget - #ms
         if budget > 0 then
-            self:qDay(beg2, now2, ms, tbls, budget)
+            self:qDay(dStop, beg2, now2, ms, tbls, budget)
         end
     end
     return ms
@@ -440,7 +633,7 @@ function CfoxTSDB:qNow(sec, tbls)
 
     local ms = {}
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
-        self:qDay(beg, now, ms, tbls)
+        self:qDay(dStart, beg, now, ms, tbls)
     else
         dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
@@ -448,10 +641,10 @@ function CfoxTSDB:qNow(sec, tbls)
         local now1 = beg2 - 1
         local now2 = now
 
-        self:qDay(beg1, now1, ms, tbls)
+        self:qDay(dStart, beg1, now1, ms, tbls)
         local budget = self._qBudget - #ms
         if budget > 0 then
-            self:qDay(beg2, now2, ms, tbls, budget)
+            self:qDay(dStop, beg2, now2, ms, tbls, budget)
         end
     end
     return ms
@@ -469,7 +662,7 @@ function CfoxTSDB:qTabelNow(sec)
 
     local tbls = {}
     if self.cffi.check_foxdate(dStart, dStop) ~= 0 then
-        self:qDayTables(beg, now, tbls)
+        self:qDayTables(dStart, beg, now, tbls)
     else
         dStop.hour, dStop.min, dStop.sec = 0, 0, 0
         local beg1 = beg
@@ -477,10 +670,17 @@ function CfoxTSDB:qTabelNow(sec)
         local now1 = beg2 - 1
         local now2 = now
 
-        self:qDayTables(beg1, now1, tbls)
-        self:qDayTables(beg2, now2, tbls)
+        self:qDayTables(dStart, beg1, now1, tbls)
+        self:qDayTables(dStop,  beg2, now2, tbls)
     end
-    return tbls
+
+    local res = {}
+    local c = 1
+    for k, _ in pairs(tbls) do
+        res[c] = k
+        c = c + 1
+    end
+    return res
 end
 
 return CfoxTSDB

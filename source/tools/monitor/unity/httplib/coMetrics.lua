@@ -12,53 +12,83 @@ local pystring = require("common.pystring")
 local lineParse = require("common.lineParse")
 local CtransPro = require("common.transPro")
 local base64 = require("base64")
-local addition = require("common.addition")
+local sls_api = require("sls_api")
 
 local CcoMetrics = class("coMetrics", CcoHttpCliInst)
 
-function CcoMetrics:_init_(fYaml)
+function CcoMetrics:_init_(fYaml, config, instance)
 
     local res = system:parseYaml(fYaml)
     local _metrics = res.metrics
     self._mhead = _metrics.head
     self._title = _metrics.title
 
-    local Cidentity = require("beaver.identity")
-    local inst = Cidentity.new(fYaml)
-    local instance = inst:id()
+    local _addition = config.addition
 
-    local _addition = res.pushTo.addition
+    self._key1, self._key2 = sls_api.decode(_addition)
+    self._project = config.project
+    self._endpoint = config.endpoint
+    self._metricstore = config.metricstore
 
-    self._key1, self._key2 = addition:decode(_addition)
-    self._project = res.pushTo.project
-    self._endpoint = res.pushTo.endpoint
-    self._metricstore = res.pushTo.metricstore
-    self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"
-    self._host = self._project .."." .. self._endpoint
+    if self._project and self._endpoint and self._metricstore then
+        self._url = "/prometheus/" ..self._project.."/"..self._metricstore.."/api/v1/write"
+        self._host = self._project .."." .. self._endpoint
 
-    local pushMetrics = {
-        host = self._host,
-        url = self._url,
-        port = 80
-    }
-    CcoHttpCliInst._init_(self, instance, pushMetrics)
-    -- go ffi
-    local ffi = require("common.protobuf.metricstore.ffi_lua")
-    self.ffi = ffi.ffi
-    self.awesome = ffi.awesome
+        local pushMetrics = {
+            host = self._host,
+            url = self._url,
+            port = 80
+        }
+        CcoHttpCliInst._init_(self, instance, pushMetrics)
+        -- go ffi
+        local ffi = require("common.protobuf.metricstore.ffi_lua")
+        self.ffi = ffi.ffi
+        self.awesome = ffi.awesome
 
-    --fox ffi
-    local foxFFI = require("tsdb.native.foxffi")
-    self.foxffi = foxFFI.ffi
-    self.foxcffi = foxFFI.cffi
+        --fox ffi
+        local foxFFI = require("tsdb.native.foxffi")
+        self.foxffi = foxFFI.ffi
+        self.foxcffi = foxFFI.cffi
 
-    self._transPro = CtransPro.new(instance, fYaml, false, false)
+        self._transPro = CtransPro.new(instance, fYaml, false, false)
+    end
+
 end
 
 function CcoMetrics:echo(tReq)
-    --if tReq.code ~= "204" then
-    print(tReq.code, tReq.data)
-    --end
+    --if tReq.code ~= "200" then
+    if string.sub(tReq.code,1,1) ~= "2" then
+        print(tReq.code, tReq.data)
+    end
+end
+
+local function transLines(lines)
+    if not lines then
+        return {}
+    end
+    local res = {}
+    local c = 1
+    for _, line in ipairs(lines) do
+        local cell = {title = line.line}
+        local labels = {}
+        if line.ls then
+            for _, vlabel in ipairs(line.ls) do
+                labels[vlabel.name] = vlabel.index
+            end
+        end
+        cell.labels = labels
+
+        local values = {}
+        if line.vs then
+            for _, vvalue in ipairs(line.vs) do
+                values[vvalue.name] = vvalue.value
+            end
+        end
+        cell.values = values
+        res[c] = cell
+        c = c+1
+    end
+    return res
 end
 
 function CcoMetrics:trans(msgs)
@@ -66,7 +96,7 @@ function CcoMetrics:trans(msgs)
     local c = 0
     local lines
 
-    lines = msgs.lines
+    lines = transLines(msgs.lines)
     res = self._transPro:export(lines)
     local prome = self.ffi.new("GoString")
     prome.p = res
@@ -94,7 +124,6 @@ function CcoMetrics:pack(body)
         ["Authorization"] = "Basic " .. keys64,
     }
     local heads = self:packCliHeaders(head)
-    print("pack finish")
     return pystring:join("\r\n", {line, heads, body})
 end
 

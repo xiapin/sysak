@@ -8,8 +8,8 @@ local ffi = require("ffi")
 local cffi = ffi.load('foxTSDB')
 
 ffi.cdef [[
-typedef unsigned long off_t;
-typedef unsigned long fox_time_t;
+typedef signed long fox_time_t;
+typedef size_t fox_off_t;
 
 struct foxDate {
     short year;
@@ -22,16 +22,41 @@ struct foxDate {
 
 struct fox_manager {
     fox_time_t now;
-    off_t pos;          //now offset;
-    off_t last_pos;     // last pos
-    size_t fsize;        // file size.
+    fox_off_t w_off;        // now write offset;
+    fox_off_t r_index;      // now index
+    fox_off_t r_next;       // for next index
+    fox_off_t cells;        // index max
+    size_t isize;        //index file size;
+    size_t fsize;        //data file size.
+    fox_off_t data_pos;     // data position
+    int table_len;          // data table size
+    int data_len;           // data size
+
     int fd;
+    int fdi;
+    char iname[16];  // info file name,
+    char fname[16];  // data file name,
     int new_day;
 
     short year;
     char mon;
     char mday;
 };
+
+typedef struct {
+	char* message; // exception message
+	char* funcname; // source function of exception (e.g. SearchSysCache)
+	char* filename; // source of exception (e.g. parse.l)
+	int lineno; // source of exception (e.g. 104)
+	int cursorpos; // char in query at which exception occurred
+	char* context; // additional context (optional, can be NULL)
+} PgQueryError;
+
+typedef struct {
+  char* parse_tree;
+  char* stderr_buffer;
+  PgQueryError* error;
+} PgQueryParseResult;
 
 fox_time_t get_us(void);
 int get_date_from_us(fox_time_t us, struct foxDate * p);
@@ -42,13 +67,20 @@ int check_pman_date(struct fox_manager* pman, struct foxDate* pdate);
 
 int fox_setup_write(struct fox_manager* pman, struct foxDate * p, fox_time_t now);
 int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,
+             const char* tData, int tLen,
              const char* data, int len);
 int fox_setup_read(struct fox_manager* pman, struct foxDate * p, fox_time_t now);
 int fox_cur_move(struct fox_manager* pman, fox_time_t now);
 int fox_read_resize(struct fox_manager* pman);
-int fox_read(struct fox_manager* pman, fox_time_t stop, char **pp, fox_time_t *us);
+int fox_next(struct fox_manager* pman, fox_time_t stop);
+int fox_read_table(struct fox_manager* pman, char **pp);
+int fox_read_data(struct fox_manager* pman, char **pp, fox_time_t *us);
 void fox_free_buffer(char **pp);
 void fox_del_man(struct fox_manager* pman);
+
+int parse_sql(const char* sql, PgQueryParseResult* pRes);
+void parse_sql_free(PgQueryParseResult* pRes);
+void parse_sql_exit();
 ]]
 
 return {ffi = ffi, cffi = cffi}

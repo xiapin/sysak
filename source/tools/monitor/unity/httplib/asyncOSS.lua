@@ -8,17 +8,16 @@ require("common.class")
 local system = require("common.system")
 local pystring = require("common.pystring")
 local sha1 = require("sha1")
-local base64 = require("base64")
+local sls_api = require("sls_api")
 local CasyncHttp = require("httplib.asyncHttp")
-
+local base64 = require("base64")
 local CasyncOSS = class("asyncOSS", CasyncHttp)
 
 function CasyncOSS:_init_(res)
     CasyncHttp._init_(self)
     self._bucket = res.bucket
     self._endPoint = res.endPoint
-    self._ak = base64.decode(res.ak)
-    self._sk = base64.decode(res.sk)
+    self._k1, self._k2 = sls_api.decode(res.addition)
 end
 
 function CasyncOSS:sign(cType, date, uri)
@@ -30,11 +29,11 @@ function CasyncOSS:sign(cType, date, uri)
         uri,    --
     }
     local s = table.concat(ss, '\n')
-    return base64.encode(sha1.hmac_binary(self._sk, s))
+    return base64.encode(sha1.hmac_binary(self._k2, s))
 end
 
 function CasyncOSS:auth(cType, date, uri)
-    local ss = {"OSS ", self._ak, ":", self:sign(cType, date, uri)}
+    local ss = {"OSS ", self._k1, ":", self:sign(cType, date, uri)}
     return table.concat(ss)
 end
 

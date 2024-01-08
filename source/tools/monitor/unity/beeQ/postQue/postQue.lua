@@ -8,15 +8,16 @@ local mod = {}
 local ffi = require("ffi")
 
 ffi.cdef [[
-int postQue_pull(char *msg);
+int postQue_pull(char *msg, int size);
 int postQue_post(const char *msg);
 ]]
 
 local cffi = ffi.load("postQue")
 
 function mod.pull()
-    local s = ffi.new("char[?]", 1024)
-    local ret = cffi.postQue_pull(s)
+    local len = 16*1024
+    local s = ffi.new("char[?]", len)
+    local ret = cffi.postQue_pull(s,len)
     if ret > 0 then
         return ffi.string(s)
     end

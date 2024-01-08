@@ -121,6 +121,10 @@ local function setupPostEngine(que, proto_q, fYaml, tid)
     return w, 1
 end
 
+local function work_loop(e)
+    return e:proc()
+end
+
 function work(que, proto_q, yaml, tid)
     local fYaml = yaml or "../collector/plugin.yaml"
     checkSos()
@@ -135,5 +139,11 @@ function work(que, proto_q, yaml, tid)
     e:addEvent("postEngine", engine, unit)
     engine:setMainloop(main)
 
-    return e:proc()
+    local res, msg = pcall(work_loop, e)
+    if res then
+        return res
+    else
+        print(msg)
+        return nil
+    end
 end

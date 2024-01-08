@@ -30,8 +30,8 @@ end
 function CforkRun:_del_()
     if self._pid then
         exec.kill(self._pid)
+        print("kill " .. self._pid)
     end
-    print("kill " .. self._pid)
 end
 
 function CforkRun:proc(elapsed, lines)

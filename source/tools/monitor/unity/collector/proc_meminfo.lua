@@ -34,15 +34,16 @@ end
 
 function CprocMeminfo:readVmalloc()
     local pages = 0
-    for line in io.lines("/proc/vmallocinfo") do
-        if string.find(line,"vmalloc") and string.find(line,"pages=") then
-            local cells = pystring:split(pystring:split(pystring:strip(line),"pages=",1)[2]," ",1)
-            pages = pages + tonumber(cells[1])
-        end
-    end
+    --for line in io.lines("/proc/vmallocinfo") do
+     --   if string.find(line,"vmalloc") and string.find(line,"pages=") then
+      --      local cells = pystring:split(pystring:split(pystring:strip(line),"pages=",1)[2]," ",1)
+       --     pages = pages + tonumber(cells[1])
+        --end
+    --end
     self._protoTable_dict["vs"]["VmallocUsed"]=pages * 4
 end
 
+--[[
 function CprocMeminfo:readUsed()
     local f = io.popen('free -k','r')
     io.input(f)
@@ -55,6 +56,7 @@ function CprocMeminfo:readUsed()
     end
     f:close()
 end
+]]
 
 function CprocMeminfo:readHugepage(size,name)
     local file = "/sys/kernel/mm/hugepages/hugepages-" .. size .. "kB/nr_hugepages"
@@ -89,14 +91,18 @@ function CprocMeminfo:proc(elapsed, lines)
     end
     local tmp_dict = self._protoTable_dict.vs
     self:readVmalloc()
-    self:readUsed()
+    --self:readUsed()
     self:readHugepage(2048,"huge_2M")
     self:readHugepage(1048576,"huge_1G")
 
     local cell = {name="total", value=tmp_dict["MemTotal"]+tmp_dict["res"]}
     table.insert(self._protoTable["vs"], cell)
 
-    cell = {name="used", value=tmp_dict["free_used"]+tmp_dict["Shmem"]}
+    --cell = {name="used", value=tmp_dict["free_used"]+tmp_dict["Shmem"]}
+    --table.insert(self._protoTable["vs"], cell)
+
+    local used = tmp_dict["MemTotal"] - tmp_dict["MemFree"] - tmp_dict["Cached"] - tmp_dict["Buffers"] - tmp_dict["SReclaimable"] + tmp_dict["Shmem"]
+    cell = {name="used", value = used }
     table.insert(self._protoTable["vs"], cell)
 
     local kernel_other = tmp_dict["Slab"]+tmp_dict["KernelStack"]+tmp_dict["PageTables"]+tmp_dict["VmallocUsed"]

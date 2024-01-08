@@ -47,6 +47,7 @@ function CpipeMon:setupPipe(fYaml)
             s:bind(path)
             print("bind " .. path)
             table.insert(self._socks, s)
+
         else
             error("create udp pipe failed.")
         end
@@ -89,6 +90,7 @@ function CpipeMon:procLines(stream)
     end
     local bytes = self._proto:encode(lines)
     self._proto:que(bytes)
+    return 0
 end
 
 function CpipeMon:poll()
@@ -104,7 +106,10 @@ function CpipeMon:poll()
             end
             local stream, err = sock:receive()
             if stream then
-                self:procLines(stream)
+                local res, msg = pcall(self.procLines, self, stream)
+                if not res then
+                    print("bad line:\n" .. stream .. msg)
+                end
             else
                 print("recv line return: " .. err)
                 return 0

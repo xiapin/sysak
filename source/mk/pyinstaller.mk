@@ -8,7 +8,7 @@ all: $(target) target_rule
 
 $(target): $@
 	rm -Rf build dist
-	pyinstaller $@.spec
+	pyinstaller --clean $@.spec
 	cp dist/$@ $(TARGET_PATH)/
 
 include $(SRC)/mk/target.inc

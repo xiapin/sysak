@@ -11,12 +11,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "async_ssl.h"
 
 int setsockopt_AP(int fd){
     int opt =1;
-    int r = setsockopt(fd, SOL_SOCKET,SO_REUSEPORT,(char*)&opt,sizeof(int));
+    int r = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, (char*)&opt, sizeof(int));
 //    SO_REUSEPORT
-    if(r<0){
+    if (r < 0) {
         perror("set sock opt");
     }
     return r;
@@ -24,7 +25,7 @@ int setsockopt_AP(int fd){
 
 static int socket_non_blocking(int sfd)
 {
-    int flags, res;
+    int flags = 0, ret = 0;
 
     flags = fcntl(sfd, F_GETFL);
     if (flags < 0) {
@@ -33,44 +34,52 @@ static int socket_non_blocking(int sfd)
     }
 
     flags |= O_NONBLOCK;
-    res    = fcntl(sfd, F_SETFL, flags);
-    if (res < 0) {
+    ret    = fcntl(sfd, F_SETFL, flags);
+    if (ret < 0) {
         perror("error : cannot set socket flags!\n");
-        return -errno;
+        ret = -errno;
+        goto fcntlFailed;
     }
 
     return 0;
+    fcntlFailed:
+    return ret;
 }
 
 static int epoll_add(int efd, int fd) {
     struct epoll_event event;
-    int res;
+    int ret = 0;
 
     event.events  = EPOLLIN;
     event.data.fd = fd;
 
-    res = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event);
-    if (res < 0) {
+    ret = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event);
+    if (ret < 0) {
         perror("error : can not add event to epoll!\n");
         return -errno;
     }
-    return res;
+    return ret;
 }
 
 static int epoll_del(int efd, int fd) {
-    int res;
+    int ret;
 
-    res = epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
-    if (res < 0) {
+    ret = epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
+    if (ret < 0) {
         perror("error : can not del event to epoll!\n");
         return -errno;
     }
-    return res;
+    return ret;
 }
 
 int init(int listen_fd) {
-    int efd;
-    int res;
+    int efd = 0;
+    int ret = 0;
+
+    ret = async_ssl_init();
+    if (ret < 0) {
+        goto end_ssl_init;
+    }
 
     efd = epoll_create(NATIVE_EVENT_MAX);
     if (efd < 0) {
@@ -78,69 +87,71 @@ int init(int listen_fd) {
         exit(1);
     }
 
-    res = epoll_add(efd, listen_fd);
-    if (res < 0) {
+    ret = epoll_add(efd, listen_fd);
+    if (ret < 0) {
+        ret = -errno;
         goto end_epoll_add;
     }
     return efd;
 
+    end_ssl_init:
     end_epoll_add:
-    return -errno;
+    return ret;
 }
 
 int add_fd(int efd, int fd) {
-    int res;
+    int ret;
 
-    res = socket_non_blocking(fd);
-    if (res < 0) {
+    ret = socket_non_blocking(fd);
+    if (ret < 0) {
         goto end_socket_non_blocking;
     }
 
-    res = epoll_add(efd, fd);
-    if (res < 0) {
+    ret = epoll_add(efd, fd);
+    if (ret < 0) {
         goto end_epoll_add;
     }
-    return res;
+    return ret;
 
     end_socket_non_blocking:
     end_epoll_add:
-    return res;
+    return ret;
 }
 
 int mod_fd(int efd, int fd, int wr) {
     struct epoll_event event;
-    int res;
+    int ret;
 
-    event.events  =  wr ? EPOLLIN | EPOLLOUT : EPOLLIN;
+    event.events  =  wr ? EPOLLOUT | EPOLLERR : EPOLLIN | EPOLLERR;
     event.data.fd = fd;
 
-    res = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &event);
-    if (res < 0) {
+    ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &event);
+    if (ret < 0) {
         perror("error : can not add event to epoll!\n");
         return -errno;
     }
-    return res;
+    return ret;
 }
 
 int del_fd(int efd, int fd) {
-    int res;
-    res = epoll_del(efd, fd);
+    int ret;
+    ret = epoll_del(efd, fd);
 
     close(fd);
-    return res;
+    return ret;
 }
 
 int poll_fds(int efd, int tmo, native_events_t* nes) {
     struct epoll_event events[NATIVE_EVENT_MAX];
-    int i, res;
+    int i, ret = 0;
 
-    res = epoll_wait(efd, events, NATIVE_EVENT_MAX, tmo * 1000);
-    if (res < 0) {
+    ret = epoll_wait(efd, events, NATIVE_EVENT_MAX, tmo * 1000);
+    if (ret < 0) {
         perror("error : epoll failed!\n");
         return -errno;
     }
-    nes->num = res;
-    for (i = 0; i < res; i ++) {
+    nes->num = ret;
+    for (i = 0; i < ret; i ++) {
         nes->evs[i].fd = events[i].data.fd;
 
         if ( (events[i].events & EPOLLERR) ||
@@ -159,4 +170,5 @@ int poll_fds(int efd, int tmo, native_events_t* nes) {
 
 void deinit(int efd) {
     close(efd);
+    async_ssl_deinit();
 }

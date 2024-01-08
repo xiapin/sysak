@@ -1,6 +1,17 @@
 # 外部数据写入支持
 unity-mon可以作为一个独立的TSDB 数据库进行使用，支持[行协议](https://jasper-zhang1.gitbooks.io/influxdb/content/Write_protocols/line_protocol.html)写入数据，并按需完成对外数据吐出，如exporter等接口。
 
+## 行协议格式说明
+行协议使用换行符\n分隔每一行，每一行表示一个数据点，可以类比为关系型数据库中的一行。行协议是对空格敏感的。
+
+```
+<measurement>[,<tag_key>=<tag_value>[,<tag_key>=<tag_value>]] <field_key>=<field_value>[,<field_key>=<field_value>]
+```
+从语法中可以看出，行协议分为如下四个内容：measurement、tag set、field set
+* measurement是必需的，可以类比为关系型数据库的表名。measurement类型是字符串。如一个描述气温的时序型数据库，measurement为"气温"。
+* tag set不是必需的，用于描述一些不随时间变化的信息。tag_key和tag_value的类型均为字符串，如描述具体某地气温时，"城市"="深圳"。
+* field set是必需的，一个数据点中必须有至少一个field。field用于描述随时间变化的信息。field_key的类型是字符串，field_value只能是浮点型或字符串。field_value为浮点型时表示数值，field_value为字符串时表示日志。
+
 ## 行协议格式支持情况
 unity-mon 当前除了不支持时间戳，支持行协议其它所有的数据类型，包含数值和日志。写行数据时，有以下注意事项：
 

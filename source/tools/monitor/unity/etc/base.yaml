@@ -1,8 +1,10 @@
 config:
-  freq: 15   # unit second
+  freq: 30   # unit second
   port: 8400  # bind port
   bind_addr: 0.0.0.0 # bind ip
   backlog: 32  # listen backlog
+  daemon: true
+  url_safe: close
   identity:   # support hostip, curl(need url arg), hostname, file(need path arg), specify(need name arg)
     #    mode: curl
     #    url: "http://100.100.100.200/latest/meta-data/instance-id"
@@ -10,50 +12,105 @@ config:
     mode: hostip
   #  real_timestamps: true
   #  unix_socket: "/tmp/sysom_unity.sock"
-  proc_path: /  # in container mode, like -v /:/mnt/host , should use /mnt/host/
+  proc_path: / # in container mode, like -v /:/mnt/host , should use /mnt/host/
   db:
-    rotate: 7  # tsdb file retention time, unit day
+    rotate: 7 # tsdb file retention time, unit day
     budget: 200 # max query buffer from tsdb.
   limit:
     cpu: 30  # unit %
     mem: 50  # unit mb
     tasks: 10  # monitor 10 pid max.
+    cellLimit: -1 # set guard limit time. guard time is unlimit when cellLimit is -1,default is 50(ms)
+
+#pushTo:
+#  to: "Influx"
+#  host: "192.168.0.127"
+#  port: 80
+#  url: "/api/v1/cec_proxy/proxy/line_protocol"
 
 outline:
   - /var/sysom/outline
 
+container:
+  mode: "pods"
+  runtime: ["k8sApi", "docker"]
+  nsBlacklist: ["kube-system", "arms-prom", "kube-public", "kube-node-lease"]
+  luaPlugin: ["cg_cpu_cfs_quota","cg_mem_drcm_glob_latency","cg_memory_util","cg_cpu_stat_sample", "cg_cpuacct_stat",
+              "cg_cpuacct_proc_stat", "cg_memory_drcm_latency", "cg_memory_fail_cnt","cg_memory_dcmp_latency", 
+              "cg_cpuacct_wait_latency", "con_net_stat", "cg_blkio_stat", "cg_memory_oom_cnt", "podmem"]
+
+# cgroupv2:
+#   directPaths: ["kubepods/besteffort", "kubepods.slice/kubepods-besteffort.slices"]
+#   luaPlugin: ["cg_sched_cfs_stat_v2","cg_cpu_stat_v2"]
+
 luaPlugins: ["proc_buddyinfo", "proc_diskstats", "proc_meminfo", "proc_mounts", "proc_netdev",
              "proc_snmp_stat", "proc_sockstat", "proc_stat", "proc_statm", "proc_vmstat",
-             "proc_uptime", "proc_arp", "proc_cgroups", "proc_interrupts", "proc_softirqs", "proc_softnet_stat",
-]
+             "proc_uptime", "proc_arp", "proc_cgroups", "proc_softirqs", "proc_softnet_stat",
+             "proc_fd"]
+
+resctrl:
+  path: "sys/fs/resctrl"
+
+  monLuaPlugin: ["rdt_llc_occupancy", "rdt_local_mem_bw", "rdt_total_mem_bw"]
+
+  resLuaPlugin: ["rdt_size"]
+
+  auto: true # search all mon-groups and res-group, it will ignore config arg group
+
+  # group:
+  #   - name: ""
+  #   - name: "LS"
+  #     # monitor: ["mon1", "mon2"]
+  #   - name: "BE"
+  #     monitor: ["pod3#con3"]
 
 plugins:
   - so: kmsg
     description: "collect dmesg info."
-  -
-    so: proc_schedstat
+  - so: proc_schedstat
     description: "collect schedule stat info of percpu"
-  -
-    so: proc_loadavg
+  - so: proc_loadavg
     description: "collect load avg"
   - so: net_health
     description: "tcp net health."
   - so: net_retrans
     description: "tcp retrans monitor."
-  -
-    so: unity_irqoff
-    description: "irqoff:detect irq turned off and can't response"
-  -
-    so: gpuinfo
+  - so: unity_nosched
+    description: "nosched:sys hold cpu and didn't scheduling"
+  # irqoff may eat up the perf_event_fd ,so pmu_events will fail;
+  # so we close it temporarily
+  #  - so: unity_irqoff
+  #    description: "irqoff:detect irq turned off and can't response"
+  - so: gpuinfo
     description: "collect gpuinfo"
+  - so: uncore_imc
+    description: "IMC latency and bandwidth"
+  - so: pmu_events
+    description: "collect pmu events"
+  - so: cpufreq
+    description: "collect cpu frequence of perf cpu"
+  - so: cpudist
+    description: "sched delay"
+  - so: numainfo
+    description: "numainfo"
 
 metrics:
-  -
-    title: sysom_proc_cpu_total
+  - title: sysom_java_app
+    from: sysom_java_app
+    head: value
+    help: "java application observe."
+    type: "gauge"
+  - title: sysom_observe
+    from: observe
+    head: value
+    help: "application observe."
+    type: "gauge"
+  - title: sysom_proc_cpu_total
     from: cpu_total
     head: mode
     help: "cpu usage info for total."
     type: "gauge"
+    discrete: true # datas are discrete.default is false
   - title: sysom_proc_cpus
     from: cpus
     head: mode
@@ -103,6 +160,11 @@ metrics:
     from: fs_stat
     head: counter
     help: "file system information."
+    type: "gauge"
+  - title: sysom_file_descriptor
+    from: procfd
+    head: type
+    help: "used file descriptor number."
     type: "gauge"
   - title: sysom_sock_stat
     from: sock_stat
@@ -229,3 +291,176 @@ metrics:
     head: value
     help: "net stat net_tcp_ext_count"
     type: "gauge"
+  - title: sysom_ntopo_node
+    from: sysom_metrics_ntopo_node
+    head: mode
+    help: "net topology node"
+    type: "gauge"
+  - title: sysom_ntopo_edge
+    from: sysom_metrics_ntopo_edge
+    head: mode
+    help: "net topology edge"
+    type: "gauge"
+  - title: sysom_obser_app_rt_ntopo
+    from: sysom_metrics_ntopo_request
+    head: value
+    help: rt and req/resp bytes of apps
+    type: "gauge"
+    discrete: true
+  - title: sysom_obser_mysqld_os
+    from: sysom_obser_metrics_mysqld_os
+    head: value
+    help: "os level metrics of mysqld"
+    type: "gauge"
+  - title: sysom_obser_mysqld_process
+    from: sysom_obser_metrics_mysqld_process
+    head: value
+    help: "process level metrics of mysqld"
+    type: "gauge"
+  - title: sysom_obser_mysqld_innodb
+    from: sysom_obser_metrics_mysqld_innodb
+    head: value
+    help: "innodb metrics of mysqld"
+    type: "gauge"
+  - title: sysom_obser_mysqld_alarm
+    from: sysom_obser_mysqld_alarm
+    head: value
+    help: "alarm on process exception of mysqld"
+    type: "gauge"
+  - title: sysom_obser_os_alarm
+    from: sysom_obser_os_alarm
+    head: value
+    help: "alarm on os exception of mysqld"
+    type: "gauge"
+  - title: sysom_podmem
+    from: podmem
+    head: value
+    help: "file cache for pod"
+    type: "gauge"
+  - title: sysom_container_memfail_cnt
+    from: cg_memfail_cnt
+    head: value
+    help: "sysom_container_memFail_cnt"
+    type: "gauge"
+  - title: sysom_container_memory_oomcnt
+    from: cg_memoom_cnt
+    head: value
+    help: "container oom event count"
+    type: "counter"
+  - title: sysom_container_memUtil
+    from: cg_memory_util
+    head: value
+    help: "sysom_container_memory_util"
+    type: "gauge"
+  - title: sysom_container_memgdrcm_latency
+    from: cgGlbDrcmLatency
+    head: value
+    help: "sysom global memory latency"
+    type: "gauge"
+  - title: sysom_container_memdrcm_latency
+    from: cg_memdrcm_latency
+    head: value
+    help: "sysom_container_memdrcm_latency"
+    type: "gauge"
+  - title: sysom_container_memmcmp_latency
+    from: cg_memmcmp_latency
+    head: value
+    help: "sysom_container_memmcmp_latency"
+    type: "gauge"
+  - title: sysom_container_cpu_stat
+    from: cg_cpu_stat
+    head: value
+    help: "sysom_container_cpu_stat"
+    type: "gauge"
+  - title: sysom_container_cpuacct_stat
+    from: cg_cpuacct_stat
+    head: value
+    help: "cpuacct/cpuacct.stat"
+    type: "gauge"
+  - title: sysom_container_proc_stat
+    from: cg_proc_stat
+    head: value
+    help: "container cpuacct proc stat"
+    type: "gauge"
+  - title: sysom_container_cfs_quota
+    from: cgCpuQuota
+    head: value
+    help: "cfs quota"
+    type: "gauge"
+  - title: sysom_container_network_stat
+    from: con_net_stat
+    head: value
+    help: "network stat of containers"
+    type: "gauge"
+  - title: sysom_container_blkio_stat
+    from: cg_blkio_stat
+    head: value
+    help: "io stat from blkio cgroup"
+    type: "gauge"
+  - title: sysom_container_cpuacct_wait_latency
+    from: cg_wait_latency
+    head: value
+    help: "wait_latency of cgroups"
+    type: "gauge"
+  - title: sysom_imc_channel_event
+    from: imc_channel_event
+    head: value
+    help: "imc latency and bw for channels"
+    type: "gauge"
+  - title: sysom_imc_event_socket
+    from: imc_socket_event
+    head: value
+    help: "imc latency and bw for socket"
+    type: "gauge"
+  - title: sysom_imc_event_node
+    from: imc_node_event
+    head: value
+    help: "imc latency and bw for node"
+    type: "gauge"
+  - title: sysom_rdt_usage
+    from: rdt_usage
+    head: value
+    help: "RDT LLC and memory bandwidth usage"
+    type: "gauge"
+  - title: sysom_rdt_alloc_policy
+    from: rdt_alloc_policy
+    head: value
+    help: "RDT LLC and memory bandwidth allocation policy"
+    type: "gauge"
+  - title: sysom_pmu_events
+    from: pmu_events
+    head: value
+    help: "pmu events, such as  cycles/instructions, llc events"
+    type: "gauge"
+  - title: sysom_pmu_events_percpu
+    from: pmu_events_percpu
+    head: value
+    help: "pmu events of percpu"
+    type: "gauge"
+  - title: sysom_cpu_freq
+    from: cpufreq
+    head: value
+    help: "the frequence of percpu"
+    type: "gauge"
+  - title: sysom_numainfo
+    from: numainfo
+    head: value
+    help: "numainfo of system from /sys/devices/system/"
+    type: "gauge"
+  - title: sysom_cg_sched_cfs_stat_v2
+    from: cg_sched_cfs_stat_v2
+    head: value
+    help: "cgroupv2 cg_sched_cfs_stat_v2 info"
+    type: "gauge"
+  - title: sysom_cg_cpu_stat_v2
+    from: cg_cpu_stat_v2
+    head: value
+    help: "cgroupv2 cg_cpu_stat_v2 info"
+    type: "gauge"
+
+
+observe:
+  comms:
+    java: "cgroup"
+    mysqld: "cgroup"
+  period: 20000

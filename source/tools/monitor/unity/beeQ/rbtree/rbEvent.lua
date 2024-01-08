@@ -36,7 +36,7 @@ function CrbEvent:_init_()
     self._nsec = timeNsec()
 end
 
-function CrbEvent:addEvent(name, obj, period, delay, loop)
+function CrbEvent:addEvent(name, obj, period, delay, loop)--delay 要不要等一等再执行
     loop = loop or -1   -- -1: 会永远增加下去，大于1 则会递减，减少0 不再使用
 
     if loop == 0 then

@@ -15,10 +15,12 @@ fi
 TOOLS_PATH=$WORK_PATH/tools/`uname -r`
 LIB_PATH=$WORK_PATH/lib/`uname -r`
 latency_bin=$WORK_PATH/tools/latency
+iolatency_bin=$WORK_PATH/tools/tracing_latency
 hangdetect_bin=$WORK_PATH/tools/hangdetect
 data_analysis=$WORK_PATH/tools/iosdiag_data_analysis
-logfile="/var/log/sysak/iosdiag/$1/result.log.seq"
 threshold_arg="-t 1000"
+kernel_version=$(uname -r)
+config_file="/boot/config-$kernel_version"
 
 function usage() {
 	echo "Usage: sysak iosdiag [options] subcmd [cmdargs]"
@@ -30,6 +32,16 @@ function usage() {
 	echo "       options:"
 	echo "              -u url, transfer datafile to remote url"
 	echo "              -s latency|[hangdetect], stop diagnosis"
+}
+
+check_bpf_config() {
+    if grep -q "CONFIG_BPF=y" "$config_file"; then
+        # echo "found CONFIG_BPF=y"
+		support_bpf="Yes"
+    else
+        # echo "CONFIG_BPF=y not found"
+		support_bpf="No"
+	fi
 }
 
 upload_data() {
@@ -57,7 +69,10 @@ datafile_analysis() {
 		elif [ -e "/usr/bin/python3.5" ]; then
 			run_python="/usr/bin/python3.5"
 		fi
-		$run_python $data_analysis --$1 -s -f $logfile $threshold_arg
+		if [ -e "$data_analysis" ]
+		then
+			$run_python $data_analysis --$1 -s -f $logfile $threshold_arg
+		fi
 	fi
 }
 
@@ -121,24 +136,41 @@ disable_hangdetect() {
 }
 
 enable_latency() {
-	if [ ! -e "$latency_bin" ]; then
-		echo "$latency_bin not found"
-		echo "iosdiag latency not support '$(uname -r)', please report to the developer"
-		exit -1
-	fi
-	{
-		flock -n 3
-		[ $? -eq 1 ] && { echo "another latency is running."; exit -1; }
-		trap disable_latency SIGINT SIGTERM SIGQUIT
-		#mkdir -p `dirname $datafile`
-		chmod +x $latency_bin
-		rm -f $(dirname $logfile)/result.log*
-		#$SYSAK_WORK_PATH/../sysak btf
-		$latency_bin $* &
-		latency_pid=$!
-		wait $latency_pid
-		disable_latency
-	} 3<> /tmp/latency.lock
+	check_bpf_config
+    args=("$@")
+    num_args=${#args[@]}
+    if [ "$support_bpf" = "Yes" ]; then
+        if [ ! -e "$latency_bin" ]; then
+            echo "$latency_bin not found"
+            echo "iosdiag latency not support '$(uname -r)', please report to the developer"
+            exit -1
+        fi
+    else
+        if [ ! -e "$iolatency_bin" ]; then
+            echo "$iolatency_bin not found"
+            echo "iosdiag iolatency not support '$(uname -r)', please report to the developer"
+            exit -1
+        fi
+		latency_bin=$iolatency_bin
+    	if (( $num_args % 2 == 1 && $num_args > 1 )); then
+		    last_arg=${args[$num_args-1]}  
+        	unset args[num_args-1]  
+        	args+=("-d" "$last_arg")   
+    	fi
+    fi
+
+	# echo ${args[@]}
+    {
+        flock -n 3
+        [ $? -eq 1 ] && { echo "another latency is running."; exit -1; }
+        trap disable_latency SIGINT SIGTERM SIGQUIT
+        chmod +x $latency_bin
+        rm -f $(dirname $logfile)/result.log*
+		$latency_bin ${args[@]} &
+        latency_pid=$!
+        wait $latency_pid
+        disable_latency
+    } 3<> /tmp/latency.lock
 }
 
 disable_latency() {
@@ -162,7 +194,6 @@ disable_latency() {
 	exit 0
 }
 
-
 #execute command,every command need such args:
 # -h/--help: command usage
 # -f/--file: output files, default stdout
@@ -178,7 +209,7 @@ function execute() {
 }
 
 diag_stop=
-while getopts 'hs:u:' OPT; do
+while getopts 'hos:u:' OPT; do
 	case $OPT in
 		"u")
 			url=$OPTARG
@@ -202,6 +233,7 @@ fi
 
 subcmd=${@:$OPTIND:1}
 subargs=${*:$OPTIND+1};
-[ "$subcmd" != "latency" -a "$subcmd" != "hangdetect" ] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
+[[ "$subcmd" != "latency" && "$subcmd" != "hangdetect" ]] && { echo "not support subcmd $subcmd!!!"; usage; exit -1; }
+logfile="/var/log/sysak/iosdiag/$subcmd/result.log.seq"
 execute $subcmd $subargs
 

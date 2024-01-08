@@ -13,8 +13,8 @@ from collections import OrderedDict
 from nfPut import CnfPut
 
 class ioMonitorClass(object):
-    def __init__(self, logRootPath, cfg, pipeFile):
-        self.window = 60
+    def __init__(self, logRootPath, cfg, pipeFile, mode, resultPath):
+        self.window = 20
         self.cfg = cfg
         self.cfg.createCfgFlagFile()
         self.diagSwitch = {
@@ -28,12 +28,13 @@ class ioMonitorClass(object):
                             'esi':'IO-Hang'}
             }
         self._sender = CnfPut(pipeFile)
+        self._mode = mode
         self._nfPutTlb = 'IOMonIndForDisksIO'
         self._nfPutTlb4System = 'IOMonIndForSystemIO'
         self.fieldDicts = OrderedDict()
         self.exceptChkDicts = {'system': exceptCheckClass(self.window)}
         self.exceptChkDicts['system'].addItem('iowait')
-        self.diagnose = diagnoseClass(self.window, logRootPath, self._sender)
+        self.diagnose = diagnoseClass(self.window, logRootPath, self._sender, self._mode, resultPath)
         self.diagnose.addItem('system', 'iowait', 0, 60)
         self.fDiskStats = open("/proc/diskstats")
         self.cpuStatIowait = {'sum': 0, 'iowait': 0}
@@ -298,7 +299,7 @@ class ioMonitorClass(object):
         self.fDiskStats.seek(0)
         for stat in self.fDiskStats.readlines():
             stat = stat.split()
-            if os.path.exists('/sys/block/'+stat[2]) == False:
+            if os.path.exists('/sys/block/'+stat[2]) == False or stat[2].startswith("loop"):
                 if stat[2] in fieldDicts.keys():
                     self._removeDiskMonitor(stat[2])
                 continue
@@ -318,7 +319,7 @@ class ioMonitorClass(object):
                 value[0] = long(stat[int(idx) + 2])
 
 
-    def _collectEnd(self, secs):
+    def _collectEnd(self, secs, timeout):
         fieldDicts = self.fieldDicts
         exceptChkDicts = self.exceptChkDicts
         uploadInter = self.uploadInter
@@ -335,7 +336,7 @@ class ioMonitorClass(object):
         self.fDiskStats.seek(0)
         for stat in self.fDiskStats.readlines():
             stat = stat.split()
-            if os.path.exists('/sys/block/'+stat[2]) == False:
+            if os.path.exists('/sys/block/'+stat[2]) == False or stat[2].startswith("loop"):
                 if stat[2] in fieldDicts.keys():
                     self._removeDiskMonitor(stat[2])
                 continue
@@ -356,17 +357,24 @@ class ioMonitorClass(object):
             # Detect await exception
             self._checkAwaitException(devname, io['wait'], ioburst)
 
-        if ((self.uploadInter * secs) % 60) == 0:
+        if ((self.uploadInter * secs) % 60 ) == 0 and not timeout:
             self._reportDataToRemote(fieldDicts.keys())
 
 
-    def monitor(self):
+    def monitor(self, timeout):
+        startTime = time.time()
         while True:
             secs = self.cfg.getCfgItem('cycle') / 1000.0
+            if timeout:
+                currentTime = time.time()
+                diagnoseTime = currentTime - startTime
+                if diagnoseTime >= timeout:
+                    break
             self._collectBegin()
             time.sleep(secs)
-            self._collectEnd(secs)
+            self._collectEnd(secs, timeout)
             # Check if it is necessary to start the diagnosis
             self.diagnose.checkDiagnose()
         self.fDiskStats.close()
+
 

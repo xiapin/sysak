@@ -5,6 +5,7 @@
 ---
 
 require("common.class")
+local system = require("common.system")
 local ChttpComm = require("httplib.httpComm")
 local ChttpCli = class("httpCli", ChttpComm)
 
@@ -88,6 +89,40 @@ function ChttpCli:postLine(Url, line)
         ["Content-Length"] = #line,
     }
     return self:post(Url, line, headers)
+end
+
+local function addContent(content, c, line)
+    content[c] = line
+    return c + 1
+end
+
+function ChttpCli:postFormData(Url, fData)
+    local headers = {
+       ["accept"] = "application/json",
+       ["Content-Type"] = "multipart/form-data"
+    }
+
+    local boundary = "----" .. system:randomStr(32)
+    local c = 1
+    local content = {}
+    for k, v in pairs(fData) do
+        c = addContent(content, c, boundary)   -- add boundary
+        if type(v) == "table" then -- file: name, stream, type
+            c = addContent(content, c, string.format('Content-Disposition: form-data; name="%s"; filename="%s"', k, v[1]))
+            c = addContent(content, c, string.format('Content-Type: %s', v[3]))
+            c = addContent(content, c, "")
+            c = addContent(content, c, v[2])
+        else
+            c = addContent(content, c, string.format('content-disposition: form-data; name="%s"', k))
+            c = addContent(content, c, "")
+            c = addContent(content, c, v)
+        end
+    end
+    addContent(content, c, boundary .. "--")
+    local s = table.concat(content, "\n")
+    headers["Content-type"] = string.format("multipart/form-data; boundary=%s", boundary)
+    headers["Content-Length"] = #s
+    return self:post(Url, s, headers)
 end
 
 return ChttpCli

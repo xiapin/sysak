@@ -12,12 +12,18 @@ local CbtfLoader = require("collector.btfLoader")
 local CpluginManager = require("collector.pluginManager")
 local calcJiffies = require("collector.guard.calcJiffies")
 local CguardSched = require("collector.guard.guardSched")
+local CguardObserve = require("collector.guard.guardObserve")
 local CguardDaemon = require("collector.guard.guardDaemon")
 local CguardSelfStat = require("collector.guard.guardSelfStat")
 local CpostPlugin = require("collector.postPlugin.postPlugin")
 local CforkRun = require("collector.execEngine.forkRun")
 local CpodFilter = require("collector.podMan.podFilter")
+local CrdtManager = require("collector.rdt.rdtManager")
+local Ccgroupv2 = require("collector.cgroupv2.cgroupv2")
+---local CpodFilter = require("collector.podMan.podFilter")
+
 local CpodsAll = require("collector.podMan.podsAll")
+
 local Cloop = class("loop")
 
 function Cloop:_init_(que, proto_q, fYaml, tid)
@@ -31,10 +37,25 @@ function Cloop:_init_(que, proto_q, fYaml, tid)
     self:forkRun(res)
     local jperiod = calcJiffies.calc(res.config.proc_path, procffi)  --
 
-    self._guardSched = CguardSched.new(tid, self._procs, self._names, jperiod)
+
+    self._guardSched = CguardSched.new(tid, self._procs, self._names, jperiod,res)
+    self._guardObserve = CguardObserve.new(tid, jperiod, res, que, res.config.proc_path, procffi)
+
     self.soPlugins = CpluginManager.new(procffi, proto_q, res, tid, jperiod)
     self._guardStat = CguardSelfStat.new(self._proto, procffi, "/", res, jperiod)
     self.postPlugin = CpostPlugin.new(self._proto, procffi, res)
+
+end
+
+local function newProc(plugin, proto, procffi, proc_path)
+    print("add " .. plugin)
+    local CProcs = require("collector." .. plugin)
+    return CProcs.new(proto, procffi, proc_path)
+end
+
+local function newPlugin(Cplugin, res, proto, procffi, proc_path)
+    print("add plugin")
+    return Cplugin.new(res, proto, procffi, proc_path)
 end
 
 function Cloop:loadLuaPlugin(res, proc_path, procffi)
@@ -45,23 +66,67 @@ function Cloop:loadLuaPlugin(res, proc_path, procffi)
     local c = 1
     if res.luaPlugins then
         for _, plugin in ipairs(luas) do
-            local CProcs = require("collector." .. plugin)
-            self._procs[c] = CProcs.new(self._proto, procffi, proc_path)
-            self._names[c] = plugin
-            c = c + 1
+            --local CProcs = require("collector." .. plugin)
+            local status,msg  = pcall(newProc,  plugin, self._proto, procffi, proc_path)
+            if status then
+                self._procs[c] = msg
+                self._names[c] = plugin
+                c = c + 1
+            else
+                print("add plugin " .. plugin .. " failed: " .. msg)
+            end
+            --self._procs[c] = CProcs.new(self._proto, procffi, proc_path)
+            --self._names[c] = plugin
+            --c = c + 1
         end
     end
+
     if res.container then
         if res.container.mode == "cgroup" then
 	    --print("mods1="..res.container.mode)
-            self._procs[c] = CpodFilter.new(res, self._proto, procffi, proc_path)
-            self._names[c] = "podFilter"
+            local status, msg = pcall(newPlugin, CpodFilter, res, self._proto, procffi, proc_path)
+            if status then
+                self._procs[c] = msg
+                self._names[c] = "podFilter"
+                c = c + 1
+            else
+                print("add podFilter failed. " .. msg)
+            end
         else
 	    --print("mods2="..res.container.mode)
-            self._procs[c] = CpodsAll.new(res, self._proto, procffi, proc_path)
-            self._names[c] = "podMon"
+            local status, msg = pcall(newPlugin, CpodsAll, res, self._proto, procffi, proc_path)
+            if status then
+                self._procs[c] = msg
+                self._names[c] = "podMon"
+                c = c + 1
+            else
+                print("add podMon failed. " .. msg)
+            end
         end
     end
+
+    if res.resctrl then
+        local status, msg = pcall(newPlugin, CrdtManager, res, self._proto, procffi, proc_path)
+        if status then
+            self._procs[c] = msg
+            self._names[c] = "rdtManager"
+            c = c + 1
+        else
+            print("add rdtManager failed. " .. msg)
+        end
+    end
+
+    if res.cgroupv2 then
+        local status, msg = pcall(newPlugin, Ccgroupv2, res, self._proto, procffi, proc_path)
+        if status then
+            self._procs[c] = msg
+            self._names[c] = "cgroupv2"
+            c = c + 1
+        else
+            print("add cgroupv2 failed. " .. msg)
+        end
+    end
+
     print("add " .. system:keyCount(self._procs) .. " lua plugin.")
 end
 
@@ -81,6 +146,7 @@ function Cloop:work(t)
     local lines = self._proto:protoTable()
 
     self._guardSched:proc(t, lines)
+    self._guardObserve:proc(t, lines)
     self.soPlugins:proc(t, lines)
     self._guardStat:proc(t, lines)
     self.postPlugin:proc(t, lines)

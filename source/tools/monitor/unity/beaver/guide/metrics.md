@@ -46,27 +46,6 @@
 | iowait | % | iowait百分比 |  | collector/proc\_stat.lua |
 
 
-### cpus 表
-
-* 对应export 指标 sysak\_proc\_cpus
-* 属性标签: mode
-
-
-| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
-| :--- | ---: | :---- | :---- | :--- |
-| cpu_name |  | CPU 名称 |  | collector/proc\_stat.lua |
-| softirq | % | 软中断百分比 |  | collector/proc\_stat.lua |
-| user | % | 用户态占用率百分比 |  | collector/proc\_stat.lua |
-| guestnice | % | guestnice百分比 |  | collector/proc\_stat.lua |
-| guest | % |guest百分比 |  | collector/proc\_stat.lua |
-| steal | % |steal百分比 |  | collector/proc\_stat.lua |
-| hardirq | % | 硬中断百分比 |  | collector/proc\_stat.lua |
-| nice | % | nice百分比 |  | collector/proc\_stat.lua |
-| idle | % | idle百分比 |  | collector/proc\_stat.lua |
-| sys | % | sys百分比 |  | collector/proc\_stat.lua |
-| iowait | % | iowait百分比 |  | collector/proc\_stat.lua |
-
-
 ### stat\_counters表
 
 * 对应export 指标 sysak\_proc\_stat\_counters
@@ -93,21 +72,6 @@
 | load5  | - | load5 |  | collector/proc\_load.lua |
 | load10  | - | load10 |  | collector/proc\_load.lua |
 | plit | - | plit |  | collector/proc\_load.lua |
-
-
-### proc\_loadavg 表
-
-* 对应 export 指标： sysak\_proc\_loadavg
-* 属性标签：value
-
-| 指标名      | 单位 | 标签说明 | 备注 | 源码路径 |
-|:---------| ---: | :---- | :---- | :--- |
-| runq | - | rq队列长度 |  | collector/proc\_load.lua |
-| load1  | - | load1 |  | collector/proc\_load.lua |
-| load5  | - | load5 |  | collector/proc\_load.lua |
-| load10  | - | load10 |  | collector/proc\_load.lua |
-| plit | - | plit |  | collector/proc\_load.lua |
-
 
 ### meminfo 表
 
@@ -297,6 +261,19 @@
 | time\_squeeze | 个 | cpu，对应CPU号 | 函数 net\_rx\_action 调用次数. | collector/proc\_softnet\_stat.lua |
 | flow\_limit\_count | 个 | cpu，对应CPU号 | 达到 flow limit 的次数. | collector/proc\_softnet\_stat.lua |
 
+
+### con_net_stat 表
+
+| 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
+| :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
+| net_rx_bytes     | byte | 容器对应网口接收字节数   | interface对应容器中的网口（如eth0）| collector/container/con_net_stat.lua |
+| net_rx_packets | packet   | 容器对应网口接收数据包数                |      | collector/container/con_net_stat.lua  |
+| net_rx_dropped | packet   | 容器对应网口接收端丢包数 |      | collector/container/con_net_stat.lua  |
+| net_tx_bytes     | byte | 容器对应网口发送字节数               |      | collector/container/con_net_stat.lua |
+| net_tx_packets | packet   | 容器对应网口发送数据包数                |      | collector/container/con_net_stat.lua  |
+| net_tx_dropped | packet   | 容器对应网口发送端丢包数 |      | collector/container/con_net_stat.lua  |
+
+
 ### cgroups 表
 
 * 对应 export 指标： sysak\_cgroups
@@ -337,6 +314,27 @@
 | util           | 占比 | IO繁忙度 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
 | await          | ms |  平均每个IO的延迟 | - | ../ioMonitor/ioMon/ioMonitorClass.py |
 
+### disks表
+* 对应 export 指标： sysom\_proc\_disks
+* 属性标签：counter
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| disk_name | - | 磁盘或分区名 | - | collector/proc\_diskstats.lua |
+| busy | % | 该磁盘非空闲的时间比例 | - | collector/proc\_diskstats.lua |
+| inflight | 个 | 正在进行中的IO请求个数 | - | collector/proc\_diskstats.lua |
+| xfers | 次 | 读写总次数 | - | collector/proc\_diskstats.lua |
+| bsize | B | 平均每次IO的字节数 | - | collector/proc\_diskstats.lua |
+| reads | 次 | 读请求次数 | - | collector/proc\_diskstats.lua |
+| writes | 次 | 写请求次数 | - | collector/proc\_diskstats.lua |
+| rmerge | 次 | 合并后的读请求数 | - | collector/proc\_diskstats.lua |
+| wmerge | 次 | 合并后的写请求数 | - | collector/proc\_diskstats.lua |
+| rkb | KB | 写的总流量大小 | - | collector/proc\_diskstats.lua |
+| wkb | KB | 写的总流量大小 | - | collector/proc\_diskstats.lua |
+| rmsec | ms | 所有读请求总耗时 | - | collector/proc\_diskstats.lua |
+| wmsec | ms | 所有写请求总耗时 | - | collector/proc\_diskstats.lua |
+
+
 ### IOMonIndForSystemIO 表 
 统计系统IO异常
 
@@ -352,17 +350,18 @@
 
 ### cg_cpu_stat 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_cpu\_stat
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | nr_throttled | - | total throttled number |  | collector/container/cg\_cpu\_stat.lua | 
 | throttled_time | ms | total throttled time |  | collector/container/cg\_cpu\_stat.lua | 
+| nr_periods | - | total period number |  | collector/container/cg\_cpu\_stat.lua |
 
 ### cg_proc_stat 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_proc\_stat
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
@@ -387,7 +386,7 @@
  
 ### cg_memfail_cnt 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_memfail\_cnt
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
@@ -396,10 +395,11 @@
  
 ### cg_memdrcm_latency 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_memdrcm\_latency
 * 属性标签：value
 
 This table show the hist of the latency of direct memory reclamation
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | memDrcm_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
@@ -408,13 +408,37 @@ This table show the hist of the latency of direct memory reclamation
 | memDrcm_lat_100to500ms | - | times 100to500ms |  | collector/container/cg\_memory\_drcm\_latency.lua | 
 | memDrcm_lat_500to1000ms | - | times 500msto1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
 | memDrcm_lat_1000ms | - | times more than 1s |  | collector/container/cg\_memory\_drcm\_latency.lua | 
- 
+
+### cg_blkio_stat 表
+
+* 对应 export 指标： sysom\_container\_blkio\_stat
+* 属性标签：value
+
+| 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
+| :---   | --- | :---- | :---- | :--- |
+| writes_service_bytes | byte | 容器中写字节数 | device对应容器进行IO的块设备名  | collector/container/cg\_blkio\_stat.lua | 
+| reads_service_bytes | byte | 容器中读字节数 |  | collector/container/cg\_blkio\_stat.lua | 
+| total_service_bytes | byte | 容器所有IO操作（read, write, sync, async）的字节数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_serviced | I/Os | 容器中写IO个数 |  | collector/container/cg\_blkio\_stat.lua | 
+| reads_serviced | I/Os| 容器中读IO个数|  | collector/container/cg\_blkio\_stat.lua | 
+| total_serviced | I/Os | 容器中所有IO操作（read, write, sync, async）的个数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_bytes_queued | byte |  容器中写排队的IO字节数 | | collector/container/cg\_blkio\_stat.lua | 
+| reads_bytes_queued | byte | 容器中读排队的IO字节数|  | collector/container/cg\_blkio\_stat.lua | 
+| total_bytes_queued | byte | 容器所有IO操作（read, write, sync, async）的排队字节数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_io_queued | I/Os |  容器中写排队IO个数 || collector/container/cg\_blkio\_stat.lua | 
+| reads_io_queued | I/Os | 容器中读排队IO个数|  | collector/container/cg\_blkio\_stat.lua | 
+| total_io_queued | I/Os | 容器中对所有IO操作（read, write, sync, async）排队个数 |  | collector/container/cg\_blkio\_stat.lua |
+| writes_wait_time | ns |  容器中写I/O在调度队列中等待的时间 || collector/container/cg\_blkio\_stat.lua | 
+| reads_wait_time | ns | 容器中读I/O在调度队列中等待的时间|  | collector/container/cg\_blkio\_stat.lua | 
+| total_wait_time | ns | 容器中对所有IO操作（read, write, sync, async）在调度队列中等待的时间 |  | collector/container/cg\_blkio\_stat.lua |
+
 ### cg_memmcmp_latency 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_container\_memmcmp\_latency
 * 属性标签：value
 
 This table show the hist of the latency of direct memory compaction
+
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
 | memDcmp_lat_1to5ms | - | times 1to5ms |  | collector/container/cg\_memory\_dcmp\_latency.lua | 
@@ -426,34 +450,116 @@ This table show the hist of the latency of direct memory compaction
  
 ### pmu_events 表
 
-* 对应 export 指标： sysak\_
+* 对应 export 指标： sysom\_pmu\_events
 * 属性标签：value
 
 | 指标名 | 单位 | 标签说明 | 备注 | 源码路径 |
 | :---   | --- | :---- | :---- | :--- |
-| cpu_cycles | - | cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| instructions | - | instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| ipc | - | instructions per cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| cpi | - | cycles per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_store_ref | - | llc stroe hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_store_miss | - | llc stroe miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_load_ref | - | llc load hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_load_miss | - | llc load miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_rmiss_rate | - | llc load miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_wmiss_rate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_miss_rate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
-| llc_cache_mpi | - | llc miss per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| cycles | - | cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| ins | - | instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| IPC | - | instructions per cycles |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| CPI | - | cycles per instructions |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcStore | - | llc stroe hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcStoreMis | - | llc stroe miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcLoad | - | llc load hits counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| llcLoadMis | - | llc load miss counts |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| l3LoadMisRate | - | llc load miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| l3StoreMisRate | - | llc store miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| l3MisRate | - | llc miss rate |  | collector/plugin/pmu_events/pmu\_events.c  | 
+| MPI | - | llc miss per kilo-instruction |  | collector/plugin/pmu_events/pmu\_events.c  | 
 
-### imc_socket_latency 表
 
-| 指标名 | 单位 | 标签说明              | 备注 | 源码路径                                    |
-| :----- | ---- | :-------------------- | :--- | :------------------------------------------ |
-| rlat   | ns   | imc read ddr latency  |  socket级    | collector/plugin/imc_latency/imc\_latency.c |
-| wlat   | ns   | imc write ddr latency |  socket级    | collector/plugin/imc_latency/imc\_latency.c |
+### imc_node_event 表
 
-### imc_channel_latency 表
+* 对应 export 指标： sysom\_imc\_event\_node
+* 属性标签：value
 
-| 指标名 | 单位 | 标签说明              | 备注 | 源码路径                                    |
-| :----- | ---- | :-------------------- | :--- | :------------------------------------------ |
-| rlat   | ns   | imc read ddr latency  | channel级     | collector/plugin/imc_latency/imc\_latency.c |
-| wlat   | ns   | imc write ddr latency | channel级     | collector/plugin/imc_latency/imc\_latency.c |
+| 指标名 | 单位 | 标签说明              | 备注   | 源码路径                                 |
+| :----- | ---- | :-------------------- | :----- | :--------------------------------------- |
+| rlat   | ns   | imc read ddr latency  | node级 | collector/plugin/uncore_imc/uncore_imc.c |
+| wlat   | ns   | imc write ddr latency | node级 | collector/plugin/uncore_imc/uncore_imc.c |
+| avglat | ns   | imc avg ddr latency   | node级 | collector/plugin/uncore_imc/uncore_imc.c |
+
+### imc_socket_event 表
+
+* 对应 export 指标： sysom\_imc\_event\_socket
+* 属性标签：value
+
+| 指标名 | 单位 | 标签说明              | 备注     | 源码路径                                 |
+| :----- | ---- | :-------------------- | :------- | :--------------------------------------- |
+| rlat   | ns   | imc read ddr latency  | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| wlat   | ns   | imc write ddr latency | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| avglat | ns   | imc avg ddr latency   | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_rd  | byte | imc read bandwidth    | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_wr  | byte | imc write bandwidth   | socket级 | collector/plugin/uncore_imc/uncore_imc.c |
+
+### imc_channel_event 表
+
+* 对应 export 指标： sysom\_imc\_channel\_event
+* 属性标签：value
+
+| 指标名 | 单位 | 标签说明              | 备注      | 源码路径                                 |
+| :----- | ---- | :-------------------- | :-------- | :--------------------------------------- |
+| rlat   | ns   | imc read ddr latency  | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| wlat   | ns   | imc write ddr latency | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| avglat | ns   | imc avg ddr latency   | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_rd  | byte | imc read bandwidth    | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+| bw_wr  | byte | imc write bandwidth   | channel级 | collector/plugin/uncore_imc/uncore_imc.c |
+
+
+### rdt_usage 表
+
+* 对应 export 指标： sysom\_rdt\_usage
+* 属性标签：value
+
+| 指标名       | 单位 | 标签说明                     | 备注 | 源码路径                                   |
+| :----------- | ---- | :--------------------------- | :--- | :----------------------------------------- |
+| llc_occ      | byte | llc occupancy                |      | collector/rdt/plugin/rdt_llc_occupancy.lua |
+| local_mem_bw | MB   | 本地内存带宽                 |      | collector/rdt/plugin/rdt_local_mem_bw.lua  |
+| total_mem_bw | MB   | Remote内存带宽+Local内存带宽 |      | collector/rdt/plugin/rdt_total_mem_bw.lua  |
+
+### rdt_alloc_policy 表
+
+* 对应 export 指标： sysom\_rdt\_alloc\_policy
+* 属性标签：value
+
+| 指标名 | 单位 | 标签说明         | 备注                   | 源码路径                          |
+| :----- | ---- | :--------------- | :--------------------- | :-------------------------------- |
+| MB     |      | 内存带宽分配比例 | MB（Memory Bandwidth） | collector/rdt/plugin/rdt_size.lua |
+| L3     | byte | llc分配size      |                        | collector/rdt/plugin/rdt_size.lua |
+
+
+### cg_sched_cfs_stat_v2
+
+- 对应 export 指标： sysom_cg_sched_cfs_stat_v2
+- 属性标签：value
+  
+| 指标名        | 单位 | 标签说明                         | 备注 | 源码路径                                              |
+| :------------ | ---- | :------------------------------- | :--- | :---------------------------------------------------- |
+| serve         | ns   | 从开始运行到睡眠的时间           |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| oncpu         | ns   | oncpu时间                        |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| queue_other   | ns   | 被非兄弟层级打断的时长           |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| queue_sibling | ns   | 被兄弟层级打断的时长             |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| queue_max     | ns   | 在调度队列上的最大等待时间       |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+| force_idle    | ns   | 被core sched造成force idle的时间 |      | collector/container/cgroupv2/cg_sched_cfs_stat_v2.lua |
+
+
+### cg_cpu_stat_v2
+
+- 对应 export 指标： sysom_cg_cpu_stat_v2
+- 属性标签：value
+  
+| 指标名                     | 单位 | 标签说明              | 备注 | 源码路径                                        |
+| :------------------------- | ---- | :-------------------- | :--- | :---------------------------------------------- |
+| usage_usec                 | usec | 运行时长              |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| user_usec                  | usec | 用户态时间            |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| system_usec                | usec | 内核态时间            |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| core_sched.force_idle_usec | usec | 对端HT force idle时间 |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| sibidle_usec               | usec | 对端HT idle时间       |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| nr_periods                 | 次   | 带宽周期数            |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| nr_throttled               | 次   | 限流次数              |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| throttled_usec             | usec | 限流时长              |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| current_bw                 |      |                       |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| nr_bursts                  | 次   | burst次数             |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+| burst_usec                 | usec | busrt时长             |      | collector/container/cgroupv2/cg_cpu_stat_v2.lua |
+

@@ -12,23 +12,18 @@ local system = require("common.system")
 
 local CcoInflux = class("coInflux", CcoHttpCliInst)
 
-function CcoInflux:_init_(fYaml)
-    local res = system:parseYaml(fYaml)
+function CcoInflux:_init_(fYaml, config, instance)
     local pushInflux = {
-        host = res.pushTo.host,
-        url = res.pushTo.url,
-        port = res.pushTo.port
+        host = config.host,
+        url = config.url,
+        port = config.port
     }
-
-    local Cidentity = require("beaver.identity")
-    local inst = Cidentity.new(fYaml)
-    local instance = inst:id()
-
     CcoHttpCliInst._init_(self, instance, pushInflux)
 end
 
 function CcoInflux:echo(tReq)
-    if tReq.code ~= "204" then
+    --if tReq.code ~= "200" then
+    if string.sub(tReq.code,1,1) ~= "2" then
         print(tReq.code, tReq.data)
     end
 end

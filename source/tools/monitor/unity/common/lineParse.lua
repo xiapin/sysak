@@ -110,6 +110,52 @@ function module.pack(title, ls, vs)
     return line
 end
 
+function module.packMetric(line)
+    local cells
+    local title = line.line
+    local ls = {}
+    local vs = {}
+
+    if line.vs then
+        cells = line.ls
+        if cells then
+            for _, cell in ipairs(cells) do
+                ls[cell.name] = cell.index
+            end
+        end
+
+        cells = line.vs
+        for _, cell in ipairs(cells) do
+            vs[cell.name] = cell.value
+        end
+
+        return module.pack(title, ls, vs)
+    end
+end
+
+function module.packLog(line)
+    local cells
+    local title = line.line
+    local ls = {}
+    local vs = {}
+
+    if line.log then
+        cells = line.ls
+        if cells then
+            for _, cell in ipairs(cells) do
+                ls[cell.name] = cell.index
+            end
+        end
+
+        cells = line.log
+        for _, cell in ipairs(cells) do
+            vs[cell.name] = cell.log
+        end
+
+        return module.pack(title, ls, vs)
+    end
+end
+
 function module.packs(line)
     local cells
     local title = line.line

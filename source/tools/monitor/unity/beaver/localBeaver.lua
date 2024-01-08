@@ -166,6 +166,101 @@ function CLocalBeaver:_install_fd(port, ip, backlog)
     end
 end
 
+function CLocalBeaver:ssl_read(handle, maxLen)
+    maxLen = maxLen or 2 * 1024 * 1024  -- signal conversation accept 2M stream max
+    local function readHandle()
+        local e = coroutine.yield()
+        if e.ev_close > 0 then
+            return nil
+        elseif e.ev_in > 0 then
+            local size = 16 * 1024
+            local data = self._ffi.new("char[?]", size)
+            local ret = self._cffi.ssl_read(handle, data, size)
+            if ret > 0 then
+                local s = self._ffi.string(data, ret)
+                return s
+            elseif ret == 0 then
+                return ""
+            else
+                return nil
+            end
+        else
+            print(system:dump(e))
+        end
+        return nil
+    end
+    return readHandle
+end
+
+function CLocalBeaver:ssl_write(fd, handle, stream)
+    local ret
+    local len = #stream
+    ret = self._cffi.ssl_write(handle, stream, len)
+    assert(ret >= 0, "ssl_write return " .. ret)
+
+    if ret < len then
+        ret = self._cffi.mod_fd(self._efd, fd, 1)  -- epoll write ev
+        assert(ret == 0)
+
+        while ret < len do
+            local e = coroutine.yield()
+            if e.ev_close > 0 then
+                return nil
+            elseif e.ev_out then
+                stream = string.sub(stream, len + 1)
+                if stream == nil then
+                    return 1
+                end
+                ret = self._cffi.ssl_write(handle, stream, len)
+                assert(ret >= 0)
+            end
+        end
+
+        ret = self._cffi.mod_fd(self._efd, fd, 0)
+        assert(ret == 0)
+    end
+    return 1
+end
+
+local function handshakeYield()
+    local e = coroutine.yield()
+    if e.ev_close > 0 then
+        return true
+    end
+    return false
+end
+
+function CLocalBeaver:ssl_handshake(fd)
+    local handle = self._cffi.ssl_connect_pre(fd)
+
+    local ret
+    repeat
+        ret = self._cffi.ssl_connect(handle)
+        if ret == 1 then  -- 1 means neet to write
+            self._cffi.mod_fd(self._efd, fd, 1)
+            if handshakeYield() then
+                ret = -1
+            end
+        elseif ret == 2 then  -- 2 means neet to read
+            self._cffi.mod_fd(self._efd, fd, 0)
+            if handshakeYield() then
+                ret = -1
+            end
+        end
+    until (ret <= 0)
+    self._cffi.mod_fd(self._efd, fd, 0)  -- set back to 0
+
+    if ret < 0 then
+        self._cffi.ssl_del(handle)
+        handle = nil
+    end
+    return handle
+end
+
+function CLocalBeaver:ssl_del(handle)
+    self._cffi.ssl_del(handle)
+end
+
 function CLocalBeaver:read(fd, maxLen)
     maxLen = maxLen or 2 * 1024 * 1024  -- signal conversation accept 2M stream max
     local function readFd()
@@ -215,6 +310,7 @@ function CLocalBeaver:write(fd, stream)
                     sent, err, errno = socket.send(fd, stream)
                     if sent == nil then
                         if errno == 11 then  -- EAGAIN ?
+                            sent = 0
                             goto continue
                         end
                         system:posixError("socket send error.", err, errno)

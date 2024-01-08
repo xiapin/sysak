@@ -56,14 +56,6 @@ function CgMemUtil:proc(elapsed, lines)
             value = val
         }
         k = k + 1
-        if ("total_cache" == cell[1]) or ("total_rss" == cell[1]) then
-                local ratio = (100.00*val) / tonumber(self.usage)
-                values[k] = {
-                name = name.."_ratio",
-                value = ratio
-                }
-                k = k + 1
-        end
     end
     end
     values[k] = {
@@ -71,8 +63,8 @@ function CgMemUtil:proc(elapsed, lines)
      value = self.usage
     }
     values[k+1] = {
-         name = "mem_util",
-         value = (tonumber(self.usage)*100.0)/ tonumber(self.limit)
+         name = "limit",
+         value = self.limit
     }
     self:appendLine(self:_packProto("cg_memory_util", self.ls, values))
     self:push(lines)

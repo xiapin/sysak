@@ -6,3 +6,5 @@ all:
 
 	echo "build for beeQ"
 	make dist -C beeQ
+clean:
+	make -C collector/plugin clean

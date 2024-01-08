@@ -1,75 +1,159 @@
-mod latency;
-use crate::latency::latency::{run_latency, LatencyCommand};
-
-mod delta;
-use crate::delta::delta::{run_delta, DeltaCommand};
-
-mod drop;
-use crate::drop::drop::{run_drop, DropCommand};
-
-mod retran;
-use crate::retran::{run_retran, RetranCommand};
-
-use anyhow::{bail, Result};
+use anyhow::Result;
+use rtrace::application::drop::DropApplication;
+use rtrace::application::jitter::JitterApplication;
+use rtrace::application::ping::PingApplication;
+use rtrace::application::retran::RetranApplication;
+use rtrace::application::tcpping::TcppingApplication;
+use rtrace::common::config::Config;
+use rtrace::common::file_logger::setup_file_logger;
+use rtrace::common::protocol::Protocol;
+use rtrace::common::utils::parse_ip_str;
+use rtrace::common::utils::run_old_rtrace;
+use rtrace::event::initial_stop_event_thread;
 use structopt::StructOpt;
 
-mod message;
-use std::path::Path;
+fn parse_protocol(src: &str) -> Result<Protocol, &'static str> {
+    Protocol::try_from(src)
+}
+
+fn parse_threshold(threshold: &str) -> u64 {
+    let base = if threshold.ends_with("ms") {
+        1_000_000
+    } else if threshold.ends_with("us") {
+        1000
+    } else {
+        panic!("Please end with ms or us")
+    };
+
+    let mut tmp = threshold.to_owned();
+    tmp.pop();
+    tmp.pop();
+
+    let ns: u64 = tmp.parse().expect("not a number");
+
+    ns * base
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "rtrace", about = "Diagnosing tools of kernel network")]
 pub struct Command {
-    #[structopt(subcommand)]
-    subcommand: SubCommand,
-
-    #[structopt(long, help = "Custom btf path")]
-    btf: Option<String>,
-
+    #[structopt(long, help = "program running time in seconds")]
+    duration: Option<u64>,
+    #[structopt(short, long, default_value = "0us", parse(from_str = parse_threshold), help = "jitter threshold, ms/us")]
+    threshold: u64,
+    #[structopt(long, parse(from_str = parse_ip_str), help = "Network source address")]
+    src: Option<(u32, u16)>,
+    #[structopt(long, parse(from_str = parse_ip_str), help = "Network destination address")]
+    dst: Option<(u32, u16)>,
+    #[structopt(short, long, default_value = "tcp", parse(try_from_str = parse_protocol), help = "Network protocol")]
+    protocol: Protocol,
+    #[structopt(short, long, default_value = "1000", help = "Collection times")]
+    count: u32,
+    #[structopt(
+        short,
+        long,
+        default_value = "eth0",
+        help = "Monitoring virtio-net tx/rx queue"
+    )]
+    interface: String,
+    #[structopt(long, default_value = "1", help = "Monitoring period, unit seconds")]
+    period: f32,
+    #[structopt(long, help = "Enable the network jitter diagnosing module")]
+    jitter: bool,
+    #[structopt(long, help = "Monitoring virtio-net tx/rx queue")]
+    virtio: bool,
+    #[structopt(long, help = "Enable the network packetdrop diagnosing module")]
+    drop: bool,
+    #[structopt(long, help = "Enable the network retransmission diagnosing module")]
+    retran: bool,
+    #[structopt(long, help = "Enable the tcpping module")]
+    tcpping: bool,
+    #[structopt(long, help = "Enable the ping module")]
+    ping: bool,
+    #[structopt(long, help = "output in json format")]
+    json: bool,
+    #[structopt(long, help = "Enable IQR analysis module")]
+    iqr: bool,
     #[structopt(short, long, help = "Verbose debug output")]
     verbose: bool,
 }
 
-#[derive(Debug, StructOpt)]
-enum SubCommand {
-    #[structopt(name = "drop", about = "Packet drop diagnosing")]
-    Drop(DropCommand),
-    #[structopt(name = "latency", about = "Packet latency tracing")]
-    Latency(LatencyCommand),
-    #[structopt(name = "delta", about = "Store or display delta information")]
-    Delta(DeltaCommand),
-    #[structopt(name = "retran", about = "Tracing retransmit")]
-    Retran(RetranCommand),
+fn compatible_args() -> Vec<String> {
+    let mut args: Vec<String> = std::env::args().collect();
+    let mut old_rtrace = false;
+    for arg in &mut args {
+        if arg.as_str() == "retran" {
+            *arg = "--retran".to_owned();
+        } else if arg.as_str() == "drop" {
+            *arg = "--drop".to_owned();
+        } else if arg.as_str() == "latency" {
+            old_rtrace = true;
+        }
+    }
+    if old_rtrace {
+        args.remove(0);
+        run_old_rtrace(args);
+        return vec![];
+    }
+    args
 }
 
-fn main() -> Result<()> {
-    env_logger::init();
-    let opts = Command::from_args();
-
-    let mut btf = opts.btf.clone();
-    if btf.is_none() {
-        if let Ok(sysak) = std::env::var("SYSAK_WORK_PATH") {
-            if let Ok(info) = uname::uname() {
-                btf = Some(format!("{}/tools/vmlinux-{}", sysak, info.release));
-                log::debug!("{:?}", btf);
-            }
-        }
+fn main() {
+    let args = compatible_args();
+    if args.is_empty() {
+        return;
     }
-    eutils_rs::helpers::bump_memlock_rlimit()?;
+    let opts = Command::from_iter(args.iter());
+    setup_file_logger(opts.verbose).expect("failed to setup file logger");
 
-    match opts.subcommand {
-        SubCommand::Drop(cmd) => {
-            run_drop(&cmd, opts.verbose, &btf);
-        }
-        SubCommand::Latency(cmd) => {
-            run_latency(&cmd, opts.verbose, &btf);
-        }
-        SubCommand::Delta(cmd) => {
-            run_delta(&cmd);
-        }
-        SubCommand::Retran(cmd) => {
-            run_retran(&cmd, opts.verbose, &btf);
-        }
+    let config = Config {
+        threshold: opts.threshold,
+        src: if let Some(x) = opts.src { x } else { (0, 0) },
+        dst: if let Some(x) = opts.dst { x } else { (0, 0) },
+        protocol: opts.protocol,
+        jitter: opts.jitter,
+        drop: opts.drop,
+        retran: opts.retran,
+        verbose: opts.verbose,
+        ping: opts.ping,
+        output_raw: !opts.json,
+        output_json: opts.json,
+        interface: opts.interface.clone(),
+        period: std::time::Duration::from_millis((opts.period * 1000.0) as u64),
+        virtio: opts.virtio,
+        disable_kfree_skb: false,
+        tcpping: opts.tcpping,
+        count: opts.count,
+        iqr: opts.iqr,
+    };
+
+    if let Some(d) = opts.duration {
+        let dt = std::time::Duration::from_secs(d);
+        initial_stop_event_thread(dt);
     }
 
-    Ok(())
+    if config.drop {
+        DropApplication::run(config);
+        return;
+    }
+
+    if config.tcpping {
+        TcppingApplication::run(config);
+        return;
+    }
+
+    if config.ping {
+        PingApplication::run(config);
+        return;
+    }
+
+    if config.retran {
+        RetranApplication::run(config);
+        return;
+    }
+
+    if config.jitter {
+        JitterApplication::run(config);
+        return;
+    }
 }

@@ -15,20 +15,27 @@
 #include <pthread.h>
 #include <errno.h>
 
-#define FNAME_SIZE 16
-#define FOX_MAGIC   0xf030
+#define FOX_MAGIC 0x0f030f03
 #define MICRO_UNIT (1000 * 1000UL)
 
-#define FOX_VALUE_FLAG  (1 << 0ULL)
-#define FOX_LOG_FLAG    (1 << 1ULL)
+// for lseek mode choose.
+#ifndef FOX_LSEEK_MODE
+#define FOX_LSEEK_MODE 64
+#endif
 
-struct fox_head{
-    unsigned int prev;
-    unsigned int next;
+#if (FOX_LSEEK_MODE==64)
+#define FOX_LSEEK lseek64
+#else
+#define FOX_LSEEK lseek
+#endif
+
+struct fox_index {
     fox_time_t t_us;
-    unsigned short magic;
-    unsigned short flag;
+    fox_off_t off;
+    int table_len;
+    int data_len;
 };
+#define FOX_INDEX_SIZE sizeof(struct fox_index)
 
 fox_time_t get_us(void) {
     fox_time_t res = 0;
@@ -56,7 +63,7 @@ static void date2tm(struct foxDate * p, struct tm * ptm) {
     ptm->tm_hour = p->hour;
     ptm->tm_min  = p->min;
     ptm->tm_sec  = p->sec;
-    ptm->tm_isdst = -1;
+    ptm->tm_isdst = 0;
 }
 
 int get_date_from_us(fox_time_t us, struct foxDate * p) {
@@ -108,141 +115,6 @@ static fox_time_t fox_read_day_max(struct fox_manager* pman) {
     return make_stamp(&date) + 24 * 60 * 60 * MICRO_UNIT;
 }
 
-static size_t fd_size(int fd) {
-    int ret;
-    struct stat file_info;
-
-    ret = fstat(fd, &file_info);
-    if (ret < 0) {
-        fprintf(stderr, "stat file failed. %d, %s\n", errno, strerror(errno));
-    }
-    return (!ret) ? file_info.st_size : -EACCES;
-}
-
-static void pack_fname(char* pname, struct foxDate * p) {
-    snprintf(pname, FNAME_SIZE, "%04d%02d%02d.fox", p->year, p->mon, p->mday);
-}
-
-static int fox_read_head(int fd, struct fox_head* phead) {
-    size_t size;
-
-    size = read(fd, phead, sizeof (struct fox_head));
-
-    if (size == sizeof (struct fox_head)) {
-        if (phead->magic == FOX_MAGIC) {
-            return size;
-        } else {
-            fprintf(stderr, "bad magic: 0x%x, hope: 0x%x\n", phead->magic, FOX_MAGIC);
-            return -EINVAL;
-        }
-    } else if (size == 0) {
-        return 0;
-    } else {
-        fprintf(stderr, "read file failed. %d, %s\n", errno, strerror(errno));
-        return -EACCES;
-    }
-}
-
-static int fox_check_head(int fd, struct fox_manager* pman) {
-    int ret;
-    struct fox_head head;
-    off_t off = 0;
-
-    head.prev = 0;
-    while (1) {
-        off = lseek(fd, off, SEEK_SET);
-        if (off < 0) {
-            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
-            ret = -EACCES;
-            goto endSeek;
-        }
-
-        ret = fox_read_head(fd, &head);
-        if (ret > 0) {
-            off = head.next;
-        } else if (ret == 0) {
-            pman->last_pos = head.prev;
-            pman->pos = off;
-            break;
-        } else {
-            fprintf(stderr, "write file failed. pos: 0x%llx\n", off);
-            goto endHead;
-        }
-    }
-
-    return ret;
-    endHead:
-    endSeek:
-    return ret;
-}
-
-static int fox_check(int fd, struct fox_manager* pman) {
-    int ret = 0;
-    int retLock = 0;
-
-    ret = lockf(fd, F_LOCK, 0);
-    if (ret < 0) {
-        fprintf(stderr, "lock file failed. %d, %s\n", errno, strerror(errno));
-        goto endLock;
-    }
-
-    ret = fox_check_head(fd, pman);
-    if (ret < 0) {
-        goto endCheck;
-    }
-
-    ret = lockf(fd, F_ULOCK, 0);
-    if (ret < 0) {
-        fprintf(stderr, "lock file failed. %d, %s\n", errno, strerror(errno));
-        goto endUnLock;
-    }
-
-    return ret;
-
-    endCheck:
-    retLock = lockf(fd, F_ULOCK, 0);
-    if (retLock < 0) {
-        fprintf(stderr, "lock file failed. %d, %s\n", errno, strerror(errno));
-        ret = retLock;
-        goto endUnLock;
-    }
-    return ret;
-    endUnLock:
-    endLock:
-    return ret;
-}
-
-int fox_setup_write(struct fox_manager* pman, struct foxDate * p, fox_time_t now) {
-    char fname[FNAME_SIZE];
-    int ret = 0;
-
-    pack_fname(fname, p);
-
-    pman->fd = open(fname, O_RDWR|O_APPEND|O_CREAT);
-    if (pman->fd < 0) {
-        fprintf(stderr, "open %s error, return %d, %s", fname, errno, strerror(errno));
-        ret = -ENOENT;
-        goto endOpen;
-    }
-
-    ret = fox_check(pman->fd, pman);
-    if (ret < 0) {
-        goto endCheck;
-    }
-
-    pman->year = p->year;
-    pman->mon  = p->mon;
-    pman->mday = p->mday;
-    pman->now = now;
-
-    return ret;
-    endCheck:
-    close(pman->fd);
-    pman->fd = 0;
-    endOpen:
-    return ret;
-}
-
 int check_foxdate(struct foxDate* d1, struct foxDate* d2) {
     return  (d1->year == d2->year) && \
             (d1->mon == d2->mon) && \
@@ -255,66 +127,172 @@ int check_pman_date(struct fox_manager* pman, struct foxDate* pdate) {
             (pman->mday == pdate->mday);
 }
 
-static int fox_write_data(struct fox_manager* pman, fox_time_t us, const char* data, int len) {
+// tell file size.
+static size_t fd_size(int fd) {
+    int ret;
+    struct stat file_info;
+
+    ret = fstat(fd, &file_info);
+    if (ret < 0) {
+        fprintf(stderr, "stat file failed. %d, %s\n", errno, strerror(errno));
+    }
+    return (!ret) ? file_info.st_size : -EACCES;
+}
+
+// create .foxi  file name
+static void pack_iname(char* pname, struct foxDate * p) {
+    snprintf(pname, FNAME_SIZE, "%04d%02d%02d.foxi", p->year, p->mon, p->mday);
+}
+
+// create .fox file name
+static void pack_fname(char* pname, struct foxDate * p) {
+    snprintf(pname, FNAME_SIZE, "%04d%02d%02d.fox", p->year, p->mon, p->mday);
+}
+
+//open .foxi to write data index info
+static int fox_open_w_fdi(struct foxDate * p, char * iname) {
+    int fd;
+    int ret;
+    fox_off_t off;
+
+    pack_iname(iname, p);
+
+    fd = open(iname, O_RDWR | O_APPEND | O_CREAT);
+    if (fd < 0) {
+        fprintf(stderr, "open %s error, return %d, %s\n", iname, errno, strerror(errno));
+        ret = -ENOENT;
+        goto endOpen;
+    }
+
+    off = FOX_LSEEK(fd, 0, SEEK_END);
+    if (off < 0) {
+        fprintf(stderr, "fox_open_w_fdi lseek %s error, return %d, %s\n", iname, errno, strerror(errno));
+        ret = -errno;
+        goto endSeek;
+    }
+
+    return fd;
+    endSeek:
+    close(fd);
+    endOpen:
+    return ret;
+}
+
+//open .fox to write data index info
+static int fox_open_w_fd(struct foxDate * p, char * fname) {
+    int fd;
+    int ret;
+    fox_off_t off;
+
+    pack_fname(fname, p);
+    fd = open(fname, O_RDWR | O_APPEND | O_CREAT);
+    if (fd < 0) {
+        fprintf(stderr, "open %s error, return %d, %s", fname, errno, strerror(errno));
+        ret = -ENOENT;
+        goto endOpen;
+    }
+
+    off = FOX_LSEEK(fd, 0, SEEK_END);
+    if (off < 0) {
+        fprintf(stderr, "fox_open_w_fd lseek %s error, return %d, %s\n", fname, errno, strerror(errno));
+        ret = -errno;
+        goto endSeek;
+    }
+
+    return fd;
+    endSeek:
+    close(fd);
+    endOpen:
+    return ret;
+}
+
+// export for setup write
+int fox_setup_write(struct fox_manager* pman, struct foxDate * p, fox_time_t now) {
+    int ret = 0;
+    size_t pos;
+
+    pman->fdi = fox_open_w_fdi(p, pman->iname);   // open fdi for data index.
+    if (pman->fdi < 0) {
+        ret = pman->fdi;
+        goto endOpeni;
+    }
+
+    pman->fd = fox_open_w_fd(p, pman->fname);    // open fd for data.
+    if (pman->fd < 0) {
+        ret = pman->fd;
+        goto endOpen;
+    }
+
+    pos = fd_size(pman->fd);
+    if (pos < 0) {
+        ret = pos;
+        goto endSize;
+    }
+
+    pman->year = p->year;
+    pman->mon  = p->mon;
+    pman->mday = p->mday;
+    pman->now = now;
+    pman->w_off = pos;
+
+    return ret;
+
+    endSize:
+    close(pman->fd);
+    endOpen:
+    pman->fd = 0;
+    close(pman->fdi);
+    endOpeni:
+    pman->fdi = 0;
+    return ret;
+}
+
+static int fox_write_data(struct fox_manager* pman, fox_time_t us,
+        const char* tData, int tLen,
+        const char* data, int len) {
     int ret = 0;
     int fd = pman->fd;
-    struct fox_head head;
+    int fdi = pman->fdi;
+    struct fox_index index;
 
-    head.prev = pman->last_pos;
-    head.next = pman->pos + sizeof (struct fox_head) + len;
-    head.t_us = us;
-    head.magic = FOX_MAGIC;
-    head.flag = 0;
+    index.t_us = us;
+    index.off  = pman->w_off;
+    index.table_len  = tLen;
+    index.data_len   = len;
 
-    ret = lockf(fd, F_LOCK, 0);
+    //write foxi
+    ret = write(fdi, &index, FOX_INDEX_SIZE);
     if (ret < 0) {
-        fprintf(stderr, "lock file failed. %d, %s\n", errno, strerror(errno));
-        ret = -EACCES;
-        goto endLock;
-    }
-
-    ret = write(fd, &head, sizeof (struct fox_head));
-    if (ret < 0) {
-        fprintf(stderr, "write file failed. %d, %s\n", errno, strerror(errno));
-        goto endWrite;
-    }
-    ret = write(fd, data, len );
-    if (ret < 0) {
-        fprintf(stderr, "write file failed. %d, %s\n", errno, strerror(errno));
+        fprintf(stderr, "write foxi file failed. %d, %s\n", errno, strerror(errno));
         goto endWrite;
     }
 
-    ret = lockf(fd, F_ULOCK, 0);
+    //write fox
+    ret = write(fd, tData, tLen );  // for table
     if (ret < 0) {
-        fprintf(stderr, "lock file failed. %d, %s\n", errno, strerror(errno));
-        ret = -EACCES;
-        goto endUnLock;
+        fprintf(stderr, "write data file table failed. %d, %s\n", errno, strerror(errno));
+        goto endWrite;
+    }
+    ret = write(fd, data, len );  // for stream
+    if (ret < 0) {
+        fprintf(stderr, "write file failed. %d, %s\n", errno, strerror(errno));
+        goto endWrite;
     }
 
     pman->now = us;
-    pman->last_pos = pman->pos;   // record last position
-    pman->pos = head.next;
+    pman->w_off += tLen + len;
     return  ret;
-
     endWrite:
-    ret = lockf(fd, F_ULOCK, 0);
-    if (ret < 0) {
-        fprintf(stderr, "lock file failed. %d, %s\n", errno, strerror(errno));
-        ret = -EACCES;
-        goto endUnLock;
-    }
-    return ret;
-    endUnLock:
-    endLock:
     return ret;
 }
 
 int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,
-          const char* data, int len) {
+              const char* tData, int tLen,
+              const char* data, int len) {
     int res = 0;
 
     if (!check_pman_date(pman, pdate)) {  // new day?
-        close(pman->fd);   // close this file at first.
+        fox_del_man(pman);   // free old
         res = fox_setup_write(pman, pdate, us);
         if (res < 0) {
             fprintf(stderr, "create new file failed.\n");
@@ -326,123 +304,133 @@ int fox_write(struct fox_manager* pman, struct foxDate* pdate, fox_time_t us,
     }
 
     if (pman->now <= us) {  // time should monotonically increasing
-        res = fox_write_data(pman, us, data, len);
+        res = fox_write_data(pman, us, tData, tLen, data, len);
     }
-    return  res;
+    return res;
 
     endCreateFile:
     return res;
 }
 
-static int fox_cursor_left(int fd, struct fox_manager* pman, fox_time_t now) {
-    int ret;
-    off_t pos;
-    struct fox_head head;
-    fox_time_t last_t_us = pman->now;
+static int fox_index_get(int fdi, fox_off_t index, struct fox_index *pindex) {
+    int ret = 0;
+    size_t size;
+    fox_off_t pos = index * FOX_INDEX_SIZE;
 
-    if (pman->pos == pman->fsize) {
-        pos = pman->last_pos;
+    ret = FOX_LSEEK(fdi, pos, SEEK_SET);
+    if (ret < 0) {
+        fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
+        ret = -EACCES;
+        goto endSeek;
+    }
+
+    size = read(fdi, pindex, FOX_INDEX_SIZE);
+    if (size == FOX_INDEX_SIZE) {
+        return size;
+    } else if (size > 0) {
+        fprintf(stderr, "read index file return %ld.\n", size);
+        ret = -EACCES;
+        goto endRead;
     } else {
-        pos = pman->pos;
+        fprintf(stderr, "read index file failed. %d, %s\n", errno, strerror(errno));
+        ret = -EACCES;
+        goto endRead;
     }
 
-    while (1) {
-        ret = lseek(fd, pos, SEEK_SET);
+    return ret;
+    endRead:
+    endSeek:
+    return ret;
+}
+
+static void fox_cursor_save(struct fox_manager* pman, struct fox_index *pindex, fox_off_t find) {
+    pman->r_index = find;
+
+    pman->r_next = pman->r_index + 1;
+    if (pman->r_next > pman->cells - 1) {  // r_next should less than pman->cells - 1 and 0;
+        pman->r_next = pman->cells ? pman->cells - 1 : 0 ;
+    }
+    pman->now = pindex->t_us;
+    pman->data_pos = pindex->off;
+    pman->table_len = pindex->table_len;
+    pman->data_len = pindex->data_len;
+}
+
+//cursor left
+static int fox_cursor_left(int fdi, struct fox_manager* pman, fox_time_t now) {
+    int ret = 0;
+    fox_off_t start = 0, end = pman->r_index;
+    fox_off_t mid = start;
+    struct fox_index index = {0, 0, 0, 0};
+    fox_time_t us = 0;
+
+    while (start < end) {
+        mid = start + (end - start) / 2;
+
+        ret = fox_index_get(fdi, mid, &index);
+        us= index.t_us;
         if (ret < 0) {
-            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
+            fprintf(stderr, "fox index %ld get failed. %d, %s\n", mid, errno, strerror(errno));
             ret = -EACCES;
             goto endSeek;
         }
 
-        ret = fox_read_head(fd, &head);;
-        if (ret < 0) {
-            goto endRead;
-        }
-
-        if (head.t_us < now) {
-            pman->pos = head.next;
-            pman->now = last_t_us;
-            pman->last_pos = pos;
-            break;
-        }
-
-        last_t_us = head.t_us;
-        pos = head.prev;
-        if (pos == 0) {     //begin of file
-            pman->pos = pos;
-            pman->now = last_t_us;
-            pman->last_pos = pos;
+        if (now < us) {    // now is little, upper half
+            end = mid;
+        } else if (now > us) {  // now is large, lower region
+            start = mid + 1;
+        } else {   // equal
             break;
         }
     }
-    ret = 0;
-    return ret;
+    fox_cursor_save(pman, &index, mid);
+    return 0;
     endSeek:
-    endRead:
     return ret;
 }
 
-static int fox_cursor_right(int fd, struct fox_manager* pman, fox_time_t now) {
-    int ret;
-    off_t last_pos = pman->last_pos;
-    off_t pos = pman->pos;
-    struct fox_head head;
+static int fox_cursor_right(int fdi, struct fox_manager* pman, fox_time_t now) {
+    int ret = 0;
+    fox_off_t start = pman->r_index, end = pman->cells ? pman->cells - 1 : 0;
+    fox_off_t mid = start;
+    struct fox_index index = {0, 0, 0, 0};
+    fox_time_t us = 0;
 
-    while (1) {
-        if (pos == pman->fsize) {
-            pman->last_pos = last_pos;
-            pman->pos = pos;
-            pman->now = fox_read_day_max(pman);
-            ret = 0;
-            goto endEndoffile;
-        } else if (pos > pman->fsize) {
-            ret = -ERANGE;
-            goto endRange;
-        }
+    while (start < end) {
+        mid = start + (end - start) / 2;
 
-        ret = lseek(fd, pos, SEEK_SET);
+        ret = fox_index_get(fdi, mid, &index);
+        us = index.t_us;
         if (ret < 0) {
-            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
+            fprintf(stderr, "fox index %ld get failed. %d, %s\n", mid, errno, strerror(errno));
             ret = -EACCES;
             goto endSeek;
         }
 
-        ret = fox_read_head(fd, &head);;
-        if (ret < 0) {
-            goto endRead;
-        }
-
-        if (head.t_us >= now) {  // just >
-            pman->pos = pos;
-            pman->now = head.t_us;
-            pman->last_pos = last_pos;
+        if (now < us) {    // now is little, upper half
+            end = mid;
+        } else if (now > us) {  // now is large, lower region
+            start = mid + 1;
+        } else {   // equal
             break;
         }
-        last_pos = pos;
-        pos = head.next;
     }
-    ret = 0;
-    return ret;
-    endEndoffile:
-    return ret;
-    endRange:  //out of file range.
-    return ret;
+    fox_cursor_save(pman, &index, mid);
+    return 0;
     endSeek:
-    endRead:
-    endSize:
     return ret;
 }
 
-static int fox_cursor_work(int fd, struct fox_manager* pman, fox_time_t now) {
+static int fox_cursor(int fdi, struct fox_manager* pman, fox_time_t now) {
     int ret = 0;
 
     if (pman->now > now) {
-        ret = fox_cursor_left(fd, pman, now);
+        ret = fox_cursor_left(fdi, pman, now);
         if (ret < 0) {
             goto endCursor;
         }
     } else if (pman->now < now) {
-        ret = fox_cursor_right(fd, pman, now);
+        ret = fox_cursor_right(fdi, pman, now);
         if (ret < 0) {
             goto endCursor;
         }
@@ -453,163 +441,136 @@ static int fox_cursor_work(int fd, struct fox_manager* pman, fox_time_t now) {
     return ret;
 }
 
-static int fox_cursor(int fd, struct fox_manager* pman, fox_time_t now) {
-    int ret;
-
-    ret = fox_cursor_work(fd, pman, now);
-    if (ret < 0) {
-        goto endLock;
-    }
-
-    return ret;
-    endLock:
-    return ret;
-}
-
 int fox_cur_move(struct fox_manager* pman, fox_time_t now) {
-    int fd;
-
-    fd = pman->fd;
-
-    return fox_cursor(fd, pman, now);
-}
-
-static int fox_cur_next(struct fox_manager* pman, struct fox_head* phead) {
-    int ret = 0;
-    off_t pos = phead->next;
-    struct fox_head head;
-    int fd = pman->fd;
-
-    pman->pos = pos;
-    if (pos < pman->fsize) {
-        ret = lseek(fd, pos, SEEK_SET);
-        if (ret < 0) {
-            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
-            goto endSeek;
-        }
-
-        ret = fox_read_head(fd, &head);;
-        if (ret < 0) {
-            goto endRead;
-        }
-        pman->now = head.t_us;
-    } else {
-        pman->now = fox_read_day_max(pman);
-    }
-
-    return ret;
-    endSeek:
-    endRead:
+    int ret = fox_cursor(pman->fdi, pman, now);
     return ret;
 }
 
-static int fox_cur_back(struct fox_manager* pman) {
+static int fox_cursor_next(struct fox_manager* pman, struct fox_index* pindex) {
     int ret = 0;
-    off_t pos = pman->last_pos;
-    struct fox_head head;
-    int fd = pman->fd;
 
-    pman->pos = pos;
-    if (pos > 0) {
-        ret = lseek(fd, pos, SEEK_SET);
-        if (ret < 0) {
-            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
-            goto endSeek;
-        }
-
-        ret = fox_read_head(fd, &head);;
-        if (ret < 0) {
-            goto endRead;
-        }
-        pman->now = head.t_us;
-    } else {
-        pman->now = fox_read_init_now(pman);
+    ret = fox_index_get(pman->fdi, pman->r_next, pindex);
+    if (ret < 0) {
+        goto endIndex;
     }
 
+    fox_cursor_save(pman, pindex, pman->r_next);
     return ret;
-    endSeek:
-    endRead:
+    endIndex:
     return ret;
 }
 
 int fox_read_resize(struct fox_manager* pman) {
     int ret = 0;
 
-    size_t fsize = fd_size(pman->fd);
-    if (fsize < 0) {
-        ret = fsize;
+    size_t isize = fd_size(pman->fdi);  // fresh new file size.
+    if (isize < 0) {
+        ret = isize;
         goto endSize;
     }
-
-    if (fsize > pman->fsize) {
-        if (pman->pos == pman->fsize) {  // at the end of file.
-            ret = fox_cur_back(pman);
-            if (ret < 0) {
-                goto endCur;
-            }
-        }
-        pman->fsize = fsize;
-    } else {
-        struct foxDate d;
-        d.year = pman->year;
-        d.mon  = pman->mon;
-        d.mday = pman->mday;
-        d.hour = 0;
-        d.min  = 0;
-        d.sec  = 0;
-
-        fox_time_t now = make_stamp(&d);
-
-        ret = fox_setup_read(pman, &d, now);
-        if (ret !=0 ) {
-            ret = -EACCES;
-            goto endSetup;
+    pman->isize = isize;
+    pman->cells = isize / FOX_INDEX_SIZE;
+    if (pman->r_index == pman->r_next) {  // end of file? check new next.
+        if (pman->r_next < pman->cells - 1) {
+            pman->r_next = pman->r_index + 1;
         }
     }
+
     return ret;
-    endSetup:
     endSize:
-    endCur:
+    return ret;
+}
+
+//open .foxi to write data index info
+static int fox_open_r_fdi(struct foxDate * p, int* pfd, char *iname) {
+    int fd;
+    int ret = 0;
+
+    pack_iname(iname, p);
+    fd = open(iname, O_RDONLY);
+    if (fd < 0) {
+        if (errno == ENOENT) {  // not such file.
+            ret = errno;
+            goto endOpen;
+        }
+        fprintf(stderr, "open %s error, return %d, %s", iname, errno, strerror(errno));
+        ret = -errno;
+        goto endOpen;
+    }
+
+    *pfd = fd;
+    return ret;
+    endOpen:
+    return ret;
+}
+
+//open .fox to write data index info
+static int fox_open_r_fd(struct foxDate * p, int *pfd, char* fname) {
+    int fd;
+    int ret = 0;
+
+    pack_fname(fname, p);
+    fd = open(fname, O_RDONLY);
+    if (fd < 0) {
+        if (errno == ENOENT) {  // not such file.
+            ret = errno;
+            goto endOpen;
+        }
+        fprintf(stderr, "open %s error, return %d, %s", fname, errno, strerror(errno));
+        ret = -ENOENT;
+        goto endOpen;
+    }
+
+    *pfd = fd;
+    return ret;
+    endOpen:
     return ret;
 }
 
 int fox_setup_read(struct fox_manager* pman, struct foxDate * p, fox_time_t now) {
-    char fname[FNAME_SIZE];
     int ret = 0;
+    size_t isize = 0;
 
-    pack_fname(fname, p);
-    pman->fd = open(fname, O_RDONLY);
-    if (pman->fd < 0) {
-        fprintf(stderr, "open %s failed, return %d, %s", fname, errno, strerror(errno));
-        ret = 1;
+    ret = fox_open_r_fdi(p, &pman->fdi, pman->iname);    // for index file
+    if (ret != 0) {
+        goto endOpeni;
+    }
+
+    ret = fox_open_r_fd(p, &pman->fd, pman->fname);     // for data file
+    if (ret != 0) {
+        ret = pman->fd;
         goto endOpen;
+    }
+
+    isize = fd_size(pman->fdi);
+    if (isize < 0) {
+        ret = isize;
+        goto endSize;
     }
 
     pman->year = p->year;
     pman->mon = p->mon;
     pman->mday = p->mday;
-    pman->now = fox_read_init_now(pman);
-    pman->pos = 0;
-    pman->last_pos = 0;
-    pman->fsize = fd_size(pman->fd);
-    if (pman->fsize < 0) {
-        ret = -EACCES;
-        goto endSize;
-    }
+    pman->now = fox_read_init_now(pman);  // at begin of a day default.
+    pman->isize = isize;
+    pman->cells = isize / FOX_INDEX_SIZE;
+    pman->r_index = 0;                    // at begin of the file.
+    pman->r_next = pman->cells ? pman->r_index + 1 : 0;     // for empty file, next is 0
 
-    ret = fox_cursor(pman->fd, pman, now);
+    ret = fox_cursor(pman->fdi, pman, now);
     if (ret < 0) {
         goto endCursor;
     }
 
-//    printf("setup %s, fd: %d, size: %ld, pos: %lld, pnow: %ld, now:%ld\n",
-//           fname, pman->fd, pman->fsize, pman->pos, pman->now, now);
     return ret;
-    endSize:
     endCursor:
+    endSize:
     close(pman->fd);
     endOpen:
-    pman->fd = -1;
+    pman->fd = 0;
+    close(pman->fdi);
+    endOpeni:
+    pman->fdi = 0;
     return ret;
 }
 
@@ -627,77 +588,129 @@ static int fox_read_stream(int fd, char* stream, int size) {
     return ret;
 }
 
-static int fox_read_work(int fd, struct fox_manager* pman, fox_time_t stop,
-        char **pp, int *len, fox_time_t *us) {
+// cursor move to next, < 0 bad, equal 0，>0 end.
+int fox_next(struct fox_manager* pman, fox_time_t stop) {
     int ret = 0;
-    off_t pos = pman->pos;
-    int size;
 
-    if (pman->now <= stop) {
-        struct fox_head head;
-        char *p;
+    if (pman->now <= stop && pman->r_index < pman->r_next) {  // r_index equal r_next  means is the end of file.
+        struct fox_index index;
 
-        ret = lseek(fd, pos, SEEK_SET);
+        ret = fox_cursor_next(pman, &index);  // the cursor will point to next position.
         if (ret < 0) {
-            fprintf(stderr, "seek file failed. %d, %s\n", errno, strerror(errno));
-            ret = -EACCES;
-            goto endSeek;
-        }
-
-        ret = fox_read_head(fd, &head);
-        if (ret < 0) {
-            goto endRead;
-        }
-
-        size = head.next - pos - sizeof (struct fox_head);
-        if (size < 0) {
-            goto endSize;
-        }
-        p = malloc(size);
-        if (p == NULL) {
-            fprintf(stderr, "malloc %d failed. %d, %s\n", size, errno, strerror(errno));
-            ret = -ENOMEM;
-            goto endMalloc;
-        }
-
-        ret = fox_read_stream(fd, p, size);
-        if (ret < 0) {
-            free(p);
-            goto endRead2;
-        }
-
-        ret = fox_cur_next(pman, &head);  // the cursor will to next position.
-        if (ret < 0) {
-            free(p);
             goto endNext;
         }
+        ret = 0;
 
-        *us  = head.t_us;
-        *pp  = p;
-        *len = size;
     } else {
-        *pp  = NULL;
-        *len = 0;
+        ret = 1;
     }
     return ret;
 
     endNext:
-    endRead2:
-    endSize:
-    endMalloc:
+    return ret;
+}
+
+// read function
+static int _fox_read_table(struct fox_manager* pman, char **pp, int *len) {
+    int ret = 0;
+
+    char *p = NULL;
+    int size = 0;
+
+    size = pman->table_len;
+    ret = FOX_LSEEK(pman->fd, pman->data_pos, SEEK_SET);
+    if (ret < 0) {
+        fprintf(stderr, "lseek data fd %d pos: %lld, failed. %d, %s\n", pman->fd, pman->data_pos, errno, strerror(errno));
+        ret = -EACCES;
+        goto endSeek;
+    }
+
+    p = malloc(size);
+    if (p == NULL) {
+        fprintf(stderr, "malloc %d failed. %d, %s\n", size, errno, strerror(errno));
+        ret = -ENOMEM;
+        goto endMalloc;
+    }
+
+    ret = fox_read_stream(pman->fd, p, size);
+    if (ret < 0) {
+        free(p);
+        goto endRead;
+    }
+
+    *pp  = p;
+    *len = size;
+
+    return ret;
+
     endRead:
+    endMalloc:
     endSeek:
     *pp  = NULL;
     *len = 0;
     return ret;
 }
 
-int fox_read(struct fox_manager* pman, fox_time_t stop, char **pp, fox_time_t *us) {
+int fox_read_table(struct fox_manager* pman, char **pp) {
     int ret;
     int len;
-    int fd = pman->fd;
 
-    ret = fox_read_work(fd, pman, stop, pp, &len, us);
+    ret = _fox_read_table(pman, pp, &len);
+    if (ret < 0) {
+        goto endWork;
+    }
+    return len;
+
+    endWork:
+    return ret;
+}
+
+// read function
+static int _fox_read_data(struct fox_manager* pman, char **pp, int *len, fox_time_t *us) {
+    int ret = 0;
+
+    char *p = NULL;
+    int size = 0;
+
+    size = pman->data_len;
+    ret = FOX_LSEEK(pman->fd, pman->data_pos + pman->table_len, SEEK_SET);
+    if (ret < 0) {
+        fprintf(stderr, "lseek data fd failed. %d, %s\n", errno, strerror(errno));
+        ret = -EACCES;
+        goto endSeek;
+    }
+
+    p = malloc(size);
+    if (p == NULL) {
+        fprintf(stderr, "malloc %d failed. %d, %s\n", size, errno, strerror(errno));
+        ret = -ENOMEM;
+        goto endMalloc;
+    }
+
+    ret = fox_read_stream(pman->fd, p, size);
+    if (ret < 0) {
+        free(p);
+        goto endRead;
+    }
+
+    *pp  = p;
+    *len = size;
+    *us  = pman->now;
+    return ret;
+
+    endRead:
+    endMalloc:
+    endSeek:
+    *pp  = NULL;
+    *len = 0;
+    return ret;
+}
+
+int fox_read_data(struct fox_manager* pman, char **pp, fox_time_t *us) {
+    int ret = 0;
+    int len = 0;
+
+    ret = _fox_read_data(pman, pp, &len, us);
     if (ret < 0) {
         goto endWork;
     }
@@ -714,7 +727,25 @@ void fox_free_buffer(char **pp) {
 
 void fox_del_man(struct fox_manager* pman) {
     if (pman->fd > 0) {
+        posix_fadvise(pman->fd, 0, 0, POSIX_FADV_DONTNEED);
         close(pman->fd);
-        pman->fd = -1;
+        pman->fd = 0;
     }
+    if (pman->fdi > 0) {
+        close(pman->fdi);
+        pman->fdi = 0;
+    }
+}
+
+int parse_sql(const char* sql, PgQueryParseResult* pRes) {
+    *pRes = pg_query_parse(sql);
+    return 0;
+}
+
+void parse_sql_free(PgQueryParseResult* pRes) {
+    pg_query_free_parse_result(*pRes);
+}
+
+void parse_sql_exit() {
+    pg_query_exit();
 }

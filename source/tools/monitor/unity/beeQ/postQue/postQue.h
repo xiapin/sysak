@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-int postQue_pull(char *msg);
+int postQue_pull(char *msg, int size);
 int postQue_post(const char *msg);
 int postQue_init();
 
