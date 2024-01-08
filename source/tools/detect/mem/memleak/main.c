@@ -14,6 +14,10 @@
 #include "memleak.h"
 #include "user_api.h"
 
+#define SLABINFO_FILE "/proc/slabinfo"
+#define SLABINFO_MAX_LINES 100
+#define SLABINFO_MAX_LINE_LENGTH 256
+
 extern int read_meminfo(struct meminfo *mem);
 extern int slab_main(struct memleak_settings *set, int fd);
 extern int vmalloc_main(int argc, char **argv);
@@ -66,6 +70,76 @@ static int memleak_check_only(struct meminfo *mi)
     return 0;
 }
 
+int validate_monitor_time (    char * optarg) {
+	int monitor_time = 300;
+	int rc = 1;
+
+	if (optarg == NULL) {
+		printf("Arguments needed in \"-i\".\n");
+		rc = 0;
+	} else {
+		if (strchr(optarg, '.') == NULL &&
+			sscanf(optarg, "%d", &monitor_time) &&
+			monitor_time > 0) {
+		} else {
+			printf("Only the integer bigger than 0 is valid.\n");
+			rc = 0;
+		}
+	}
+	return rc;
+}
+
+int check_sys_kmalloc_list ( char * results[], char * kmalloc_name ) {
+	int rc = 0;
+	int count = 0;
+	char slabinfo_line[SLABINFO_MAX_LINE_LENGTH];
+
+	FILE* file = fopen(SLABINFO_FILE, "r");
+	if (file == NULL) {
+		printf("Fail to open \"/proc/slabinfo\".\n");
+		return rc;
+	}
+	while (fgets(slabinfo_line, sizeof(slabinfo_line), file) != NULL) {
+		char * token = strtok(slabinfo_line, " ");
+		if (token != NULL && strncmp(token, "kmalloc", 7) == 0) {
+			if (strcmp(token, kmalloc_name) == 0) {
+				rc = 1;
+				break;
+			}
+			results[count++] = strdup(token);
+		}
+	}
+	fclose(file);
+
+	if (!rc) {
+		printf("You've probably entered the wrong name of kmalloc.\n");
+		printf("The list of system-supported kmallocs: \n");
+		for (int i = 0; i < count; i++) {
+			printf("%s\n", results[i]);
+			free(results[i]);
+		}
+	}
+
+	return rc;
+}
+
+int validate_slab_name ( char * optarg ) {
+	int rc;
+	char * kmalloc_list[SLABINFO_MAX_LINES];
+	char * kmalloc_name = "";
+
+	if (optarg == NULL) {
+		printf("Arguments needed in \"-n\".\n");
+	} else {
+		kmalloc_name = optarg;
+	}
+	rc = check_sys_kmalloc_list(kmalloc_list, kmalloc_name);
+
+	return rc;
+}
+
+
+
 int get_arg(struct memleak_settings *set, int argc, char * argv[])
 {
     int ch;
@@ -83,7 +157,10 @@ int get_arg(struct memleak_settings *set, int argc, char * argv[])
 					set->type = MEMLEAK_TYPE_VMALLOC;
                 break;
 			case 'i':
-				set->monitor_time = atoi(optarg);
+				if (validate_monitor_time(optarg))
+					set->monitor_time = atoi(optarg);
+				else
+					error = 1;
                 break;
 			case 'r':
 				set->rate = atoi(optarg);
@@ -93,7 +170,10 @@ int get_arg(struct memleak_settings *set, int argc, char * argv[])
                 error = 1;
                 break;
 			case 'n':
-				strncpy(set->name, optarg, NAME_LEN - 1);
+				if (validate_slab_name(optarg))
+					strncpy(set->name, optarg, NAME_LEN - 1);
+				else
+					error = 1;
                 break;
 			case 'h':
 				show_usage();
